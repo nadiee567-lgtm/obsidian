@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>OBSIDIAN — logo morado</title>
+<style>
+  body { background:#0b1120; color:#cbd5e1; font-family:system-ui,sans-serif;
+         display:flex; flex-wrap:wrap; gap:40px; justify-content:center;
+         align-items:center; min-height:100vh; margin:0; padding:40px; }
+  .card { text-align:center; }
+  .card svg { width:200px; height:200px; display:block; margin:0 auto 12px; }
+  .card span { font-size:14px; color:#94a3b8; }
+  h1 { width:100%; text-align:center; font-weight:600; letter-spacing:1px; color:#e2e8f0; }
+  .dark-bg { background:#0b1120; border-radius:16px; padding:20px; }
+  .light-bg { background:#f1f5f9; border-radius:16px; padding:20px; }
+</style>
+</head>
+<body>
+<h1>⬛ OBSIDIAN — octágonos concéntricos, morado</h1>
+
+<!-- VARIANTE 1: outline morado + cuadrado lleno -->
+<div class="card">
+  <div class="dark-bg">
+  <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="g1" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="3" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <!-- octágono exterior -->
+    <polygon points="172.9,128.8 128.8,172.9 71.2,172.9 27.1,128.8 27.1,71.2 71.2,27.1 128.8,27.1 172.9,71.2"
+             fill="none" stroke="#a855f7" stroke-width="4" filter="url(#g1)"/>
+    <!-- octágono interior (más adentro) -->
+    <polygon points="148.0,119.9 119.9,148.0 80.1,148.0 52.0,119.9 52.0,80.1 80.1,52.0 119.9,52.0 148.0,80.1"
+             fill="none" stroke="#a855f7" stroke-width="3.5" filter="url(#g1)" transform="rotate(22.5 100 100)"/>
+    <!-- cuadrado lleno central -->
+    <rect x="78" y="78" width="44" height="44" rx="3" fill="#a855f7" filter="url(#g1)"/>
+  </svg>
+  </div>
+  <span>1 · Outline morado + cuadrado lleno</span>
+</div>
+
+<!-- VARIANTE 2: morado neón más brillante (con relleno sutil) -->
+<div class="card">
+  <div class="dark-bg">
+  <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="fill2" cx="50%" cy="50%" r="60%">
+        <stop offset="0%" stop-color="#a855f7" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="g2" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="2.6" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <polygon points="172.9,128.8 128.8,172.9 71.2,172.9 27.1,128.8 27.1,71.2 71.2,27.1 128.8,27.1 172.9,71.2"
+             fill="url(#fill2)" stroke="#c084fc" stroke-width="4" filter="url(#g2)"/>
+    <polygon points="148.0,119.9 119.9,148.0 80.1,148.0 52.0,119.9 52.0,80.1 80.1,52.0 119.9,52.0 148.0,80.1"
+             fill="none" stroke="#c084fc" stroke-width="3" filter="url(#g2)" transform="rotate(22.5 100 100)"/>
+    <rect x="78" y="78" width="44" height="44" rx="3" fill="#c084fc" filter="url(#g2)"/>
+  </svg>
+  </div>
+  <span>2 · Morado neón más brillante</span>
+</div>
+
+<!-- VARIANTE 3: morado sólido (fondo claro / favicon) -->
+<div class="card">
+  <div class="light-bg">
+  <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="172.9,128.8 128.8,172.9 71.2,172.9 27.1,128.8 27.1,71.2 71.2,27.1 128.8,27.1 172.9,71.2"
+             fill="none" stroke="#7c3aed" stroke-width="5"/>
+    <polygon points="148.0,119.9 119.9,148.0 80.1,148.0 52.0,119.9 52.0,80.1 80.1,52.0 119.9,52.0 148.0,80.1"
+             fill="none" stroke="#7c3aed" stroke-width="4" transform="rotate(22.5 100 100)"/>
+    <rect x="78" y="78" width="44" height="44" rx="3" fill="#7c3aed"/>
+  </svg>
+  </div>
+  <span>3 · Morado sólido (favicon / fondo claro)</span>
+</div>
+
+</body>
+</html>

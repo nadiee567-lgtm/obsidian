@@ -1,0 +1,33 @@
+# Respaldos locales — nunca al repo
+*.bak
+*.bak-*
+*.orig
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Datos de investigación y estado — PRIVADOS, jamás públicos
+obsidian-cases/
+*.db
+*.sqlite
+*.sqlite3
+auth.json
+screenshots/
+
+# Secretos / llaves de API
+.env
+*.pem
+*.key
+apikeys.json
+secrets.json
+
+# Estáticos generados / grandes
+vis-network.min.js
+
+# Sistema
+.DS_Store
+*.log
