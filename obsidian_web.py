@@ -2,6 +2,7 @@
 """OBSIDIAN Web — Local OSINT & Security Framework"""
 import subprocess, requests, json, os, re, sys, threading, time, datetime, html, socket, hashlib, secrets
 import shutil, tempfile, glob, base64, sqlite3, ipaddress
+from urllib.parse import urlparse, urljoin
 from flask import Flask, request, jsonify, Response, stream_with_context, send_from_directory, session, redirect
 
 HOME_INIT = os.path.expanduser('~')
@@ -219,6 +220,76 @@ def run_tool(argv, timeout=25, stdin=None):
         return f'[Error: {argv[0] if argv else "?"} no encontrado]'
     except Exception as e:
         return f'[Error: {e}]'
+
+# ── Seguridad: anti-SSRF para fetches de URLs del usuario ─────────────────────
+def _url_publica(url):
+    """True solo si `url` es http/https hacia un host que resuelve a IP(s)
+    PÚBLICAS. Bloquea SSRF: localhost, LAN (10/172.16/192.168), link-local
+    (169.254.x, incluida la metadata de la nube), reservadas y multicast."""
+    try:
+        p = urlparse(url)
+    except Exception:
+        return False
+    if p.scheme not in ('http', 'https') or not p.hostname:
+        return False
+    try:
+        port = p.port or (443 if p.scheme == 'https' else 80)
+        infos = socket.getaddrinfo(p.hostname, port, proto=socket.IPPROTO_TCP)
+    except Exception:
+        return False
+    if not infos:
+        return False
+    for info in infos:
+        try:
+            addr = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            return False
+        if (addr.is_private or addr.is_loopback or addr.is_link_local
+                or addr.is_reserved or addr.is_multicast or addr.is_unspecified):
+            return False
+    return True
+
+def _fetch_seguro(url, timeout=10, stream=False, max_redirs=3):
+    """GET que cierra SSRF: valida que CADA hop apunte a IP pública. Sigue los
+    redirects a mano y revalida cada uno (un sitio público puede redirigir a
+    169.254.169.254). Lanza ValueError si algún destino es interno.
+    Nota: no cubre DNS rebinding (TOCTOU); vector avanzado, pendiente futuro."""
+    if '://' not in url:
+        url = 'https://' + url
+    for _ in range(max_redirs + 1):
+        if not _url_publica(url):
+            raise ValueError('URL bloqueada (SSRF): red interna/privada o esquema no permitido')
+        r = SESSION.get(url, timeout=timeout, stream=stream, allow_redirects=False)
+        if r.status_code in (301, 302, 303, 307, 308) and r.headers.get('Location'):
+            url = urljoin(url, r.headers['Location'])
+            continue
+        return r
+    raise ValueError('Demasiados redirects')
+
+# ── Seguridad: anti path traversal en nombres de caso ────────────────────────
+def _slug_caso(nombre):
+    """Nombre de caso saneado para usar como archivo. Solo deja [A-Za-z0-9 _.-],
+    sin separadores de ruta ni '..'. Devuelve '' si queda inválido — así un
+    nombre como '../../.bashrc' no escribe/lee fuera de CASES_DIR."""
+    nombre = (nombre or '').strip()
+    # Rechazar de plano cualquier cosa con pinta de ruta, no "arreglarla".
+    if '/' in nombre or '\\' in nombre or '..' in nombre:
+        return ''
+    limpio = re.sub(r'[^A-Za-z0-9 _.-]', '', nombre).strip()[:80]
+    if not limpio or set(limpio) <= {'.'}:   # vacío, '.', '...'
+        return ''
+    return limpio
+
+def _ruta_caso_segura(nombre, sufijo='.json'):
+    """Ruta dentro de CASES_DIR para un caso saneado, o None si es inválido o
+    intentara escaparse del directorio (defensa en profundidad con realpath)."""
+    slug = _slug_caso(nombre)
+    if not slug:
+        return None
+    path = os.path.join(CASES_DIR, slug + sufijo)
+    if not os.path.realpath(path).startswith(os.path.realpath(CASES_DIR) + os.sep):
+        return None
+    return path
 
 def _which(cmd):
     return subprocess.run(['which',cmd], capture_output=True).returncode == 0
@@ -748,9 +819,11 @@ def _recon_passivedns(dominio):
     return datos
 
 def _recon_metadata(url):
+    if '://' not in url:
+        url = 'https://' + url
     datos = {'tipo':'metadata','objetivo':url,'resultados':{}}
     try:
-        r = SESSION.get(url, timeout=10, stream=True)
+        r = _fetch_seguro(url, timeout=10, stream=True)
         content_type = r.headers.get('Content-Type','')
         # Si es imagen, extraer EXIF
         if 'image' in content_type:
@@ -1717,7 +1790,7 @@ def _monitor_stop():
 
 def _generar_reporte_html():
     nombre = case['nombre'] or f'reporte_{int(time.time())}'
-    path = os.path.join(CASES_DIR, f'{nombre}_reporte.html')
+    path = _ruta_caso_segura(nombre, '_reporte.html') or os.path.join(CASES_DIR, f'reporte_{int(time.time())}_reporte.html')
     ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
     secciones = ''
     for clave, valor in case['datos'].items():
@@ -1811,8 +1884,11 @@ def api_caso():
         return jsonify({'casos': archivos, 'actual': case['nombre']})
     d = request.json or {}
     if request.method == 'POST':
+        slug = _slug_caso(d.get('nombre','caso1'))
+        if not slug:
+            return jsonify({'error':'Nombre de caso inválido'}), 400
         with case_lock:
-            case.update({'nombre':d.get('nombre','caso1'), 'objetivo':d.get('objetivo',''),
+            case.update({'nombre':slug, 'objetivo':d.get('objetivo',''),
                          'datos':{}, 'historial':[], 'iniciado':datetime.datetime.now().isoformat()})
         return jsonify({'ok':True})
     if request.method == 'DELETE':
@@ -1823,7 +1899,8 @@ def api_caso():
 @app.route('/api/caso/guardar', methods=['POST'])
 def api_guardar():
     if not case['nombre']: return jsonify({'error':'No active case'}), 400
-    path = os.path.join(CASES_DIR, f"{case['nombre']}.json")
+    path = _ruta_caso_segura(case['nombre'])
+    if not path: return jsonify({'error':'Nombre de caso inválido'}), 400
     with open(path,'w') as f: json.dump(case, f, ensure_ascii=False, indent=2, default=str)
     _db_guardar_caso(case)
     return jsonify({'ok':True, 'path':path})
@@ -1837,7 +1914,8 @@ def api_buscar():
 @app.route('/api/caso/cargar', methods=['POST'])
 def api_cargar():
     nombre = (request.json or {}).get('nombre','')
-    path = os.path.join(CASES_DIR, f'{nombre}.json')
+    path = _ruta_caso_segura(nombre)
+    if not path: return jsonify({'error':'Nombre de caso inválido'}), 400
     if not os.path.exists(path): return jsonify({'error':'No encontrado'}), 404
     with open(path) as f: data = json.load(f)
     with case_lock: case.update(data)
