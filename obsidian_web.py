@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """OBSIDIAN Web — Local OSINT & Security Framework"""
 import subprocess, requests, json, os, re, sys, threading, time, datetime, html, socket, hashlib, secrets
-import shutil, tempfile, glob, base64, sqlite3
+import shutil, tempfile, glob, base64, sqlite3, ipaddress
 from flask import Flask, request, jsonify, Response, stream_with_context, send_from_directory, session, redirect
 
 HOME_INIT = os.path.expanduser('~')
@@ -198,6 +198,25 @@ def _cmd(cmd, timeout=25):
         return (r.stdout + r.stderr).strip() or '(sin salida)'
     except subprocess.TimeoutExpired:
         return f'[Timeout {timeout}s]'
+    except Exception as e:
+        return f'[Error: {e}]'
+
+def run_tool(argv, timeout=25, stdin=None):
+    """Ejecuta una herramienta SIN shell: argv es una lista, no un string.
+    Cierra la inyección por metacaracteres (;, |, `, $()...) porque nunca
+    pasa por un intérprete de shell. Para cerrar TAMBIÉN la argument
+    injection (un valor que empieza con '-' se interpreta como flag),
+    validar el objetivo por tipo con _validar() ANTES de llamar aquí.
+    Preferir esta función sobre _cmd para todo lo que interpole datos del
+    usuario. _cmd queda solo para pipelines internos con valores ya validados."""
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
+                           cwd=HOME, env={**os.environ, 'HOME': HOME}, input=stdin)
+        return (r.stdout + r.stderr).strip() or '(sin salida)'
+    except subprocess.TimeoutExpired:
+        return f'[Timeout {timeout}s]'
+    except FileNotFoundError:
+        return f'[Error: {argv[0] if argv else "?"} no encontrado]'
     except Exception as e:
         return f'[Error: {e}]'
 
@@ -405,7 +424,7 @@ def _osint_ip(ip):
     except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
     # Puertos
     if _which('nmap'):
-        out = _cmd(f'nmap -T4 --top-ports 20 -sV --open {ip} 2>/dev/null', timeout=60)
+        out = run_tool(['nmap','-T4','--top-ports','20','-sV','--open',ip], timeout=60)
         puertos = [l.strip() for l in out.splitlines() if '/tcp' in l or '/udp' in l]
         datos['resultados']['puertos'] = puertos
     # PTR
@@ -1596,7 +1615,7 @@ def _shodan_search(query):
 def _shodan_ip(ip):
     datos = {'tipo': 'shodan_ip', 'objetivo': ip, 'resultados': {}}
     if not SHODAN_KEY:
-        out = _cmd(f'nmap -sV -T4 --top-ports 50 {ip} 2>/dev/null', timeout=60)
+        out = run_tool(['nmap','-sV','-T4','--top-ports','50',ip], timeout=60)
         datos['resultados']['nmap_full'] = out
     else:
         try:
@@ -1824,18 +1843,50 @@ def api_cargar():
     with case_lock: case.update(data)
     return jsonify({'ok':True, 'modulos':len(case['datos'])})
 
-# ── Seguridad: anti command injection ─────────────────────────────────────────
-# Estos módulos interpolan el objetivo del usuario en comandos con shell=True.
-# Un objetivo como "x; rm -rf ~" ejecutaba comandos arbitrarios. Como un
-# username/dominio/ip/email NUNCA lleva metacaracteres de shell ni espacios,
-# rechazamos cualquiera que los traiga ANTES de correr nada.
-_MODULOS_SHELL     = {'usuario', 'dominio', 'ip', 'email', 'ssl',
-                      'typosquatting', 'takeover'}
+# ── Seguridad: validación de objetivo (allowlist por tipo) ───────────────────
+# Antes esto era una DENYLIST (rechazar si trae ';', '|', etc). Problema: dejaba
+# pasar un '-' inicial → argument injection (ej: ip = "-oG/home/user/.bashrc" en
+# nmap escribía archivos arbitrarios). La solución correcta es una ALLOWLIST:
+# cada tipo de objetivo tiene una forma estricta y se rechaza todo lo que no
+# encaje. Un dominio/ip/email/usuario válido NUNCA empieza con '-' ni lleva
+# metacaracteres, así que esto cierra command injection Y argument injection.
 _SHELL_PELIGROSOS  = set(' \t\n\r;&|`$<>(){}[]!*?~"\'\\')
 
+# Un módulo → qué tipo de objetivo espera (para validar con el patrón correcto).
+_MODULO_TIPO = {
+    'usuario': 'usuario', 'dominio': 'dominio', 'ip': 'ip', 'email': 'email',
+    'ssl': 'dominio', 'typosquatting': 'dominio', 'takeover': 'dominio',
+}
+
+_RE_DOMINIO = re.compile(r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$')
+_RE_USUARIO = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,38}$')
+_RE_EMAIL   = re.compile(r'^[A-Za-z0-9._%+-]{1,64}@(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})+$')
+
+def _es_ip(v):
+    try:
+        ipaddress.ip_address(v)
+        return True
+    except ValueError:
+        return False
+
+def _validar(arg, tipo):
+    """True solo si `arg` encaja EXACTAMENTE en la forma esperada de `tipo`."""
+    arg = (arg or '').strip()
+    if not arg or len(arg) > 253:
+        return False
+    if tipo == 'dominio':  return bool(_RE_DOMINIO.match(arg))
+    if tipo == 'ip':       return _es_ip(arg)
+    if tipo == 'usuario':  return bool(_RE_USUARIO.match(arg))
+    if tipo == 'email':    return bool(_RE_EMAIL.match(arg))
+    # tipo desconocido → check genérico (abajo)
+    return _objetivo_seguro(arg)
 
 def _objetivo_seguro(arg):
-    """False si el objetivo trae caracteres de shell (posible inyección)."""
+    """Check genérico para objetivos sin tipo fijo (distrobox, shodan).
+    Rechaza vacío, '-' inicial (argument injection) y metacaracteres de shell."""
+    arg = (arg or '').strip()
+    if not arg or arg.startswith('-'):
+        return False
     return not any(c in _SHELL_PELIGROSOS for c in arg)
 
 
@@ -1879,8 +1930,8 @@ def api_run():
         return jsonify({'error': f'Unknown module: {mod}'}), 400
     if not arg and mod not in ('wordlist','escenario','superficie','analizar'):
         return jsonify({'error': 'Argument required'}), 400
-    if mod in _MODULOS_SHELL and not _objetivo_seguro(arg):
-        return jsonify({'error': 'Objetivo inválido: contiene caracteres no permitidos'}), 400
+    if mod in _MODULO_TIPO and not _validar(arg, _MODULO_TIPO[mod]):
+        return jsonify({'error': f'Objetivo inválido: no tiene forma de {_MODULO_TIPO[mod]}'}), 400
 
     def _run_stream():
         yield f"data: {json.dumps({'status':'iniciando','modulo':mod})}\n\n"
