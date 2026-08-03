@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>OBSIDIAN</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#d99a4e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="OBSIDIAN">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<script>
+if('serviceWorker' in navigator && location.protocol === 'https:'){
+  navigator.serviceWorker.register('/sw.js');
+}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:#0a0a0e;color:#e8e8ee;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;min-height:100vh}
+:root{--p:#d99a4e;--c:#5b9bd5;--g:#6fae7c;--r:#d9564b;--y:#cc9a3c;--s:#26262f;--bg:#16161c;--mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace}
+
+/* Header */
+.header{background:#101014;padding:12px 16px;display:flex;align-items:center;
+  justify-content:space-between;border-bottom:1px solid #26262f;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}.logo-svg{width:26px;height:26px;flex-shrink:0}.logo-text{font-family:var(--mono);font-size:.85rem;font-weight:700;letter-spacing:.2em;color:var(--p)}
+.logo span{color:#8b8b98;font-size:.62rem;font-weight:400;display:block;letter-spacing:.1em;margin-top:1px}
+.status-dot{width:6px;height:6px;border-radius:50%;background:#55555f;display:inline-block;margin-right:6px}
+.status-dot.on{background:var(--g)}
+
+/* Layout */
+.shell{display:flex;align-items:flex-start}
+.rail-nav{width:186px;flex-shrink:0;position:sticky;top:49px;max-height:calc(100vh - 49px);
+  overflow-y:auto;border-right:1px solid #1c1c24;padding:14px 10px 30px}
+.main-content{flex:1;min-width:0;padding:16px 20px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.grid-2{grid-template-columns:1fr}.shell{flex-direction:column}.rail-nav{width:100%;position:static;max-height:none;border-right:none;border-bottom:1px solid #1c1c24}}
+
+/* Cards */
+.card{background:var(--bg);border:1px solid #26262f;border-radius:2px;padding:14px;margin-bottom:12px;transition:border-color .15s}.card:hover{border-color:#3a3a46}
+.card-title{font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.12em;color:#8b8b98;
+  text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+
+/* Módulos */
+.mod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-bottom:8px}
+.mod-btn{background:#101014;border:1px solid #26262f;border-radius:2px;
+  padding:9px 8px;cursor:pointer;text-align:center;transition:.15s;user-select:none}
+.mod-btn:active{opacity:.8}
+.mod-btn .icon{display:none}
+.mod-btn .name{font-size:.72rem;font-weight:600;color:#e8e8ee}
+.mod-btn .cat{font-family:var(--mono);font-size:.6rem;color:#8b8b98;margin-top:1px}
+.mod-btn:hover{border-color:#55555f}
+.mod-btn.active{border-color:var(--p);background:#d99a4e14}
+
+/* Input */
+.input-row{display:flex;gap:8px;margin-bottom:10px}
+input[type=text]{background:#101014;border:1px solid #26262f;border-radius:2px;
+  padding:9px 11px;color:#e8e8ee;font-size:.82rem;flex:1;outline:none;
+  font-family:var(--mono)}
+input[type=text]:focus{border-color:var(--p)}
+input[type=text]::placeholder{color:#55555f}
+.btn{background:var(--p);color:#0a0a0e;border:none;border-radius:2px;
+  padding:9px 16px;font-weight:600;font-size:.78rem;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn:hover{opacity:.9}
+.btn:active{opacity:.8}
+.btn.secondary{background:#1c1c24;color:#e8e8ee;border:1px solid #26262f}
+.btn.danger{background:transparent;color:var(--r);border:1px solid var(--r)}
+.btn.success{background:transparent;color:var(--g);border:1px solid var(--g)}
+
+/* Output */
+.output{background:#08080b;border:1px solid #16161c;border-radius:2px;
+  padding:14px;font-family:var(--mono);font-size:.74rem;line-height:1.6;
+  min-height:200px;max-height:420px;overflow-y:auto;color:#c7c7d1;white-space:pre-wrap;word-break:break-all}
+.output .error{color:var(--r)}
+.output .warn{color:var(--y)}
+.output .ok{color:var(--g)}
+.output .info{color:var(--c)}
+.output .critical{color:var(--r);font-weight:700}
+
+/* Badge */
+.badge{padding:2px 7px;border-radius:9px;font-family:var(--mono);font-size:.62rem;font-weight:600}
+.badge.r{background:#d9564b1c;color:var(--r)}
+.badge.g{background:#6fae7c1c;color:var(--g)}
+.badge.p{background:#d99a4e1c;color:var(--p)}
+
+/* Caso panel */
+.caso-info{background:#101014;border:1px solid #1c1c24;border-radius:2px;padding:10px 12px;
+  font-size:.75rem;color:#8b8b98;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.caso-info b{color:#e8e8ee;font-family:var(--mono)}
+
+/* Rail nav (reemplaza la barra de tabs horizontal) */
+.rgroup-label{font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:#55555f;
+  text-transform:uppercase;padding:14px 8px 6px}
+.rgroup-label:first-child{padding-top:2px}
+.tab{display:block;padding:7px 10px;font-family:var(--mono);font-size:.72rem;font-weight:600;
+  letter-spacing:.02em;cursor:pointer;border-left:2px solid transparent;border-radius:0 4px 4px 0;transition:.15s}
+.tab.active{color:var(--p);border-left-color:var(--p);background:#d99a4e0f}
+.tab:not(.active){color:#8b8b98}
+.tab:not(.active):hover{color:#e8e8ee;background:#101014}
+.tab-panel{display:none}.tab-panel.active{display:block}
+
+/* Spinner */
+.spin{display:inline-block;width:12px;height:12px;border:2px solid #26262f;
+  border-top-color:var(--p);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:#1c1c24;border:1px solid #26262f;color:#e8e8ee;padding:9px 16px;border-radius:2px;
+  font-size:.78rem;z-index:999;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+
+/* Scroll */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:#0a0a0e}
+::-webkit-scrollbar-thumb{background:#26262f;border-radius:2px}
+
+/* Stage: lienzo dominante (Grafo) — sin card, borde a borde */
+.stage{position:relative;background:#0a0a0e;border-radius:2px;border:1px solid #16161c;
+  overflow:hidden;height:calc(100vh - 128px);min-height:420px}
+.stage-toolbar{position:absolute;top:10px;left:10px;z-index:5;display:flex;gap:6px;
+  flex-wrap:wrap;max-width:calc(100% - 20px)}
+.stage-legend{position:absolute;bottom:10px;left:10px;z-index:5;display:flex;gap:10px;
+  flex-wrap:wrap;background:#101014e6;border:1px solid #1c1c24;border-radius:2px;
+  padding:6px 10px;font-size:.66rem;max-width:calc(100% - 20px)}
+.stage-detail{position:absolute;top:10px;right:10px;z-index:5;width:260px;max-width:calc(100% - 20px);
+  background:#101014f2;border:1px solid #26262f;border-radius:2px;padding:10px 12px;
+  font-size:.75rem;color:#8b8b98;display:none}
+.stage-detail.show{display:block}
+@media(max-width:700px){.stage{height:60vh}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <svg class="logo-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="172.9,128.8 128.8,172.9 71.2,172.9 27.1,128.8 27.1,71.2 71.2,27.1 128.8,27.1 172.9,71.2" fill="none" stroke="#d99a4e" stroke-width="6"/>
+      <polygon points="148.0,119.9 119.9,148.0 80.1,148.0 52.0,119.9 52.0,80.1 80.1,52.0 119.9,52.0 148.0,80.1" fill="none" stroke="#d99a4e" stroke-width="5.5" transform="rotate(22.5 100 100)"/>
+      <rect x="78" y="78" width="44" height="44" rx="4" fill="#d99a4e"/>
+    </svg>
+    <div class="logo-text">OBSIDIAN<span>OSINT & RECON FRAMEWORK</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;font-size:.72rem;color:#8b8b98">
+    <span class="status-dot" id="sdot"></span>
+    <span id="slabel">connecting...</span>
+  </div>
+</div>
+
+<div class="shell">
+
+  <!-- RAIL: navegación por módulos, agrupada -->
+  <div class="rail-nav">
+    <div class="rgroup-label">Investigación</div>
+    <div class="tab active" data-tab="grafo" onclick="switchTab('grafo')">Grafo</div>
+    <div class="tab" data-tab="osint" onclick="switchTab('osint')">OSINT</div>
+    <div class="tab" data-tab="recon" onclick="switchTab('recon')">Recon</div>
+    <div class="tab" data-tab="timeline" onclick="switchTab('timeline')">Timeline</div>
+    <div class="tab" data-tab="datos" onclick="switchTab('datos')">Data</div>
+
+    <div class="rgroup-label">Inteligencia</div>
+    <div class="tab" data-tab="dark" onclick="switchTab('dark')">Dark Web</div>
+    <div class="tab" data-tab="shodan" onclick="switchTab('shodan')">Shodan</div>
+
+    <div class="rgroup-label">IA / Análisis</div>
+    <div class="tab" data-tab="sim" onclick="switchTab('sim')">Sim</div>
+    <div class="tab" data-tab="analyze" onclick="switchTab('analyze')">Analyze</div>
+
+    <div class="rgroup-label">Vigilancia</div>
+    <div class="tab" data-tab="monitor" onclick="switchTab('monitor')">Monitor</div>
+
+    <div class="rgroup-label">Ofensivo</div>
+    <div class="tab" data-tab="kali" onclick="switchTab('kali')">Kali</div>
+    <div class="tab" data-tab="parrot" onclick="switchTab('parrot')">Parrot</div>
+    <div class="tab" data-tab="remnux" onclick="switchTab('remnux')">REMnux</div>
+    <div class="tab" data-tab="blackarch" onclick="switchTab('blackarch')">BlackArch</div>
+  </div>
+
+  <div class="main-content">
+
+  <!-- CASO ACTIVO -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">Active Investigation</div>
+    <div class="caso-info" id="caso-info">No active case</div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <input type="text" id="caso-nombre" placeholder="case name" style="max-width:150px">
+      <input type="text" id="caso-obj" placeholder="target (domain, person...)">
+      <button class="btn" onclick="nuevoCaso()">New</button>
+      <button class="btn secondary" onclick="guardarCaso()">Save</button>
+      <button class="btn danger" onclick="limpiarCaso()">Clear</button>
+    </div>
+  </div>
+
+  <!-- TAB: OSINT -->
+  <div class="tab-panel" id="tab-osint">
+    <div class="card">
+      <div class="card-title">OSINT Modules</div>
+      <div class="mod-grid">
+        <div class="mod-btn" onclick="selMod('persona')"><span class="icon">👤</span><div class="name">Persona</div><div class="cat">OSINT</div></div>
+        <div class="mod-btn" onclick="selMod('usuario')"><span class="icon">🏷️</span><div class="name">Username</div><div class="cat">400+ platforms</div></div>
+        <div class="mod-btn" onclick="selMod('dominio')"><span class="icon">🌐</span><div class="name">Domain</div><div class="cat">Full Recon</div></div>
+        <div class="mod-btn" onclick="selMod('ip')"><span class="icon">📡</span><div class="name">IP</div><div class="cat">Geo · Ports · ASN</div></div>
+        <div class="mod-btn" onclick="selMod('email')"><span class="icon">📧</span><div class="name">Email</div><div class="cat">Breach · SPF · DMARC</div></div>
+        <div class="mod-btn" onclick="selMod('telefono')"><span class="icon">📱</span><div class="name">Phone</div><div class="cat">Carrier · Social</div></div>
+      </div>
+      <div class="input-row">
+        <input type="text" id="mod-arg" placeholder="Enter target..." onkeydown="if(event.key==='Enter')ejecutar()">
+        <button class="btn" onclick="ejecutar()" id="exec-btn">Run</button>
+      </div>
+      <div class="output" id="output">
+<span class="info">⬛ OBSIDIAN ready. Select a module and enter the target.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: RECONOCIMIENTO -->
+  <div class="tab-panel" id="tab-recon">
+    <div class="card">
+      <div class="card-title">Advanced Reconnaissance</div>
+      <div class="mod-grid">
+        <div class="mod-btn" onclick="selMod('github_sec')"><span class="icon">🔑</span><div class="name">GitHub Secrets</div><div class="cat">Tokens · Keys</div></div>
+        <div class="mod-btn" onclick="selMod('ssl')"><span class="icon">🔒</span><div class="name">SSL Deep</div><div class="cat">Ciphers · Vulns</div></div>
+        <div class="mod-btn" onclick="selMod('favicon')"><span class="icon">◇</span><div class="name">Favicon Hash</div><div class="cat">Related infra</div></div>
+        <div class="mod-btn" onclick="selMod('typosquatting')"><span class="icon">🎭</span><div class="name">Typosquatting</div><div class="cat">Fake domains</div></div>
+        <div class="mod-btn" onclick="selMod('buckets')"><span class="icon">🪣</span><div class="name">Cloud Buckets</div><div class="cat">S3 · GCS · Azure</div></div>
+        <div class="mod-btn" onclick="selMod('takeover')"><span class="icon">💀</span><div class="name">Subdomain Takeover</div><div class="cat">Orphan subdomains</div></div>
+        <div class="mod-btn" onclick="selMod('metadata')"><span class="icon">🗂️</span><div class="name">Metadata</div><div class="cat">EXIF · GPS · Meta</div></div>
+        <div class="mod-btn" onclick="selMod('passivedns')"><span class="icon">◇</span><div class="name">Passive DNS</div><div class="cat">Historical IPs</div></div>
+        <div class="mod-btn" onclick="selMod('cve')"><span class="icon">🚨</span><div class="name">CVE Correlation</div><div class="cat">Technologies → CVEs</div></div>
+        <div class="mod-btn" onclick="selMod('wordlist')"><span class="icon">📝</span><div class="name">Wordlist AI</div><div class="cat">Custom dictionary</div></div>
+        <div class="mod-btn" onclick="selMod('yara_bulk')"><span class="icon">◇</span><div class="name">YARA Bulk Scan</div><div class="cat">Scan a folder</div></div>
+        <div class="mod-btn" onclick="selMod('render_js')"><span class="icon">◇</span><div class="name">JS Render</div><div class="cat">Headless screenshot</div></div>
+      </div>
+      <div class="input-row">
+        <input type="text" id="mod-arg" placeholder="Target..." onkeydown="if(event.key==='Enter')ejecutar()">
+        <button class="btn" onclick="ejecutar()" id="exec-btn2">Run</button>
+      </div>
+      <div class="output" id="output2"><span class="info">Select a reconnaissance module.</span></div>
+    </div>
+  </div>
+
+  <!-- TAB: SIMULACIÓN -->
+  <div class="tab-panel" id="tab-sim">
+    <div class="card">
+      <div class="card-title">Simulation & Analysis</div>
+      <div class="mod-grid">
+        <div class="mod-btn" onclick="runSim('escenario')"><span class="icon">🎯</span><div class="name">Scenario</div><div class="cat">Kill Chain · MITRE</div></div>
+        <div class="mod-btn" onclick="runSim('superficie')"><span class="icon">🗺️</span><div class="name">Surface</div><div class="cat">Attack Surface</div></div>
+        <div class="mod-btn" onclick="runSim('analizar')"><span class="icon">🧠</span><div class="name">AI Analysis</div><div class="cat">Full correlation</div></div>
+      </div>
+      <div class="input-row">
+        <input type="text" id="sim-arg" placeholder="Target (or leave empty to use active case)">
+        <button class="btn success" onclick="generarReporte()">HTML</button>
+        <button class="btn success" onclick="exportarPDF()">PDF</button>
+      </div>
+      <div class="output" id="output3"><span class="info">Simulation modules use the OSINT data collected in this investigation.</span></div>
+    </div>
+  </div>
+
+  <!-- TAB: DARK WEB -->
+  <div class="tab-panel" id="tab-dark">
+    <div class="card">
+      <div class="card-title">Dark Web Intelligence</div>
+      <div style="font-size:.72rem;color:#8b8b98;margin-bottom:10px">
+        Searches .onion indexes (Ahmia) and paste databases without needing Tor
+      </div>
+      <div class="input-row">
+        <input type="text" id="dark-query" placeholder="name, email, domain, username...">
+        <button class="btn" onclick="buscarDark()">Search</button>
+      </div>
+      <div class="output" id="output-dark"><span class="info">Enter a target to search on the indexed dark web.</span></div>
+    </div>
+  </div>
+
+  <!-- TAB: SHODAN -->
+  <div class="tab-panel" id="tab-shodan">
+    <div class="card">
+      <div class="card-title">Shodan</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="shodan-key" placeholder="API Key (free at shodan.io)" style="max-width:220px;font-size:.72rem">
+        <button class="btn secondary" onclick="guardarShodanKey()">Save key</button>
+        <span style="font-size:.7rem;color:#8b8b98">No key: falls back to HackerTarget</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="netlas-key" placeholder="Netlas API Key (free, 50/day at netlas.io)" style="max-width:220px;font-size:.72rem">
+        <button class="btn secondary" onclick="guardarNetlasKey()">Save key</button>
+      </div>
+      <div class="input-row">
+        <input type="text" id="shodan-query" placeholder="IP, org, hostname, port...">
+        <button class="btn" onclick="buscarShodan()">Scan (Shodan)</button>
+        <button class="btn secondary" onclick="buscarNetlas()">Scan (Netlas)</button>
+      </div>
+      <div class="output" id="output-shodan"><span class="info">Search exposed devices, services and vulnerabilities.</span></div>
+    </div>
+  </div>
+
+  <!-- TAB: ANALYZE -->
+  <div class="tab-panel" id="tab-analyze">
+    <div class="card">
+      <div class="card-title">URL / Phishing Analyzer</div>
+      <div style="font-size:.72rem;color:#8b8b98;margin-bottom:10px">
+        Detects phishing, malware and dangerous URLs. Add VirusTotal and AbuseIPDB keys for better accuracy.
+      </div>
+      <div class="input-row">
+        <input type="text" id="url-check-input" placeholder="https://ejemplo.com/login">
+        <button class="btn" onclick="checkURL()">Analyze</button>
+      </div>
+      <div class="output" id="output-url"><span class="info">Paste a suspicious URL to analyze it.</span></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">Password Analyzer</div>
+      <div style="font-size:.72rem;color:#8b8b98;margin-bottom:10px">
+        Analyzed locally — the password is NEVER sent to any external server.
+      </div>
+      <div class="input-row">
+        <input type="password" id="pwd-input" placeholder="Enter password to analyze">
+        <button class="btn" onclick="checkPassword()">Analyze</button>
+      </div>
+      <div class="output" id="output-pwd"><span class="info">100% local analysis. Score, entropy, crack time and recommendations.</span></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">API Keys (optional)</div>
+      <div style="font-size:.72rem;color:#8b8b98;margin-bottom:8px">For deeper URL analysis</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="text" id="vt-key-input" placeholder="VirusTotal API Key" style="max-width:200px;font-size:.72rem">
+        <button class="btn secondary" onclick="guardarVTKey()">Save VT</button>
+        <input type="text" id="abuse-key-input" placeholder="AbuseIPDB API Key" style="max-width:200px;font-size:.72rem">
+        <button class="btn secondary" onclick="guardarAbuseKey()">Save Abuse</button>
+      </div>
+      <div style="font-size:.68rem;color:#55555f;margin-top:6px">Free at virustotal.com and abuseipdb.com</div>
+    </div>
+  </div>
+
+  <!-- TAB: TIMELINE -->
+  <div class="tab-panel" id="tab-timeline">
+    <div class="card">
+      <div class="card-title">Investigation Timeline</div>
+      <button class="btn secondary" onclick="cargarTimeline()" style="margin-bottom:12px">Refresh</button>
+      <div id="timeline-container" style="position:relative;padding-left:24px">
+        <div style="color:#55555f;font-size:.8rem">Click refresh to load the investigation timeline.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: MONITOR -->
+  <div class="tab-panel" id="tab-monitor">
+    <div class="card">
+      <div class="card-title">Continuous Monitor</div>
+      <div style="font-size:.72rem;color:#8b8b98;margin-bottom:10px">
+        Monitors the target in background and alerts when new information appears
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+        <input type="text" id="mon-obj" placeholder="target (or use active case)">
+        <select id="mon-interval" style="background:#101014;border:1px solid #26262f;color:#e8e8ee;padding:8px;border-radius:2px;font-size:.82rem">
+          <option value="1800">Every 30 min</option>
+          <option value="3600" selected>Every 1 hour</option>
+          <option value="7200">Every 2 hours</option>
+          <option value="21600">Every 6 hours</option>
+        </select>
+        <button class="btn success" onclick="iniciarMonitor()">Start</button>
+        <button class="btn danger" onclick="detenerMonitor()">Stop</button>
+      </div>
+      <div id="mon-status" style="background:#101014;border-radius:2px;padding:10px;font-size:.75rem;color:#8b8b98;margin-bottom:10px">
+        Monitor inactive
+      </div>
+      <div class="card-title" style="margin-top:8px">Alerts</div>
+      <div class="output" id="output-monitor" style="min-height:150px">
+        <span class="info">No alerts yet.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: GRAFO -->
+  <div class="tab-panel active" id="tab-grafo">
+    <div class="stage" id="grafo-container">
+      <div class="stage-toolbar">
+        <button class="btn" onclick="cargarGrafo()">Refresh graph</button>
+        <button class="btn secondary" onclick="grafoFisica(true)">Physics ON</button>
+        <button class="btn secondary" onclick="grafoFisica(false)">Pin nodes</button>
+        <span id="grafo-stats" style="font-size:.7rem;color:#8b8b98;align-self:center;margin-left:4px"></span>
+      </div>
+      <div id="grafo-placeholder" style="display:flex;align-items:center;justify-content:center;height:100%;color:#55555f;font-size:.85rem;flex-direction:column;gap:8px">
+        <span style="font-size:1.6rem;color:#3a3a46">◇</span>
+        <span>Run OSINT modules and click "Refresh graph"</span>
+      </div>
+      <div id="grafo-vis" style="width:100%;height:100%;display:none"></div>
+      <div class="stage-legend">
+        <span style="color:#d99a4e">● Target</span>
+        <span style="color:#5b9bd5">● Domain</span>
+        <span style="color:#7fb8d9">● Subdomain</span>
+        <span style="color:#d9564b">● IP / Risk</span>
+        <span style="color:#6fae7c">● Email</span>
+        <span style="color:#cc9a3c">● Username</span>
+        <span style="color:#c17a52">● Platform</span>
+        <span style="color:#5fa8a0">● Technology</span>
+        <span style="color:#d99a4e">● Repo</span>
+      </div>
+      <div id="grafo-detalle" class="stage-detail">
+        Click a node to see its details.
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: DATOS -->
+  <!-- TAB: KALI -->
+  <div class="tab-panel" id="tab-kali">
+    <div class="card">
+      <div class="card-title">Kali Linux — Tools</div>
+      <div style="font-size:.72rem;color:#d9564b;margin-bottom:10px">
+        ⚠ Only use on systems you own or have explicit written authorization.
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn secondary" onclick="kaliCat('recon')" id="kcat-recon">Recon</button>
+        <button class="btn secondary" onclick="kaliCat('web')" id="kcat-web">Web</button>
+        <button class="btn secondary" onclick="kaliCat('passwords')" id="kcat-passwords">Passwords</button>
+        <button class="btn secondary" onclick="kaliCat('forensics')" id="kcat-forensics">Forensics</button>
+        <button class="btn secondary" onclick="kaliCat('exploits')" id="kcat-exploits">Exploits</button>
+        <button class="btn secondary" onclick="kaliCat('network')" id="kcat-network">Network</button>
+      </div>
+
+      <div id="kali-tools-grid" class="mod-grid" style="margin-bottom:12px"></div>
+
+      <div class="input-row">
+        <input type="text" id="kali-arg" placeholder="Argument (IP, domain, hash, path...)">
+        <button class="btn" onclick="ejecutarKali()" id="kali-exec-btn">Run</button>
+      </div>
+
+      <div style="font-size:.7rem;color:#8b8b98;margin-bottom:6px" id="kali-cmd-preview"></div>
+
+      <div class="output" id="output-kali" style="min-height:200px">
+        <span class="info">Select a category and a tool to get started.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: PARROT -->
+  <div class="tab-panel" id="tab-parrot">
+    <div class="card">
+      <div class="card-title">Parrot Security — Tools</div>
+      <div style="font-size:.72rem;color:#d9564b;margin-bottom:10px">
+        ⚠ Only use on systems you own or have explicit written authorization.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn secondary" onclick="parrotCat('anonymity')" id="pcat-anonymity">Anonymity</button>
+        <button class="btn secondary" onclick="parrotCat('osint')" id="pcat-osint">OSINT</button>
+        <button class="btn secondary" onclick="parrotCat('wifi')" id="pcat-wifi">WiFi</button>
+        <button class="btn secondary" onclick="parrotCat('passwords')" id="pcat-passwords">Passwords</button>
+        <button class="btn secondary" onclick="parrotCat('forensics')" id="pcat-forensics">Forensics</button>
+      </div>
+      <div id="parrot-tools-grid" class="mod-grid" style="margin-bottom:12px"></div>
+      <div class="input-row">
+        <input type="text" id="parrot-arg" placeholder="Argument (IP, domain, WiFi network...)">
+        <button class="btn" onclick="ejecutarParrot()" id="parrot-exec-btn">Run</button>
+      </div>
+      <div style="font-size:.7rem;color:#8b8b98;margin-bottom:6px" id="parrot-cmd-preview"></div>
+      <div class="output" id="output-parrot" style="min-height:200px">
+        <span class="info">Select a category and a tool to get started.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: REMNUX -->
+  <div class="tab-panel" id="tab-remnux">
+    <div class="card">
+      <div class="card-title">REMnux — Malware Analysis</div>
+      <div style="font-size:.72rem;color:#6fae7c;margin-bottom:10px">
+        Safely analyze malware, malicious documents and binaries.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn secondary" onclick="remnuxCat('malware')" id="rcat-malware">Malware</button>
+        <button class="btn secondary" onclick="remnuxCat('documents')" id="rcat-documents">Documents</button>
+        <button class="btn secondary" onclick="remnuxCat('analysis')" id="rcat-analysis">Analysis</button>
+        <button class="btn secondary" onclick="remnuxCat('crypto')" id="rcat-crypto">Crypto</button>
+      </div>
+      <div id="remnux-tools-grid" class="mod-grid" style="margin-bottom:12px"></div>
+      <div class="input-row">
+        <input type="text" id="remnux-arg" placeholder="File path to analyze (/path/malware.exe)">
+        <button class="btn" onclick="ejecutarRemnux()" id="remnux-exec-btn">Run</button>
+      </div>
+      <div style="font-size:.7rem;color:#8b8b98;margin-bottom:6px" id="remnux-cmd-preview"></div>
+      <div class="output" id="output-remnux" style="min-height:200px">
+        <span class="info">Select a category and a tool to get started.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-blackarch">
+    <div class="card">
+      <div class="card-title">BlackArch — Advanced Offensive</div>
+      <div style="font-size:.72rem;color:#d9564b;margin-bottom:10px">
+        2800+ tools. Recon, exploitation, Windows/AD attacks, wireless and forensics.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn secondary" onclick="blackarchCat('recon')"     id="bcat-recon">Recon</button>
+        <button class="btn secondary" onclick="blackarchCat('web')"       id="bcat-web">Web</button>
+        <button class="btn secondary" onclick="blackarchCat('passwords')" id="bcat-passwords">Passwords</button>
+        <button class="btn secondary" onclick="blackarchCat('windows')"   id="bcat-windows">Windows/AD</button>
+        <button class="btn secondary" onclick="blackarchCat('wireless')"  id="bcat-wireless">Wireless</button>
+        <button class="btn secondary" onclick="blackarchCat('forensics')" id="bcat-forensics">Forensics</button>
+      </div>
+      <div id="blackarch-tools-grid" class="mod-grid" style="margin-bottom:12px"></div>
+      <div class="input-row">
+        <input type="text" id="blackarch-arg" placeholder="Target IP, domain, file or hash">
+        <button class="btn" onclick="ejecutarBlackarch()" id="blackarch-exec-btn">Run</button>
+      </div>
+      <div style="font-size:.7rem;color:#8b8b98;margin-bottom:6px" id="blackarch-cmd-preview"></div>
+      <div class="output" id="output-blackarch" style="min-height:200px">
+        <span class="info">Select a category and a tool to get started.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-datos">
+    <div class="card">
+      <div class="card-title">Collected Data</div>
+      <button class="btn secondary" onclick="cargarDatos()" style="margin-bottom:10px">Refresh</button>
+      <div class="output" id="output4" style="max-height:500px"><span class="info">Click refresh to view collected data.</span></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">Search across all saved cases</div>
+      <div class="input-row">
+        <input type="text" id="buscar-casos-input" placeholder="email, domain, username..." onkeydown="if(event.key==='Enter')buscarEnCasos()">
+        <button class="btn" onclick="buscarEnCasos()">Search</button>
+      </div>
+      <div class="output" id="output-buscar-casos"><span class="info">Searches every case you've saved, not just the active one.</span></div>
+    </div>
+  </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/static/vis-network.min.js"></script>
+<script>
+let modActivo = null;
+let tabActiva = 'grafo';
+let grafoNet  = null;
+
+function switchTab(tab) {
+  tabActiva = tab;
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === tab);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  if (tab === 'grafo' && grafoNet) grafoNet.fit();
+  if (tab === 'timeline') cargarTimeline();
+  if (tab === 'monitor') refreshMonitor();
+}
+
+// ── Dark Web ──────────────────────────────────────────────────────────────────
+async function buscarDark() {
+  const q = document.getElementById('dark-query').value.trim();
+  if (!q) { toast('Enter a target'); return; }
+  const out = document.getElementById('output-dark');
+  out.innerHTML = '<span class="info">🌑 Searching the indexed dark web...</span>';
+  try {
+    const r = await fetch('/api/darkweb', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+    const d = await r.json();
+    out.innerHTML = '';
+    const res = d.resultados || {};
+    const ahmia = res.ahmia || [];
+    if (ahmia.length) {
+      append(out, `[Ahmia — ${ahmia.length} results .onion]\n`, 'ok');
+      ahmia.forEach(r2 => {
+        append(out, '\n  ' + r2.titulo + '\n', 'warn');
+        append(out, '  ' + r2.url + '\n', 'info');
+        if (r2.descripcion) append(out, '  ' + r2.descripcion + '\n');
+      });
+    } else append(out, 'No results in Ahmia\n', 'info');
+    const pastes = res.pastes || [];
+    if (pastes.length) {
+      append(out, `\n[Pastes — ${pastes.length} found]\n`, 'ok');
+      pastes.forEach(p => append(out, '  · ' + p.title + ' → ' + p.url + '\n', 'warn'));
+    }
+    await refreshStatus();
+  } catch(e) { document.getElementById('output-dark').innerHTML = '<span class="error">'+e.message+'</span>'; }
+}
+
+// ── Shodan ────────────────────────────────────────────────────────────────────
+async function guardarShodanKey() {
+  const key = document.getElementById('shodan-key').value.trim();
+  await fetch('/api/shodan/key', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});
+  toast(key ? 'API key saved ✓' : 'Key deleted');
+}
+
+async function buscarShodan() {
+  const q = document.getElementById('shodan-query').value.trim();
+  if (!q) { toast('Enter IP or query'); return; }
+  const out = document.getElementById('output-shodan');
+  out.innerHTML = '<span class="info">📡 Scanning...</span>';
+  const esIP = /^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$/.test(q);
+  try {
+    const body = esIP ? {ip:q} : {query:q};
+    const r = await fetch('/api/shodan', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d = await r.json();
+    out.innerHTML = '';
+    append(out, JSON.stringify(d.resultados, null, 2));
+    await refreshStatus();
+  } catch(e) { document.getElementById('output-shodan').innerHTML = '<span class="error">'+e.message+'</span>'; }
+}
+
+// ── Netlas ────────────────────────────────────────────────────────────────────
+async function guardarNetlasKey() {
+  const key = document.getElementById('netlas-key').value.trim();
+  await fetch('/api/netlas/key', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});
+  toast(key ? 'API key saved ✓' : 'Key deleted');
+}
+
+async function buscarNetlas() {
+  const q = document.getElementById('shodan-query').value.trim();
+  if (!q) { toast('Enter IP or query'); return; }
+  const out = document.getElementById('output-shodan');
+  append(out, '\n[Netlas]\n', 'ok');
+  try {
+    const r = await fetch('/api/netlas', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+    const d = await r.json();
+    append(out, JSON.stringify(d.resultados, null, 2) + '\n');
+    await refreshStatus();
+  } catch(e) { append(out, 'Error: ' + e.message + '\n', 'error'); }
+}
+
+// ── Kali ──────────────────────────────────────────────────────────────────────
+let kaliTools = {};
+let kaliToolActiva = null;
+
+async function cargarKaliTools() {
+  if (Object.keys(kaliTools).length > 0) return;
+  const r = await fetch('/api/kali/tools');
+  kaliTools = await r.json();
+}
+
+async function kaliCat(cat) {
+  await cargarKaliTools();
+  document.querySelectorAll('[id^="kcat-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('kcat-'+cat)?.classList.add('active');
+  const grid = document.getElementById('kali-tools-grid');
+  grid.innerHTML = '';
+  const ICONS = {recon:'🔍',web:'🌐',passwords:'🔑',forensics:'🔬',exploits:'💣',network:'📡'};
+  (kaliTools[cat]||[]).forEach(t => {
+    const btn = document.createElement('div');
+    btn.className = 'mod-btn' + (kaliToolActiva?.id === t.id ? ' active' : '');
+    btn.innerHTML = `<span class="icon">${ICONS[cat]||'⚙'}</span><div class="name" style="font-size:.7rem">${t.nombre}</div><div class="cat">${t.desc}</div>`;
+    btn.onclick = () => selKaliTool(t);
+    grid.appendChild(btn);
+  });
+}
+
+function selKaliTool(tool) {
+  kaliToolActiva = tool;
+  document.querySelectorAll('#kali-tools-grid .mod-btn').forEach(b => b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('kali-arg').placeholder = tool.placeholder || 'Argumento...';
+  document.getElementById('kali-cmd-preview').textContent = '→ ' + tool.cmd;
+  document.getElementById('kali-arg').focus();
+}
+
+async function ejecutarKali() {
+  if (!kaliToolActiva) { toast('Select a tool first'); return; }
+  const arg = document.getElementById('kali-arg').value.trim();
+  const out = document.getElementById('output-kali');
+  out.innerHTML = '';
+  append(out, `[${new Date().toLocaleTimeString()}] Running ${kaliToolActiva.nombre}...\n`, 'info');
+  append(out, `→ ${kaliToolActiva.cmd.replace('{arg}', arg)}\n\n`, 'info');
+  const btn = document.getElementById('kali-exec-btn');
+  btn.disabled = true; btn.textContent = '⏳ Running...';
+  try {
+    const r = await fetch('/api/kali', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({tool: kaliToolActiva.id, arg})
+    });
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while(true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value);
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const d = JSON.parse(line.slice(5));
+          if (d.status === 'completado') {
+            const res = d.resultado;
+            if (res.error) {
+              append(out, '❌ ' + res.error + '\n', 'error');
+            } else {
+              append(out, res.output + '\n');
+            }
+          } else if (d.status === 'error') {
+            append(out, '❌ Error: ' + d.mensaje + '\n', 'error');
+          }
+        } catch(e) {}
+      }
+    }
+    append(out, '\n✅ Done\n', 'ok');
+  } catch(e) {
+    append(out, 'Connection error: ' + e.message, 'error');
+  }
+  btn.disabled = false; btn.textContent = '▶ Run';
+}
+
+// ── Parrot ────────────────────────────────────────────────────────────────────
+let parrotTools = null;
+let parrotToolActiva = null;
+
+async function cargarParrotTools() {
+  if (!parrotTools) {
+    const r = await fetch('/api/parrot/tools');
+    parrotTools = await r.json();
+  }
+}
+
+async function parrotCat(cat) {
+  await cargarParrotTools();
+  document.querySelectorAll('[id^="pcat-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('pcat-'+cat)?.classList.add('active');
+  const grid = document.getElementById('parrot-tools-grid');
+  grid.innerHTML = '';
+  const ICONS = {anonymity:'🕵️',osint:'🔍',wifi:'📡',passwords:'🔑',forensics:'🔬'};
+  (parrotTools[cat]||[]).forEach(t => {
+    const btn = document.createElement('div');
+    btn.className = 'mod-btn' + (parrotToolActiva?.id === t.id ? ' active' : '');
+    btn.innerHTML = `<span class="icon">${ICONS[cat]||'⚙'}</span><div class="name" style="font-size:.7rem">${t.nombre}</div><div class="cat">${t.desc}</div>`;
+    btn.onclick = () => selParrotTool(t, btn);
+    grid.appendChild(btn);
+  });
+}
+
+function selParrotTool(tool, el) {
+  parrotToolActiva = tool;
+  document.querySelectorAll('#parrot-tools-grid .mod-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('parrot-arg').placeholder = tool.placeholder || 'Argumento...';
+  document.getElementById('parrot-cmd-preview').textContent = '→ ' + tool.cmd;
+  document.getElementById('parrot-arg').focus();
+}
+
+async function ejecutarParrot() {
+  if (!parrotToolActiva) { toast('Select a tool first'); return; }
+  const arg = document.getElementById('parrot-arg').value.trim();
+  const out = document.getElementById('output-parrot');
+  out.innerHTML = '';
+  append(out, `[${new Date().toLocaleTimeString()}] Running ${parrotToolActiva.nombre}...\n`, 'info');
+  append(out, `→ ${parrotToolActiva.cmd.replace('{arg}', arg)}\n\n`, 'info');
+  const btn = document.getElementById('parrot-exec-btn');
+  btn.disabled = true; btn.textContent = '⏳ Running...';
+  try {
+    const r = await fetch('/api/parrot', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({tool: parrotToolActiva.id, arg})
+    });
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while(true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value);
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const d = JSON.parse(line.slice(5));
+          if (d.status === 'completado') {
+            const res = d.resultado;
+            if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
+            else append(out, res.output + '\n');
+          } else if (d.status === 'error') {
+            append(out, '❌ Error: ' + d.mensaje + '\n', 'error');
+          }
+        } catch(e) {}
+      }
+    }
+    append(out, '\n✅ Done\n', 'ok');
+  } catch(e) {
+    append(out, 'Connection error: ' + e.message, 'error');
+  }
+  btn.disabled = false; btn.textContent = '▶ Run';
+}
+
+// ── REMnux ────────────────────────────────────────────────────────────────────
+let remnuxTools = null;
+let remnuxToolActiva = null;
+
+async function cargarRemnuxTools() {
+  if (!remnuxTools) {
+    const r = await fetch('/api/remnux/tools');
+    remnuxTools = await r.json();
+  }
+}
+
+async function remnuxCat(cat) {
+  await cargarRemnuxTools();
+  document.querySelectorAll('[id^="rcat-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('rcat-'+cat)?.classList.add('active');
+  const grid = document.getElementById('remnux-tools-grid');
+  grid.innerHTML = '';
+  const ICONS = {malware:'🦠',documents:'📄',analysis:'🔍',crypto:'🔐'};
+  (remnuxTools[cat]||[]).forEach(t => {
+    const btn = document.createElement('div');
+    btn.className = 'mod-btn' + (remnuxToolActiva?.id === t.id ? ' active' : '');
+    btn.innerHTML = `<span class="icon">${ICONS[cat]||'⚙'}</span><div class="name" style="font-size:.7rem">${t.nombre}</div><div class="cat">${t.desc}</div>`;
+    btn.onclick = () => selRemnuxTool(t, btn);
+    grid.appendChild(btn);
+  });
+}
+
+function selRemnuxTool(tool, el) {
+  remnuxToolActiva = tool;
+  document.querySelectorAll('#remnux-tools-grid .mod-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('remnux-arg').placeholder = tool.placeholder || 'File path...';
+  document.getElementById('remnux-cmd-preview').textContent = '→ ' + tool.cmd;
+  document.getElementById('remnux-arg').focus();
+}
+
+async function ejecutarRemnux() {
+  if (!remnuxToolActiva) { toast('Select a tool first'); return; }
+  const arg = document.getElementById('remnux-arg').value.trim();
+  const out = document.getElementById('output-remnux');
+  out.innerHTML = '';
+  append(out, `[${new Date().toLocaleTimeString()}] Running ${remnuxToolActiva.nombre}...\n`, 'info');
+  append(out, `→ ${remnuxToolActiva.cmd.replace('{arg}', arg)}\n\n`, 'info');
+  const btn = document.getElementById('remnux-exec-btn');
+  btn.disabled = true; btn.textContent = '⏳ Running...';
+  try {
+    const r = await fetch('/api/remnux', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({tool: remnuxToolActiva.id, arg})
+    });
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while(true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value);
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const d = JSON.parse(line.slice(5));
+          if (d.status === 'completado') {
+            const res = d.resultado;
+            if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
+            else append(out, res.output + '\n');
+          } else if (d.status === 'error') {
+            append(out, '❌ Error: ' + d.mensaje + '\n', 'error');
+          }
+        } catch(e) {}
+      }
+    }
+    append(out, '\n✅ Done\n', 'ok');
+  } catch(e) {
+    append(out, 'Connection error: ' + e.message, 'error');
+  }
+  btn.disabled = false; btn.textContent = '▶ Run';
+}
+
+// ── BlackArch ─────────────────────────────────────────────────────────────────
+let blackarchTools = null;
+let blackarchToolActiva = null;
+
+async function cargarBlackarchTools() {
+  if (!blackarchTools) {
+    const r = await fetch('/api/blackarch/tools');
+    blackarchTools = await r.json();
+  }
+}
+
+async function blackarchCat(cat) {
+  await cargarBlackarchTools();
+  document.querySelectorAll('[id^="bcat-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('bcat-'+cat)?.classList.add('active');
+  const grid = document.getElementById('blackarch-tools-grid');
+  grid.innerHTML = '';
+  const ICONS = {recon:'🔍',web:'🌐',passwords:'🔑',windows:'🪟',wireless:'📡',forensics:'🔬',anonymity:'🕵️',osint:'🔎',wifi:'📶',malware:'🦠',documents:'📄',analysis:'🔬',crypto:'🔐',exploits:'💣',network:'📡'};
+  (blackarchTools[cat]||[]).forEach(t => {
+    const btn = document.createElement('div');
+    btn.className = 'mod-btn' + (blackarchToolActiva?.id === t.id ? ' active' : '');
+    btn.innerHTML = `<span class="icon">${ICONS[cat]||'⚙'}</span><div class="name" style="font-size:.7rem">${t.nombre}</div><div class="cat">${t.desc}</div>`;
+    btn.onclick = () => selBlackarchTool(t, btn);
+    grid.appendChild(btn);
+  });
+}
+
+function selBlackarchTool(tool, el) {
+  blackarchToolActiva = tool;
+  document.querySelectorAll('#blackarch-tools-grid .mod-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('blackarch-arg').placeholder = tool.placeholder || 'Target or argument...';
+  document.getElementById('blackarch-cmd-preview').textContent = '→ ' + tool.cmd;
+  document.getElementById('blackarch-arg').focus();
+}
+
+async function ejecutarBlackarch() {
+  if (!blackarchToolActiva) { toast('Select a tool first'); return; }
+  const arg = document.getElementById('blackarch-arg').value.trim();
+  const out = document.getElementById('output-blackarch');
+  out.innerHTML = '';
+  append(out, `[${new Date().toLocaleTimeString()}] Running ${blackarchToolActiva.nombre}...\n`, 'info');
+  append(out, `→ ${blackarchToolActiva.cmd.replace('{arg}', arg)}\n\n`, 'info');
+  const btn = document.getElementById('blackarch-exec-btn');
+  btn.disabled = true; btn.textContent = '⏳ Running...';
+  try {
+    const r = await fetch('/api/blackarch', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({tool: blackarchToolActiva.id, arg})
+    });
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while(true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value);
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const d = JSON.parse(line.slice(5));
+          if (d.status === 'completado') {
+            const res = d.resultado;
+            if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
+            else append(out, res.output + '\n');
+          } else if (d.status === 'error') {
+            append(out, '❌ Error: ' + d.mensaje + '\n', 'error');
+          }
+        } catch(e) {}
+      }
+    }
+    append(out, '\n✅ Done\n', 'ok');
+  } catch(e) {
+    append(out, 'Connection error: ' + e.message, 'error');
+  }
+  btn.disabled = false; btn.textContent = '▶ Run';
+}
+
+// ── Analyze ───────────────────────────────────────────────────────────────────
+async function checkURL() {
+  const url = document.getElementById('url-check-input').value.trim();
+  if (!url) { toast('Enter a URL'); return; }
+  const out = document.getElementById('output-url');
+  out.innerHTML = '<span class="info">🔍 Analyzing URL...</span>';
+  try {
+    const r = await fetch('/api/run', {method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({modulo:'url_check',argumento:url})});
+    const reader = r.body.getReader(); const dec = new TextDecoder();
+    let buf = '';
+    while(true) {
+      const {done,value} = await reader.read(); if(done) break;
+      buf += dec.decode(value);
+      const lines = buf.split('\n'); buf = lines.pop();
+      for(const line of lines) {
+        if(!line.startsWith('data:')) continue;
+        const d = JSON.parse(line.slice(5));
+        if(d.status === 'completado') {
+          const res = d.resultado?.resultados || {};
+          out.innerHTML = '';
+          const score = res.score_phishing || 0;
+          const color = score >= 70 ? '#d9564b' : score >= 40 ? '#cc9a3c' : '#6fae7c';
+          append(out, `PHISHING SCORE: ${score}/100 — ${res.nivel_riesgo}\n`, score >= 40 ? 'warn' : 'ok');
+          if(res.flags?.length) {
+            append(out, '\n[!] FLAGS DETECTED:\n', 'warn');
+            res.flags.forEach(f => append(out, `  · ${f}\n`));
+          }
+          if(res.virustotal) {
+            const vt = res.virustotal;
+            append(out, `\n[VirusTotal] Malicious: ${vt.malicioso} | Suspicious: ${vt.sospechoso} | Clean: ${vt.limpio}\n`, vt.malicioso > 0 ? 'error' : 'ok');
+          }
+          if(res.abuseipdb) {
+            append(out, `[AbuseIPDB] IP: ${res.abuseipdb.ip} | Score: ${res.abuseipdb.abuse_score}% | Reports: ${res.abuseipdb.reportes}\n`, res.abuseipdb.abuse_score > 50 ? 'warn' : 'ok');
+          }
+          if(res.ip_dominio) append(out, `[IP] ${res.ip_dominio}\n`, 'info');
+          if(!res.flags?.length && score < 20) append(out, '\n✓ URL appears clean. No phishing indicators.\n', 'ok');
+        }
+      }
+    }
+  } catch(e) { document.getElementById('output-url').innerHTML = '<span class="error">'+e.message+'</span>'; }
+}
+
+async function checkPassword() {
+  const pwd = document.getElementById('pwd-input').value;
+  if (!pwd) { toast('Enter a password'); return; }
+  const out = document.getElementById('output-pwd');
+  out.innerHTML = '<span class="info">🔐 Analyzing...</span>';
+  try {
+    const r = await fetch('/api/run', {method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({modulo:'password',argumento:pwd})});
+    const reader = r.body.getReader(); const dec = new TextDecoder();
+    let buf = '';
+    while(true) {
+      const {done,value} = await reader.read(); if(done) break;
+      buf += dec.decode(value);
+      const lines = buf.split('\n'); buf = lines.pop();
+      for(const line of lines) {
+        if(!line.startsWith('data:')) continue;
+        const d = JSON.parse(line.slice(5));
+        if(d.status === 'completado') {
+          const res = d.resultado?.resultados || {};
+          out.innerHTML = '';
+          const color = res.score >= 75 ? '#6fae7c' : res.score >= 55 ? '#cc9a3c' : '#d9564b';
+          append(out, `LEVEL: ${res.nivel} (${res.score}/100)\n`, res.score >= 55 ? 'ok' : 'warn');
+          append(out, `Length: ${res.longitud} chars | Entropy: ${res.entropia_bits} bits\n`, 'info');
+          append(out, `Approx. crack time: ${res.tiempo_crackeo}\n\n`, 'info');
+          if(res.puntos_fuertes?.length) {
+            append(out, '[+] Strengths:\n', 'ok');
+            res.puntos_fuertes.forEach(p => append(out, `  ✓ ${p}\n`));
+          }
+          if(res.problemas?.length) {
+            append(out, '\n[-] Issues:\n', 'warn');
+            res.problemas.forEach(p => append(out, `  ✗ ${p}\n`));
+          }
+        }
+      }
+    }
+  } catch(e) { document.getElementById('output-pwd').innerHTML = '<span class="error">'+e.message+'</span>'; }
+}
+
+function guardarVTKey() {
+  const key = document.getElementById('vt-key-input').value.trim();
+  fetch('/api/apikeys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vt_key:key})});
+  toast(key ? 'VirusTotal key saved ✓' : 'Key deleted');
+}
+
+function guardarAbuseKey() {
+  const key = document.getElementById('abuse-key-input').value.trim();
+  fetch('/api/apikeys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({abuse_key:key})});
+  toast(key ? 'AbuseIPDB key saved ✓' : 'Key deleted');
+}
+
+// ── Timeline ──────────────────────────────────────────────────────────────────
+async function cargarTimeline() {
+  const cont = document.getElementById('timeline-container');
+  try {
+    const r = await fetch('/api/timeline');
+    const d = await r.json();
+    const evs = d.eventos || [];
+    if (!evs.length) { cont.innerHTML = '<div style="color:#55555f;font-size:.8rem">No timeline data yet.</div>'; return; }
+    const COLORS = {ejecucion:'#d99a4e',dominio:'#5b9bd5',ip:'#d9564b',usuario:'#cc9a3c',email:'#6fae7c',darkweb:'#d9564b'};
+    cont.innerHTML = '<div style="position:absolute;left:10px;top:0;bottom:0;width:2px;background:#26262f"></div>' +
+      evs.map(e => {
+        const color = COLORS[e.modulo] || '#8b8b98';
+        return `<div style="position:relative;margin-bottom:16px;padding-left:20px">
+          <div style="position:absolute;left:-5px;width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #16161c;top:2px"></div>
+          <div style="font-size:.7rem;color:#8b8b98">${e.fecha}</div>
+          <div style="font-size:.8rem;color:#e8e8ee;font-weight:600">${e.descripcion}</div>
+        </div>`;
+      }).join('');
+  } catch(e) { cont.innerHTML = '<div style="color:#d9564b">Error: '+e.message+'</div>'; }
+}
+
+// ── Monitor ───────────────────────────────────────────────────────────────────
+async function iniciarMonitor() {
+  const obj = document.getElementById('mon-obj').value.trim() || '';
+  const intervalo = parseInt(document.getElementById('mon-interval').value);
+  const r = await fetch('/api/monitor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({objetivo:obj,intervalo})});
+  const d = await r.json();
+  toast(d.ok ? 'Monitor started ✓' : 'Already active');
+  refreshMonitor();
+}
+
+async function detenerMonitor() {
+  await fetch('/api/monitor',{method:'DELETE'});
+  toast('Monitor stopped');
+  refreshMonitor();
+}
+
+async function refreshMonitor() {
+  try {
+    const r = await fetch('/api/monitor');
+    const d = await r.json();
+    const st = document.getElementById('mon-status');
+    st.innerHTML = d.activo
+      ? `<span style="color:#6fae7c">● ACTIVE</span> — target: <b>${d.objetivo||'active case'}</b> · interval: ${d.intervalo/60}min`
+      : '<span style="color:#55555f">● INACTIVO</span>';
+    const out = document.getElementById('output-monitor');
+    if (d.alertas && d.alertas.length) {
+      out.innerHTML = '';
+      d.alertas.forEach(a => {
+        append(out, `[${a.ts}] `, 'info');
+        append(out, a.mensaje + '\n', 'warn');
+      });
+    }
+  } catch(e) {}
+}
+
+// ── PDF Export ────────────────────────────────────────────────────────────────
+async function exportarPDF() {
+  const r = await fetch('/api/reporte',{method:'POST'});
+  const d = await r.json();
+  if (d.ok) {
+    window.open('/reporte_pdf?t='+Date.now(),'_blank');
+  }
+}
+
+async function cargarGrafo() {
+  try {
+    const r = await fetch('/api/grafo');
+    const d = await r.json();
+    if (!d.nodes.length) { toast('No data for graph — run OSINT modules first'); return; }
+
+    document.getElementById('grafo-placeholder').style.display = 'none';
+    const cont = document.getElementById('grafo-vis');
+    cont.style.display = 'block';
+    cont.innerHTML = '';
+
+    document.getElementById('grafo-stats').textContent =
+      `${d.stats.nodos} nodos · ${d.stats.conexiones} conexiones`;
+
+    const data = {
+      nodes: new vis.DataSet(d.nodes),
+      edges: new vis.DataSet(d.edges)
+    };
+
+    const options = {
+      background: { color: '#0a0a0e' },
+      nodes: {
+        shape: 'dot',
+        borderWidth: 2,
+        borderWidthSelected: 3,
+        chosen: true,
+        shadow: { enabled: true, color: 'rgba(203,166,247,0.3)', size: 10 }
+      },
+      edges: {
+        width: 1.2,
+        smooth: { type: 'continuous' },
+        arrows: { to: { enabled: true, scaleFactor: 0.5 } },
+        font: { align: 'middle' }
+      },
+      physics: {
+        enabled: true,
+        solver: 'forceAtlas2Based',
+        forceAtlas2Based: { gravitationalConstant: -60, springLength: 120, springConstant: 0.05 },
+        stabilization: { iterations: 150 }
+      },
+      interaction: {
+        hover: true,
+        tooltipDelay: 100,
+        navigationButtons: false,
+        keyboard: true
+      }
+    };
+
+    grafoNet = new vis.Network(cont, data, options);
+
+    grafoNet.on('click', params => {
+      if (!params.nodes.length) return;
+      const nodo = d.nodes.find(n => n.id === params.nodes[0]);
+      if (nodo) {
+        const det = document.getElementById('grafo-detalle');
+        // Los datos OSINT los controla el objetivo investigado: nunca con innerHTML.
+        det.textContent = '';
+        const nom = document.createElement('b');
+        nom.style.color = nodo.color;
+        nom.textContent = nodo.label;
+        const grp = document.createElement('span');
+        grp.style.color = '#55555f';
+        grp.textContent = '  [' + nodo.group + ']';
+        const ttl = document.createElement('span');
+        ttl.style.color = '#e8e8ee';
+        ttl.textContent = nodo.title;
+        det.append(nom, grp, document.createElement('br'), ttl);
+        det.classList.add('show');
+      }
+    });
+
+    grafoNet.on('stabilizationIterationsDone', () => {
+      grafoNet.setOptions({ physics: { enabled: false } });
+    });
+
+  } catch(e) { toast('Error loading graph: ' + e.message); }
+}
+
+function grafoFisica(on) {
+  if (grafoNet) grafoNet.setOptions({ physics: { enabled: on } });
+}
+
+function selMod(mod) {
+  modActivo = mod;
+  document.querySelectorAll('.mod-btn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('onclick') === `selMod('${mod}')`);
+  });
+  toast('Module: ' + mod);
+}
+
+function getOutput() {
+  const outs = {osint:'output',recon:'output2',sim:'output3',datos:'output4'};
+  return document.getElementById(outs[tabActiva] || 'output');
+}
+
+function getArg() {
+  if (tabActiva === 'sim') return document.getElementById('sim-arg').value.trim();
+  const inp = document.querySelector(`#tab-${tabActiva} input[type=text]`);
+  return inp ? inp.value.trim() : '';
+}
+
+function append(out, text, cls='') {
+  const span = document.createElement('span');
+  if (cls) span.className = cls;
+  span.textContent = text;
+  out.appendChild(span);
+  out.scrollTop = out.scrollHeight;
+}
+
+async function ejecutar() {
+  if (!modActivo) { toast('Select a module first'); return; }
+  const arg = getArg();
+  const out = getOutput();
+  out.innerHTML = '';
+  append(out, `[${new Date().toLocaleTimeString()}] Running: ${modActivo} ${arg}\n`, 'info');
+
+  try {
+    const r = await fetch('/api/run', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({modulo: modActivo, argumento: arg, stream: true})
+    });
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    while(true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      const text = dec.decode(value);
+      for (const line of text.split('\n')) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const d = JSON.parse(line.slice(5));
+          if (d.status === 'iniciando') { append(out, '⚡ Processing...\n', 'info'); }
+          else if (d.status === 'completado') {
+            const res = d.resultado;
+            const tipo = res?.tipo || '';
+            const resultados = res?.resultados || {};
+            // Renderizado inteligente por tipo
+            if (tipo === 'render_js' && resultados.screenshot) {
+              append(out, `\n✅ Rendered — ${resultados.titulo || '?'}\n`, 'ok');
+              const img = document.createElement('img');
+              img.src = resultados.screenshot + '?t=' + Date.now();
+              img.style.cssText = 'max-width:100%;border:1px solid #26262f;border-radius:2px;margin:6px 0;display:block';
+              out.appendChild(img);
+              append(out, JSON.stringify(resultados, null, 2) + '\n');
+            } else if (tipo === 'github_secrets') {
+              const h = resultados.hallazgos || [];
+              const repos = resultados.repos_analizados || 0;
+              if (resultados.error) { append(out, '❌ Error: ' + resultados.error + '\n', 'error'); }
+              else if (h.length === 0) {
+                append(out, `\n✓ No exposed secrets in ${repos} analyzed repos.\n`, 'ok');
+              } else {
+                append(out, `\n⚠ ${h.length} SECRETS FOUND in ${repos} repos:\n`, 'warn');
+                h.forEach(x => append(out, `  [${x.tipo}] ${x.repo} · commit ${x.commit} · ${x.archivo}\n  → ${x.valor}\n`, 'error'));
+              }
+            } else {
+              append(out, '\n✅ COMPLETED\n', 'ok');
+              append(out, JSON.stringify(res, null, 2) + '\n');
+            }
+            await refreshStatus();
+            if (grafoNet) cargarGrafo();
+          }
+          else if (d.status === 'error') { append(out, '❌ Error: ' + d.mensaje + '\n', 'error'); }
+        } catch(e) {}
+      }
+    }
+  } catch(e) {
+    append(out, 'Connection error: ' + e.message, 'error');
+  }
+}
+
+async function runSim(mod) {
+  modActivo = mod;
+  const arg = document.getElementById('sim-arg').value.trim();
+  const out = document.getElementById('output3');
+  out.innerHTML = '';
+  append(out, `[${new Date().toLocaleTimeString()}] ${mod}...\n`, 'info');
+  try {
+    const r = await fetch('/api/run', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({modulo:mod, argumento:arg, stream:true})
+    });
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    while(true) {
+      const {done,value} = await reader.read();
+      if (done) break;
+      const text = dec.decode(value);
+      for (const line of text.split('\n')) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const d = JSON.parse(line.slice(5));
+          if (d.status === 'completado') {
+            const analisis = d.resultado?.resultados?.analisis || JSON.stringify(d.resultado,null,2);
+            append(out, '\n' + analisis + '\n');
+          }
+        } catch(e) {}
+      }
+    }
+  } catch(e) { append(out,'Error: '+e.message,'error'); }
+}
+
+async function nuevoCaso() {
+  const nombre = document.getElementById('caso-nombre').value.trim() || 'caso1';
+  const objetivo = document.getElementById('caso-obj').value.trim();
+  if (!objetivo) { toast('Enter the target'); return; }
+  await fetch('/api/caso', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({nombre, objetivo})});
+  await refreshStatus();
+  toast('Case started: ' + nombre);
+}
+
+async function guardarCaso() {
+  const r = await fetch('/api/caso/guardar', {method:'POST'});
+  const d = await r.json();
+  if (d.ok) toast('Case saved ✓');
+  else toast('Error: ' + d.error);
+}
+
+async function limpiarCaso() {
+  await fetch('/api/caso', {method:'DELETE'});
+  await refreshStatus();
+  toast('Case cleared');
+}
+
+async function generarReporte() {
+  const r = await fetch('/api/reporte', {method:'POST'});
+  const d = await r.json();
+  if (d.ok) toast('Report generated: ' + d.path);
+  else toast('Error: ' + d.error);
+}
+
+async function cargarDatos() {
+  const out = document.getElementById('output4');
+  out.innerHTML = '';
+  try {
+    const r = await fetch('/api/datos');
+    const d = await r.json();
+    if (!Object.keys(d.datos).length) { append(out,'No data collected yet.','info'); return; }
+    append(out, JSON.stringify(d.datos, null, 2));
+  } catch(e) { append(out,'Error: '+e.message,'error'); }
+}
+
+async function buscarEnCasos() {
+  const q = document.getElementById('buscar-casos-input').value.trim();
+  if (!q) { toast('Enter something to search'); return; }
+  const out = document.getElementById('output-buscar-casos');
+  out.innerHTML = '<span class="info">Searching...</span>';
+  try {
+    const r = await fetch('/api/buscar?q=' + encodeURIComponent(q));
+    const d = await r.json();
+    out.innerHTML = '';
+    const res = d.resultados || [];
+    if (!res.length) { append(out, 'No matches in any saved case.\n', 'info'); return; }
+    append(out, `${res.length} case(s) matched:\n\n`, 'ok');
+    res.forEach(r2 => {
+      append(out, `[${r2.caso}] target: ${r2.objetivo || '?'} · updated ${r2.actualizado}\n`, 'info');
+      append(out, `  modules: ${r2.modulos_con_match.join(', ') || '?'}\n\n`);
+    });
+  } catch(e) { document.getElementById('output-buscar-casos').innerHTML = '<span class="error">'+e.message+'</span>'; }
+}
+
+async function refreshStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    document.getElementById('sdot').className = 'status-dot on';
+    document.getElementById('slabel').textContent = d.caso ? `${d.caso} — ${d.modulos} modules` : 'ready';
+    window.casoActivo = !!d.caso;
+    const ci = document.getElementById('caso-info');
+    if (d.caso) {
+      ci.innerHTML = `<b>${d.caso}</b> · target: <b>${d.objetivo}</b> · <span class="badge p">${d.modulos} modules</span>`;
+    } else {
+      ci.textContent = 'No active case — create one above';
+    }
+  } catch(e) {
+    document.getElementById('sdot').className = 'status-dot';
+    document.getElementById('slabel').textContent = 'offline';
+  }
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// Init
+(async () => { await refreshStatus(); if (window.casoActivo) cargarGrafo(); })();
+setInterval(refreshStatus, 8000);
+
+// Enter en inputs
+document.querySelectorAll('input[type=text]').forEach(inp => {
+  inp.addEventListener('keydown', e => { if(e.key==='Enter') ejecutar(); });
+});
+</script>
+</body>
+</html>
