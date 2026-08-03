@@ -2117,6 +2117,28 @@ def _t_rdap(entidad, ctx):
     except Exception as _e:
         log.debug("rdap no disponible: %s", _e)
 
+@transform(entrada='ip', salidas=('org',), nombre='greynoise',
+           descripcion='Threat intel de la IP (GreyNoise Community, keyless pero 25/día; 404=no observada)')
+def _t_greynoise(entidad, ctx):
+    try:
+        r = SESSION.get(f'https://api.greynoise.io/v3/community/{entidad.valor}', timeout=8)
+        if r.status_code != 200:   # 404 = IP no observada scanando -> sin enriquecer
+            return
+        d = r.json()
+        if d.get('noise'):
+            entidad.etiquetar('escaneando-internet')
+        if d.get('riot'):
+            entidad.etiquetar('servicio-conocido')
+            if d.get('name'):
+                ctx.emitir('org', d['name'], etiqueta='greynoise')
+        clasif = d.get('classification')
+        if clasif:
+            entidad.propiedades['greynoise'] = clasif
+            if clasif == 'malicious':
+                entidad.etiquetar('malicioso')
+    except Exception as _e:
+        log.debug("greynoise no disponible: %s", _e)
+
 
 @app.route('/api/v2/transforms/<tipo>')
 def api_v2_transforms(tipo):
