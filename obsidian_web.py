@@ -1981,6 +1981,44 @@ def _t_crtsh(entidad, ctx):
     except Exception as _e:
         log.debug("crtsh no disponible: %s", _e)
 
+@transform(entrada='ip', salidas=('pais', 'org', 'asn'), nombre='geo_ip',
+           descripcion='Geolocalización e info de red de la IP (ip-api.com)')
+def _t_geo_ip(entidad, ctx):
+    try:
+        r = SESSION.get(f'http://ip-api.com/json/{entidad.valor}'
+                        '?fields=status,country,org,isp,as', timeout=8)
+        d = r.json()
+        if d.get('status') != 'success':
+            return
+        if d.get('country'):
+            ctx.emitir('pais', d['country'], etiqueta='location')
+        org = d.get('org') or d.get('isp')
+        if org:
+            ctx.emitir('org', org, etiqueta='org')
+        if d.get('as'):
+            ctx.emitir('asn', d['as'], etiqueta='asn')
+    except Exception as _e:
+        log.debug("geo_ip no disponible: %s", _e)
+
+@transform(entrada='usuario', salidas=('email', 'repo'), nombre='github_usuario',
+           descripcion='Email y repos públicos del usuario en GitHub')
+def _t_github(entidad, ctx):
+    try:
+        gh = SESSION.get(f'https://api.github.com/users/{entidad.valor}', timeout=8).json()
+        if not gh.get('login'):
+            return
+        if gh.get('email') and gh['email'] != 'oculto':
+            ctx.emitir('email', gh['email'], etiqueta='github email')
+        repos = SESSION.get(f'https://api.github.com/users/{entidad.valor}/repos'
+                            '?per_page=10&sort=updated', timeout=8)
+        if repos.status_code == 200:
+            for repo in repos.json():
+                if repo.get('name'):
+                    ctx.emitir('repo', repo['name'], etiqueta='repo',
+                               lenguaje=repo.get('language'), stars=repo.get('stargazers_count'))
+    except Exception as _e:
+        log.debug("github_usuario no disponible: %s", _e)
+
 
 @app.route('/api/v2/transforms/<tipo>')
 def api_v2_transforms(tipo):
