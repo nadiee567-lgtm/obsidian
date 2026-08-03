@@ -85,6 +85,8 @@ class Entidad:
     valor: str
     propiedades: dict = field(default_factory=dict)
     origenes: set = field(default_factory=set)     # nombres de transforms/fuentes
+    procedencia: list = field(default_factory=list)  # paso 18: [{transform, input}]
+    tags: set = field(default_factory=set)          # paso 23: interesante/sospechoso/...
     confianza: float = 1.0                          # 0..1
     creada: str = field(default_factory=_ahora)
     id: str = field(default='', init=False)
@@ -97,7 +99,24 @@ class Entidad:
             raise ValueError("valor de entidad vacío")
         if isinstance(self.origenes, (list, tuple)):
             self.origenes = set(self.origenes)
+        if isinstance(self.tags, (list, tuple)):
+            self.tags = set(self.tags)
         self.id = self._calcular_id()
+
+    # ── Paso 23: tags del analista ──
+    def etiquetar(self, *tags) -> None:
+        self.tags.update(tags)
+
+    def quitar_etiqueta(self, tag) -> None:
+        self.tags.discard(tag)
+
+    # ── Paso 18: trazabilidad detallada ──
+    def anotar_procedencia(self, transform, input_id=None) -> None:
+        """Registra qué transform (y sobre qué entidad de entrada) la creó."""
+        self.origenes.add(transform)
+        entrada = {'transform': transform, 'input': input_id}
+        if entrada not in self.procedencia:
+            self.procedencia.append(entrada)
 
     def _calcular_id(self) -> str:
         base = f"{self.tipo}:{self.valor}".encode('utf-8')
@@ -109,6 +128,10 @@ class Entidad:
         if otra.id != self.id:
             raise ValueError("no se puede fusionar entidades de distinto id")
         self.origenes |= otra.origenes
+        self.tags |= otra.tags
+        for p in otra.procedencia:
+            if p not in self.procedencia:
+                self.procedencia.append(p)
         for k, v in otra.propiedades.items():
             if v not in (None, '', [], {}):
                 self.propiedades[k] = v
@@ -119,6 +142,7 @@ class Entidad:
     def to_dict(self) -> dict:
         d = asdict(self)
         d['origenes'] = sorted(self.origenes)   # set no es JSON-serializable
+        d['tags'] = sorted(self.tags)
         return d
 
     @classmethod
@@ -126,6 +150,8 @@ class Entidad:
         e = cls(tipo=d['tipo'], valor=d['valor'],
                 propiedades=dict(d.get('propiedades', {})),
                 origenes=set(d.get('origenes', [])),
+                procedencia=list(d.get('procedencia', [])),
+                tags=set(d.get('tags', [])),
                 confianza=d.get('confianza', 1.0))
         e.creada = d.get('creada', e.creada)
         return e
@@ -155,12 +181,18 @@ class Relacion:
 
 # ── Paso 16 + 17: el Almacén con dedup automático ────────────────────────────
 class Almacen:
-    """Guarda entidades y relaciones de un caso. Deduplica por id al agregar."""
+    """Guarda entidades y relaciones de un caso. Deduplica por id al agregar.
+    Si se le pasa un Bus, publica eventos al crear/fusionar/relacionar (paso 19)."""
 
-    def __init__(self):
+    def __init__(self, bus=None):
         self._entidades: dict[str, Entidad] = {}
         self._relaciones: dict[str, Relacion] = {}
         self._por_tipo: dict[str, set] = {}     # tipo -> {id, ...}
+        self._bus = bus
+
+    def _publicar(self, evento, *args):
+        if self._bus is not None:
+            self._bus.publicar(evento, *args)
 
     # -- entidades --
     def agregar(self, ent: Entidad) -> Entidad:
@@ -168,9 +200,11 @@ class Almacen:
         existente = self._entidades.get(ent.id)
         if existente:
             existente.fusionar(ent)
+            self._publicar('entidad_actualizada', existente)
             return existente
         self._entidades[ent.id] = ent
         self._por_tipo.setdefault(ent.tipo, set()).add(ent.id)
+        self._publicar('entidad_nueva', ent)
         return ent
 
     def crear(self, tipo, valor, **kw) -> Entidad:
@@ -194,7 +228,9 @@ class Almacen:
         oid = origen.id if isinstance(origen, Entidad) else origen
         did = destino.id if isinstance(destino, Entidad) else destino
         rel = Relacion(origen=oid, destino=did, etiqueta=etiqueta)
-        self._relaciones.setdefault(rel.id, rel)
+        if rel.id not in self._relaciones:
+            self._relaciones[rel.id] = rel
+            self._publicar('relacion_nueva', rel)
         return self._relaciones[rel.id]
 
     # -- vistas --

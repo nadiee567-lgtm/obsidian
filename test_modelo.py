@@ -4,6 +4,7 @@ Correr:  ../.venv/bin/python -m pytest test_modelo.py -q
 """
 import pytest
 from core.modelo import Entidad, Relacion, Almacen, normalizar, TIPOS, tipo_valido
+from core.eventos import Bus, ENTIDAD_NUEVA, ENTIDAD_ACTUALIZADA, RELACION_NUEVA
 
 
 # ── id determinístico + normalización (pasos 14, 22) ─────────────────────────
@@ -95,3 +96,65 @@ def test_roundtrip_almacen():
     ent = alm2.buscar('dominio', 'example.com')
     assert ent.origenes == {'whois'}
     assert ent.propiedades == {'reg': 'GoDaddy'}
+
+
+# ── tags del analista (paso 23) ──────────────────────────────────────────────
+def test_tags():
+    e = Entidad('ip', '8.8.8.8')
+    e.etiquetar('interesante', 'revisar')
+    assert e.tags == {'interesante', 'revisar'}
+    e.quitar_etiqueta('revisar')
+    assert e.tags == {'interesante'}
+    # los tags sobreviven la serialización
+    assert set(e.to_dict()['tags']) == {'interesante'}
+    assert Entidad.from_dict(e.to_dict()).tags == {'interesante'}
+
+def test_tags_se_fusionan():
+    a = Entidad('ip', '8.8.8.8', tags={'a'})
+    b = Entidad('ip', '8.8.8.8', tags={'b'})
+    a.fusionar(b)
+    assert a.tags == {'a', 'b'}
+
+
+# ── procedencia detallada (paso 18) ──────────────────────────────────────────
+def test_procedencia():
+    e = Entidad('subdominio', 'mail.example.com')
+    e.anotar_procedencia('transform_subdominios', input_id='abc123')
+    assert 'transform_subdominios' in e.origenes
+    assert {'transform': 'transform_subdominios', 'input': 'abc123'} in e.procedencia
+    # no duplica la misma procedencia
+    e.anotar_procedencia('transform_subdominios', input_id='abc123')
+    assert len(e.procedencia) == 1
+
+
+# ── event bus (paso 19) ──────────────────────────────────────────────────────
+def test_bus_publica_entidad_nueva_y_actualizada():
+    bus = Bus()
+    nuevas, actualizadas = [], []
+    bus.suscribir(ENTIDAD_NUEVA, lambda e: nuevas.append(e))
+    bus.suscribir(ENTIDAD_ACTUALIZADA, lambda e: actualizadas.append(e))
+    alm = Almacen(bus=bus)
+    alm.crear('dominio', 'example.com')            # nueva
+    alm.crear('dominio', 'www.example.com')        # mismo id -> actualizada
+    assert len(nuevas) == 1
+    assert len(actualizadas) == 1
+
+def test_bus_publica_relacion_nueva():
+    bus = Bus()
+    rels = []
+    bus.suscribir(RELACION_NUEVA, lambda r: rels.append(r))
+    alm = Almacen(bus=bus)
+    d = alm.crear('dominio', 'example.com')
+    i = alm.crear('ip', '93.184.216.34')
+    alm.relacionar(d, i, 'resuelve_a')
+    alm.relacionar(d, i, 'resuelve_a')   # dup: no re-publica
+    assert len(rels) == 1
+
+def test_bus_aisla_fallos_de_suscriptor():
+    bus = Bus()
+    ok = []
+    bus.suscribir(ENTIDAD_NUEVA, lambda e: (_ for _ in ()).throw(RuntimeError("boom")))
+    bus.suscribir(ENTIDAD_NUEVA, lambda e: ok.append(e))
+    errores = bus.publicar(ENTIDAD_NUEVA, Entidad('ip', '8.8.8.8'))
+    assert len(ok) == 1, "el segundo suscriptor corre aunque el primero falle"
+    assert len(errores) == 1
