@@ -106,3 +106,53 @@ def test_transform_dispara_eventos_del_bus():
     dom = alm.crear('dominio', 'example.com')   # 1 evento
     tr.ejecutar_por_nombre('dns', dom, alm)     # +1 evento (la ip)
     assert len(nuevas) == 2
+
+
+# ── caché: no repetir el mismo (transform, entidad) — paso 41 ────────────────
+def test_corredor_cachea():
+    corridas = []
+    @tr.transform(entrada='dominio', salidas=('ip',), nombre='dns')
+    def _f(entidad, ctx):
+        corridas.append(1)
+        ctx.emitir('ip', '8.8.8.8')
+
+    alm = Almacen()
+    dom = alm.crear('dominio', 'example.com')
+    corr = tr.Corredor(alm)
+    corr.ejecutar('dns', dom)
+    corr.ejecutar('dns', dom)      # segunda vez: caché, no re-ejecuta
+    assert len(corridas) == 1
+
+
+# ── Machine: cadena que cascada de un tipo al siguiente — paso 39 ────────────
+def test_machine_cascada():
+    @tr.transform(entrada='dominio', salidas=('ip',), nombre='dns')
+    def _dns(entidad, ctx):
+        ctx.emitir('ip', '93.184.216.34', etiqueta='A')
+
+    @tr.transform(entrada='ip', salidas=('puerto',), nombre='ports')
+    def _ports(entidad, ctx):
+        ctx.emitir('puerto', '443', etiqueta='abierto')
+
+    alm = Almacen()
+    dom = alm.crear('dominio', 'example.com')
+    receta = tr.Machine(nombre='recon', pasos=('dns', 'ports'))
+    producidas = tr.Corredor(alm).ejecutar_machine(receta, dom)
+
+    tipos = sorted(e.tipo for e in producidas)
+    assert tipos == ['ip', 'puerto']              # cascada: dominio→ip→puerto
+    assert alm.buscar('puerto', '443') is not None
+
+
+# ── plugins: cargar transforms desde un directorio — paso 42 ─────────────────
+def test_cargar_plugins(tmp_path):
+    plugin = tmp_path / "mi_transform.py"
+    plugin.write_text(
+        "import core.transforms as tr\n"
+        "@tr.transform(entrada='dominio', salidas=('ip',), nombre='plugin_dns')\n"
+        "def f(entidad, ctx):\n"
+        "    ctx.emitir('ip', '1.2.3.4')\n"
+    )
+    cargados = tr.cargar_plugins(str(tmp_path))
+    assert 'mi_transform' in cargados
+    assert tr.REGISTRO.por_nombre('plugin_dns') is not None

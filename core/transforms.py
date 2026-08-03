@@ -129,3 +129,64 @@ def ejecutar_por_nombre(nombre: str, entidad: Entidad, almacen: Almacen) -> list
     if t is None:
         raise KeyError(f"transform no registrado: {nombre}")
     return ejecutar(t, entidad, almacen)
+
+
+# ── Paso 39: Machines (recetas = cadenas de transforms, estilo Maltego) ──────
+@dataclass
+class Machine:
+    """Una receta: transforms en orden que cascada de un tipo al siguiente.
+    Ej: ['dns_resolver','port_scan'] → dominio→ips, luego ips→puertos."""
+    nombre: str
+    pasos: tuple = ()
+    descripcion: str = ''
+
+
+# ── Paso 41: Corredor con caché (no repetir la misma consulta cara) ──────────
+class Corredor:
+    """Ejecuta transforms/machines sobre un almacén, recordando qué
+    (transform, entidad) ya corrió para no repetirlo en la misma sesión."""
+    def __init__(self, almacen: Almacen):
+        self.almacen = almacen
+        self._hechos: set = set()   # {(nombre_transform, entidad_id)}
+
+    def ejecutar(self, nombre: str, entidad: Entidad) -> list:
+        clave = (nombre, entidad.id)
+        if clave in self._hechos:
+            return []               # caché: ya se corrió sobre esta entidad
+        self._hechos.add(clave)
+        return ejecutar_por_nombre(nombre, entidad, self.almacen)
+
+    def ejecutar_machine(self, machine: Machine, semilla: Entidad) -> list:
+        """Corre la receta: cada paso corre sobre las entidades del tipo que
+        espera (semilla + lo producido antes). El caché evita re-ejecutar."""
+        pool = {semilla.id: semilla}
+        producidas = []
+        for paso in machine.pasos:
+            t = REGISTRO.por_nombre(paso)
+            if t is None:
+                continue
+            objetivos = [e for e in list(pool.values()) if e.tipo == t.entrada]
+            for ent in objetivos:
+                for nueva in self.ejecutar(paso, ent):
+                    pool[nueva.id] = nueva
+                    producidas.append(nueva)
+        return producidas
+
+
+# ── Paso 42: cargar transforms desde plugins (sin tocar el core) ─────────────
+def cargar_plugins(directorio: str) -> list:
+    """Importa cada .py de `directorio` (que se auto-registra con @transform).
+    Extensible como el Transform Hub de Maltego. Devuelve los nombres cargados."""
+    import importlib.util
+    import os
+    import glob
+    cargados = []
+    for ruta in sorted(glob.glob(os.path.join(directorio, '*.py'))):
+        base = os.path.splitext(os.path.basename(ruta))[0]
+        if base.startswith('_'):
+            continue
+        spec = importlib.util.spec_from_file_location(f"obsidian_plugin_{base}", ruta)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        cargados.append(base)
+    return cargados
