@@ -8,9 +8,11 @@ Seguridad: los nombres pasan por _slug_caso (anti path traversal) y toda ruta se
 verifica contenida en el directorio de workspaces. Módulo PURO (sin Flask)."""
 import os
 import glob
+import shutil
+import datetime
 
 from core.modelo import Almacen
-from core.persistencia import guardar_almacen, cargar_almacen
+from core.persistencia import guardar_almacen, cargar_almacen, registrar_evento, leer_historial
 from core.validacion import _slug_caso
 
 
@@ -78,3 +80,51 @@ class Gestor:
         if os.path.exists(rn):
             raise ValueError('ya existe un workspace con el nombre nuevo')
         os.rename(rv, rn)
+
+    # ── Historial / auditoría (paso 48) ──
+    def registrar(self, nombre, transform, entrada, salidas):
+        r = self._ruta(nombre)
+        if r and os.path.exists(r):
+            registrar_evento(r, transform, entrada, salidas)
+
+    def historial(self, nombre):
+        r = self._ruta(nombre)
+        return leer_historial(r) if (r and os.path.exists(r)) else []
+
+    # ── Snapshots / versiones (paso 49) ──
+    def _dir_snaps(self, nombre):
+        slug = _slug_caso(nombre)
+        d = os.path.join(self.dir, '_snapshots', slug) if slug else None
+        if d:
+            os.makedirs(d, exist_ok=True)
+        return d
+
+    def snapshot(self, nombre):
+        """Copia el .db del caso a un snapshot con timestamp. Devuelve su id."""
+        r = self._ruta(nombre)
+        d = self._dir_snaps(nombre)
+        if not r or not os.path.exists(r) or not d:
+            raise KeyError('workspace no encontrado')
+        snap_id = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')  # μs: ids únicos
+        shutil.copy2(r, os.path.join(d, snap_id + '.db'))
+        return snap_id
+
+    def listar_snapshots(self, nombre):
+        d = self._dir_snaps(nombre)
+        if not d:
+            return []
+        return sorted((os.path.splitext(os.path.basename(p))[0]
+                       for p in glob.glob(os.path.join(d, '*.db'))), reverse=True)
+
+    def restaurar(self, nombre, snap_id):
+        """Vuelve el caso a un snapshot anterior (hace snapshot del actual antes)."""
+        r = self._ruta(nombre)
+        d = self._dir_snaps(nombre)
+        if not r or not d:
+            raise KeyError('workspace no encontrado')
+        origen = os.path.join(d, _slug_caso(snap_id) + '.db') if _slug_caso(snap_id) else None
+        if not origen or not os.path.exists(origen):
+            raise KeyError('snapshot no encontrado')
+        if os.path.exists(r):
+            self.snapshot(nombre)     # respaldar el estado actual antes de pisar
+        shutil.copy2(origen, r)

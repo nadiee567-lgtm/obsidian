@@ -2204,9 +2204,10 @@ def api_v2_run():
         producidas = ejecutar_por_nombre(nombre, semilla, _almacen)
     except (KeyError, ValueError) as e:
         return _error(str(e), 400)
-    if _ws_activo:                              # autosave (paso 46)
+    if _ws_activo:                              # autosave (46) + auditoría (48)
         try:
             _gestor.guardar(_ws_activo, _almacen)
+            _gestor.registrar(_ws_activo, nombre, valor, len(producidas))
         except Exception as _e:
             log.warning("autosave falló: %s", _e)
     return jsonify({'producidas': [e.to_dict() for e in producidas],
@@ -2250,6 +2251,24 @@ def api_v2_workspace_abrir():
         return _error('workspace no encontrado', 404)
     _ws_activo = _slug_caso(nombre)
     return jsonify({'ok': True, 'activo': _ws_activo, 'total_entidades': len(_almacen)})
+
+@app.route('/api/v2/workspaces/historial')
+def api_v2_ws_historial():
+    """Historial de transforms del workspace activo (F3 paso 48)."""
+    return jsonify({'historial': _gestor.historial(_ws_activo) if _ws_activo else []})
+
+@app.route('/api/v2/workspaces/snapshot', methods=['GET', 'POST'])
+def api_v2_ws_snapshot():
+    """Crear (POST) o listar (GET) snapshots del workspace activo (F3 paso 49)."""
+    if not _ws_activo:
+        return _error('no hay workspace activo', 400)
+    if request.method == 'POST':
+        try:
+            sid = _gestor.snapshot(_ws_activo)
+        except KeyError:
+            return _error('workspace no encontrado', 404)
+        return jsonify({'ok': True, 'snapshot': sid})
+    return jsonify({'snapshots': _gestor.listar_snapshots(_ws_activo)})
 
 @app.route('/v2')
 def v2_page():

@@ -7,6 +7,7 @@ entidad — consultable, a diferencia de un blob JSON. Base de los workspaces
 Módulo PURO respecto a Flask: recibe la ruta de la DB, no depende del server."""
 import sqlite3
 import json
+import datetime
 
 from core.modelo import Entidad, Almacen
 
@@ -27,6 +28,13 @@ CREATE TABLE IF NOT EXISTS relaciones (
     origen TEXT NOT NULL,
     destino TEXT NOT NULL,
     etiqueta TEXT
+);
+CREATE TABLE IF NOT EXISTS historial (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts TEXT,
+    transform TEXT,
+    entrada TEXT,
+    salidas INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_ent_tipo  ON entidades(tipo);
 CREATE INDEX IF NOT EXISTS idx_ent_valor ON entidades(valor);
@@ -87,3 +95,27 @@ def cargar_almacen(db_path: str) -> Almacen:
         alm.relacionar(row[0], row[1], row[2] or '')
     con.close()
     return alm
+
+
+# ── Historial / auditoría por caso (F3 paso 48) ──────────────────────────────
+def registrar_evento(db_path: str, transform: str, entrada: str, salidas: int) -> None:
+    """Anota que se corrió un transform (qué, cuándo, cuántos resultados)."""
+    con = _conectar(db_path)
+    with con:
+        con.execute(
+            "INSERT INTO historial (ts,transform,entrada,salidas) VALUES (?,?,?,?)",
+            (datetime.datetime.now().isoformat(timespec='seconds'), transform, entrada, salidas),
+        )
+    con.close()
+
+
+def leer_historial(db_path: str, limite: int = 100) -> list:
+    """Historial del caso, más reciente primero."""
+    con = _conectar(db_path)
+    con.row_factory = sqlite3.Row
+    filas = con.execute(
+        "SELECT ts,transform,entrada,salidas FROM historial ORDER BY id DESC LIMIT ?",
+        (limite,),
+    ).fetchall()
+    con.close()
+    return [dict(f) for f in filas]

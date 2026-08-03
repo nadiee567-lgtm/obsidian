@@ -71,3 +71,30 @@ def test_nombres_maliciosos_rechazados(tmp_path):
             g.crear(malo)
     # y no se creó nada fuera del directorio
     assert g.listar() == []
+
+
+def test_historial(tmp_path):
+    g = Gestor(str(tmp_path))
+    g.crear('caso')
+    g.registrar('caso', 'dns_a', 'example.com', 3)
+    g.registrar('caso', 'rdap', 'example.com', 5)
+    h = g.historial('caso')
+    assert len(h) == 2
+    assert h[0]['transform'] == 'rdap' and h[0]['salidas'] == 5   # más reciente primero
+
+
+def test_snapshots(tmp_path):
+    g = Gestor(str(tmp_path))
+    a = g.crear('caso')
+    a.crear('ip', '8.8.8.8')
+    g.guardar('caso', a)
+    sid = g.snapshot('caso')
+    assert sid in g.listar_snapshots('caso')
+
+    # cambiar el caso, luego restaurar el snapshot -> vuelve el estado viejo
+    a2 = g.cargar('caso')
+    a2.crear('ip', '1.1.1.1')
+    g.guardar('caso', a2)
+    assert len(g.cargar('caso')) == 2
+    g.restaurar('caso', sid)
+    assert len(g.cargar('caso')) == 1   # volvió al snapshot (solo 8.8.8.8)
