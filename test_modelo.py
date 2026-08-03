@@ -117,6 +117,16 @@ def test_tags_se_fusionan():
 
 
 # ── procedencia detallada (paso 18) ──────────────────────────────────────────
+def test_valor_bien_formado():
+    assert Entidad('ip', '8.8.8.8').valor_bien_formado() is True
+    assert Entidad('dominio', 'example.com').valor_bien_formado() is True
+    assert Entidad('email', 'a@b.com').valor_bien_formado() is True
+    # un valor con forma inválida para su tipo se detecta (aunque se pueda crear)
+    assert Entidad('ip', '999.999.999.999').valor_bien_formado() is False
+    # tipos sin validador estricto: siempre True (persona con espacios, etc.)
+    assert Entidad('persona', 'Juan Perez Garcia').valor_bien_formado() is True
+
+
 def test_procedencia():
     e = Entidad('subdominio', 'mail.example.com')
     e.anotar_procedencia('transform_subdominios', input_id='abc123')

@@ -15,6 +15,15 @@ import ipaddress
 import datetime
 from dataclasses import dataclass, field, asdict
 
+from core.validacion import _validar   # paso 25: una sola fuente de verdad
+
+# Tipo de entidad → tipo de validación de core.validacion (los que tienen forma
+# estricta). Los demás (persona, org, hash...) no se validan por forma.
+_TIPO_VALIDACION = {
+    'ip': 'ip', 'dominio': 'dominio', 'subdominio': 'dominio',
+    'email': 'email', 'usuario': 'usuario',
+}
+
 
 # ── Paso 13: catálogo de tipos de entidad ────────────────────────────────────
 # Única fuente de verdad de qué tipos existen y cómo se ven (el grafo leerá de
@@ -121,6 +130,14 @@ class Entidad:
     def _calcular_id(self) -> str:
         base = f"{self.tipo}:{self.valor}".encode('utf-8')
         return hashlib.sha1(base).hexdigest()[:16]
+
+    def valor_bien_formado(self) -> bool:
+        """True si el valor tiene forma válida para su tipo, usando los MISMOS
+        validadores de seguridad (paso 25). Tipos sin forma estricta (persona,
+        org, hash...) devuelven True. No se fuerza al construir: es un check
+        opcional para que los transforms filtren basura antes de agregar."""
+        tv = _TIPO_VALIDACION.get(self.tipo)
+        return True if tv is None else _validar(self.valor, tv)
 
     def fusionar(self, otra: 'Entidad') -> None:
         """Absorbe otra entidad del mismo id (paso 17): une orígenes y
