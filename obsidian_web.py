@@ -4,6 +4,7 @@ import subprocess, requests, json, os, re, sys, threading, time, datetime, html,
 import shutil, tempfile, glob, base64, sqlite3, ipaddress
 from urllib.parse import urlparse, urljoin
 from flask import Flask, request, jsonify, Response, stream_with_context, send_from_directory, session, redirect
+from werkzeug.exceptions import HTTPException
 
 from core.config import HOME, HOME_INIT, CASES_DIR, STATIC_DIR, CASES_DB, PORT, VIS_FILE as _VIS
 from core.validacion import (_SHELL_PELIGROSOS, _MODULO_TIPO, _es_ip, _validar,
@@ -17,6 +18,25 @@ app   = Flask(__name__,
               static_url_path='/static')
 os.makedirs(CASES_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
+
+# ── Manejo uniforme de errores (paso 11) ─────────────────────────────────────
+def _error(mensaje, codigo=400):
+    """Respuesta de error consistente en JSON: {'error': msg, 'code': n}."""
+    return jsonify({'error': mensaje, 'code': codigo}), codigo
+
+@app.errorhandler(Exception)
+def _manejar_error(e):
+    """Cualquier error termina en JSON uniforme para rutas /api. Las excepciones
+    no controladas se loguean completas del lado servidor, pero al cliente solo
+    le llega un mensaje genérico — no filtrar el stack trace."""
+    if isinstance(e, HTTPException):
+        if request.path.startswith('/api/'):
+            return _error(e.description or e.name, e.code)
+        return e   # páginas normales: 404/405 HTML por defecto
+    log.exception("error no controlado en %s %s", request.method, request.path)
+    if request.path.startswith('/api/'):
+        return _error('Error interno del servidor', 500)
+    return 'Error interno del servidor', 500
 
 def _db_init():
     con = sqlite3.connect(CASES_DB)
