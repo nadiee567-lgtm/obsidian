@@ -8,7 +8,7 @@
   :root{
     --bg:#0b0d12; --panel:#12141c; --panel2:#171a24; --line:#232735;
     --text:#c8cfdf; --muted:#6b7488; --blue:#7aa2f7; --amber:#e0af68;
-    --green:#9ece6a; --red:#f7768e; --mauve:#bb9af7; --cyan:#7dcfff;
+    --green:#9ece6a; --red:#f7768e; --mauve:#bb9af7; --cyan:#7dcfff; --dim:#454b5c;
     --mono:ui-monospace,Menlo,Consolas,monospace;
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   }
@@ -20,6 +20,10 @@
   .sub{color:var(--muted);font-size:.82rem;font-family:var(--mono);margin-bottom:1.5rem}
   .sub a{color:var(--blue);text-decoration:none}
 
+  .wsbar{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.7rem;font-family:var(--mono);font-size:.8rem}
+  .wslabel{color:var(--muted);letter-spacing:.1em;text-transform:uppercase;font-size:.66rem}
+  .wssep{color:var(--dim)}
+  .wsactivo{color:var(--muted);margin-left:auto} .wsactivo b{color:var(--amber)}
   .barra{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.9rem}
   select,input,button{font-family:var(--mono);font-size:.85rem;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:.5rem .7rem}
   input{flex:1;min-width:180px}
@@ -60,6 +64,16 @@
 <div class="wrap">
   <h1><span class="sq">⬛</span> OBSIDIAN · motor v2</h1>
   <div class="sub">demo del modelo tipado + transforms · <a href="/">← interfaz clásica</a></div>
+
+  <div class="wsbar">
+    <span class="wslabel">workspace</span>
+    <select id="wsSel"></select>
+    <button id="btnAbrir">Abrir</button>
+    <span class="wssep">·</span>
+    <input id="wsNuevo" placeholder="nombre nuevo" autocomplete="off">
+    <button id="btnCrear">+ Crear</button>
+    <span class="wsactivo">activo: <b id="wsActivo">—</b></span>
+  </div>
 
   <div class="barra">
     <select id="tipo">
@@ -165,8 +179,34 @@ async function pintarGrafo(){
   });
 }
 
+// ── workspaces (F3) ──
+async function cargarWorkspaces(){
+  const d = await (await fetch('/api/v2/workspaces')).json();
+  const sel = $('#wsSel'); sel.textContent='';
+  d.workspaces.forEach(w=>{ const o=el('option'); o.value=w; o.textContent=w; sel.appendChild(o); });
+  $('#wsActivo').textContent = d.activo || 'ninguno (efímero)';
+  if(d.activo) sel.value = d.activo;
+}
+async function abrirWs(){
+  const n = $('#wsSel').value; if(!n) return;
+  const r = await fetch('/api/v2/workspaces/abrir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
+  if(r.ok){ setStatus('workspace abierto: '+n); await cargarWorkspaces(); await pintarGrafo(); }
+}
+async function crearWs(){
+  const n = $('#wsNuevo').value.trim(); if(!n){ setStatus('escribe un nombre de workspace', true); return; }
+  const r = await fetch('/api/v2/workspaces',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
+  const d = await r.json();
+  if(!r.ok){ setStatus('error: '+(d.error||r.status), true); return; }
+  $('#wsNuevo').value=''; setStatus('workspace creado y activo: '+d.activo);
+  await cargarWorkspaces(); await pintarGrafo();
+}
+$('#btnAbrir').onclick = abrirWs;
+$('#btnCrear').onclick = crearWs;
+$('#wsNuevo').addEventListener('keydown', e=>{ if(e.key==='Enter') crearWs(); });
+
 $('#btnCargar').onclick = cargarTransforms;
 $('#valor').addEventListener('keydown', e=>{ if(e.key==='Enter') cargarTransforms(); });
+cargarWorkspaces();
 pintarGrafo();  // por si ya hay algo en la sesión
 </script>
 </body>
