@@ -18,12 +18,15 @@ def _client():
 
 def test_transforms_reales_registrados():
     nombres = {t.nombre for t in REGISTRO.todos()}
-    assert {'dns_a', 'ptr', 'crtsh', 'geo_ip', 'github_usuario'} <= nombres
+    assert {'dns_a', 'ptr', 'crtsh', 'geo_ip', 'github_usuario',
+            'puertos', 'dns_mx', 'dns_ns'} <= nombres
 
 
 def test_transforms_aplicables_por_tipo():
     ip = {t.nombre for t in REGISTRO.aplicables('ip')}
-    assert {'ptr', 'geo_ip'} <= ip
+    assert {'ptr', 'geo_ip', 'puertos'} <= ip
+    dominio = {t.nombre for t in REGISTRO.aplicables('dominio')}
+    assert {'dns_a', 'crtsh', 'dns_mx', 'dns_ns'} <= dominio
     usuario = {t.nombre for t in REGISTRO.aplicables('usuario')}
     assert 'github_usuario' in usuario
 

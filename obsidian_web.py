@@ -2019,6 +2019,44 @@ def _t_github(entidad, ctx):
     except Exception as _e:
         log.debug("github_usuario no disponible: %s", _e)
 
+@transform(entrada='ip', salidas=('puerto',), nombre='puertos',
+           descripcion='Puertos abiertos y servicios (nmap top-20)')
+def _t_puertos(entidad, ctx):
+    if not _which('nmap'):
+        return
+    out = run_tool(['nmap', '-T4', '--top-ports', '20', '-sV', '--open', entidad.valor], timeout=60)
+    for linea in out.splitlines():
+        if '/tcp' not in linea and '/udp' not in linea:
+            continue
+        parts = linea.split()
+        num = parts[0].split('/')[0] if parts else ''
+        if not num.isdigit():
+            continue
+        servicio = parts[2] if len(parts) > 2 else '?'
+        # el valor lleva la IP: puerto 80 de dos hosts != el mismo nodo
+        ctx.emitir('puerto', f'{entidad.valor}:{num}', etiqueta='abierto', servicio=servicio)
+
+@transform(entrada='dominio', salidas=('dominio',), nombre='dns_mx',
+           descripcion='Servidores de correo del dominio (MX)')
+def _t_dns_mx(entidad, ctx):
+    out = run_tool(['dig', entidad.valor, 'MX', '+short'], timeout=10)
+    for linea in out.splitlines():
+        linea = linea.strip().rstrip('.')
+        if not linea:
+            continue
+        host = linea.split()[-1]   # "10 mail.example.com" -> "mail.example.com"
+        if host:
+            ctx.emitir('dominio', host, etiqueta='MX')
+
+@transform(entrada='dominio', salidas=('dominio',), nombre='dns_ns',
+           descripcion='Name servers del dominio (NS)')
+def _t_dns_ns(entidad, ctx):
+    out = run_tool(['dig', entidad.valor, 'NS', '+short'], timeout=10)
+    for linea in out.splitlines():
+        host = linea.strip().rstrip('.')
+        if host:
+            ctx.emitir('dominio', host, etiqueta='NS')
+
 
 @app.route('/api/v2/transforms/<tipo>')
 def api_v2_transforms(tipo):
