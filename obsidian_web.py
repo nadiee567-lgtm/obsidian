@@ -6,13 +6,14 @@ from urllib.parse import urlparse, urljoin
 from flask import Flask, request, jsonify, Response, stream_with_context, send_from_directory, session, redirect
 from werkzeug.exceptions import HTTPException
 
-from core.config import HOME, HOME_INIT, CASES_DIR, STATIC_DIR, CASES_DB, PORT, VIS_FILE as _VIS
+from core.config import HOME, HOME_INIT, CASES_DIR, STATIC_DIR, CASES_DB, PORT, WORKSPACES_DIR, VIS_FILE as _VIS
 from core.validacion import (_SHELL_PELIGROSOS, _MODULO_TIPO, _es_ip, _validar,
                              _objetivo_seguro, _slug_caso, _ruta_caso_segura, _url_publica)
 from core.registro import get_logger
 from core.modelo import Almacen, Entidad, tipo_valido
 from core.transforms import transform, REGISTRO, ejecutar_por_nombre
 from core.migracion import migrar_caso
+from core.workspaces import Gestor
 
 log = get_logger()
 
@@ -204,6 +205,11 @@ case_lock = threading.Lock()
 # Modelo tipado de la sesión (F2, integración del motor de transforms).
 # Convive con `case` mientras migramos; los endpoints /api/v2/* usan esto.
 _almacen = Almacen()
+
+# F3: gestor de workspaces (casos aislados en SQLite). _ws_activo = None -> modo
+# efímero (no se guarda); si hay uno activo, cada transform hace autosave.
+_gestor = Gestor(WORKSPACES_DIR)
+_ws_activo = None
 
 SYSTEM = """You are OBSIDIAN AI, an OSINT intelligence analysis engine.
 ROLE: Expert analyst. Correlate data, find patterns, generate actionable conclusions.
@@ -2198,8 +2204,13 @@ def api_v2_run():
         producidas = ejecutar_por_nombre(nombre, semilla, _almacen)
     except (KeyError, ValueError) as e:
         return _error(str(e), 400)
+    if _ws_activo:                              # autosave (paso 46)
+        try:
+            _gestor.guardar(_ws_activo, _almacen)
+        except Exception as _e:
+            log.warning("autosave falló: %s", _e)
     return jsonify({'producidas': [e.to_dict() for e in producidas],
-                    'total_entidades': len(_almacen)})
+                    'total_entidades': len(_almacen), 'workspace': _ws_activo})
 
 @app.route('/api/v2/grafo')
 def api_v2_grafo():
@@ -2207,6 +2218,38 @@ def api_v2_grafo():
     if request.args.get('migrar') == '1':
         return jsonify(migrar_caso(case).to_dict())
     return jsonify(_almacen.to_dict())
+
+@app.route('/api/v2/workspaces', methods=['GET', 'POST', 'DELETE'])
+def api_v2_workspaces():
+    """CRUD de workspaces (F3 paso 44). Cada uno es un caso aislado en SQLite."""
+    global _almacen, _ws_activo
+    if request.method == 'GET':
+        return jsonify({'workspaces': _gestor.listar(), 'activo': _ws_activo})
+    nombre = (request.json or {}).get('nombre', '')
+    if request.method == 'POST':
+        try:
+            _almacen = _gestor.crear(nombre)
+        except ValueError as e:
+            return _error(str(e), 400)
+        _ws_activo = _slug_caso(nombre)
+        return jsonify({'ok': True, 'activo': _ws_activo})
+    if request.method == 'DELETE':
+        _gestor.borrar(nombre)
+        if _ws_activo == _slug_caso(nombre):
+            _almacen, _ws_activo = Almacen(), None
+        return jsonify({'ok': True, 'activo': _ws_activo})
+
+@app.route('/api/v2/workspaces/abrir', methods=['POST'])
+def api_v2_workspace_abrir():
+    """Carga un workspace en memoria y lo hace el activo (F3 paso 45)."""
+    global _almacen, _ws_activo
+    nombre = (request.json or {}).get('nombre', '')
+    try:
+        _almacen = _gestor.cargar(nombre)
+    except KeyError:
+        return _error('workspace no encontrado', 404)
+    _ws_activo = _slug_caso(nombre)
+    return jsonify({'ok': True, 'activo': _ws_activo, 'total_entidades': len(_almacen)})
 
 @app.route('/v2')
 def v2_page():

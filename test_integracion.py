@@ -80,6 +80,35 @@ def test_auth_protege_v2():
     assert r.status_code == 401
 
 
+def test_workspaces_flujo(tmp_path):
+    """CRUD + persistencia de workspaces vía endpoints (F3), aislado en tmp."""
+    from core.workspaces import Gestor
+    prev_g, prev_ws, prev_a = ob._gestor, ob._ws_activo, ob._almacen
+    ob._gestor = Gestor(str(tmp_path))
+    ob._ws_activo = None
+    ob._almacen = ob.Almacen()
+    try:
+        c = _client()
+        # crear -> queda activo
+        r = c.post('/api/v2/workspaces', json={'nombre': 'caso demo'})
+        assert r.status_code == 200 and r.get_json()['activo'] == 'caso demo'
+        # listar
+        j = c.get('/api/v2/workspaces').get_json()
+        assert 'caso demo' in j['workspaces'] and j['activo'] == 'caso demo'
+        # simular datos guardados y abrir en limpio
+        ob._almacen.crear('ip', '8.8.8.8')
+        ob._gestor.guardar('caso demo', ob._almacen)
+        ob._almacen = ob.Almacen()
+        r = c.post('/api/v2/workspaces/abrir', json={'nombre': 'caso demo'})
+        assert r.status_code == 200 and r.get_json()['total_entidades'] == 1
+        # borrar -> sin activo
+        r = c.delete('/api/v2/workspaces', json={'nombre': 'caso demo'})
+        assert r.status_code == 200 and r.get_json()['activo'] is None
+        assert c.get('/api/v2/workspaces').get_json()['workspaces'] == []
+    finally:
+        ob._gestor, ob._ws_activo, ob._almacen = prev_g, prev_ws, prev_a
+
+
 def test_guard_recuerda_destino():
     # sin sesión, ir a /v2 redirige a /login Y guarda el destino en la sesión,
     # para volver ahí tras loguear (arregla el rebote a la página vieja)

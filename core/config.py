@@ -13,3 +13,6 @@ CASES_DB   = os.path.join(CASES_DIR, 'casos.db')
 PORT       = int(os.environ.get('OBSIDIAN_PORT', 8767))
 HOST       = os.environ.get('OBSIDIAN_HOST', '127.0.0.1')
 VIS_FILE   = 'vis-network.min.js'
+
+# F3: cada workspace (caso) es una base SQLite aislada dentro de esta carpeta.
+WORKSPACES_DIR = os.path.join(HOME, '.obsidian', 'workspaces')
