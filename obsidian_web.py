@@ -14,6 +14,7 @@ from core.modelo import Almacen, Entidad, tipo_valido
 from core.transforms import transform, REGISTRO, ejecutar_por_nombre
 from core.migracion import migrar_caso
 from core.workspaces import Gestor
+from core.boveda import Boveda
 
 log = get_logger()
 
@@ -210,6 +211,9 @@ _almacen = Almacen()
 # efímero (no se guarda); si hay uno activo, cada transform hace autosave.
 _gestor = Gestor(WORKSPACES_DIR)
 _ws_activo = None
+
+# F3 paso 51: bóveda de API keys cifrada (Fernet).
+_boveda = Boveda(os.path.join(HOME, '.obsidian'))
 
 SYSTEM = """You are OBSIDIAN AI, an OSINT intelligence analysis engine.
 ROLE: Expert analyst. Correlate data, find patterns, generate actionable conclusions.
@@ -2072,10 +2076,11 @@ def _t_dns_ns(entidad, ctx):
            descripcion='Brechas donde apareció el email (HIBP; requiere HIBP_API_KEY real)')
 def _t_email_breaches(entidad, ctx):
     try:
+        hibp_key = _boveda.obtener('hibp') or os.environ.get('HIBP_API_KEY', '')
         r = SESSION.get(
             f'https://haveibeenpwned.com/api/v3/breachedaccount/{requests.utils.quote(entidad.valor)}',
             timeout=8,
-            headers={'hibp-api-key': os.environ.get('HIBP_API_KEY', ''), 'User-Agent': 'OBSIDIAN-OSINT'})
+            headers={'hibp-api-key': hibp_key, 'User-Agent': 'OBSIDIAN-OSINT'})
         if r.status_code == 200:
             for b in r.json():
                 nombre = b.get('Name')
@@ -2269,6 +2274,25 @@ def api_v2_ws_snapshot():
             return _error('workspace no encontrado', 404)
         return jsonify({'ok': True, 'snapshot': sid})
     return jsonify({'snapshots': _gestor.listar_snapshots(_ws_activo)})
+
+@app.route('/api/v2/keys', methods=['GET', 'POST', 'DELETE'])
+def api_v2_keys():
+    """Bóveda de API keys cifrada (F3 paso 51). GET lista solo NOMBRES de
+    servicio (nunca valores). POST guarda; DELETE borra."""
+    if request.method == 'GET':
+        return jsonify({'servicios': _boveda.servicios()})
+    d = request.json or {}
+    servicio = (d.get('servicio', '') or '').strip().lower()
+    if not servicio:
+        return _error('falta el servicio', 400)
+    if request.method == 'POST':
+        valor = d.get('valor', '')
+        if not valor:
+            return _error('falta el valor de la key', 400)
+        _boveda.guardar(servicio, valor)
+        return jsonify({'ok': True, 'servicios': _boveda.servicios()})
+    _boveda.borrar(servicio)   # DELETE
+    return jsonify({'ok': True, 'servicios': _boveda.servicios()})
 
 @app.route('/v2')
 def v2_page():
