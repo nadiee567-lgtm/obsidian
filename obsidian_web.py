@@ -2086,6 +2086,37 @@ def _t_email_spoofable(entidad, ctx):
     if not tiene_spf:
         entidad.etiquetar('spoofable')
 
+@transform(entrada='dominio', salidas=('dominio', 'org'), nombre='rdap',
+           descripcion='WHOIS moderno (RDAP, sin key): registrar, name servers, fechas')
+def _t_rdap(entidad, ctx):
+    try:
+        r = SESSION.get(f'https://rdap.org/domain/{entidad.valor}', timeout=12,
+                        headers={'Accept': 'application/rdap+json'})
+        if r.status_code != 200:
+            return
+        d = r.json()
+        for ent in d.get('entities', []):
+            if 'registrar' in (ent.get('roles') or []):
+                nombre, vc = None, ent.get('vcardArray')
+                if vc and len(vc) > 1:
+                    for campo in vc[1]:
+                        if campo and campo[0] == 'fn':
+                            nombre = campo[3]
+                if nombre:
+                    ctx.emitir('org', nombre, etiqueta='registrar')
+        for ns in d.get('nameservers', []):
+            if ns.get('ldhName'):
+                ctx.emitir('dominio', ns['ldhName'], etiqueta='NS')
+        fechas = {e.get('eventAction'): (e.get('eventDate') or '')[:10] for e in d.get('events', [])}
+        if fechas.get('registration'):
+            entidad.propiedades['creado'] = fechas['registration']
+        if fechas.get('expiration'):
+            entidad.propiedades['expira'] = fechas['expiration']
+        if d.get('status'):
+            entidad.propiedades['status'] = d['status']
+    except Exception as _e:
+        log.debug("rdap no disponible: %s", _e)
+
 
 @app.route('/api/v2/transforms/<tipo>')
 def api_v2_transforms(tipo):
