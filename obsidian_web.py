@@ -157,6 +157,7 @@ def _require_auth():
         return
     if request.path.startswith('/api/'):
         return jsonify({'error': 'No autenticado'}), 401
+    session['next'] = request.path   # recordar a dónde iba, para volver tras el login
     return redirect('/login')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -171,11 +172,15 @@ def login():
         pw = request.form.get('password', '')
         salt = bytes.fromhex(_AUTH['salt'])
         if secrets.compare_digest(_hash_password(pw, salt), _AUTH['hash']):
+            dest = session.get('next', '/')
             session.clear()
             session['auth'] = True
             session.permanent = True
             _login_attempts.pop(ip, None)
-            return redirect('/')
+            # solo rutas internas (anti open-redirect)
+            if not dest.startswith('/') or dest.startswith('//'):
+                dest = '/'
+            return redirect(dest)
         intentos += 1
         bloqueado_hasta = now + _LOCK_SECONDS if intentos >= _LOCK_THRESHOLD else 0
         _login_attempts[ip] = [intentos, bloqueado_hasta]

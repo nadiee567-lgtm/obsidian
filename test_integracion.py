@@ -77,3 +77,13 @@ def test_auth_protege_v2():
     c = ob.app.test_client()
     r = c.get('/api/v2/transforms/dominio')
     assert r.status_code == 401
+
+
+def test_guard_recuerda_destino():
+    # sin sesión, ir a /v2 redirige a /login Y guarda el destino en la sesión,
+    # para volver ahí tras loguear (arregla el rebote a la página vieja)
+    c = ob.app.test_client()
+    r = c.get('/v2')
+    assert r.status_code == 302 and '/login' in r.headers.get('Location', '')
+    with c.session_transaction() as s:
+        assert s.get('next') == '/v2'
