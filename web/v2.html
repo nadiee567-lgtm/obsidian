@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OBSIDIAN · motor v2</title>
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#12141c; --panel2:#171a24; --line:#232735;
+    --text:#c8cfdf; --muted:#6b7488; --blue:#7aa2f7; --amber:#e0af68;
+    --green:#9ece6a; --red:#f7768e; --mauve:#bb9af7; --cyan:#7dcfff;
+    --mono:ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5}
+  .wrap{max-width:1100px;margin:0 auto;padding:1.5rem 1.25rem 4rem}
+  h1{font-family:var(--mono);font-size:1.2rem;letter-spacing:.02em;margin:0 0 .2rem}
+  h1 .sq{color:var(--blue)}
+  .sub{color:var(--muted);font-size:.82rem;font-family:var(--mono);margin-bottom:1.5rem}
+  .sub a{color:var(--blue);text-decoration:none}
+
+  .barra{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.9rem}
+  select,input,button{font-family:var(--mono);font-size:.85rem;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:.5rem .7rem}
+  input{flex:1;min-width:180px}
+  button{cursor:pointer;transition:border-color .15s,background .15s}
+  button:hover{border-color:var(--blue)}
+  button.primary{background:var(--blue);color:#0b0d12;border-color:var(--blue);font-weight:700}
+  button:disabled{opacity:.4;cursor:not-allowed}
+
+  .transforms{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem}
+  .tchip{display:flex;flex-direction:column;gap:.25rem;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.6rem .75rem;min-width:150px}
+  .tchip b{font-family:var(--mono);font-size:.82rem;color:var(--cyan)}
+  .tchip small{color:var(--muted);font-size:.7rem;line-height:1.35}
+  .tchip .key{color:var(--amber);font-size:.65rem;font-family:var(--mono)}
+  .tchip button{margin-top:.3rem;font-size:.72rem;padding:.3rem}
+
+  .cols{display:grid;grid-template-columns:1.4fr 1fr;gap:1rem;margin-top:1.5rem}
+  @media(max-width:760px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1rem}
+  .card h2{font-family:var(--mono);font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 .8rem}
+  .card h2 span{color:var(--text)}
+
+  .grupo{margin-bottom:1rem}
+  .grupo .gt{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem}
+  .ent{display:flex;flex-wrap:wrap;align-items:baseline;gap:.5rem;padding:.4rem .55rem;border-left:2px solid var(--tc,var(--muted));background:var(--panel2);border-radius:0 6px 6px 0;margin-bottom:.35rem}
+  .ent .v{font-family:var(--mono);font-size:.82rem;color:var(--text);word-break:break-all}
+  .tag{font-family:var(--mono);font-size:.62rem;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 .3rem}
+  .prop{font-family:var(--mono);font-size:.68rem;color:var(--muted)}
+  .org{font-family:var(--mono);font-size:.62rem;color:var(--muted)}
+
+  .rel{font-family:var(--mono);font-size:.76rem;color:#aab2c5;padding:.25rem 0;border-bottom:1px solid var(--line)}
+  .rel .a{color:var(--text)} .rel .e{color:var(--amber)} .rel .b{color:var(--cyan)}
+  .vacio{color:var(--muted);font-family:var(--mono);font-size:.8rem}
+  #status{font-family:var(--mono);font-size:.76rem;color:var(--green);min-height:1.1rem;margin-top:.6rem}
+  #status.err{color:var(--red)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="sq">⬛</span> OBSIDIAN · motor v2</h1>
+  <div class="sub">demo del modelo tipado + transforms · <a href="/">← interfaz clásica</a></div>
+
+  <div class="barra">
+    <select id="tipo">
+      <option value="dominio">dominio</option>
+      <option value="ip">ip</option>
+      <option value="email">email</option>
+      <option value="usuario">usuario</option>
+    </select>
+    <input id="valor" placeholder="example.com" autocomplete="off">
+    <button class="primary" id="btnCargar">Ver transforms →</button>
+  </div>
+
+  <div class="transforms" id="transforms"></div>
+  <div id="status"></div>
+
+  <div class="cols">
+    <div class="card">
+      <h2>Entidades · <span id="nEnt">0</span></h2>
+      <div id="entidades"><div class="vacio">Corre un transform para ver el grafo tipado.</div></div>
+    </div>
+    <div class="card">
+      <h2>Relaciones · <span id="nRel">0</span></h2>
+      <div id="relaciones"><div class="vacio">—</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLOR = {objetivo:'#d99a4e',dominio:'#5b9bd5',subdominio:'#7fb8d9',ip:'#d9564b',
+  email:'#6fae7c',usuario:'#cc9a3c',org:'#bb9af7',pais:'#7a85b0',asn:'#7a85b0',
+  puerto:'#8b8b98',tech:'#5fa8a0',repo:'#d99a4e',plataforma:'#c17a52',credencial:'#f7768e'};
+const $ = s => document.querySelector(s);
+const el = (t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
+
+function setStatus(msg, err){ const s=$('#status'); s.textContent=msg; s.className = err?'err':''; }
+
+async function cargarTransforms(){
+  const tipo = $('#tipo').value;
+  setStatus('cargando transforms…');
+  const r = await fetch('/api/v2/transforms/'+tipo);
+  const d = await r.json();
+  const cont = $('#transforms'); cont.textContent='';
+  if(!d.transforms.length){ cont.innerHTML='<div class="vacio">Sin transforms para este tipo.</div>'; setStatus(''); return; }
+  d.transforms.forEach(t=>{
+    const c = el('div','tchip');
+    const b = el('b'); b.textContent = t.nombre; c.appendChild(b);
+    if(t.requiere_key){ const k=el('span','key'); k.textContent='⚿ necesita key'; c.appendChild(k); }
+    const s = el('small'); s.textContent = t.descripcion || ('→ '+t.salidas.join(', ')); c.appendChild(s);
+    const btn = el('button'); btn.textContent='Correr'; btn.onclick=()=>correr(t.nombre); c.appendChild(btn);
+    cont.appendChild(c);
+  });
+  setStatus('elige un transform y córrelo.');
+}
+
+async function correr(nombre){
+  const tipo=$('#tipo').value, valor=$('#valor').value.trim();
+  if(!valor){ setStatus('escribe un objetivo primero.', true); return; }
+  setStatus('corriendo '+nombre+' sobre '+valor+'…');
+  const r = await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tipo,valor,transform:nombre})});
+  const d = await r.json();
+  if(!r.ok){ setStatus('error: '+(d.error||r.status), true); return; }
+  setStatus('✓ '+nombre+': +'+(d.producidas?d.producidas.length:0)+' entidades (total '+d.total_entidades+')');
+  await pintarGrafo();
+}
+
+async function pintarGrafo(){
+  const r = await fetch('/api/v2/grafo'); const g = await r.json();
+  const idMap = {}; g.entidades.forEach(e=> idMap[e.id]=e);
+  $('#nEnt').textContent = g.entidades.length;
+  $('#nRel').textContent = g.relaciones.length;
+
+  // entidades agrupadas por tipo
+  const porTipo = {};
+  g.entidades.forEach(e=>{ (porTipo[e.tipo]=porTipo[e.tipo]||[]).push(e); });
+  const cont = $('#entidades'); cont.textContent='';
+  if(!g.entidades.length){ cont.innerHTML='<div class="vacio">Corre un transform para ver el grafo tipado.</div>'; }
+  Object.keys(porTipo).sort().forEach(tipo=>{
+    const grupo = el('div','grupo');
+    const gt = el('div','gt'); gt.textContent = tipo+' ('+porTipo[tipo].length+')'; grupo.appendChild(gt);
+    porTipo[tipo].forEach(e=>{
+      const row = el('div','ent'); row.style.setProperty('--tc', COLOR[tipo]||'#6b7488');
+      const v = el('span','v'); v.textContent = e.valor; row.appendChild(v);
+      (e.tags||[]).forEach(t=>{ const tg=el('span','tag'); tg.textContent=t; row.appendChild(tg); });
+      Object.entries(e.propiedades||{}).slice(0,3).forEach(([k,val])=>{
+        const p=el('span','prop'); p.textContent=k+'='+val; row.appendChild(p);
+      });
+      if((e.origenes||[]).length){ const o=el('span','org'); o.textContent='◂ '+e.origenes.join(', '); row.appendChild(o); }
+      grupo.appendChild(row);
+    });
+    cont.appendChild(grupo);
+  });
+
+  // relaciones
+  const rc = $('#relaciones'); rc.textContent='';
+  if(!g.relaciones.length){ rc.innerHTML='<div class="vacio">—</div>'; }
+  g.relaciones.forEach(rel=>{
+    const a = idMap[rel.origen], b = idMap[rel.destino];
+    if(!a||!b) return;
+    const d = el('div','rel');
+    d.innerHTML = '<span class="a">'+a.valor+'</span> <span class="e">—'+(rel.etiqueta||'→')+'→</span> <span class="b">'+b.valor+'</span>';
+    rc.appendChild(d);
+  });
+}
+
+$('#btnCargar').onclick = cargarTransforms;
+$('#valor').addEventListener('keydown', e=>{ if(e.key==='Enter') cargarTransforms(); });
+pintarGrafo();  // por si ya hay algo en la sesión
+</script>
+</body>
+</html>

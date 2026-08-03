@@ -2178,6 +2178,12 @@ def api_v2_grafo():
         return jsonify(migrar_caso(case).to_dict())
     return jsonify(_almacen.to_dict())
 
+@app.route('/v2')
+def v2_page():
+    """Página demo del motor v2: correr transforms y ver el grafo tipado.
+    Protegida por el guard de auth (no está en _PUBLIC_PATHS)."""
+    return _cargar_web('v2.html')
+
 
 @app.route('/api/reporte', methods=['POST'])
 def api_reporte():
