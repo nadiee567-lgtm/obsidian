@@ -2057,6 +2057,35 @@ def _t_dns_ns(entidad, ctx):
         if host:
             ctx.emitir('dominio', host, etiqueta='NS')
 
+@transform(entrada='email', salidas=('org',), nombre='email_breaches',
+           descripcion='Brechas donde apareció el email (HIBP; requiere HIBP_API_KEY real)')
+def _t_email_breaches(entidad, ctx):
+    try:
+        r = SESSION.get(
+            f'https://haveibeenpwned.com/api/v3/breachedaccount/{requests.utils.quote(entidad.valor)}',
+            timeout=8,
+            headers={'hibp-api-key': os.environ.get('HIBP_API_KEY', ''), 'User-Agent': 'OBSIDIAN-OSINT'})
+        if r.status_code == 200:
+            for b in r.json():
+                nombre = b.get('Name')
+                if nombre:
+                    ctx.emitir('org', nombre, etiqueta='filtrado en')
+            entidad.etiquetar('filtrado')
+    except Exception as _e:
+        log.debug("hibp no disponible: %s", _e)
+
+@transform(entrada='email', salidas=(), nombre='email_spoofable',
+           descripcion='Revisa el SPF del dominio del email (riesgo de spoofing)')
+def _t_email_spoofable(entidad, ctx):
+    dominio = entidad.valor.split('@')[-1]
+    if not dominio:
+        return
+    txt = run_tool(['dig', dominio, 'TXT', '+short'], timeout=10)
+    tiene_spf = 'v=spf1' in txt.lower()
+    entidad.propiedades['spf'] = 'configurado' if tiene_spf else 'NO CONFIGURADO'
+    if not tiene_spf:
+        entidad.etiquetar('spoofable')
+
 
 @app.route('/api/v2/transforms/<tipo>')
 def api_v2_transforms(tipo):
