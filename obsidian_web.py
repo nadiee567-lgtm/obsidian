@@ -8,6 +8,9 @@ from flask import Flask, request, jsonify, Response, stream_with_context, send_f
 from core.config import HOME, HOME_INIT, CASES_DIR, STATIC_DIR, CASES_DB, PORT, VIS_FILE as _VIS
 from core.validacion import (_SHELL_PELIGROSOS, _MODULO_TIPO, _es_ip, _validar,
                              _objetivo_seguro, _slug_caso, _ruta_caso_segura, _url_publica)
+from core.registro import get_logger
+
+log = get_logger()
 
 app   = Flask(__name__,
               static_folder=os.path.join(HOME_INIT, 'obsidian-static'),
@@ -39,7 +42,7 @@ def _db_guardar_caso(caso_dict):
         con.commit()
         con.close()
     except Exception as e:
-        print("[obsidian] error guardando espejo SQLite:", e, file=sys.stderr)
+        log.error("error guardando espejo SQLite: %s", e)
 
 def _db_buscar(termino):
     """Busca un término (email, dominio, usuario...) en todos los casos guardados."""
@@ -275,7 +278,7 @@ def _osint_persona(nombre):
             datos['resultados']['resumen'] = d['AbstractText'][:400]
         topics = [t['Text'][:200] for t in d.get('RelatedTopics',[])[:5] if isinstance(t,dict) and t.get('Text')]
         if topics: datos['resultados']['temas'] = topics
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     # Dorks
     datos['resultados']['dorks'] = [
         f'"{nombre}" site:linkedin.com',
@@ -291,7 +294,7 @@ def _osint_persona(nombre):
         r = SESSION.get(f"https://haveibeenpwned.com/unifiedsearch/{requests.utils.quote(nombre)}",
                        timeout=6, headers={'User-Agent':'OSINT-Research'})
         datos['resultados']['hibp'] = 'Posible presencia en HIBP' if r.status_code==200 else 'No encontrado en HIBP'
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     _guardar_dato(f'persona_{nombre}', datos)
     return datos
 
@@ -315,7 +318,7 @@ def _osint_usuario(username):
             r = SESSION.get(url, timeout=5, allow_redirects=True)
             if r.status_code == 200 and 'not found' not in r.text.lower()[:300]:
                 encontrados.append({'plataforma':plat,'url':url})
-        except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+        except Exception as _e: log.debug("fuente no disponible: %s", _e)
     ths = [threading.Thread(target=_check, args=(p,u)) for p,u in plataformas.items()]
     for t in ths: t.start()
     for t in ths: t.join(timeout=8)
@@ -336,7 +339,7 @@ def _osint_usuario(username):
                 repos = [{'nombre':r['name'],'url':r['html_url'],'stars':r['stargazers_count'],
                           'lenguaje':r.get('language','?')} for r in repos_r.json()]
                 datos['resultados']['github_repos'] = repos
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     # Sherlock
     if _which('sherlock'):
         out = _cmd(f'sherlock {username} --timeout 5 --print-found 2>/dev/null', timeout=60)
@@ -360,7 +363,7 @@ def _osint_usuario(username):
                             sitio = rec.get('sitename') or rec.get('site_name') or rec.get('name') or '?'
                             url   = rec.get('url_user') or rec.get('url') or ''
                             encontrados_mg.append({'plataforma': sitio, 'url': url})
-                except Exception as _e: print("[obsidian] maigret parse:", _e, file=sys.stderr)
+                except Exception as _e: log.debug("maigret parse: %s", _e)
             if encontrados_mg:
                 datos['resultados']['maigret'] = encontrados_mg
     _guardar_dato(f'usuario_{username}', datos)
@@ -390,7 +393,7 @@ def _osint_dominio(dominio):
                 s = s.strip().lstrip('*.')
                 if s.endswith(dominio) and s != dominio: subs.add(s)
         datos['resultados']['subdominios'] = sorted(list(subs))[:30]
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     # Headers / Tecnologías
     try:
         import urllib3; urllib3.disable_warnings()
@@ -401,7 +404,7 @@ def _osint_dominio(dominio):
                                     'X-Frame-Options','X-Content-Type-Options'] if k not in h]
         datos['resultados']['tecnologias'] = tech
         datos['resultados']['headers_faltantes'] = missing_sec
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     # theHarvester
     if _which('theHarvester'):
         out = _cmd(f'theHarvester -d {dominio} -b duckduckgo -l 50 2>/dev/null', timeout=45)
@@ -414,7 +417,7 @@ def _osint_dominio(dominio):
         r = SESSION.get(f'http://archive.org/wayback/available?url={dominio}', timeout=8)
         snap = r.json().get('archived_snapshots',{}).get('closest',{})
         if snap.get('url'): datos['resultados']['wayback'] = snap
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     _guardar_dato(f'dominio_{dominio}', datos)
     return datos
 
@@ -425,7 +428,7 @@ def _osint_ip(ip):
         r = SESSION.get(f'http://ip-api.com/json/{ip}?fields=status,country,regionName,city,isp,org,as,lat,lon,mobile,proxy,hosting', timeout=8)
         d = r.json()
         if d.get('status') == 'success': datos['resultados']['geo'] = d
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     # Puertos
     if _which('nmap'):
         out = run_tool(['nmap','-T4','--top-ports','20','-sV','--open',ip], timeout=60)
@@ -438,7 +441,7 @@ def _osint_ip(ip):
     try:
         r = SESSION.get(f'https://api.hackertarget.com/aslookup/?q={ip}', timeout=8)
         datos['resultados']['asn'] = r.text.strip()
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     _guardar_dato(f'ip_{ip}', datos)
     return datos
 
@@ -451,7 +454,7 @@ def _osint_email(email):
                        timeout=8, headers={'X-RapidAPI-Key':'demo','X-RapidAPI-Host':'breachdirectory.p.rapidapi.com'})
         if r.status_code == 200:
             datos['resultados']['breach'] = r.json()
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     # HIBP
     try:
         r = SESSION.get(f'https://haveibeenpwned.com/api/v3/breachedaccount/{requests.utils.quote(email)}',
@@ -461,7 +464,7 @@ def _osint_email(email):
             datos['resultados']['hibp_breaches'] = breaches
         elif r.status_code == 404:
             datos['resultados']['hibp_breaches'] = []
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     # SPF/DKIM/DMARC del dominio
     if dominio:
         spf   = _cmd(f'dig {dominio} TXT +short 2>/dev/null')
@@ -484,7 +487,7 @@ def _osint_phone(numero):
     try:
         r = SESSION.get(f'https://api.hackertarget.com/ipgeo/?q={numero_limpio}', timeout=8)
         datos['resultados']['raw'] = r.text.strip()
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     # NumVerify (sin key — básico)
     try:
         r = SESSION.get(f'http://apilayer.net/api/validate?number={numero_limpio}', timeout=8)
@@ -496,7 +499,7 @@ def _osint_phone(numero):
                 'carrier': d.get('carrier','?'),
                 'tipo': d.get('line_type','?')
             }
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     # Buscar en redes
     datos['resultados']['busquedas'] = [
         f'"{numero}" site:truecaller.com',
@@ -567,7 +570,7 @@ def _recon_ssl(dominio):
         r = SESSION.get(f'https://{dominio}', timeout=8, verify=False)
         datos['resultados']['hsts'] = r.headers.get('Strict-Transport-Security','NO CONFIGURADO')
         datos['resultados']['ocsp'] = 'Verificar manualmente'
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     _guardar_dato(f'ssl_{dominio}', datos)
     return datos
 
@@ -588,7 +591,7 @@ def _recon_favicon(dominio):
             if r.status_code == 200 and r.content:
                 favicon_bytes = r.content
                 break
-        except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+        except Exception as _e: log.debug("fuente no disponible: %s", _e)
     if not favicon_bytes:
         datos['resultados']['error'] = 'No se encontró favicon.ico en el objetivo (probar con otra ruta manualmente)'
         _guardar_dato(f'favicon_{dominio}', datos)
@@ -671,7 +674,7 @@ def _recon_buckets(empresa):
                         'status': r.status_code,
                         'publico': r.status_code == 200
                     })
-            except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+            except Exception as _e: log.debug("fuente no disponible: %s", _e)
     ths = [threading.Thread(target=_check, args=(b,)) for b in variantes]
     for t in ths: t.start()
     for t in ths: t.join(timeout=15)
@@ -852,7 +855,7 @@ def _recon_yara_bulk(carpeta):
         except subprocess.TimeoutExpired:
             continue
         except Exception as _e:
-            print("[obsidian] yara error:", _e, file=sys.stderr)
+            log.warning("yara error: %s", _e)
             continue
         if salida and 'no rules matched' not in salida.lower():
             hallazgos.append({'archivo': archivo, 'resultado': salida[:500]})
@@ -1162,7 +1165,7 @@ def _check_url(url):
                 if malicious > 0:
                     flags.append(f'VirusTotal: {malicious} motores lo marcan como MALICIOSO')
                     score += 50
-        except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+        except Exception as _e: log.debug("fuente no disponible: %s", _e)
 
     # AbuseIPDB para la IP del dominio
     try:
@@ -1182,7 +1185,7 @@ def _check_url(url):
                     score += 30
         else:
             datos['resultados']['ip_dominio'] = ip_check
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
 
     score = min(score, 100)
     nivel = 'CRITICAL' if score >= 70 else 'HIGH' if score >= 40 else 'MEDIUM' if score >= 20 else 'LOW'
@@ -1514,7 +1517,7 @@ def _darkweb_search(query):
             pastes = r.json().get('data', [])[:10]
             datos['resultados']['pastes'] = [{'id': p.get('id'), 'title': p.get('title','?'),
                                                'url': f"https://pastebin.com/{p.get('id')}"} for p in pastes]
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
 
     # IntelligenceX (sin API key — búsqueda básica)
     try:
@@ -1523,7 +1526,7 @@ def _darkweb_search(query):
             headers={'x-key': 'PUBLIC'}, timeout=10)
         if r.status_code == 200:
             datos['resultados']['intelx_id'] = r.json().get('id','')
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
 
     _guardar_dato(f'darkweb_{query}', datos)
     return datos
@@ -1666,7 +1669,7 @@ def _build_timeline():
                         'modulo': tipo, 'objetivo': objetivo,
                         'descripcion': f'{tipo}: {objetivo or clave}'
                     })
-                except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+                except Exception as _e: log.debug("fuente no disponible: %s", _e)
     # Agregar historial de módulos ejecutados
     for h in case.get('historial', []):
         ts = h.get('ts', 0)
@@ -1706,7 +1709,7 @@ def _monitor_loop():
                         'mensaje': f'Cambio detectado en {objetivo}',
                         'nuevo': nuevo
                     })
-        except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+        except Exception as _e: log.debug("fuente no disponible: %s", _e)
         time.sleep(monitor_state['intervalo'])
 
 def _monitor_start(objetivo, intervalo=3600):
@@ -1783,7 +1786,7 @@ def icon(size):
                               input=svg.encode(), capture_output=True, timeout=5)
         if result.returncode == 0:
             return Response(result.stdout, mimetype='image/png')
-    except Exception as _e: print("[obsidian] fuente no disponible:", _e, file=sys.stderr)
+    except Exception as _e: log.debug("fuente no disponible: %s", _e)
     return Response(svg.encode(), mimetype='image/svg+xml')
 
 @app.route('/sw.js')
