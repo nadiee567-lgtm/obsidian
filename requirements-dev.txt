@@ -1,0 +1,8 @@
+# OBSIDIAN — dependencias de desarrollo (tests + análisis estático)
+# Instalar:  pip install -r requirements-dev.txt
+# Incluye también las de ejecución.
+
+-r requirements.txt
+
+pytest==9.1.1
+pyflakes==3.4.0

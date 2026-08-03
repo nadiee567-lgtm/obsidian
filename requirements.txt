@@ -1,0 +1,20 @@
+# OBSIDIAN — dependencias de ejecución
+# Instalar todo de un jalón:  pip install -r requirements.txt
+#
+# Versiones pinneadas a lo probado (Python 3.14, venv del lab).
+
+Flask==3.1.3
+Werkzeug==3.1.8
+requests==2.34.2
+beautifulsoup4==4.15.0
+
+# ── Opcional ──────────────────────────────────────────────────────────────────
+# Solo si quieres el módulo render_js (screenshots con navegador headless).
+# Descomenta y además corre:  playwright install chromium
+# playwright==1.48.0
+
+# ── Herramientas del sistema (NO son pip — instalar con el gestor del SO) ─────
+# Los transforms las usan por línea de comandos. En Debian/Ubuntu/Mint:
+#   sudo apt install dnsutils nmap whois libimage-exiftool-perl
+#   (dig = dnsutils; exiftool = libimage-exiftool-perl)
+# Opcionales para OSINT de usuario:  pipx install sherlock-project maigret
