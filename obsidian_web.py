@@ -10,6 +10,9 @@ from core.config import HOME, HOME_INIT, CASES_DIR, STATIC_DIR, CASES_DB, PORT, 
 from core.validacion import (_SHELL_PELIGROSOS, _MODULO_TIPO, _es_ip, _validar,
                              _objetivo_seguro, _slug_caso, _ruta_caso_segura, _url_publica)
 from core.registro import get_logger
+from core.modelo import Almacen, Entidad, tipo_valido
+from core.transforms import transform, REGISTRO, ejecutar_por_nombre
+from core.migracion import migrar_caso
 
 log = get_logger()
 
@@ -192,6 +195,10 @@ SESSION.headers.update({'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:125.0)
 # Estado global de investigación
 case = {'nombre': None, 'objetivo': None, 'datos': {}, 'historial': [], 'iniciado': None}
 case_lock = threading.Lock()
+
+# Modelo tipado de la sesión (F2, integración del motor de transforms).
+# Convive con `case` mientras migramos; los endpoints /api/v2/* usan esto.
+_almacen = Almacen()
 
 SYSTEM = """You are OBSIDIAN AI, an OSINT intelligence analysis engine.
 ROLE: Expert analyst. Correlate data, find patterns, generate actionable conclusions.
@@ -1936,6 +1943,83 @@ def api_run():
     return Response(stream_with_context(_run_stream()),
                    mimetype='text/event-stream',
                    headers={'Cache-Control':'no-cache','X-Accel-Buffering':'no'})
+
+# ════════════════════════════════════════════════════════════════════════════
+# F2 — Motor de transforms integrado (endpoints /api/v2/*, aditivo)
+# ════════════════════════════════════════════════════════════════════════════
+
+@transform(entrada='dominio', salidas=('ip',), nombre='dns_a',
+           descripcion='Registros A del dominio (dig)')
+def _t_dns_a(entidad, ctx):
+    out = run_tool(['dig', entidad.valor, 'A', '+short'], timeout=10)
+    for linea in out.splitlines():
+        linea = linea.strip()
+        if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', linea):
+            ctx.emitir('ip', linea, etiqueta='A')
+
+@transform(entrada='ip', salidas=('dominio',), nombre='ptr',
+           descripcion='PTR / DNS inverso (dig -x)')
+def _t_ptr(entidad, ctx):
+    out = run_tool(['dig', '-x', entidad.valor, '+short'], timeout=10)
+    for linea in out.splitlines():
+        linea = linea.strip().rstrip('.')
+        if linea and not linea.startswith(';'):
+            ctx.emitir('dominio', linea, etiqueta='PTR')
+
+@transform(entrada='dominio', salidas=('subdominio',), nombre='crtsh',
+           descripcion='Subdominios desde crt.sh (Certificate Transparency)')
+def _t_crtsh(entidad, ctx):
+    try:
+        r = SESSION.get(f'https://crt.sh/?q=%.{entidad.valor}&output=json', timeout=12)
+        vistos = set()
+        for cert in r.json():
+            for s in cert.get('name_value', '').split('\n'):
+                s = s.strip().lstrip('*.')
+                if s.endswith(entidad.valor) and s != entidad.valor and s not in vistos:
+                    vistos.add(s)
+                    ctx.emitir('subdominio', s, etiqueta='subdominio')
+    except Exception as _e:
+        log.debug("crtsh no disponible: %s", _e)
+
+
+@app.route('/api/v2/transforms/<tipo>')
+def api_v2_transforms(tipo):
+    """Transforms que aplican a un tipo de entidad (paso 35)."""
+    ts = [{'nombre': t.nombre, 'salidas': list(t.salidas),
+           'requiere_key': t.requiere_key, 'descripcion': t.descripcion}
+          for t in REGISTRO.aplicables(tipo)]
+    return jsonify({'tipo': tipo, 'transforms': ts})
+
+@app.route('/api/v2/run', methods=['POST'])
+def api_v2_run():
+    """Corre un transform sobre una entidad {tipo, valor} (paso 36)."""
+    d = request.json or {}
+    tipo = d.get('tipo', '')
+    valor = (d.get('valor', '') or '').strip()
+    nombre = d.get('transform', '')
+    if not tipo_valido(tipo):
+        return _error('tipo de entidad inválido', 400)
+    try:
+        semilla = Entidad(tipo, valor)
+    except ValueError as e:
+        return _error(str(e), 400)
+    if not semilla.valor_bien_formado():
+        return _error(f'valor con forma inválida para {tipo}', 400)
+    semilla = _almacen.agregar(semilla)
+    try:
+        producidas = ejecutar_por_nombre(nombre, semilla, _almacen)
+    except (KeyError, ValueError) as e:
+        return _error(str(e), 400)
+    return jsonify({'producidas': [e.to_dict() for e in producidas],
+                    'total_entidades': len(_almacen)})
+
+@app.route('/api/v2/grafo')
+def api_v2_grafo():
+    """Grafo tipado. ?migrar=1 convierte el case['datos'] viejo al modelo nuevo."""
+    if request.args.get('migrar') == '1':
+        return jsonify(migrar_caso(case).to_dict())
+    return jsonify(_almacen.to_dict())
+
 
 @app.route('/api/reporte', methods=['POST'])
 def api_reporte():

@@ -9,11 +9,16 @@ import core.transforms as tr
 
 
 @pytest.fixture(autouse=True)
-def _registro_limpio():
-    """Cada test arranca con el registro vacío (aislamiento)."""
+def _registro_aislado():
+    """Cada test arranca con el registro vacío, pero RESTAURA lo que hubiera
+    antes al terminar — así no borra los transforms reales que registra la app
+    (independiente del orden de los tests)."""
+    prev_entrada = {k: list(v) for k, v in tr.REGISTRO._por_entrada.items()}
+    prev_nombre = dict(tr.REGISTRO._por_nombre)
     tr.REGISTRO.limpiar()
     yield
-    tr.REGISTRO.limpiar()
+    tr.REGISTRO._por_entrada = prev_entrada
+    tr.REGISTRO._por_nombre = prev_nombre
 
 
 # ── contrato + registro + decorator (pasos 26, 27) ───────────────────────────
