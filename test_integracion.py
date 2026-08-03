@@ -19,7 +19,8 @@ def _client():
 def test_transforms_reales_registrados():
     nombres = {t.nombre for t in REGISTRO.todos()}
     assert {'dns_a', 'ptr', 'crtsh', 'geo_ip', 'github_usuario', 'puertos', 'dns_mx',
-            'dns_ns', 'email_breaches', 'email_spoofable', 'rdap', 'greynoise'} <= nombres
+            'dns_ns', 'email_breaches', 'email_spoofable', 'rdap', 'greynoise',
+            'dns_txt', 'ssl'} <= nombres
 
 
 def test_transforms_aplicables_por_tipo():

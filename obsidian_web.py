@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """OBSIDIAN Web — Local OSINT & Security Framework"""
-import subprocess, requests, json, os, re, sys, threading, time, datetime, html, socket, hashlib, secrets
+import subprocess, requests, json, os, re, sys, threading, time, datetime, html, socket, hashlib, secrets, ssl
 import shutil, tempfile, glob, base64, sqlite3, ipaddress
 from urllib.parse import urlparse, urljoin
 from flask import Flask, request, jsonify, Response, stream_with_context, send_from_directory, session, redirect
@@ -2143,6 +2143,31 @@ def _t_greynoise(entidad, ctx):
                 entidad.etiquetar('malicioso')
     except Exception as _e:
         log.debug("greynoise no disponible: %s", _e)
+
+@transform(entrada='dominio', salidas=(), nombre='dns_txt',
+           descripcion='Registros TXT del dominio (SPF, verificaciones, etc.)')
+def _t_dns_txt(entidad, ctx):
+    out = run_tool(['dig', entidad.valor, 'TXT', '+short'], timeout=10)
+    txt = [l.strip().strip('"') for l in out.splitlines() if l.strip()]
+    if txt:
+        entidad.propiedades['txt'] = txt[:10]
+
+@transform(entrada='dominio', salidas=('org',), nombre='ssl',
+           descripcion='Certificado TLS del dominio: emisor y vigencia')
+def _t_ssl(entidad, ctx):
+    try:
+        contexto = ssl.create_default_context()
+        with socket.create_connection((entidad.valor, 443), timeout=8) as sock:
+            with contexto.wrap_socket(sock, server_hostname=entidad.valor) as segura:
+                cert = segura.getpeercert()
+        issuer = dict(x[0] for x in cert.get('issuer', []))
+        org = issuer.get('organizationName')
+        if org:
+            ctx.emitir('org', org, etiqueta='emisor cert')
+        entidad.propiedades['cert_desde'] = cert.get('notBefore')
+        entidad.propiedades['cert_expira'] = cert.get('notAfter')
+    except Exception as _e:
+        log.debug("ssl no disponible: %s", _e)
 
 
 @app.route('/api/v2/transforms/<tipo>')
