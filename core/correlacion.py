@@ -38,17 +38,78 @@ def regla(fn):
 
 _SUPRIMIR = {'descartado', 'falso-positivo'}
 
+# ── Reglas YAML del usuario (paso 63) ────────────────────────────────────────
+# El usuario define reglas propias en YAML sin tocar Python. Se evalúan junto a
+# las de fábrica. Formato:
+#   - nombre: ftp-anonimo
+#     severidad: alto            # critico|alto|medio|bajo
+#     mensaje: "FTP anónimo en {valor}"
+#     cuando:
+#       tipo: puerto             # tipo de entidad (opcional)
+#       tag: ftp-anon            # tag requerido (opcional)
+#       valor_contiene: ":21"    # substring en el valor (opcional)
+#       propiedad: {nombre: servicio, valor: ftp}   # prop == valor (opcional)
+_REGLAS_YAML = []
+
+
+def _coincide_yaml(ent, cuando) -> bool:
+    if 'tag' in cuando and cuando['tag'] not in ent.tags:
+        return False
+    if 'valor_contiene' in cuando and str(cuando['valor_contiene']) not in ent.valor:
+        return False
+    prop = cuando.get('propiedad')
+    if isinstance(prop, dict):
+        if str(ent.propiedades.get(prop.get('nombre'))) != str(prop.get('valor')):
+            return False
+    return True
+
+
+def cargar_reglas_yaml(texto: str) -> int:
+    """Parsea reglas YAML (texto) y las deja activas. Devuelve cuántas cargó.
+    Ignora entradas inválidas (no rompe la correlación)."""
+    import yaml
+    try:
+        data = yaml.safe_load(texto) or []
+    except Exception:
+        return 0
+    specs = []
+    for s in (data if isinstance(data, list) else []):
+        if isinstance(s, dict) and s.get('nombre'):
+            if s.get('severidad', 'medio') not in SEVERIDADES:
+                s['severidad'] = 'medio'
+            specs.append(s)
+    _REGLAS_YAML[:] = specs           # mutar en sitio: las referencias externas lo ven
+    return len(specs)
+
+
+def _evaluar_yaml(almacen) -> list:
+    out = []
+    for spec in _REGLAS_YAML:
+        cuando = spec.get('cuando', {}) or {}
+        tipo = cuando.get('tipo')
+        ents = almacen.de_tipo(tipo) if tipo else almacen.entidades
+        for e in ents:
+            if _coincide_yaml(e, cuando):
+                msg = str(spec.get('mensaje', spec['nombre'])).replace('{valor}', e.valor)
+                out.append(Hallazgo(spec['nombre'], spec.get('severidad', 'medio'), msg, [e.id]))
+    return out
+
+
 def correlacionar(almacen) -> list:
-    """Corre todas las reglas y devuelve los hallazgos ordenados por severidad.
-    Respeta el feedback del analista: si TODAS las entidades de un hallazgo están
-    marcadas 'descartado'/'falso-positivo', el hallazgo se suprime (ciclo de
-    feedback — la herramienta aprende de las correcciones humanas)."""
+    """Corre todas las reglas (de fábrica + YAML del usuario) y devuelve los
+    hallazgos ordenados por severidad. Respeta el feedback del analista: si TODAS
+    las entidades de un hallazgo están marcadas 'descartado'/'falso-positivo', el
+    hallazgo se suprime (ciclo de feedback — aprende de las correcciones humanas)."""
     out = []
     for fn in _REGLAS:
         try:
             out.extend(fn(almacen) or [])
         except Exception:
             pass   # una regla rota no tumba la correlación
+    try:
+        out.extend(_evaluar_yaml(almacen))
+    except Exception:
+        pass
     idx = {e.id: e for e in almacen.entidades}
     def suprimido(h):
         ids = [eid for eid in h.entidades if eid in idx]

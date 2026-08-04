@@ -138,3 +138,39 @@ def test_pivote_plataformas_pocas_no_dispara():
     for i in range(3):                                   # <5 → sin hallazgo
         alm.relacionar(u.id, alm.crear('plataforma', f'p{i}').id, 'presente')
     assert not [x for x in correlacionar(alm) if x.regla == 'pivote-plataformas']
+
+
+# ── 63: cargador de reglas YAML del usuario ──────────────────────────────────
+def test_reglas_yaml():
+    from core.correlacion import cargar_reglas_yaml, correlacionar
+    yaml_txt = """
+- nombre: puerto-ftp
+  severidad: alto
+  mensaje: "FTP en {valor}"
+  cuando:
+    tipo: puerto
+    valor_contiene: ":21"
+"""
+    try:
+        assert cargar_reglas_yaml(yaml_txt) == 1
+        alm = Almacen()
+        alm.crear('puerto', '1.2.3.4:21')
+        alm.crear('puerto', '1.2.3.4:443')              # no matchea
+        r = [x for x in correlacionar(alm) if x.regla == 'puerto-ftp']
+        assert len(r) == 1 and r[0].severidad == 'alto' and r[0].mensaje == 'FTP en 1.2.3.4:21'
+    finally:
+        cargar_reglas_yaml('')                          # limpia el global
+
+
+def test_reglas_yaml_severidad_invalida_se_normaliza():
+    from core.correlacion import cargar_reglas_yaml, _REGLAS_YAML
+    try:
+        cargar_reglas_yaml("- nombre: x\n  severidad: URGENTISIMO\n  cuando: {tag: y}\n")
+        assert _REGLAS_YAML[0]['severidad'] == 'medio'  # severidad inválida → medio
+    finally:
+        cargar_reglas_yaml('')
+
+
+def test_reglas_yaml_basura_no_rompe():
+    from core.correlacion import cargar_reglas_yaml
+    assert cargar_reglas_yaml('no: [es: :valido') == 0   # YAML roto → 0, sin excepción

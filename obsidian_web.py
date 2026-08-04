@@ -15,7 +15,7 @@ from core.transforms import transform, REGISTRO, ejecutar_por_nombre, ejecutar_l
 from core.migracion import migrar_caso
 from core.workspaces import Gestor
 from core.boveda import Boveda
-from core.correlacion import correlacionar, score_riesgo
+from core.correlacion import correlacionar, score_riesgo, cargar_reglas_yaml
 from core.reporte import generar_reporte
 from core.exportar import exportar_json, exportar_csv
 from core.monitor import Monitor, snapshot as _snap_estado
@@ -3262,6 +3262,34 @@ def _estado_datos():
         'ntfy': bool(_ntfy_topic()),
     }
 
+_REGLAS_FILE = os.path.join(HOME, '.obsidian', 'reglas.yaml')
+
+def _cargar_reglas_usuario():
+    try:
+        if os.path.exists(_REGLAS_FILE):
+            with open(_REGLAS_FILE, encoding='utf-8') as f:
+                n = cargar_reglas_yaml(f.read())
+                log.info("reglas YAML del usuario cargadas: %d", n)
+    except Exception as _e:
+        log.warning("no se pudieron cargar reglas YAML: %s", _e)
+
+@app.route('/api/v2/reglas', methods=['GET', 'POST'])
+def api_v2_reglas():
+    """Reglas de correlación YAML del usuario (paso 63). POST {yaml} las carga y
+    persiste; GET devuelve las activas."""
+    if request.method == 'POST':
+        texto = (request.json or {}).get('yaml', '')
+        n = cargar_reglas_yaml(texto)
+        try:
+            os.makedirs(os.path.dirname(_REGLAS_FILE), exist_ok=True)
+            with open(_REGLAS_FILE, 'w', encoding='utf-8') as f:
+                f.write(texto)
+        except Exception as _e:
+            log.warning("no se pudo guardar reglas.yaml: %s", _e)
+        return jsonify({'ok': True, 'cargadas': n})
+    from core.correlacion import _REGLAS_YAML
+    return jsonify({'reglas': _REGLAS_YAML})
+
 @app.route('/api/v2/buscar/traducir', methods=['POST'])
 def api_v2_buscar_traducir():
     """Traduce una consulta unificada al dialecto de CADA motor (F8 paso 117).
@@ -3819,6 +3847,7 @@ WEB_HTML = _cargar_web('app.html')
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
+    _cargar_reglas_usuario()
     host = os.environ.get('OBSIDIAN_HOST', '127.0.0.1')
     ts = _tailscale_ip()
     lineas = [f"   Este equipo: http://localhost:{PORT}"]
