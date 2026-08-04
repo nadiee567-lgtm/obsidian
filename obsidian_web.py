@@ -22,6 +22,7 @@ from core.monitor import Monitor, snapshot as _snap_estado
 from core.notificar import enviar_ntfy, construir_ntfy
 from core.estado import render_estado
 from core.motores import traducir as _motor_query, traducir_todos, MOTORES
+from core.imagen import enlaces_reverse
 import core.ia as ia
 
 log = get_logger()
@@ -2825,6 +2826,12 @@ def _t_binaryedge(entidad, ctx):
                 ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='binaryedge')
     except Exception as _e:
         log.debug("binaryedge no disponible: %s", _e)
+
+@transform(entrada='url', salidas=('url',), nombre='reverse_image',
+           descripcion='Búsqueda inversa de la imagen en Yandex/Google/TinEye/Bing (F9, keyless)')
+def _t_reverse_image(entidad, ctx):
+    for motor, enlace in enlaces_reverse(entidad.valor).items():
+        ctx.emitir('url', enlace, etiqueta=f'reverse:{motor}', motor=motor)
 
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
