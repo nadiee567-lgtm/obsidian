@@ -1983,6 +1983,41 @@ def _t_ptr(entidad, ctx):
         if linea and not linea.startswith(';'):
             ctx.emitir('dominio', linea, etiqueta='PTR')
 
+@transform(entrada='url', salidas=(), nombre='metadata',
+           descripcion='Metadata EXIF de una imagen/documento (exiftool): GPS, autor, software, cámara')
+def _t_metadata(entidad, ctx):
+    if not _which('exiftool'):
+        return
+    try:
+        r = _fetch_seguro(entidad.valor, timeout=10, stream=True)   # anti-SSRF
+    except Exception:
+        return
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as f:
+        for chunk in r.iter_content(8192):
+            f.write(chunk)
+            if f.tell() > 15_000_000:
+                break
+        fname = f.name
+    try:
+        out = run_tool(['exiftool', fname], timeout=20)
+        interesantes = {}
+        for linea in out.splitlines():
+            if ':' not in linea:
+                continue
+            k, v = (x.strip() for x in linea.split(':', 1))
+            if any(t in k.lower() for t in ('gps', 'author', 'creator', 'software',
+                                            'camera', 'make', 'model', 'artist')):
+                interesantes[k] = v[:100]
+        if interesantes:
+            entidad.propiedades['metadata'] = interesantes
+            if any('gps' in k.lower() for k in interesantes):
+                entidad.etiquetar('tiene-gps')
+    finally:
+        try:
+            os.unlink(fname)
+        except OSError:
+            pass
+
 @transform(entrada='dominio', salidas=(), nombre='dorks',
            descripcion='Genera Google dorks útiles del dominio (archivos, paneles, índices, backups)')
 def _t_dorks(entidad, ctx):
