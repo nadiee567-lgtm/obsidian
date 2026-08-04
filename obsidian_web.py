@@ -16,6 +16,7 @@ from core.migracion import migrar_caso
 from core.workspaces import Gestor
 from core.boveda import Boveda
 from core.correlacion import correlacionar, score_riesgo
+import core.ia as ia
 
 log = get_logger()
 
@@ -2565,13 +2566,7 @@ def api_v2_hallazgos_ia():
         f"En 3-4 frases en español: resume el riesgo principal y sugiere el siguiente paso "
         f"concreto de investigación. Directo, sin relleno.")
     try:
-        r = SESSION.post(f'{OLLAMA}/api/chat', json={
-            'model': 'qwen2.5:3b',
-            'messages': [{'role': 'user', 'content': prompt}],
-            'stream': False,
-            'options': {'num_ctx': 2048, 'num_predict': 300, 'temperature': 0.4},
-        }, timeout=(10, 120))
-        texto = (r.json().get('message', {}) or {}).get('content', '').strip()
+        texto = ia.consultar(prompt, max_tokens=300)
         return jsonify({'resumen': texto or 'La IA no devolvió texto.'})
     except Exception as e:
         log.warning("IA correlación falló: %s", e)
@@ -2602,11 +2597,7 @@ def api_v2_verificar():
             "En español, 2-3 frases: ¿riesgo real o probable falso positivo? ¿POR QUÉ (basándote "
             "en la evidencia)? ¿Qué debería verificar el usuario?")
         try:
-            r = SESSION.post(f'{OLLAMA}/api/chat', json={
-                'model': 'qwen2.5:3b', 'messages': [{'role': 'user', 'content': prompt}],
-                'stream': False, 'options': {'num_ctx': 2048, 'num_predict': 220, 'temperature': 0.3}},
-                timeout=(10, 120))
-            razon = (r.json().get('message', {}) or {}).get('content', '').strip()
+            razon = ia.consultar(prompt, max_tokens=220, temp=0.3)
         except Exception as e:
             log.warning("verificar IA falló: %s", e)
             razon = 'IA no disponible (¿Ollama en :11434?)'
