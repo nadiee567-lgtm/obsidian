@@ -2713,6 +2713,44 @@ def _t_quake(entidad, ctx):
     except Exception as _e:
         log.debug("quake no disponible: %s", _e)
 
+@transform(entrada='ip', salidas=('puerto', 'dominio'), nombre='hunter',
+           requiere_key=True,
+           descripcion='Hosts/dominios en Hunter.how (motor CN, key en la bóveda)')
+def _t_hunter(entidad, ctx):
+    key = _boveda.obtener('hunter') or os.environ.get('HUNTER_KEY', '')
+    if not key:
+        return
+    q = base64.urlsafe_b64encode(_motor_query('hunter', {'ip': entidad.valor}).encode()).decode()
+    try:
+        r = SESSION.get('https://api.hunter.how/search',
+                        params={'api-key': key, 'query': q, 'page': 1, 'page_size': 20}, timeout=12)
+        for m in ((r.json() or {}).get('data', {}) or {}).get('list', []):
+            p, dom = m.get('port'), m.get('domain')
+            if p:
+                ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='hunter')
+            if dom:
+                ctx.emitir('dominio', dom, etiqueta='hunter')
+    except Exception as _e:
+        log.debug("hunter no disponible: %s", _e)
+
+@transform(entrada='ip', salidas=('puerto',), nombre='netlas',
+           requiere_key=True,
+           descripcion='Respuestas de la IP en Netlas (key en la bóveda)')
+def _t_netlas(entidad, ctx):
+    key = _boveda.obtener('netlas') or os.environ.get('NETLAS_KEY', '')
+    if not key:
+        return
+    try:
+        r = SESSION.get('https://app.netlas.io/api/responses/',
+                        params={'q': _motor_query('netlas', {'ip': entidad.valor})},
+                        headers={'X-API-Key': key}, timeout=12)
+        for it in (r.json() or {}).get('items', []):
+            p = (it.get('data', {}) or {}).get('port')
+            if p:
+                ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='netlas')
+    except Exception as _e:
+        log.debug("netlas no disponible: %s", _e)
+
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
 # SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).

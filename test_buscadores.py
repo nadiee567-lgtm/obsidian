@@ -102,3 +102,27 @@ def test_quake_sin_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
     monkeypatch.setenv('QUAKE_KEY', '')
     assert _correr('quake', 'ip', '1.2.3.4') == []
+
+
+# ── Hunter.how + Netlas (112) ────────────────────────────────────────────────
+def test_hunter(monkeypatch):
+    resp = {'data': {'list': [{'port': 443, 'domain': 'a.com'}, {'port': 80, 'domain': 'b.com'}]}}
+    _con_key(monkeypatch, resp)
+    prod = _correr('hunter', 'ip', '1.2.3.4')
+    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:80'}
+    assert {e.valor for e in prod if e.tipo == 'dominio'} == {'a.com', 'b.com'}
+
+
+def test_netlas(monkeypatch):
+    resp = {'items': [{'data': {'port': 443}}, {'data': {'port': 22}}]}
+    _con_key(monkeypatch, resp)
+    prod = _correr('netlas', 'ip', '1.2.3.4')
+    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
+
+
+def test_hunter_netlas_sin_key(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setenv('HUNTER_KEY', '')
+    monkeypatch.setenv('NETLAS_KEY', '')
+    assert _correr('hunter', 'ip', '1.2.3.4') == []
+    assert _correr('netlas', 'ip', '1.2.3.4') == []
