@@ -2050,6 +2050,23 @@ def _t_wallet_balance(entidad, ctx):
     except Exception as _e:
         log.debug("wallet_balance no disponible: %s", _e)
 
+@transform(entrada='dominio', salidas=(), nombre='favicon_hash',
+           descripcion='Hash mmh3 del favicon — para pivotar infraestructura en Shodan/FOFA (F8)')
+def _t_favicon_hash(entidad, ctx):
+    try:
+        import mmh3
+        import codecs
+    except ImportError:
+        return
+    try:
+        r = _fetch_seguro(f'https://{entidad.valor}/favicon.ico', timeout=8, stream=False)
+        if r.status_code != 200 or not r.content:
+            return
+        # método estándar de Shodan/FOFA: base64 (con saltos de línea) + mmh3
+        entidad.propiedades['favicon_hash'] = mmh3.hash(codecs.encode(r.content, 'base64'))
+    except Exception as _e:
+        log.debug("favicon_hash no disponible: %s", _e)
+
 @transform(entrada='dominio', salidas=('subdominio',), nombre='wayback',
            descripcion='Snapshot histórico + subdominios viejos del dominio (Wayback Machine)')
 def _t_wayback(entidad, ctx):
