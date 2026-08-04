@@ -2000,8 +2000,8 @@ def _t_ptr(entidad, ctx):
         if linea and not linea.startswith(';'):
             ctx.emitir('dominio', linea, etiqueta='PTR')
 
-@transform(entrada='url', salidas=(), nombre='metadata',
-           descripcion='Metadata EXIF de una imagen/documento (exiftool): GPS, autor, software, cámara')
+@transform(entrada='url', salidas=('tech', 'persona', 'url'), nombre='metadata',
+           descripcion='Metadata EXIF como entidades pivotables: GPS, dispositivo, software, autor (F9)')
 def _t_metadata(entidad, ctx):
     if not _which('exiftool'):
         return
@@ -2027,8 +2027,22 @@ def _t_metadata(entidad, ctx):
                 interesantes[k] = v[:100]
         if interesantes:
             entidad.propiedades['metadata'] = interesantes
-            if any('gps' in k.lower() for k in interesantes):
+            # ── EXIF como entidades pivotables (paso 120) ──
+            from urllib.parse import quote as _q
+            disp = (f"{interesantes.get('Make', '')} "
+                    f"{interesantes.get('Camera Model Name') or interesantes.get('Model', '')}").strip()
+            if disp:
+                ctx.emitir('tech', disp, etiqueta='dispositivo')
+            if interesantes.get('Software'):
+                ctx.emitir('tech', interesantes['Software'], etiqueta='software')
+            for kk in ('Author', 'Creator', 'Artist'):
+                if interesantes.get(kk):
+                    ctx.emitir('persona', interesantes[kk], etiqueta=kk.lower())
+            gps = interesantes.get('GPS Position') or interesantes.get('GPS Latitude')
+            if gps:
                 entidad.etiquetar('tiene-gps')
+                ctx.emitir('url', f'https://www.google.com/maps/search/?api=1&query={_q(gps)}',
+                           etiqueta='gps', gps=gps)
     finally:
         try:
             os.unlink(fname)
