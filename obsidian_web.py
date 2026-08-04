@@ -2751,6 +2751,41 @@ def _t_netlas(entidad, ctx):
     except Exception as _e:
         log.debug("netlas no disponible: %s", _e)
 
+@transform(entrada='ip', salidas=('puerto',), nombre='criminalip',
+           requiere_key=True,
+           descripcion='Puertos/exposición de la IP (Criminal IP, key en la bóveda)')
+def _t_criminalip(entidad, ctx):
+    key = _boveda.obtener('criminalip') or os.environ.get('CRIMINALIP_KEY', '')
+    if not key:
+        return
+    try:
+        r = SESSION.get('https://api.criminalip.io/v1/asset/ip/report',
+                        params={'ip': entidad.valor}, headers={'x-api-key': key}, timeout=12)
+        for p in ((r.json() or {}).get('port', {}) or {}).get('data', []) or []:
+            num = p.get('open_port_no') or p.get('port')
+            if num:
+                ctx.emitir('puerto', f"{entidad.valor}:{num}", etiqueta='criminalip',
+                           servicio=p.get('app_name', ''))
+    except Exception as _e:
+        log.debug("criminalip no disponible: %s", _e)
+
+@transform(entrada='ip', salidas=('puerto',), nombre='binaryedge',
+           requiere_key=True,
+           descripcion='Puertos expuestos de la IP (BinaryEdge, key en la bóveda)')
+def _t_binaryedge(entidad, ctx):
+    key = _boveda.obtener('binaryedge') or os.environ.get('BINARYEDGE_KEY', '')
+    if not key:
+        return
+    try:
+        r = SESSION.get(f'https://api.binaryedge.io/v2/query/ip/{entidad.valor}',
+                        headers={'X-Key': key}, timeout=12)
+        for ev in (r.json() or {}).get('events', []):
+            p = ev.get('port')
+            if p:
+                ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='binaryedge')
+    except Exception as _e:
+        log.debug("binaryedge no disponible: %s", _e)
+
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
 # SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).

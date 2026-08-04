@@ -126,3 +126,36 @@ def test_hunter_netlas_sin_key(monkeypatch):
     monkeypatch.setenv('NETLAS_KEY', '')
     assert _correr('hunter', 'ip', '1.2.3.4') == []
     assert _correr('netlas', 'ip', '1.2.3.4') == []
+
+
+# ── Criminal IP + BinaryEdge (113) ───────────────────────────────────────────
+def test_criminalip(monkeypatch):
+    resp = {'port': {'data': [{'open_port_no': 443, 'app_name': 'HTTPS'},
+                              {'open_port_no': 8080, 'app_name': 'HTTP'}]}}
+    _con_key(monkeypatch, resp)
+    prod = _correr('criminalip', 'ip', '1.2.3.4')
+    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:8080'}
+
+
+def test_binaryedge(monkeypatch):
+    resp = {'events': [{'port': 443}, {'port': 22}, {'port': 443}]}   # dedup por id
+    _con_key(monkeypatch, resp)
+    prod = _correr('binaryedge', 'ip', '1.2.3.4')
+    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
+
+
+def test_criminalip_binaryedge_sin_key(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setenv('CRIMINALIP_KEY', '')
+    monkeypatch.setenv('BINARYEDGE_KEY', '')
+    assert _correr('criminalip', 'ip', '1.2.3.4') == []
+    assert _correr('binaryedge', 'ip', '1.2.3.4') == []
+
+
+def test_todos_los_motores_registrados():
+    """Los 9 motores de core.motores tienen su transform registrado."""
+    from core.transforms import REGISTRO
+    from core.motores import MOTORES
+    nombres = {t.nombre for t in REGISTRO.aplicables('ip')}
+    faltan = set(MOTORES) - nombres
+    assert not faltan, f'motores sin transform: {faltan}'
