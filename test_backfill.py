@@ -206,3 +206,44 @@ def test_rate_limit_concurrencia():
         assert estado['max'] == 1                # nunca más de 1 concurrente
     finally:
         set_limite('_test_rl', 0)                # quita el límite
+
+
+# ── 37: cola en background + SSE ─────────────────────────────────────────────
+def test_gestor_tareas():
+    from core.tareas import GestorTareas
+    g = GestorTareas()
+
+    def trabajo(emit):
+        emit({'tipo': 'inicio', 'total': 2})
+        emit({'tipo': 'progreso', 'hechas': 1})
+        return {'ok': True}
+
+    tid = g.crear(trabajo)
+    eventos = list(g.stream(tid))                # bloquea hasta 'fin'
+    tipos = [e['tipo'] for e in eventos]
+    assert tipos[0] == 'inicio' and tipos[-1] == 'fin'
+    assert g.estado(tid)['estado'] == 'hecho'
+    assert g.estado(tid)['resultado'] == {'ok': True}
+
+
+def test_gestor_tareas_error_no_cuelga():
+    from core.tareas import GestorTareas
+    g = GestorTareas()
+
+    def trabajo(emit):
+        raise RuntimeError('boom')
+
+    tid = g.crear(trabajo)
+    eventos = list(g.stream(tid))                # debe cerrar con 'fin' aunque falle
+    assert eventos[-1]['tipo'] == 'fin'
+    assert g.estado(tid)['estado'] == 'error'
+
+
+def test_ejecutar_lote_progreso():
+    from core.transforms import ejecutar_lote
+    vistos = []
+    ejecutar_lote([('url', 'https://a.com/x.jpg', 'reverse_image'),
+                   ('url', 'https://b.com/y.jpg', 'reverse_image')],
+                  Almacen(), on_progreso=lambda *a: vistos.append(a))
+    assert len(vistos) == 2                       # un callback por transform terminado
+    assert vistos[-1][3] == 2                      # total == 2 en el último

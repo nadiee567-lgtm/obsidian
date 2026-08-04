@@ -22,6 +22,7 @@ from core.monitor import Monitor, snapshot as _snap_estado
 from core.notificar import enviar_ntfy, construir_ntfy
 from core.estado import render_estado
 from core.motores import traducir as _motor_query, traducir_todos, MOTORES
+from core.tareas import GestorTareas
 from core.imagen import enlaces_reverse, enlaces_facial
 import core.ia as ia
 
@@ -3329,6 +3330,56 @@ def api_v2_recon():
             except Exception as _e:
                 log.warning("autosave recon falló: %s", _e)
     return jsonify({'resultados': res, 'total_entidades': len(_almacen), 'workspace': _ws_activo})
+
+_tareas = GestorTareas()
+
+@app.route('/api/v2/recon_async', methods=['POST'])
+def api_v2_recon_async():
+    """Lanza el recon en background (paso 37) y devuelve un job_id. El progreso se
+    escucha en /api/v2/tarea/<id>/stream (SSE). No bloquea la request."""
+    d = request.json or {}
+    tipo = d.get('tipo', '')
+    valor = (d.get('valor', '') or '').strip()
+    if not tipo_valido(tipo):
+        return _error('tipo de entidad inválido', 400)
+    con_keys = bool(d.get('con_keys'))
+
+    def trabajo(emit):
+        with _almacen_lock:
+            _almacen.crear(tipo, valor)
+        ts = [t for t in REGISTRO.aplicables(tipo) if con_keys or not t.requiere_key]
+        tareas = [(tipo, valor, t.nombre) for t in ts]
+        emit({'tipo': 'inicio', 'total': len(tareas)})
+
+        def prog(nombre, n, hechas, total):
+            emit({'tipo': 'progreso', 'transform': nombre, 'nuevas': n,
+                  'hechas': hechas, 'total': total, 'entidades': len(_almacen)})
+        res = ejecutar_lote(tareas, _almacen, lock=_almacen_lock, on_progreso=prog)
+        if _ws_activo:
+            with _almacen_lock:
+                try:
+                    _gestor.guardar(_ws_activo, _almacen)
+                except Exception as _e:
+                    log.warning("autosave recon_async: %s", _e)
+        return {'resultados': res, 'total_entidades': len(_almacen)}
+
+    return jsonify({'job_id': _tareas.crear(trabajo)})
+
+@app.route('/api/v2/tarea/<tid>')
+def api_v2_tarea(tid):
+    est = _tareas.estado(tid)
+    if not est:
+        return _error('tarea no encontrada', 404)
+    return jsonify({'id': est['id'], 'estado': est['estado'], 'resultado': est['resultado']})
+
+@app.route('/api/v2/tarea/<tid>/stream')
+def api_v2_tarea_stream(tid):
+    if not _tareas.estado(tid):
+        return _error('tarea no encontrada', 404)
+    def gen():
+        for ev in _tareas.stream(tid):
+            yield f'data: {json.dumps(ev)}\n\n'
+    return Response(stream_with_context(gen()), mimetype='text/event-stream')
 
 @app.route('/api/v2/entidad', methods=['POST'])
 def api_v2_entidad():

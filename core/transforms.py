@@ -161,16 +161,20 @@ def ejecutar_por_nombre(nombre: str, entidad: Entidad, almacen: Almacen) -> list
     return ejecutar(t, entidad, almacen)
 
 
-def ejecutar_lote(tareas, almacen: Almacen, max_workers: int = 8, lock=None) -> list:
+def ejecutar_lote(tareas, almacen: Almacen, max_workers: int = 8, lock=None,
+                  on_progreso=None) -> list:
     """Corre varios transforms EN PARALELO (paso 102). Los transforms son I/O-bound
     (red), así que se lanzan concurrentemente — cada uno en un Almacen AISLADO, sin
     estado compartido durante el fetch. Al terminar, se fusionan los resultados en
     `almacen` (dedup por id determinista). Si se pasa `lock`, la fusión va bajo él.
 
+    on_progreso(nombre, n, hechas, total): callback opcional que se llama a medida
+    que CADA transform termina (paso 37, para el streaming de progreso).
+
     tareas: iterable de (tipo, valor, nombre_transform).
     Devuelve [(nombre, nº_producidas), ...]."""
     import contextlib
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
     tareas = list(tareas)
     if not tareas:
@@ -187,14 +191,22 @@ def ejecutar_lote(tareas, almacen: Almacen, max_workers: int = 8, lock=None) -> 
             pass
         return nombre, n, local
 
-    with ThreadPoolExecutor(max_workers=min(max_workers, len(tareas))) as ex:
-        salidas = list(ex.map(_uno, tareas))    # la red corre en paralelo, sin lock
+    resultados, locales, total = [], [], len(tareas)
+    with ThreadPoolExecutor(max_workers=min(max_workers, total)) as ex:
+        futs = [ex.submit(_uno, t) for t in tareas]
+        for i, fut in enumerate(as_completed(futs), 1):
+            nombre, n, local = fut.result()
+            resultados.append((nombre, n))
+            locales.append(local)
+            if on_progreso:
+                try:
+                    on_progreso(nombre, n, i, total)
+                except Exception:
+                    pass
 
-    resultados = []
     ctx = lock if lock is not None else contextlib.nullcontext()
     with ctx:                                    # fusión serializada (dedup consistente)
-        for nombre, n, local in salidas:
-            resultados.append((nombre, n))
+        for local in locales:
             for e in local.entidades:
                 almacen.agregar(e)
             for r in local.relaciones:
