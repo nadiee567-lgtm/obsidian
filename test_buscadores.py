@@ -175,6 +175,21 @@ def test_favicon_pivote_ignora_hash_no_favicon(monkeypatch):
     assert ejecutar_por_nombre('favicon_pivote', h, alm) == []
 
 
+# ── Pivote por certificado TLS (115) ─────────────────────────────────────────
+def test_cert_pivote(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener',
+                        lambda s: {'fofa': 'a@b.com:k', 'shodan': 'sk'}.get(s))
+    def fake_get(url, *a, **k):
+        if 'fofa' in url:
+            return FakeResp({'error': False, 'results': [['5.5.5.5']]})
+        return FakeResp({'matches': [{'ip_str': '6.6.6.6'}]})
+    monkeypatch.setattr(ob.SESSION, 'get', fake_get)
+    alm = Almacen()
+    d = alm.crear('dominio', 'ejemplo.com', propiedades={'cert_cn': '*.ejemplo.com'})
+    prod = ejecutar_por_nombre('cert_pivote', d, alm)
+    assert {e.valor for e in prod if e.tipo == 'ip'} == {'5.5.5.5', '6.6.6.6'}
+
+
 def test_todos_los_motores_registrados():
     """Los 9 motores de core.motores tienen su transform registrado."""
     from core.transforms import REGISTRO

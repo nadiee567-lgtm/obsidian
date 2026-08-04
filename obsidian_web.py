@@ -2085,18 +2085,15 @@ def _t_favicon_hash(entidad, ctx):
     except Exception as _e:
         log.debug("favicon_hash no disponible: %s", _e)
 
-@transform(entrada='hash', salidas=('ip',), nombre='favicon_pivote', requiere_key=True,
-           descripcion='Enumera IPs que sirven este favicon (FOFA/Shodan) — sin tocar al objetivo (F8)')
-def _t_favicon_pivote(entidad, ctx):
-    if entidad.propiedades.get('tipo_hash') != 'favicon':
-        return
-    h = entidad.valor
+def _pivote_ips(campos):
+    """Busca en FOFA + Shodan por `campos` unificados y devuelve el set de IPs que
+    coinciden. Base de los pivotes (favicon, cert). Dedup cross-motor gratis (set)."""
     ips = set()
     cred = _boveda.obtener('fofa') or os.environ.get('FOFA_KEY', '')
     if cred and ':' in cred:
         email, key = cred.split(':', 1)
         try:
-            qb = base64.b64encode(_motor_query('fofa', {'favicon': h}).encode()).decode()
+            qb = base64.b64encode(_motor_query('fofa', campos).encode()).decode()
             r = SESSION.get('https://fofa.info/api/v1/search/all',
                             params={'email': email, 'key': key, 'qbase64': qb,
                                     'fields': 'ip', 'size': 100}, timeout=12)
@@ -2105,19 +2102,25 @@ def _t_favicon_pivote(entidad, ctx):
                 for row in d.get('results', []):
                     ips.add(row[0] if isinstance(row, list) else row)
         except Exception as _e:
-            log.debug("favicon_pivote fofa: %s", _e)
+            log.debug("pivote fofa: %s", _e)
     skey = _boveda.obtener('shodan') or os.environ.get('SHODAN_API_KEY', '')
     if skey:
         try:
             r = SESSION.get('https://api.shodan.io/shodan/host/search',
-                            params={'key': skey, 'query': _motor_query('shodan', {'favicon': h})},
-                            timeout=12)
+                            params={'key': skey, 'query': _motor_query('shodan', campos)}, timeout=12)
             for m in (r.json() or {}).get('matches', []):
                 if m.get('ip_str'):
                     ips.add(m['ip_str'])
         except Exception as _e:
-            log.debug("favicon_pivote shodan: %s", _e)
-    for ip in ips:
+            log.debug("pivote shodan: %s", _e)
+    return ips
+
+@transform(entrada='hash', salidas=('ip',), nombre='favicon_pivote', requiere_key=True,
+           descripcion='Enumera IPs que sirven este favicon (FOFA/Shodan) — sin tocar al objetivo (F8)')
+def _t_favicon_pivote(entidad, ctx):
+    if entidad.propiedades.get('tipo_hash') != 'favicon':
+        return
+    for ip in _pivote_ips({'favicon': entidad.valor}):
         ctx.emitir('ip', ip, etiqueta='mismo-favicon')
 
 @transform(entrada='dominio', salidas=('subdominio',), nombre='wayback',
@@ -2908,10 +2911,31 @@ def _t_ssl(entidad, ctx):
         org = issuer.get('organizationName')
         if org:
             ctx.emitir('org', org, etiqueta='emisor cert')
+        cn = dict(x[0] for x in cert.get('subject', [])).get('commonName')
+        if cn:
+            entidad.propiedades['cert_cn'] = cn          # para pivotar (paso 115)
         entidad.propiedades['cert_desde'] = cert.get('notBefore')
         entidad.propiedades['cert_expira'] = cert.get('notAfter')
     except Exception as _e:
         log.debug("ssl no disponible: %s", _e)
+
+@transform(entrada='dominio', salidas=('ip',), nombre='cert_pivote', requiere_key=True,
+           descripcion='IPs con el mismo cert TLS (CN) cruzando FOFA/Shodan — misma infra (F8)')
+def _t_cert_pivote(entidad, ctx):
+    cn = entidad.propiedades.get('cert_cn')
+    if not cn:                                            # si ssl no corrió, saca el CN ahora
+        try:
+            contexto = ssl.create_default_context()
+            with socket.create_connection((entidad.valor, 443), timeout=8) as sock:
+                with contexto.wrap_socket(sock, server_hostname=entidad.valor) as segura:
+                    cert = segura.getpeercert()
+            cn = dict(x[0] for x in cert.get('subject', [])).get('commonName')
+        except Exception:
+            cn = None
+    if not cn:
+        return
+    for ip in _pivote_ips({'cert': cn}):
+        ctx.emitir('ip', ip, etiqueta='mismo-cert')
 
 
 @app.route('/api/v2/transforms/<tipo>')
