@@ -86,6 +86,12 @@
   .alerta{background:var(--panel);border-left:3px solid var(--amber);border-radius:4px;padding:.4rem .5rem;margin-top:.4rem;font-size:.74rem}
   .alerta .ts{color:var(--muted);font-size:.68rem;font-family:ui-monospace,monospace}
   .alerta .res{color:var(--txt);margin-top:.15rem}
+  .modbox{margin-top:.7rem;border-top:1px solid var(--line);padding-top:.6rem}
+  .modtit{font-size:.62rem;letter-spacing:.08em;color:var(--muted);margin-bottom:.4rem}
+  .modgrid{display:flex;flex-wrap:wrap;gap:.3rem}
+  .modbtn{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.2rem .5rem;font-size:.7rem;font-family:var(--mono);cursor:pointer}
+  .modbtn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .modbtn .key{color:var(--amber);font-size:.58rem}
 </style>
 </head>
 <body>
@@ -276,7 +282,26 @@ function mostrarDetalle(id){
   // nota del analista
   const ta=el('textarea','nota'); ta.placeholder='nota del analista…'; ta.value=e.propiedades.nota||'';
   ta.onchange=()=>guardarNota(e.id,ta.value); d.appendChild(ta);
-  const h=el('div','hint'); h.textContent='↳ click derecho en el nodo para correr transforms'; d.appendChild(h);
+  // MÓDULOS: transforms aplicables a este nodo, visibles y a un click
+  const modBox=el('div','modbox');
+  const mt=el('div','modtit'); mt.textContent='MÓDULOS · '+e.tipo; modBox.appendChild(mt);
+  d.appendChild(modBox);
+  cargarModulos(e.tipo, e.valor, modBox);
+  const h=el('div','hint'); h.textContent='↳ click en un módulo para correrlo (o click derecho en el nodo)'; d.appendChild(h);
+}
+const _transformsCache={};
+async function cargarModulos(tipo, valor, cont){
+  let lista=_transformsCache[tipo];
+  if(!lista){ try{ lista=(await (await fetch('/api/v2/transforms/'+tipo)).json()).transforms||[]; _transformsCache[tipo]=lista; }catch(_){ lista=[]; } }
+  if(!lista.length){ const x=el('div','vacio'); x.textContent='(sin módulos para este tipo)'; cont.appendChild(x); return; }
+  const grid=el('div','modgrid');
+  lista.forEach(t=>{
+    const b=el('button','modbtn');
+    b.innerHTML=esc(t.nombre)+(t.requiere_key?' <span class="key">⚿</span>':'');
+    b.title=t.descripcion||''; b.onclick=()=>correr(tipo, valor, t.nombre);
+    grid.appendChild(b);
+  });
+  cont.appendChild(grid);
 }
 function cadenaIds(id){   // camino hacia atrás por la procedencia hasta la semilla
   const chain=[id], visto=new Set([id]); let cur=entMap[id];
