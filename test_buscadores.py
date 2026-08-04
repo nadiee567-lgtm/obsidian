@@ -190,6 +190,25 @@ def test_cert_pivote(monkeypatch):
     assert {e.valor for e in prod if e.tipo == 'ip'} == {'5.5.5.5', '6.6.6.6'}
 
 
+# ── Dedup cross-engine (116) ─────────────────────────────────────────────────
+def test_dedup_cross_engine(monkeypatch):
+    """Mismo host/puerto reportado por 2 motores = 1 entidad con 2 fuentes."""
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'id:secret')
+    alm = Almacen()
+    ip = alm.crear('ip', '1.2.3.4')
+    # Shodan ve el puerto 443
+    monkeypatch.setattr(ob.SESSION, 'get',
+                        lambda *a, **k: FakeResp({'data': [{'port': 443, 'product': 'nginx'}]}))
+    ejecutar_por_nombre('shodan', ip, alm)
+    # Censys ve el MISMO puerto 443
+    monkeypatch.setattr(ob.SESSION, 'get',
+                        lambda *a, **k: FakeResp({'result': {'services': [{'port': 443, 'service_name': 'HTTP'}]}}))
+    ejecutar_por_nombre('censys', ip, alm)
+    puertos = [e for e in alm.entidades if e.tipo == 'puerto' and e.valor == '1.2.3.4:443']
+    assert len(puertos) == 1                              # UNA sola entidad (id determinista)
+    assert {'shodan', 'censys'} <= puertos[0].origenes    # con las DOS fuentes
+
+
 def test_todos_los_motores_registrados():
     """Los 9 motores de core.motores tienen su transform registrado."""
     from core.transforms import REGISTRO
