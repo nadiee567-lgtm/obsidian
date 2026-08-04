@@ -2610,6 +2610,36 @@ def _t_shodan(entidad, ctx):
     except Exception as _e:
         log.debug("shodan no disponible: %s", _e)
 
+@transform(entrada='ip', salidas=('puerto', 'org', 'tech', 'asn'), nombre='censys',
+           requiere_key=True,
+           descripcion='Servicios de la IP (Censys, key "id:secret" en la bóveda)')
+def _t_censys(entidad, ctx):
+    cred = _boveda.obtener('censys') or os.environ.get('CENSYS_API', '')
+    if not cred or ':' not in cred:
+        return
+    cid, secret = cred.split(':', 1)
+    try:
+        r = SESSION.get(f'https://search.censys.io/api/v2/hosts/{entidad.valor}',
+                        auth=(cid, secret), timeout=12)
+        res = (r.json() or {}).get('result', {}) or {}
+        aut = res.get('autonomous_system', {}) or {}
+        if aut.get('name'):
+            ctx.emitir('org', aut['name'], etiqueta='censys')
+        if aut.get('asn'):
+            ctx.emitir('asn', f"AS{aut['asn']}", etiqueta='censys')
+        vistos = set()
+        for s in res.get('services', []):
+            p = s.get('port')
+            if p:
+                ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='censys',
+                           servicio=s.get('service_name', ''))
+            prod = s.get('service_name')
+            if prod and prod not in vistos:
+                vistos.add(prod)
+                ctx.emitir('tech', prod, etiqueta='censys')
+    except Exception as _e:
+        log.debug("censys no disponible: %s", _e)
+
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
 # SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).
