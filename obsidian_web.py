@@ -11,7 +11,7 @@ from core.validacion import (_SHELL_PELIGROSOS, _MODULO_TIPO, _es_ip, _validar,
                              _objetivo_seguro, _slug_caso, _ruta_caso_segura, _url_publica)
 from core.registro import get_logger
 from core.modelo import Almacen, Entidad, tipo_valido
-from core.transforms import transform, REGISTRO, ejecutar_por_nombre
+from core.transforms import transform, REGISTRO, ejecutar_por_nombre, ejecutar_lote
 from core.migracion import migrar_caso
 from core.workspaces import Gestor
 from core.boveda import Boveda
@@ -2716,6 +2716,28 @@ def api_v2_run():
         return _error(str(e), 400)
     return jsonify({'producidas': [e.to_dict() for e in producidas],
                     'total_entidades': len(_almacen), 'workspace': _ws_activo})
+
+@app.route('/api/v2/recon', methods=['POST'])
+def api_v2_recon():
+    """Corre en paralelo todos los transforms aplicables a la semilla (paso 102)."""
+    d = request.json or {}
+    tipo = d.get('tipo', '')
+    valor = (d.get('valor', '') or '').strip()
+    if not tipo_valido(tipo):
+        return _error('tipo de entidad inválido', 400)
+    con_keys = bool(d.get('con_keys'))
+    with _almacen_lock:
+        _almacen.crear(tipo, valor)
+    ts = [t for t in REGISTRO.aplicables(tipo) if con_keys or not t.requiere_key]
+    tareas = [(tipo, valor, t.nombre) for t in ts]
+    res = ejecutar_lote(tareas, _almacen, lock=_almacen_lock)
+    if _ws_activo:
+        with _almacen_lock:
+            try:
+                _gestor.guardar(_ws_activo, _almacen)
+            except Exception as _e:
+                log.warning("autosave recon falló: %s", _e)
+    return jsonify({'resultados': res, 'total_entidades': len(_almacen), 'workspace': _ws_activo})
 
 @app.route('/api/v2/entidad', methods=['POST'])
 def api_v2_entidad():

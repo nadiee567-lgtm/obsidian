@@ -23,7 +23,7 @@ import sys
 
 import obsidian_web as _ob   # registra los transforms (no arranca Flask)
 from core.modelo import Almacen, tipo_valido
-from core.transforms import REGISTRO, ejecutar_por_nombre
+from core.transforms import REGISTRO, ejecutar_por_nombre, ejecutar_lote
 from core.correlacion import correlacionar, score_riesgo
 from core.reporte import generar_reporte
 from core.exportar import exportar_json, exportar_csv
@@ -79,22 +79,22 @@ def cmd_run(a):
 
 
 def cmd_recon(a):
-    """Corre TODOS los transforms aplicables (sin key, salvo --con-keys) sobre la semilla."""
+    """Corre TODOS los transforms aplicables EN PARALELO (sin key, salvo --con-keys)."""
+    import time
     if not tipo_valido(a.tipo):
         return _err(f"tipo inválido: {a.tipo}")
     alm = _almacen(a.workspace)
-    semilla = alm.crear(a.tipo, a.valor)
+    alm.crear(a.tipo, a.valor)
     ts = [t for t in REGISTRO.aplicables(a.tipo) if a.con_keys or not t.requiere_key]
-    print(f"recon sobre {a.tipo} {a.valor} — {len(ts)} transform(s)")
-    for t in sorted(ts, key=lambda x: x.nombre):
-        try:
-            n = len(ejecutar_por_nombre(t.nombre, semilla, alm))
-            print(f"  {t.nombre:22} +{n}")
-        except Exception as e:
-            print(f"  {t.nombre:22} ✗ {e}")
+    tareas = [(a.tipo, a.valor, t.nombre) for t in ts]
+    print(f"recon sobre {a.tipo} {a.valor} — {len(tareas)} transform(s) en paralelo")
+    t0 = time.time()
+    for nombre, n in sorted(ejecutar_lote(tareas, alm)):
+        print(f"  {nombre:22} +{n}")
     _guardar(a.workspace, alm)
     h = correlacionar(alm)
-    print(f"total: {len(alm)} entidades · {len(h)} hallazgo(s) · riesgo {score_riesgo(h)}/100")
+    print(f"total: {len(alm)} entidades · {len(h)} hallazgo(s) · "
+          f"riesgo {score_riesgo(h)}/100 · {time.time() - t0:.1f}s")
     return 0
 
 

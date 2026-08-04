@@ -131,6 +131,47 @@ def ejecutar_por_nombre(nombre: str, entidad: Entidad, almacen: Almacen) -> list
     return ejecutar(t, entidad, almacen)
 
 
+def ejecutar_lote(tareas, almacen: Almacen, max_workers: int = 8, lock=None) -> list:
+    """Corre varios transforms EN PARALELO (paso 102). Los transforms son I/O-bound
+    (red), así que se lanzan concurrentemente — cada uno en un Almacen AISLADO, sin
+    estado compartido durante el fetch. Al terminar, se fusionan los resultados en
+    `almacen` (dedup por id determinista). Si se pasa `lock`, la fusión va bajo él.
+
+    tareas: iterable de (tipo, valor, nombre_transform).
+    Devuelve [(nombre, nº_producidas), ...]."""
+    import contextlib
+    from concurrent.futures import ThreadPoolExecutor
+
+    tareas = list(tareas)
+    if not tareas:
+        return []
+
+    def _uno(t):
+        tipo, valor, nombre = t
+        local = Almacen()
+        n = 0
+        try:
+            semilla = local.crear(tipo, valor)
+            n = len(ejecutar_por_nombre(nombre, semilla, local))
+        except Exception:
+            pass
+        return nombre, n, local
+
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(tareas))) as ex:
+        salidas = list(ex.map(_uno, tareas))    # la red corre en paralelo, sin lock
+
+    resultados = []
+    ctx = lock if lock is not None else contextlib.nullcontext()
+    with ctx:                                    # fusión serializada (dedup consistente)
+        for nombre, n, local in salidas:
+            resultados.append((nombre, n))
+            for e in local.entidades:
+                almacen.agregar(e)
+            for r in local.relaciones:
+                almacen.relacionar(r.origen, r.destino, r.etiqueta)
+    return resultados
+
+
 # ── Paso 39: Machines (recetas = cadenas de transforms, estilo Maltego) ──────
 @dataclass
 class Machine:
