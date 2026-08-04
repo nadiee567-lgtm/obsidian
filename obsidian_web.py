@@ -2853,6 +2853,34 @@ def _t_busqueda_facial(entidad, ctx):
     for motor, info in enlaces_facial(entidad.valor).items():
         ctx.emitir('url', info['url'], etiqueta=f'facial:{motor}', motor=motor, modo=info['modo'])
 
+@transform(entrada='telefono', salidas=('url', 'pais'), nombre='telefono_dorks',
+           descripcion='Dorks de búsqueda del teléfono (Truecaller/mensajería) + carrier si hay key (F2 paso 33)')
+def _t_telefono_dorks(entidad, ctx):
+    from urllib.parse import quote as _q
+    num = entidad.valor
+    limpio = re.sub(r'[^\d+]', '', num)
+    dorks = {
+        'truecaller': f'{num} site:truecaller.com',
+        'whitepages': f'{num} site:whitepages.com',
+        'mensajeria': f'{num} whatsapp OR telegram',
+        'general': limpio,
+    }
+    for nombre, q in dorks.items():
+        ctx.emitir('url', f'https://www.google.com/search?q={_q(q)}', etiqueta=f'dork:{nombre}', dork=nombre)
+    key = _boveda.obtener('numverify') or os.environ.get('NUMVERIFY_KEY', '')
+    if key:
+        try:
+            r = SESSION.get('http://apilayer.net/api/validate',
+                            params={'access_key': key, 'number': limpio}, timeout=8)
+            d = r.json() or {}
+            if d.get('valid'):
+                entidad.propiedades['carrier'] = d.get('carrier', '')
+                entidad.propiedades['tipo_linea'] = d.get('line_type', '')
+                if d.get('country_name'):
+                    ctx.emitir('pais', d['country_name'], etiqueta='país')
+        except Exception as _e:
+            log.debug("numverify no disponible: %s", _e)
+
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
 # SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).
