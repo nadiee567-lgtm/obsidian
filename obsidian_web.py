@@ -2124,6 +2124,38 @@ def _t_email_spoofable(entidad, ctx):
     if not tiene_spf:
         entidad.etiquetar('spoofable')
 
+def _http_probe(entidad):
+    """Sondea un host por HTTP y enriquece la entidad. Usa _fetch_seguro:
+    no sondea IPs internas (SSRF) y revalida redirects."""
+    try:
+        r = _fetch_seguro(entidad.valor, timeout=8, stream=False)
+    except Exception:
+        return
+    entidad.propiedades['http_status'] = r.status_code
+    entidad.propiedades['http_server'] = r.headers.get('Server', '?')
+    powered = r.headers.get('X-Powered-By')
+    if powered:
+        entidad.propiedades['http_tech'] = powered
+    try:
+        m = re.search(r'<title[^>]*>(.*?)</title>', r.text[:8000], re.I | re.S)
+        if m:
+            entidad.propiedades['http_title'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
+    except Exception:
+        pass
+    if str(r.url).rstrip('/') not in (f'https://{entidad.valor}', f'http://{entidad.valor}'):
+        entidad.propiedades['http_redirect'] = str(r.url)
+    entidad.etiquetar('http-vivo')
+
+@transform(entrada='dominio', salidas=(), nombre='http_probe',
+           descripcion='Sondeo HTTP: status, título, server, redirect (estilo httpx)')
+def _t_http_probe_dom(entidad, ctx):
+    _http_probe(entidad)
+
+@transform(entrada='subdominio', salidas=(), nombre='http_probe_sub',
+           descripcion='Sondeo HTTP del subdominio (estilo httpx)')
+def _t_http_probe_sub(entidad, ctx):
+    _http_probe(entidad)
+
 @transform(entrada='dominio', salidas=('dominio', 'org'), nombre='rdap',
            descripcion='WHOIS moderno (RDAP, sin key): registrar, name servers, fechas')
 def _t_rdap(entidad, ctx):
