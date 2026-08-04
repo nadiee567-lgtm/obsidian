@@ -3846,6 +3846,15 @@ WEB_HTML = _cargar_web('app.html')
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+# Rate limits por defecto: no más de N ejecuciones concurrentes de cada transform
+# que pega a una API de terceros (paso 40). Configurable con OBSIDIAN_LIMITE_API.
+from core.transforms import set_limite as _set_limite
+_LIMITE_API = int(os.environ.get('OBSIDIAN_LIMITE_API', '2'))
+for _rl_nombre in ('crtsh', 'ct_certspotter', 'shodan', 'censys', 'zoomeye', 'fofa',
+                   'quake', 'hunter', 'netlas', 'criminalip', 'binaryedge', 'passivedns',
+                   'github_sec', 'reverse_whois', 'abuseipdb', 'greynoise'):
+    _set_limite(_rl_nombre, _LIMITE_API)
+
 if __name__ == '__main__':
     _cargar_reglas_usuario()
     host = os.environ.get('OBSIDIAN_HOST', '127.0.0.1')

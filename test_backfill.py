@@ -174,3 +174,35 @@ def test_reglas_yaml_severidad_invalida_se_normaliza():
 def test_reglas_yaml_basura_no_rompe():
     from core.correlacion import cargar_reglas_yaml
     assert cargar_reglas_yaml('no: [es: :valido') == 0   # YAML roto → 0, sin excepción
+
+
+# ── 40: rate limiting por transform ──────────────────────────────────────────
+def test_rate_limit_concurrencia():
+    import threading
+    import time
+    from core.transforms import transform, ejecutar_por_nombre, set_limite
+
+    estado, lock = {'activos': 0, 'max': 0}, threading.Lock()
+
+    @transform(entrada='dominio', salidas=(), nombre='_test_rl')
+    def _rl(entidad, ctx):
+        with lock:
+            estado['activos'] += 1
+            estado['max'] = max(estado['max'], estado['activos'])
+        time.sleep(0.05)
+        with lock:
+            estado['activos'] -= 1
+
+    set_limite('_test_rl', 1)
+    try:
+        def run():
+            alm = Almacen()
+            ejecutar_por_nombre('_test_rl', alm.crear('dominio', 'x.com'), alm)
+        ths = [threading.Thread(target=run) for _ in range(4)]
+        for t in ths:
+            t.start()
+        for t in ths:
+            t.join()
+        assert estado['max'] == 1                # nunca más de 1 concurrente
+    finally:
+        set_limite('_test_rl', 0)                # quita el límite

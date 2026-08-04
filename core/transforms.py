@@ -110,15 +110,45 @@ class Contexto:
         return viva
 
 
+# ── Rate limiting por transform (paso 40) ────────────────────────────────────
+# Un semáforo por transform limita cuántas ejecuciones concurrentes tocan su API,
+# para no reventar a los terceros. Sin límite configurado = sin tope.
+import threading as _threading
+
+_SEMAFOROS: dict = {}
+_LIMITES: dict = {}
+_lock_lim = _threading.Lock()
+
+
+def set_limite(nombre: str, max_concurrentes: int) -> None:
+    """Configura la concurrencia máxima de un transform. <=0 quita el límite."""
+    with _lock_lim:
+        if max_concurrentes and max_concurrentes > 0:
+            _LIMITES[nombre] = max_concurrentes
+            _SEMAFOROS[nombre] = _threading.Semaphore(max_concurrentes)
+        else:
+            _LIMITES.pop(nombre, None)
+            _SEMAFOROS.pop(nombre, None)
+
+
+def limites() -> dict:
+    return dict(_LIMITES)
+
+
 def ejecutar(t: Transform, entidad: Entidad, almacen: Almacen) -> list:
     """Corre un transform sobre una entidad (paso 28). Devuelve las entidades
     producidas. AÍSLA fallos (paso 38): si el transform revienta, no propaga —
-    devuelve lo que alcanzó a emitir. Valida el tipo de entrada."""
+    devuelve lo que alcanzó a emitir. Respeta el rate limit del transform (paso 40)."""
     if entidad.tipo != t.entrada:
         raise ValueError(f"{t.nombre} espera '{t.entrada}', recibió '{entidad.tipo}'")
     ctx = Contexto(almacen, entidad, t.nombre)
+    sem = _SEMAFOROS.get(t.nombre)
     try:
-        t.fn(entidad, ctx)
+        if sem is not None:
+            with sem:                       # no más de N concurrentes de este transform
+                t.fn(entidad, ctx)
+        else:
+            t.fn(entidad, ctx)
     except Exception:
         pass   # el fallo de un transform no tumba el caso
     return ctx.emitidas
