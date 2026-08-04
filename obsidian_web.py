@@ -2034,6 +2034,25 @@ def _t_crtsh(entidad, ctx):
     except Exception as _e:
         log.debug("crtsh no disponible: %s", _e)
 
+@transform(entrada='dominio', salidas=('subdominio',), nombre='ct_certspotter',
+           descripcion='Subdominios desde Certificate Transparency (certspotter, keyless)')
+def _t_ct_certspotter(entidad, ctx):
+    try:
+        data = SESSION.get('https://api.certspotter.com/v1/issuances',
+                           params={'domain': entidad.valor, 'include_subdomains': 'true',
+                                   'expand': 'dns_names'}, timeout=12).json()
+        if not isinstance(data, list):   # rate limit / error -> {message: ...}
+            return
+        vistos = set()
+        for cert in data:
+            for nombre in cert.get('dns_names', []):
+                nombre = nombre.lstrip('*.')
+                if nombre.endswith(entidad.valor) and nombre != entidad.valor and nombre not in vistos:
+                    vistos.add(nombre)
+                    ctx.emitir('subdominio', nombre, etiqueta='subdominio')
+    except Exception as _e:
+        log.debug("certspotter no disponible: %s", _e)
+
 @transform(entrada='ip', salidas=('pais', 'org', 'asn'), nombre='geo_ip',
            descripcion='Geolocalización e info de red de la IP (ip-api.com)')
 def _t_geo_ip(entidad, ctx):
