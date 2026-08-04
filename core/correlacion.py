@@ -104,6 +104,14 @@ def r_email_filtrado(alm):
                            f'{e.valor} apareció en brechas de datos', [e.id])
 
 @regla
+def r_stealer(alm):
+    """Email salido de una máquina con infostealer = credenciales comprometidas."""
+    for e in alm.de_tipo('email'):
+        if 'stealer-infectado' in e.tags:
+            yield Hallazgo('stealer-infectado', 'critico',
+                           f'{e.valor} salió de una máquina con infostealer: credenciales comprometidas', [e.id])
+
+@regla
 def r_email_spoofable(alm):
     """Dominio de email sin SPF → spoofing posible."""
     for e in alm.de_tipo('email'):

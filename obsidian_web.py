@@ -2112,6 +2112,37 @@ def _t_email_breaches(entidad, ctx):
     except Exception as _e:
         log.debug("hibp no disponible: %s", _e)
 
+@transform(entrada='email', salidas=('org',), nombre='breaches_xon',
+           descripcion='Brechas donde apareció el email (XposedOrNot, keyless)')
+def _t_breaches_xon(entidad, ctx):
+    try:
+        r = SESSION.get(f'https://api.xposedornot.com/v1/check-email/{requests.utils.quote(entidad.valor)}',
+                        timeout=10)
+        if r.status_code != 200:
+            return
+        breaches = r.json().get('breaches') or []
+        lista = breaches[0] if breaches and isinstance(breaches[0], list) else breaches
+        for nombre in (lista or [])[:30]:
+            if nombre:
+                ctx.emitir('org', str(nombre), etiqueta='filtrado en')
+        if lista:
+            entidad.etiquetar('filtrado')
+    except Exception as _e:
+        log.debug("xposedornot no disponible: %s", _e)
+
+@transform(entrada='email', salidas=(), nombre='stealer_hudsonrock',
+           descripcion='¿El email salió de una máquina con infostealer? (HudsonRock, keyless)')
+def _t_stealer(entidad, ctx):
+    try:
+        r = SESSION.get('https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email',
+                        params={'email': entidad.valor}, timeout=10)
+        msg = (r.json() or {}).get('message', '')
+        if 'infected by an info-stealer' in msg:
+            entidad.etiquetar('stealer-infectado')
+            entidad.propiedades['stealer'] = 'sí (HudsonRock)'
+    except Exception as _e:
+        log.debug("hudsonrock no disponible: %s", _e)
+
 @transform(entrada='email', salidas=(), nombre='email_spoofable',
            descripcion='Revisa el SPF del dominio del email (riesgo de spoofing)')
 def _t_email_spoofable(entidad, ctx):

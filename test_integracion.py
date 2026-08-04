@@ -21,7 +21,7 @@ def test_transforms_reales_registrados():
     assert {'dns_a', 'ptr', 'crtsh', 'geo_ip', 'github_usuario', 'puertos', 'dns_mx',
             'dns_ns', 'email_breaches', 'email_spoofable', 'rdap', 'greynoise',
             'dns_txt', 'ssl', 'subdominios_ht', 'http_probe', 'http_probe_sub',
-            'screenshot', 'nuclei'} <= nombres
+            'screenshot', 'nuclei', 'breaches_xon', 'stealer_hudsonrock'} <= nombres
 
 
 def test_transforms_aplicables_por_tipo():
