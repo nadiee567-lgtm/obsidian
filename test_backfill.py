@@ -66,3 +66,31 @@ def test_passivedns_sin_key(monkeypatch):
     monkeypatch.setenv('VT_API_KEY', '')
     prod, _, _ = _correr('passivedns', 'dominio', 'ejemplo.com')
     assert prod == []
+
+
+# ── 60: github_sec (secretos en commits) + regla ─────────────────────────────
+class _Rj:
+    def __init__(self, data, code=200):
+        self._d, self.status_code = data, code
+    def json(self):
+        return self._d
+
+
+def test_github_sec_y_regla(monkeypatch):
+    from core.correlacion import correlacionar
+    def fake_get(url, *a, **k):
+        if '/commits/' in url:
+            return _Rj({'files': [{'filename': 'cfg.py',
+                                   'patch': 'api_key = "AKIAIOSFODNN7EXAMPLE12"'}]})
+        if '/commits?' in url:
+            return _Rj([{'sha': 'abc123'}])
+        if '/repos' in url:
+            return _Rj([{'full_name': 'user/repo1'}])
+        return _Rj([])
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: '')
+    monkeypatch.setattr(ob.SESSION, 'get', fake_get)
+    prod, _, alm = _correr('github_sec', 'usuario', 'user')
+    creds = [p for p in prod if p.tipo == 'credencial']
+    assert creds and 'secreto-github' in creds[0].tags
+    h = correlacionar(alm)
+    assert any(x.regla == 'secreto-github' and x.severidad == 'critico' for x in h)

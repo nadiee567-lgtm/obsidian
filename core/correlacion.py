@@ -148,6 +148,16 @@ def r_takeover(alm):
                            f'Subdominio vulnerable a takeover: {s.valor}', [s.id])
 
 @regla
+def r_secreto_github(alm):
+    """Credencial/secreto hardcodeado hallado en un commit de GitHub (paso 60)."""
+    for c in alm.de_tipo('credencial'):
+        if 'secreto-github' in c.tags:
+            tipo = c.propiedades.get('tipo_secreto', 'secreto')
+            repo = c.propiedades.get('repo', '?')
+            yield Hallazgo('secreto-github', 'critico',
+                           f'{tipo} expuesto en un commit de {repo}', [c.id])
+
+@regla
 def r_nuclei_vuln(alm):
     """Host con hallazgos de nuclei de severidad alta+."""
     for tipo in ('dominio', 'subdominio'):

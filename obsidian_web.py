@@ -3015,6 +3015,53 @@ def _t_passivedns(entidad, ctx):
     except Exception as _e:
         log.debug("passivedns no disponible: %s", _e)
 
+_SECRET_PATTERNS = [
+    ('API Key', r'api[_-]?key\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{20,})'),
+    ('Secret', r'secret\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{20,})'),
+    ('Password', r'password\s*[=:]\s*["\']?([^\s"\']{8,})'),
+    ('Token', r'token\s*[=:]\s*["\']?([a-zA-Z0-9_\-\.]{20,})'),
+    ('AWS Key', r'(AKIA[0-9A-Z]{16})'),
+    ('Private Key', r'-----BEGIN (?:RSA|EC|OPENSSH) PRIVATE KEY-----'),
+]
+
+@transform(entrada='usuario', salidas=('credencial', 'repo'), nombre='github_sec',
+           descripcion='Secretos hardcodeados en commits de repos públicos del usuario (F4 paso 60)')
+def _t_github_sec(entidad, ctx):
+    user = entidad.valor
+    tok = _boveda.obtener('github') or os.environ.get('GITHUB_TOKEN', '')
+    hdr = {'Authorization': f'token {tok}'} if tok else {}
+    try:
+        rr = SESSION.get(f'https://api.github.com/users/{user}/repos?per_page=20', headers=hdr, timeout=8)
+        if rr.status_code != 200:
+            rr = SESSION.get(f'https://api.github.com/orgs/{user}/repos?per_page=20', headers=hdr, timeout=8)
+        repos = rr.json()
+        if not isinstance(repos, list):
+            return
+        for repo in repos[:10]:
+            full = repo.get('full_name', '')
+            if full:
+                ctx.emitir('repo', full, etiqueta='repo')
+            cr = SESSION.get(f'https://api.github.com/repos/{full}/commits?per_page=5', headers=hdr, timeout=8)
+            if cr.status_code != 200:
+                continue
+            for commit in (cr.json() or [])[:3]:
+                sha = commit.get('sha', '')
+                dr = SESSION.get(f'https://api.github.com/repos/{full}/commits/{sha}', headers=hdr, timeout=8)
+                if dr.status_code != 200:
+                    continue
+                for f in (dr.json().get('files', []) or [])[:5]:
+                    patch = f.get('patch', '') or ''
+                    for nombre_pat, patron in _SECRET_PATTERNS:
+                        for m in re.findall(patron, patch, re.IGNORECASE):
+                            val = (m if isinstance(m, str) else ':'.join(x for x in m if x)) or nombre_pat
+                            c = ctx.emitir('credencial', val[:60], etiqueta='secreto',
+                                           tipo_secreto=nombre_pat, repo=full,
+                                           commit=sha[:8], archivo=f.get('filename', '?'))
+                            if c:
+                                c.etiquetar('secreto-github')
+    except Exception as _e:
+        log.debug("github_sec no disponible: %s", _e)
+
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
 # SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).
