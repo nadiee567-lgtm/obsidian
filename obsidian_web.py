@@ -1982,6 +1982,27 @@ def _t_ptr(entidad, ctx):
         if linea and not linea.startswith(';'):
             ctx.emitir('dominio', linea, etiqueta='PTR')
 
+@transform(entrada='dominio', salidas=('subdominio', 'ip'), nombre='subdominios_ht',
+           descripcion='Subdominios (+ su IP) vía HackerTarget hostsearch (keyless)')
+def _t_subdominios_ht(entidad, ctx):
+    try:
+        texto = SESSION.get(f'https://api.hackertarget.com/hostsearch/?q={entidad.valor}', timeout=12).text
+        if 'API count exceeded' in texto or 'error' in texto.lower():
+            return
+        for linea in texto.splitlines()[:150]:
+            if ',' not in linea:
+                continue
+            sub, ip = (x.strip() for x in linea.split(',', 1))
+            if not sub.endswith(entidad.valor) or sub == entidad.valor:
+                continue
+            sub_ent = ctx.emitir('subdominio', sub, etiqueta='subdominio')
+            if sub_ent and re.fullmatch(r'\d+\.\d+\.\d+\.\d+', ip):
+                ip_ent = ctx.almacen.crear('ip', ip, origenes={'subdominios_ht'})
+                ip_ent.anotar_procedencia('subdominios_ht', input_id=sub_ent.id)
+                ctx.almacen.relacionar(sub_ent, ip_ent, 'A')
+    except Exception as _e:
+        log.debug("subdominios_ht no disponible: %s", _e)
+
 @transform(entrada='dominio', salidas=('subdominio',), nombre='crtsh',
            descripcion='Subdominios desde crt.sh (Certificate Transparency)')
 def _t_crtsh(entidad, ctx):
