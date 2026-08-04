@@ -36,14 +36,24 @@ def regla(fn):
     return fn
 
 
+_SUPRIMIR = {'descartado', 'falso-positivo'}
+
 def correlacionar(almacen) -> list:
-    """Corre todas las reglas y devuelve los hallazgos ordenados por severidad."""
+    """Corre todas las reglas y devuelve los hallazgos ordenados por severidad.
+    Respeta el feedback del analista: si TODAS las entidades de un hallazgo están
+    marcadas 'descartado'/'falso-positivo', el hallazgo se suprime (ciclo de
+    feedback — la herramienta aprende de las correcciones humanas)."""
     out = []
     for fn in _REGLAS:
         try:
             out.extend(fn(almacen) or [])
         except Exception:
             pass   # una regla rota no tumba la correlación
+    idx = {e.id: e for e in almacen.entidades}
+    def suprimido(h):
+        ids = [eid for eid in h.entidades if eid in idx]
+        return bool(ids) and all(_SUPRIMIR & idx[eid].tags for eid in ids)
+    out = [h for h in out if not suprimido(h)]
     out.sort(key=lambda h: -SEVERIDADES.get(h.severidad, 0))
     return out
 

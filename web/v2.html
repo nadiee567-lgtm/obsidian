@@ -56,6 +56,10 @@
   #detalle .kv b{color:var(--text)}
   #detalle .tag{display:inline-block;font-family:var(--mono);font-size:.62rem;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 .3rem;margin:.15rem .15rem 0 0}
   #detalle .hint{color:var(--dim);font-size:.72rem;margin-top:.7rem;font-family:var(--mono)}
+  .tagbar{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.7rem}
+  .tagbtn{font-family:var(--mono);font-size:.62rem;padding:.2rem .4rem;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:5px;cursor:pointer}
+  .tagbtn:hover{border-color:var(--blue)}
+  .nota{width:100%;margin-top:.5rem;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:.4rem;font-family:var(--mono);font-size:.72rem;resize:vertical;min-height:44px}
 
   .score{font-family:var(--mono);font-size:.66rem;padding:.1rem .45rem;border-radius:5px;margin-left:.4rem}
   .hall{display:flex;gap:.5rem;align-items:baseline;padding:.35rem .5rem;border-left:2px solid var(--sc,var(--muted));background:var(--panel2);border-radius:0 6px 6px 0;margin-bottom:.3rem}
@@ -223,7 +227,26 @@ function mostrarDetalle(id){
     d.appendChild(kv);
   });
   if((e.origenes||[]).length){const o=el('div','kv');o.innerHTML='<b>fuentes:</b> '+e.origenes.join(', ');d.appendChild(o);}
+  // etiquetas rápidas del analista (feedback loop)
+  const tb=el('div','tagbar');
+  [['interesante','#9ece6a'],['sospechoso','#ff9e64'],['descartado','#6b7488'],['falso-positivo','#7dcfff']].forEach(([tg,col])=>{
+    const b=el('button','tagbtn'); b.textContent=tg;
+    if((e.tags||[]).includes(tg)) b.style.cssText='background:'+col+';color:#0b0d12';
+    b.onclick=()=>toggleTag(e.id,tg); tb.appendChild(b);
+  });
+  d.appendChild(tb);
+  // nota del analista
+  const ta=el('textarea','nota'); ta.placeholder='nota del analista…'; ta.value=e.propiedades.nota||'';
+  ta.onchange=()=>guardarNota(e.id,ta.value); d.appendChild(ta);
   const h=el('div','hint'); h.textContent='↳ click derecho en el nodo para correr transforms'; d.appendChild(h);
+}
+async function toggleTag(id,tag){
+  await fetch('/api/v2/entidad/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,tag})});
+  await pintarGrafo(); mostrarDetalle(id);
+}
+async function guardarNota(id,nota){
+  await fetch('/api/v2/entidad/nota',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,nota})});
+  await pintarGrafo(); setStatus('nota guardada');
 }
 
 async function menuTransforms(id,ev){

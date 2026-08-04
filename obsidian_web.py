@@ -2720,6 +2720,38 @@ def api_v2_entidad():
             log.warning("autosave falló: %s", _e)
     return jsonify({'ok': True, 'id': ent.id})
 
+def _autosave():
+    if _ws_activo:
+        try:
+            _gestor.guardar(_ws_activo, _almacen)
+        except Exception as _e:
+            log.warning("autosave falló: %s", _e)
+
+@app.route('/api/v2/entidad/nota', methods=['POST'])
+def api_v2_nota():
+    """Nota del analista sobre una entidad (F6 paso 88)."""
+    d = request.json or {}
+    e = _almacen.obtener(d.get('id', ''))
+    if not e:
+        return _error('entidad no encontrada', 404)
+    e.propiedades['nota'] = (d.get('nota', '') or '')[:1000]
+    _autosave()
+    return jsonify({'ok': True})
+
+@app.route('/api/v2/entidad/tag', methods=['POST'])
+def api_v2_tag():
+    """Toggle de una etiqueta del analista (interesante/descartado/falso-positivo)."""
+    d = request.json or {}
+    e = _almacen.obtener(d.get('id', ''))
+    if not e:
+        return _error('entidad no encontrada', 404)
+    tag = (d.get('tag', '') or '').strip()[:30]
+    if not tag:
+        return _error('falta la etiqueta', 400)
+    e.tags.discard(tag) if tag in e.tags else e.tags.add(tag)
+    _autosave()
+    return jsonify({'ok': True, 'tags': sorted(e.tags)})
+
 @app.route('/api/v2/grafo')
 def api_v2_grafo():
     """Grafo tipado. ?migrar=1 convierte el case['datos'] viejo al modelo nuevo."""

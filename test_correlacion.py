@@ -61,3 +61,13 @@ def test_score_riesgo():
 
 def test_sin_datos_sin_hallazgos():
     assert correlacionar(Almacen()) == []
+
+
+def test_feedback_suprime_descartados():
+    """Si el analista marca la entidad como falso-positivo, su hallazgo desaparece."""
+    alm = Almacen()
+    ip = alm.crear('ip', '45.9.9.9')
+    ip.etiquetar('malicioso')
+    assert len(correlacionar(alm)) == 1
+    ip.etiquetar('falso-positivo')          # feedback del analista
+    assert correlacionar(alm) == []
