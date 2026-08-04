@@ -3018,6 +3018,14 @@ def _estado_datos():
         'ntfy': bool(_ntfy_topic()),
     }
 
+@app.route('/api/v2/buscar/traducir', methods=['POST'])
+def api_v2_buscar_traducir():
+    """Traduce una consulta unificada al dialecto de CADA motor (F8 paso 117).
+    Body: {campos:{ip,dominio,favicon,cert,puerto,...}, cn:true|false|null}."""
+    d = request.json or {}
+    campos = {k: v for k, v in (d.get('campos') or {}).items() if v}
+    return jsonify({'campos': campos, 'queries': traducir_todos(campos, d.get('cn'))})
+
 @app.route('/api/v2/estado')
 def api_v2_estado():
     """Salud del sistema en JSON (paso 105)."""
