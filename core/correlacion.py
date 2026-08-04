@@ -1,0 +1,120 @@
+"""Motor de correlación de OBSIDIAN — F4, pasos 53-54, 57-62, 64.
+
+Corre reglas sobre el almacén y encuentra patrones que ningún transform ve solo
+(un puerto sensible expuesto, un cert vencido, un email en brechas...). Cada
+regla produce Hallazgos con severidad; el motor los ordena y calcula un score.
+
+Diseño: reglas como funciones Python registradas con @regla (robusto y testeable,
+estilo SpiderFoot). El cargador de reglas YAML de usuario es aparte (paso 63).
+Módulo PURO: recibe un Almacen, no toca Flask ni red."""
+from __future__ import annotations
+import datetime
+from dataclasses import dataclass, field, asdict
+
+SEVERIDADES = {'critico': 4, 'alto': 3, 'medio': 2, 'bajo': 1}
+_PESO = {'critico': 40, 'alto': 20, 'medio': 8, 'bajo': 3}
+
+
+@dataclass
+class Hallazgo:
+    """Un patrón de riesgo detectado (paso 54)."""
+    regla: str
+    severidad: str          # critico | alto | medio | bajo
+    mensaje: str
+    entidades: list = field(default_factory=list)   # ids involucrados
+
+    def to_dict(self):
+        return asdict(self)
+
+
+_REGLAS = []
+
+
+def regla(fn):
+    """Registra una función-regla: recibe el Almacen y produce Hallazgos."""
+    _REGLAS.append(fn)
+    return fn
+
+
+def correlacionar(almacen) -> list:
+    """Corre todas las reglas y devuelve los hallazgos ordenados por severidad."""
+    out = []
+    for fn in _REGLAS:
+        try:
+            out.extend(fn(almacen) or [])
+        except Exception:
+            pass   # una regla rota no tumba la correlación
+    out.sort(key=lambda h: -SEVERIDADES.get(h.severidad, 0))
+    return out
+
+
+def score_riesgo(hallazgos) -> int:
+    """Score 0-100 agregando severidades (paso 64)."""
+    return min(100, sum(_PESO.get(h.severidad, 0) for h in hallazgos))
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Reglas de fábrica (disparan con los datos que ya producen los transforms)
+# ════════════════════════════════════════════════════════════════════════════
+
+_PUERTOS_SENSIBLES = {
+    '21': 'FTP', '23': 'Telnet', '445': 'SMB', '1433': 'MSSQL', '3306': 'MySQL',
+    '3389': 'RDP', '5432': 'PostgreSQL', '5900': 'VNC', '6379': 'Redis', '27017': 'MongoDB',
+}
+
+@regla
+def r_puerto_sensible(alm):
+    """Puerto administrativo/de base de datos expuesto a internet (paso 58)."""
+    for p in alm.de_tipo('puerto'):
+        num = p.valor.split(':')[-1]
+        if num in _PUERTOS_SENSIBLES:
+            yield Hallazgo('puerto-sensible', 'alto',
+                           f'Puerto {num} ({_PUERTOS_SENSIBLES[num]}) expuesto: {p.valor}', [p.id])
+
+@regla
+def r_cert_vencido(alm):
+    """Certificado TLS vencido en un dominio (paso 61)."""
+    ahora = datetime.datetime.now()
+    for d in alm.de_tipo('dominio'):
+        exp = d.propiedades.get('cert_expira')
+        if not exp:
+            continue
+        try:
+            fecha = datetime.datetime.strptime(exp.replace(' GMT', ''), '%b %d %H:%M:%S %Y')
+        except ValueError:
+            continue
+        if fecha < ahora:
+            yield Hallazgo('cert-vencido', 'medio',
+                           f'Certificado TLS vencido en {d.valor} ({exp})', [d.id])
+
+@regla
+def r_ip_maliciosa(alm):
+    """IP marcada como maliciosa por threat intel (paso 57)."""
+    for ip in alm.de_tipo('ip'):
+        if 'malicioso' in ip.tags:
+            yield Hallazgo('ip-maliciosa', 'critico',
+                           f'IP {ip.valor} clasificada como maliciosa (GreyNoise)', [ip.id])
+
+@regla
+def r_email_filtrado(alm):
+    """Email que apareció en brechas de datos (parte del 56)."""
+    for e in alm.de_tipo('email'):
+        if 'filtrado' in e.tags:
+            yield Hallazgo('email-filtrado', 'alto',
+                           f'{e.valor} apareció en brechas de datos', [e.id])
+
+@regla
+def r_email_spoofable(alm):
+    """Dominio de email sin SPF → spoofing posible."""
+    for e in alm.de_tipo('email'):
+        if 'spoofable' in e.tags:
+            yield Hallazgo('email-spoofable', 'medio',
+                           f'El dominio de {e.valor} no tiene SPF: spoofing posible', [e.id])
+
+@regla
+def r_takeover(alm):
+    """Subdominio marcado como vulnerable a takeover (paso 55)."""
+    for s in alm.de_tipo('subdominio'):
+        if 'takeover' in s.tags:
+            yield Hallazgo('subdominio-takeover', 'alto',
+                           f'Subdominio vulnerable a takeover: {s.valor}', [s.id])
