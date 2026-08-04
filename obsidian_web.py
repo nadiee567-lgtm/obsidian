@@ -2881,6 +2881,140 @@ def _t_telefono_dorks(entidad, ctx):
         except Exception as _e:
             log.debug("numverify no disponible: %s", _e)
 
+@transform(entrada='dominio', salidas=('dominio',), nombre='typosquatting',
+           descripcion='Variantes typosquat del dominio que SÍ están registradas (F2 paso 34)')
+def _t_typosquatting(entidad, ctx):
+    dom = entidad.valor
+    nombre, ext = dom.rsplit('.', 1) if '.' in dom else (dom, 'com')
+    variantes = set()
+    subs = {'a': '4', 'e': '3', 'i': '1', 'o': '0', 's': '5', 'l': '1'}
+    for i, c in enumerate(nombre):
+        if c in subs:
+            variantes.add(f'{nombre[:i] + subs[c] + nombre[i+1:]}.{ext}')
+    teclado = {'q': 'w', 'w': 'e', 'e': 'r', 'r': 't', 't': 'y', 'a': 's', 's': 'd',
+               'd': 'f', 'f': 'g', 'g': 'h', 'z': 'x', 'x': 'c', 'c': 'v', 'v': 'b'}
+    for i, c in enumerate(nombre.lower()):
+        if c in teclado:
+            variantes.add(f'{nombre[:i] + teclado[c] + nombre[i+1:]}.{ext}')
+    for i in range(len(nombre)):
+        variantes.add(f'{nombre[:i] + nombre[i+1:]}.{ext}')
+        variantes.add(f'{nombre[:i] + nombre[i]*2 + nombre[i:]}.{ext}')
+    variantes.discard(dom)
+    registrados, lock = {}, threading.Lock()
+    def _chk(v):
+        out = run_tool(['dig', v, 'A', '+short'], timeout=4)
+        ip = next((l.strip() for l in out.splitlines()
+                   if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', l.strip())), None)
+        if ip:
+            with lock:
+                registrados[v] = ip
+    ths = [threading.Thread(target=_chk, args=(v,)) for v in list(variantes)[:25]]
+    for t in ths:
+        t.start()
+    for t in ths:
+        t.join(timeout=12)
+    for v, ip in registrados.items():
+        d = ctx.emitir('dominio', v, etiqueta='typosquat', resuelve=ip)
+        if d:
+            d.etiquetar('typosquat')
+
+@transform(entrada='org', salidas=('bucket',), nombre='buckets',
+           descripcion='Buckets S3/GCS/Azure públicos por nombre de la organización (F2 paso 34)')
+def _t_buckets(entidad, ctx):
+    base = re.sub(r'[^a-z0-9-]', '', entidad.valor.lower().replace(' ', '-').replace('_', '-'))
+    if not base:
+        return
+    variantes = [base, f'{base}-backup', f'{base}-dev', f'{base}-prod', f'{base}-staging',
+                 f'{base}-assets', f'{base}-media', f'backup-{base}', f'dev-{base}', f'assets-{base}']
+    hallados, lock = {}, threading.Lock()
+    def _chk(bucket):
+        for url in (f'https://{bucket}.s3.amazonaws.com',
+                    f'https://storage.googleapis.com/{bucket}',
+                    f'https://{bucket}.blob.core.windows.net'):
+            try:
+                r = SESSION.get(url, timeout=5)
+                if r.status_code in (200, 403):
+                    with lock:
+                        hallados[bucket] = {'url': url, 'publico': r.status_code == 200}
+                    return
+            except Exception:
+                pass
+    ths = [threading.Thread(target=_chk, args=(b,)) for b in variantes]
+    for t in ths:
+        t.start()
+    for t in ths:
+        t.join(timeout=15)
+    for bucket, info in hallados.items():
+        b = ctx.emitir('bucket', bucket, etiqueta='bucket', url=info['url'], publico=info['publico'])
+        if b and info['publico']:
+            b.etiquetar('publico')
+
+_TAKEOVER_FP = {
+    'github.io': "There isn't a GitHub Pages site here", 'herokuapp.com': 'No such app',
+    'amazonaws.com': 'NoSuchBucket', 'azurewebsites.net': '404 Web Site not found',
+    'netlify.app': 'Not Found', 'surge.sh': 'project not found',
+    'readme.io': "Project doesnt exist", 'zendesk.com': 'Help Center Closed',
+    'shopify.com': 'Sorry, this shop is currently unavailable',
+}
+
+@transform(entrada='dominio', salidas=('subdominio',), nombre='takeover',
+           descripcion='Subdominios huérfanos vulnerables a takeover (CNAME a servicio abandonado) (F2 paso 34)')
+def _t_takeover(entidad, ctx):
+    dom = entidad.valor
+    try:
+        r = SESSION.get(f'https://crt.sh/?q=%.{dom}&output=json', timeout=12)
+        subs = {s.strip().lstrip('*.') for cert in r.json()
+                for s in cert.get('name_value', '').split('\n')
+                if s.strip().lstrip('*.').endswith(dom) and s.strip().lstrip('*.') != dom}
+    except Exception:
+        subs = set()
+    vulnerables, lock = {}, threading.Lock()
+    def _chk(sub):
+        cname = run_tool(['dig', sub, 'CNAME', '+short'], timeout=4).strip()
+        if not cname:
+            return
+        for servicio, fp in _TAKEOVER_FP.items():
+            if servicio in cname:
+                estado = 'POSIBLE'
+                try:
+                    if fp.lower() in SESSION.get(f'http://{sub}', timeout=5).text.lower():
+                        estado = 'VULNERABLE'
+                except Exception:
+                    pass
+                with lock:
+                    vulnerables[sub] = {'cname': cname, 'servicio': servicio, 'estado': estado}
+                return
+    ths = [threading.Thread(target=_chk, args=(s,)) for s in list(subs)[:20]]
+    for t in ths:
+        t.start()
+    for t in ths:
+        t.join(timeout=20)
+    for sub, info in vulnerables.items():
+        s = ctx.emitir('subdominio', sub, etiqueta='takeover',
+                       servicio=info['servicio'], cname=info['cname'], estado=info['estado'])
+        if s:
+            s.etiquetar('takeover')          # dispara la regla r_takeover (F4/55)
+
+@transform(entrada='dominio', salidas=('ip',), nombre='passivedns', requiere_key=True,
+           descripcion='Historial de IPs del dominio (Passive DNS via VirusTotal, key en la bóveda) (F2 paso 34)')
+def _t_passivedns(entidad, ctx):
+    key = _boveda.obtener('virustotal') or os.environ.get('VT_API_KEY', '')
+    if not key:
+        return
+    try:
+        r = SESSION.get(f'https://www.virustotal.com/api/v3/domains/{entidad.valor}/resolutions',
+                        headers={'x-apikey': key}, params={'limit': 20}, timeout=12)
+        for item in (r.json() or {}).get('data', []):
+            attr = item.get('attributes', {}) or {}
+            ip = attr.get('ip_address')
+            if ip:
+                fecha = attr.get('date')
+                visto = (datetime.datetime.fromtimestamp(fecha, datetime.timezone.utc)
+                         .strftime('%Y-%m-%d')) if fecha else ''
+                ctx.emitir('ip', ip, etiqueta='pdns-histórico', visto=visto)
+    except Exception as _e:
+        log.debug("passivedns no disponible: %s", _e)
+
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
 # SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).
