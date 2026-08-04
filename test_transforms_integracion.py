@@ -68,6 +68,28 @@ def test_geo_ip_status_fail(monkeypatch):
     assert _correr('geo_ip', 'ip', '1.2.3.4') == []
 
 
+def test_shodan(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'fakekey')
+    host = {'org': 'ACME Corp', 'data': [
+        {'port': 443, 'product': 'nginx'},
+        {'port': 22, 'product': 'OpenSSH'},
+        {'port': 8443, 'product': 'nginx'}]}       # nginx repetido → 1 sola tech
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: FakeResp(host))
+    prod = _correr('shodan', 'ip', '1.2.3.4')
+    puertos = {e.valor for e in prod if e.tipo == 'puerto'}
+    techs = {e.valor for e in prod if e.tipo == 'tech'}
+    orgs = {e.valor for e in prod if e.tipo == 'org'}
+    assert puertos == {'1.2.3.4:443', '1.2.3.4:22', '1.2.3.4:8443'}
+    assert techs == {'nginx', 'OpenSSH'}
+    assert orgs == {'ACME Corp'}
+
+
+def test_shodan_sin_key_no_hace_nada(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setenv('SHODAN_API_KEY', '')
+    assert _correr('shodan', 'ip', '1.2.3.4') == []
+
+
 def test_transform_con_api_caida_no_propaga(monkeypatch):
     """Si la API revienta, el transform lo atrapa y devuelve vacío (aislamiento)."""
     def boom(*a, **k):

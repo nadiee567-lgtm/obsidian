@@ -2584,6 +2584,32 @@ def _t_abuseipdb(entidad, ctx):
     except Exception as _e:
         log.debug("abuseipdb no disponible: %s", _e)
 
+@transform(entrada='ip', salidas=('puerto', 'org', 'tech'), nombre='shodan',
+           requiere_key=True,
+           descripcion='Puertos/servicios/org de la IP (Shodan, key en la bóveda)')
+def _t_shodan(entidad, ctx):
+    key = _boveda.obtener('shodan') or os.environ.get('SHODAN_API_KEY', '')
+    if not key:
+        return
+    try:
+        r = SESSION.get(f'https://api.shodan.io/shodan/host/{entidad.valor}',
+                        params={'key': key}, timeout=12)
+        d = r.json() or {}
+        if d.get('org'):
+            ctx.emitir('org', d['org'], etiqueta='org')
+        vistos_prod = set()
+        for serv in d.get('data', []):
+            port = serv.get('port')
+            if port:
+                ctx.emitir('puerto', f'{entidad.valor}:{port}', etiqueta='shodan',
+                           servicio=serv.get('_shodan', {}).get('module') or serv.get('product', ''))
+            prod = serv.get('product')
+            if prod and prod not in vistos_prod:
+                vistos_prod.add(prod)
+                ctx.emitir('tech', prod, etiqueta='shodan')
+    except Exception as _e:
+        log.debug("shodan no disponible: %s", _e)
+
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
 # SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).
