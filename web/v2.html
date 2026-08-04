@@ -63,6 +63,10 @@
   .hall{display:flex;align-items:baseline;gap:.6rem;padding:.4rem .55rem;border-left:2px solid var(--sc,var(--muted));background:var(--panel2);border-radius:0 6px 6px 0;margin-bottom:.35rem}
   .hall .sev{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;color:var(--sc);border:1px solid var(--sc);border-radius:4px;padding:0 .3rem;white-space:nowrap}
   .hall .msg{font-size:.85rem;color:#c3cbdb}
+  .btnia{font-family:var(--mono);font-size:.7rem;padding:.25rem .6rem;margin-left:.7rem;background:var(--mauve);color:#0b0d12;border:none;border-radius:6px;cursor:pointer;font-weight:700;vertical-align:middle}
+  .btnia:hover{opacity:.85} .btnia:disabled{opacity:.4;cursor:wait}
+  .iaresumen{white-space:pre-wrap;font-size:.86rem;line-height:1.55;color:#d6cdea;background:rgba(187,154,247,.08);border-left:2px solid var(--mauve);border-radius:0 6px 6px 0;padding:.7rem .9rem;margin-bottom:.8rem;display:none}
+  .iaresumen.show{display:block}
 </style>
 </head>
 <body>
@@ -106,7 +110,9 @@
   </div>
 
   <div class="card hallcard">
-    <h2>Hallazgos · <span id="nHall">0</span><span class="score" id="scoreBadge"></span></h2>
+    <h2>Hallazgos · <span id="nHall">0</span><span class="score" id="scoreBadge"></span>
+      <button id="btnIA" class="btnia">🧠 Analizar con IA</button></h2>
+    <div id="iaResumen" class="iaresumen"></div>
     <div id="hallazgos"><div class="vacio">La correlación busca riesgos sola cuando corres transforms.</div></div>
   </div>
 </div>
@@ -232,6 +238,18 @@ async function crearWs(){
 $('#btnAbrir').onclick = abrirWs;
 $('#btnCrear').onclick = crearWs;
 $('#wsNuevo').addEventListener('keydown', e=>{ if(e.key==='Enter') crearWs(); });
+
+async function analizarIA(){
+  const btn = $('#btnIA'), out = $('#iaResumen');
+  btn.disabled = true; btn.textContent = '🧠 pensando…';
+  out.className = 'iaresumen show'; out.textContent = 'Ollama está analizando el caso…';
+  try{
+    const d = await (await fetch('/api/v2/hallazgos/ia',{method:'POST'})).json();
+    out.textContent = d.resumen || d.error || 'sin respuesta';
+  }catch(e){ out.textContent = 'Error: '+e.message; }
+  btn.disabled = false; btn.textContent = '🧠 Analizar con IA';
+}
+$('#btnIA').onclick = analizarIA;
 
 $('#btnCargar').onclick = cargarTransforms;
 $('#valor').addEventListener('keydown', e=>{ if(e.key==='Enter') cargarTransforms(); });

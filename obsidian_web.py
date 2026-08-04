@@ -2301,6 +2301,37 @@ def api_v2_hallazgos():
     h = correlacionar(_almacen)
     return jsonify({'hallazgos': [x.to_dict() for x in h], 'score': score_riesgo(h)})
 
+@app.route('/api/v2/hallazgos/ia', methods=['POST'])
+def api_v2_hallazgos_ia():
+    """Correlación asistida por IA (F4 paso 65): Ollama resume el riesgo y
+    sugiere el siguiente paso a partir de los hallazgos del caso."""
+    h = correlacionar(_almacen)
+    if not h:
+        return jsonify({'resumen': 'Sin hallazgos que analizar todavía. Corre más transforms.'})
+    conteo = {}
+    for e in _almacen.entidades:
+        conteo[e.tipo] = conteo.get(e.tipo, 0) + 1
+    ents = ', '.join(f'{n} {t}' for t, n in conteo.items())
+    lista = '\n'.join(f'- [{x.severidad}] {x.mensaje}' for x in h)
+    prompt = (
+        f"Eres un analista de ciberseguridad. En una investigación OSINT sobre un objetivo "
+        f"(entidades: {ents}) se detectaron estos hallazgos:\n\n{lista}\n\n"
+        f"Score de riesgo: {score_riesgo(h)}/100.\n\n"
+        f"En 3-4 frases en español: resume el riesgo principal y sugiere el siguiente paso "
+        f"concreto de investigación. Directo, sin relleno.")
+    try:
+        r = SESSION.post(f'{OLLAMA}/api/chat', json={
+            'model': 'qwen2.5:3b',
+            'messages': [{'role': 'user', 'content': prompt}],
+            'stream': False,
+            'options': {'num_ctx': 2048, 'num_predict': 300, 'temperature': 0.4},
+        }, timeout=(10, 120))
+        texto = (r.json().get('message', {}) or {}).get('content', '').strip()
+        return jsonify({'resumen': texto or 'La IA no devolvió texto.'})
+    except Exception as e:
+        log.warning("IA correlación falló: %s", e)
+        return _error('Ollama no disponible (¿está corriendo en :11434?)', 503)
+
 @app.route('/v2')
 def v2_page():
     """Página demo del motor v2: correr transforms y ver el grafo tipado.
