@@ -15,7 +15,7 @@ import datetime
 
 from core.modelo import TIPOS
 
-_SEV_COLOR = {'critico': '#f7768e', 'alto': '#ff9e64', 'medio': '#e0af68', 'bajo': '#7aa2f7'}
+_SEV_COLOR = {'critico': '#f38ba8', 'alto': '#fab387', 'medio': '#f9e2af', 'bajo': '#89b4fa'}  # Catppuccin Mocha
 _SEV_ORDEN = {'critico': 4, 'alto': 3, 'medio': 2, 'bajo': 1}
 
 
@@ -140,7 +140,7 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OBSIDIAN · Reporte · {_e(ws)}</title>
 <style>
-  :root{{--bg:#16161e;--panel:#1c1c26;--line:#2a2a36;--txt:#c8c8d0;--muted:#7a7a88;--cyan:#7dcfff;--amber:#e0af68}}
+  :root{{--bg:#1e1e2e;--panel:#181825;--line:#313244;--txt:#cdd6f4;--muted:#6c7086;--cyan:#89dceb;--amber:#fab387}}  /* Catppuccin Mocha */
   *{{box-sizing:border-box}} body{{margin:0;background:var(--bg);color:var(--txt);
     font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;padding:2rem;max-width:1000px;margin:auto}}
   h1{{font-size:1.5rem;margin:0 0 .2rem;letter-spacing:.05em}}
