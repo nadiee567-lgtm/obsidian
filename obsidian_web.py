@@ -314,6 +314,16 @@ def _get_local_ip():
         return ip
     except Exception: return '127.0.0.1'
 
+def _tailscale_ip():
+    """IP de Tailscale (100.64.0.0/10) si la malla está arriba, si no None."""
+    try:
+        out = subprocess.run(['tailscale', 'ip', '-4'], capture_output=True,
+                             text=True, timeout=3)
+        ip = (out.stdout or '').strip().splitlines()[0].strip() if out.stdout else ''
+        return ip if ip.startswith('100.') else None
+    except Exception:
+        return None
+
 # ── Módulos OSINT ─────────────────────────────────────────────────────────────
 
 def _osint_persona(nombre):
@@ -3224,10 +3234,16 @@ WEB_HTML = _cargar_web('app.html')
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    ip = _get_local_ip()
-    print(f"""
-⬛ OBSIDIAN Web — iniciando...
-   PC:      http://localhost:{PORT}
-   Celular: http://{ip}:{PORT}
-""")
-    app.run(host=os.environ.get('OBSIDIAN_HOST', '127.0.0.1'), port=PORT, debug=False, threaded=True)
+    host = os.environ.get('OBSIDIAN_HOST', '127.0.0.1')
+    ts = _tailscale_ip()
+    lineas = [f"   Este equipo: http://localhost:{PORT}"]
+    if host in ('0.0.0.0', '::'):
+        lineas.append(f"   LAN:         http://{_get_local_ip()}:{PORT}  (⚠ expuesto a toda la red local)")
+    else:
+        lineas.append(f"   LAN:         apagada (bind local). Para exponer: OBSIDIAN_HOST=0.0.0.0")
+    if ts:
+        lineas.append(f"   Tailscale:   http://{ts}:{PORT}  (remoto seguro ✓)")
+    else:
+        lineas.append(f"   Tailscale:   sin detectar — recomendado para acceso remoto sin abrir la LAN")
+    print("\n⬛ OBSIDIAN Web — iniciando...\n" + "\n".join(lineas) + "\n")
+    app.run(host=host, port=PORT, debug=False, threaded=True)
