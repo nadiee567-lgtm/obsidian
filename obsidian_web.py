@@ -18,6 +18,7 @@ from core.boveda import Boveda
 from core.correlacion import correlacionar, score_riesgo
 from core.reporte import generar_reporte
 from core.exportar import exportar_json, exportar_csv
+from core.monitor import Monitor, snapshot as _snap_estado
 import core.ia as ia
 
 log = get_logger()
@@ -2670,32 +2671,38 @@ def api_v2_transforms(tipo):
           for t in REGISTRO.aplicables(tipo)]
     return jsonify({'tipo': tipo, 'transforms': ts})
 
+# El almacén lo mutan el endpoint /run Y el hilo del monitor (paso 95): un lock
+# serializa esas escrituras y las lecturas de snapshot del monitor.
+_almacen_lock = threading.RLock()
+
+def _correr_transform_interno(tipo, valor, nombre):
+    """Corre un transform y persiste (autosave). Compartido por /run y el monitor.
+    Lanza ValueError/KeyError; el llamador decide qué hacer con el error."""
+    if not tipo_valido(tipo):
+        raise ValueError('tipo de entidad inválido')
+    semilla = Entidad(tipo, (valor or '').strip())          # puede lanzar ValueError
+    if not semilla.valor_bien_formado():
+        raise ValueError(f'valor con forma inválida para {tipo}')
+    with _almacen_lock:
+        semilla = _almacen.agregar(semilla)
+        producidas = ejecutar_por_nombre(nombre, semilla, _almacen)
+        if _ws_activo:                          # autosave (46) + auditoría (48)
+            try:
+                _gestor.guardar(_ws_activo, _almacen)
+                _gestor.registrar(_ws_activo, nombre, valor, len(producidas))
+            except Exception as _e:
+                log.warning("autosave falló: %s", _e)
+    return producidas
+
 @app.route('/api/v2/run', methods=['POST'])
 def api_v2_run():
     """Corre un transform sobre una entidad {tipo, valor} (paso 36)."""
     d = request.json or {}
-    tipo = d.get('tipo', '')
-    valor = (d.get('valor', '') or '').strip()
-    nombre = d.get('transform', '')
-    if not tipo_valido(tipo):
-        return _error('tipo de entidad inválido', 400)
     try:
-        semilla = Entidad(tipo, valor)
-    except ValueError as e:
-        return _error(str(e), 400)
-    if not semilla.valor_bien_formado():
-        return _error(f'valor con forma inválida para {tipo}', 400)
-    semilla = _almacen.agregar(semilla)
-    try:
-        producidas = ejecutar_por_nombre(nombre, semilla, _almacen)
+        producidas = _correr_transform_interno(
+            d.get('tipo', ''), d.get('valor', ''), d.get('transform', ''))
     except (KeyError, ValueError) as e:
         return _error(str(e), 400)
-    if _ws_activo:                              # autosave (46) + auditoría (48)
-        try:
-            _gestor.guardar(_ws_activo, _almacen)
-            _gestor.registrar(_ws_activo, nombre, valor, len(producidas))
-        except Exception as _e:
-            log.warning("autosave falló: %s", _e)
     return jsonify({'producidas': [e.to_dict() for e in producidas],
                     'total_entidades': len(_almacen), 'workspace': _ws_activo})
 
@@ -2888,6 +2895,71 @@ def api_v2_export_csv():
     data = exportar_csv(_almacen)
     return Response(data, mimetype='text/csv',
                     headers={'Content-Disposition': f'attachment; filename="{_nombre_export()}.csv"'})
+
+# ── Monitoreo continuo (F7 paso 95) ──────────────────────────────────────────
+_monitor = None
+_monitor_tareas = []
+
+def _monitor_snapshot():
+    with _almacen_lock:
+        return _snap_estado(_almacen)
+
+def _monitor_refrescar():
+    for t in _monitor_tareas:
+        try:
+            _correr_transform_interno(t['tipo'], t['valor'], t['transform'])
+        except Exception as e:
+            log.debug("monitor: transform %s falló: %s", t.get('transform'), e)
+
+def _monitor_alerta(cambios):
+    """Hook de alerta. El envío a ntfy (celular) llega en el paso 96."""
+    log.info("MONITOR: %s", cambios.resumen())
+
+def _tareas_monitor_default():
+    """Re-corre, sobre la semilla, los transforms que ya construyeron el grafo."""
+    seed_valor = _objetivo_del_almacen()
+    if not seed_valor:
+        return []
+    seed = next((e for e in _almacen.entidades if e.valor == seed_valor), None)
+    if not seed:
+        return []
+    usados = set()
+    for e in _almacen.entidades:
+        usados |= set(e.origenes)
+    aplicables = {t.nombre for t in REGISTRO.aplicables(seed.tipo)}
+    return [{'tipo': seed.tipo, 'valor': seed.valor, 'transform': n}
+            for n in sorted(usados & aplicables)]
+
+@app.route('/api/v2/monitor', methods=['GET'])
+def api_v2_monitor():
+    """Estado del monitor + historial de alertas."""
+    return jsonify({
+        'activo': bool(_monitor and _monitor.activo),
+        'intervalo': _monitor.intervalo if _monitor else None,
+        'ultimo_ciclo': _monitor.ultimo_ciclo if _monitor else None,
+        'tareas': _monitor_tareas,
+        'alertas': _monitor.alertas if _monitor else []})
+
+@app.route('/api/v2/monitor/start', methods=['POST'])
+def api_v2_monitor_start():
+    global _monitor, _monitor_tareas
+    d = request.json or {}
+    intervalo = max(30, int(d.get('intervalo', 300)))     # mínimo 30s (no martillar)
+    _monitor_tareas = d.get('tareas') or _tareas_monitor_default()
+    if not _monitor_tareas:
+        return _error('nada que monitorear: agrega un objetivo y corre transforms primero', 400)
+    if _monitor and _monitor.activo:
+        _monitor.detener()
+    _monitor = Monitor(_monitor_snapshot, _monitor_refrescar,
+                       on_alerta=_monitor_alerta, intervalo=intervalo)
+    _monitor.iniciar()
+    return jsonify({'activo': True, 'intervalo': intervalo, 'tareas': _monitor_tareas})
+
+@app.route('/api/v2/monitor/stop', methods=['POST'])
+def api_v2_monitor_stop():
+    if _monitor:
+        _monitor.detener()
+    return jsonify({'activo': False})
 
 @app.route('/api/v2/hallazgos/ia', methods=['POST'])
 def api_v2_hallazgos_ia():

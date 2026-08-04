@@ -79,6 +79,12 @@
   #timeline .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
   .tlrow{display:grid;grid-template-columns:6rem 8rem 1fr;gap:.6rem;font-family:var(--mono);font-size:.76rem;padding:.35rem 0;border-bottom:1px solid var(--line)}
   .tlf{color:var(--amber)} .tle{color:var(--muted)} .tlq{color:var(--cyan);word-break:break-all}
+  .monctl{display:flex;align-items:center;gap:.4rem;margin:.3rem 0 .6rem;font-size:.78rem;color:var(--muted)}
+  .monctl input{width:3.2rem;background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:5px;padding:.2rem .3rem;font-family:inherit}
+  #monEstado.on{color:#6fae7c} #monEstado.off{color:var(--muted)}
+  .alerta{background:var(--panel);border-left:3px solid var(--amber);border-radius:4px;padding:.4rem .5rem;margin-top:.4rem;font-size:.74rem}
+  .alerta .ts{color:var(--muted);font-size:.68rem;font-family:ui-monospace,monospace}
+  .alerta .res{color:var(--txt);margin-top:.15rem}
 </style>
 </head>
 <body>
@@ -134,6 +140,15 @@
           <button id="btnEscudo" class="btnia" style="background:var(--cyan)">🛡️</button></h2>
         <div id="iaResumen"></div>
         <div id="hallazgos"><div class="vacio">La correlación busca riesgos sola.</div></div>
+      </div>
+      <div class="card">
+        <h2>Monitor <span id="monEstado" class="score">apagado</span></h2>
+        <div class="monctl">
+          <input id="monIntervalo" type="number" min="1" value="10" title="minutos"> min
+          <button id="btnMonitor">▶ vigilar</button>
+        </div>
+        <div id="monInfo" class="vacio">Re-escanea el objetivo cada N minutos y avisa si algo cambia.</div>
+        <div id="monAlertas"></div>
       </div>
     </div>
   </div>
@@ -411,6 +426,32 @@ function timeline(){
 }
 $('#btnTimeline').onclick=timeline;
 $('#btnReporte').onclick=()=>window.open('/v2/reporte','_blank');
+
+async function pintarMonitor(d){
+  const est=$('#monEstado'), info=$('#monInfo'), al=$('#monAlertas'), btn=$('#btnMonitor');
+  est.textContent = d.activo?'vigilando':'apagado'; est.className='score '+(d.activo?'on':'off');
+  btn.textContent = d.activo?'■ detener':'▶ vigilar';
+  if(d.activo){ info.className=''; info.textContent='cada '+Math.round(d.intervalo/60)+' min · '+(d.tareas||[]).length+' transform(s)'+(d.ultimo_ciclo?' · último: '+d.ultimo_ciclo:''); }
+  else if(!(d.alertas||[]).length){ info.className='vacio'; info.textContent='Re-escanea el objetivo cada N minutos y avisa si algo cambia.'; }
+  else { info.className='vacio'; info.textContent=''; }
+  al.textContent='';
+  (d.alertas||[]).forEach(a=>{ const x=el('div','alerta');
+    x.innerHTML='<div class="ts">'+esc(a.ts)+'</div><div class="res">'+esc(a.resumen)+'</div>'; al.appendChild(x); });
+}
+async function cargarMonitor(){ try{ pintarMonitor(await (await fetch('/api/v2/monitor')).json()); }catch(_){} }
+$('#btnMonitor').onclick=async()=>{
+  const d=await (await fetch('/api/v2/monitor')).json();
+  if(d.activo){ await fetch('/api/v2/monitor/stop',{method:'POST'}); setStatus('monitor detenido'); }
+  else{
+    const min=Math.max(1,parseInt($('#monIntervalo').value)||10);
+    const r=await fetch('/api/v2/monitor/start',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({intervalo:min*60})});
+    const j=await r.json();
+    if(!r.ok){ setStatus('error: '+(j.error||r.status),'err'); } else setStatus('👁 monitor activo cada '+min+' min');
+  }
+  cargarMonitor();
+};
+cargarMonitor(); setInterval(cargarMonitor, 20000);   // refresca alertas periódicamente
 cargarWorkspaces(); pintarGrafo();
 </script>
 </body>
