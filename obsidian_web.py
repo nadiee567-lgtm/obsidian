@@ -1982,6 +1982,21 @@ def _t_ptr(entidad, ctx):
         if linea and not linea.startswith(';'):
             ctx.emitir('dominio', linea, etiqueta='PTR')
 
+@transform(entrada='wallet', salidas=(), nombre='wallet_balance',
+           descripcion='Balance y actividad de una wallet BTC (blockchain.info, keyless)')
+def _t_wallet_balance(entidad, ctx):
+    if not re.fullmatch(r'[a-zA-Z0-9]{20,90}', entidad.valor):   # forma BTC, no basura en la URL
+        return
+    try:
+        d = SESSION.get(f'https://blockchain.info/rawaddr/{entidad.valor}?limit=0', timeout=10).json()
+        entidad.propiedades['btc_balance'] = round(d.get('final_balance', 0) / 1e8, 8)
+        entidad.propiedades['btc_tx'] = d.get('n_tx', 0)
+        entidad.propiedades['btc_recibido'] = round(d.get('total_received', 0) / 1e8, 8)
+        if d.get('n_tx'):
+            entidad.etiquetar('wallet-activa')
+    except Exception as _e:
+        log.debug("wallet_balance no disponible: %s", _e)
+
 @transform(entrada='dominio', salidas=('subdominio', 'ip'), nombre='subdominios_ht',
            descripcion='Subdominios (+ su IP) vía HackerTarget hostsearch (keyless)')
 def _t_subdominios_ht(entidad, ctx):
