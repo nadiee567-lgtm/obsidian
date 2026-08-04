@@ -2164,6 +2164,35 @@ def _t_email_breaches(entidad, ctx):
     except Exception as _e:
         log.debug("hibp no disponible: %s", _e)
 
+def _pastes_github(entidad):
+    """Menciones del objetivo + indicadores de secreto en código público de
+    GitHub (donde de verdad se filtran credenciales). psbdmp murió; esta es la
+    ruta real, pero necesita un token gratis de GitHub (en la bóveda)."""
+    token = _boveda.obtener('github') or os.environ.get('GITHUB_TOKEN', '')
+    if not token:
+        return
+    try:
+        d = SESSION.get('https://api.github.com/search/code',
+                        params={'q': f'"{entidad.valor}" (password OR secret OR api_key OR token)', 'per_page': 10},
+                        headers={'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json'},
+                        timeout=12).json()
+        n = d.get('total_count')
+        if n:
+            entidad.propiedades['github_menciones'] = n
+            entidad.etiquetar('mencionado-github')
+    except Exception as _e:
+        log.debug("pastes_github no disponible: %s", _e)
+
+@transform(entrada='dominio', salidas=(), nombre='pastes_github',
+           descripcion='Menciones + secretos del dominio en GitHub (token gratis en la bóveda)')
+def _t_pastes_github_dom(entidad, ctx):
+    _pastes_github(entidad)
+
+@transform(entrada='email', salidas=(), nombre='pastes_github_email',
+           descripcion='Menciones del email en código público de GitHub (token gratis en la bóveda)')
+def _t_pastes_github_email(entidad, ctx):
+    _pastes_github(entidad)
+
 @transform(entrada='email', salidas=('org',), nombre='breaches_xon',
            descripcion='Brechas donde apareció el email (XposedOrNot, keyless)')
 def _t_breaches_xon(entidad, ctx):
