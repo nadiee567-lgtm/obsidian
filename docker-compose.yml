@@ -1,0 +1,20 @@
+services:
+  obsidian:
+    build: .
+    image: obsidian:latest
+    container_name: obsidian
+    # Solo al host por defecto — NO expuesto a la red. Para acceso remoto usa
+    # Tailscale en el host, no abras este puerto a la LAN.
+    ports:
+      - "127.0.0.1:8767:8767"
+    environment:
+      # Cámbiala. Sin esto, el server genera una al azar y la imprime al log.
+      OBSIDIAN_PASSWORD: "${OBSIDIAN_PASSWORD:-cambiame}"
+      # Topic de ntfy para las alertas del monitor (opcional)
+      OBSIDIAN_NTFY: "${OBSIDIAN_NTFY:-}"
+    volumes:
+      - obsidian-data:/root/.obsidian
+    restart: unless-stopped
+
+volumes:
+  obsidian-data:
