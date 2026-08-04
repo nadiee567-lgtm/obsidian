@@ -2664,6 +2664,33 @@ def _t_zoomeye(entidad, ctx):
     except Exception as _e:
         log.debug("zoomeye no disponible: %s", _e)
 
+@transform(entrada='ip', salidas=('puerto', 'dominio'), nombre='fofa',
+           requiere_key=True,
+           descripcion='Hosts/dominios en FOFA (motor CN, key "email:key" en la bóveda)')
+def _t_fofa(entidad, ctx):
+    cred = _boveda.obtener('fofa') or os.environ.get('FOFA_KEY', '')
+    if not cred or ':' not in cred:
+        return
+    email, key = cred.split(':', 1)
+    q = _motor_query('fofa', {'ip': entidad.valor})
+    qb = base64.b64encode(q.encode()).decode()
+    try:
+        r = SESSION.get('https://fofa.info/api/v1/search/all',
+                        params={'email': email, 'key': key, 'qbase64': qb,
+                                'fields': 'ip,port,domain', 'size': 100}, timeout=12)
+        d = r.json() or {}
+        if d.get('error'):
+            return
+        for row in d.get('results', []):
+            port = row[1] if len(row) > 1 else None
+            dom = row[2] if len(row) > 2 else None
+            if port:
+                ctx.emitir('puerto', f"{entidad.valor}:{port}", etiqueta='fofa')
+            if dom:
+                ctx.emitir('dominio', dom, etiqueta='fofa')
+    except Exception as _e:
+        log.debug("fofa no disponible: %s", _e)
+
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
 # SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).

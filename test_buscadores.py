@@ -63,3 +63,25 @@ def test_zoomeye_sin_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
     monkeypatch.setenv('ZOOMEYE_KEY', '')
     assert _correr('zoomeye', 'ip', '1.2.3.4') == []
+
+
+# ── FOFA CN (110) ────────────────────────────────────────────────────────────
+def test_fofa(monkeypatch):
+    resp = {'error': False, 'results': [
+        ['1.2.3.4', '443', 'sitio.com'],
+        ['1.2.3.4', '80', 'otro.com']]}
+    _con_key(monkeypatch, resp, key='correo@x.com:apikey')
+    prod = _correr('fofa', 'ip', '1.2.3.4')
+    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:80'}
+    assert {e.valor for e in prod if e.tipo == 'dominio'} == {'sitio.com', 'otro.com'}
+
+
+def test_fofa_error_api(monkeypatch):
+    _con_key(monkeypatch, {'error': True, 'errmsg': 'quota'}, key='a@b.com:k')
+    assert _correr('fofa', 'ip', '1.2.3.4') == []
+
+
+def test_fofa_sin_key(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setenv('FOFA_KEY', '')
+    assert _correr('fofa', 'ip', '1.2.3.4') == []
