@@ -2691,6 +2691,28 @@ def _t_fofa(entidad, ctx):
     except Exception as _e:
         log.debug("fofa no disponible: %s", _e)
 
+@transform(entrada='ip', salidas=('puerto', 'tech'), nombre='quake',
+           requiere_key=True,
+           descripcion='Servicios de la IP en Quake/360 (motor CN, key en la bóveda)')
+def _t_quake(entidad, ctx):
+    key = _boveda.obtener('quake') or os.environ.get('QUAKE_KEY', '')
+    if not key:
+        return
+    try:
+        r = SESSION.post('https://quake.360.net/api/v3/search/quake_service',
+                         headers={'X-QuakeToken': key, 'Content-Type': 'application/json'},
+                         json={'query': _motor_query('quake', {'ip': entidad.valor}), 'size': 50},
+                         timeout=12)
+        for m in (r.json() or {}).get('data', []):
+            p = m.get('port')
+            nombre = (m.get('service', {}) or {}).get('name')
+            if p:
+                ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='quake', servicio=nombre or '')
+            if nombre:
+                ctx.emitir('tech', nombre, etiqueta='quake')
+    except Exception as _e:
+        log.debug("quake no disponible: %s", _e)
+
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
 # SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).

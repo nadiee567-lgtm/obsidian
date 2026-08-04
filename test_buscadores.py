@@ -85,3 +85,20 @@ def test_fofa_sin_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
     monkeypatch.setenv('FOFA_KEY', '')
     assert _correr('fofa', 'ip', '1.2.3.4') == []
+
+
+# ── Quake/360 CN (111) — usa POST ────────────────────────────────────────────
+def test_quake(monkeypatch):
+    resp = {'data': [{'port': 443, 'service': {'name': 'http/ssl'}},
+                     {'port': 22, 'service': {'name': 'ssh'}}]}
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'fakekey')
+    monkeypatch.setattr(ob.SESSION, 'post', lambda *a, **k: FakeResp(resp))
+    prod = _correr('quake', 'ip', '1.2.3.4')
+    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
+    assert {e.valor for e in prod if e.tipo == 'tech'} == {'http/ssl', 'ssh'}
+
+
+def test_quake_sin_key(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setenv('QUAKE_KEY', '')
+    assert _correr('quake', 'ip', '1.2.3.4') == []
