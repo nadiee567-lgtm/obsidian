@@ -92,6 +92,9 @@
   .modbtn{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.2rem .5rem;font-size:.7rem;font-family:var(--mono);cursor:pointer}
   .modbtn:hover{border-color:var(--cyan);color:var(--cyan)}
   .modbtn .key{color:var(--amber);font-size:.58rem}
+  .iabtns{display:flex;gap:.3rem;margin:.4rem 0}
+  .iabtns button{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem;font-size:.68rem;font-family:var(--mono);cursor:pointer}
+  .iabtns button:hover{border-color:var(--mauve);color:var(--mauve)}
 </style>
 </head>
 <body>
@@ -146,6 +149,11 @@
           <button id="btnIA" class="btnia">🧠 IA</button>
           <button id="btnEscudo" class="btnia" style="background:var(--cyan)">🛡️</button></h2>
         <div id="iaResumen"></div>
+        <div class="iabtns">
+          <button onclick="iaCaso('escenario')">🎯 escenario</button>
+          <button onclick="iaCaso('superficie')">🗺️ superficie</button>
+          <button onclick="iaCaso('analizar')">🧩 analizar</button>
+        </div>
         <div id="hallazgos"><div class="vacio">La correlación busca riesgos sola.</div></div>
       </div>
       <div class="card">
@@ -452,6 +460,12 @@ function timeline(){
 }
 $('#btnTimeline').onclick=timeline;
 $('#btnReporte').onclick=()=>window.open('/v2/reporte','_blank');
+async function iaCaso(modo){
+  const out=$('#iaResumen'); out.innerHTML='<div class="iaresumen">IA ('+esc(modo)+') analizando el caso…</div>';
+  try{ const r=await fetch('/api/v2/ia/'+modo,{method:'POST'}); const d=await r.json();
+    out.innerHTML='<div class="iaresumen">'+esc(d.resultado||d.error||'sin respuesta')+'</div>'; }
+  catch(e){ out.textContent='Error: '+e.message; }
+}
 
 async function pintarMonitor(d){
   const est=$('#monEstado'), info=$('#monInfo'), al=$('#monAlertas'), btn=$('#btnMonitor');

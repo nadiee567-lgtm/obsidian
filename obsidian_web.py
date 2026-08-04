@@ -3071,6 +3071,138 @@ def _t_github_sec(entidad, ctx):
     except Exception as _e:
         log.debug("github_sec no disponible: %s", _e)
 
+@transform(entrada='persona', salidas=('url',), nombre='persona',
+           descripcion='OSINT de una persona: resumen (DuckDuckGo) + dorks (LinkedIn/X/GitHub…) (keyless)')
+def _t_persona(entidad, ctx):
+    from urllib.parse import quote as _q
+    nombre = entidad.valor
+    try:
+        d = SESSION.get(f'https://api.duckduckgo.com/?q={_q(nombre)}&format=json&no_html=1', timeout=8).json()
+        if d.get('AbstractText'):
+            entidad.propiedades['resumen'] = d['AbstractText'][:400]
+    except Exception as _e:
+        log.debug("persona ddg: %s", _e)
+    dorks = {'linkedin': f'"{nombre}" site:linkedin.com',
+             'x': f'"{nombre}" site:twitter.com OR site:x.com',
+             'contacto': f'"{nombre}" email OR phone OR address',
+             'pdf': f'"{nombre}" filetype:pdf',
+             'github': f'"{nombre}" site:github.com',
+             'facebook': f'"{nombre}" site:facebook.com'}
+    for k, q in dorks.items():
+        ctx.emitir('url', f'https://www.google.com/search?q={_q(q)}', etiqueta=f'dork:{k}', dork=k)
+
+@transform(entrada='persona', salidas=('url',), nombre='darkweb',
+           descripcion='Búsqueda en dark web (Ahmia, índice .onion clearnet, sin Tor) (keyless)')
+def _t_darkweb(entidad, ctx):
+    from urllib.parse import quote as _q
+    try:
+        r = SESSION.get(f'https://ahmia.fi/search/?q={_q(entidad.valor)}', timeout=12)
+        n = 0
+        for m in re.finditer(r'<h4[^>]*><a href="([^"]+)"[^>]*>([^<]+)</a>', r.text, re.DOTALL):
+            ctx.emitir('url', m.group(1), etiqueta='onion', titulo=m.group(2).strip()[:80])
+            n += 1
+            if n >= 15:
+                break
+    except Exception as _e:
+        log.debug("darkweb ahmia: %s", _e)
+
+@transform(entrada='url', salidas=(), nombre='url_check',
+           descripcion='Reputación de la URL en URLhaus (abuse.ch, CC0, keyless)')
+def _t_url_check(entidad, ctx):
+    try:
+        d = SESSION.post('https://urlhaus-api.abuse.ch/v1/url/',
+                         data={'url': entidad.valor}, timeout=8).json() or {}
+        if d.get('query_status') == 'ok':
+            entidad.propiedades['urlhaus'] = d.get('threat', 'listada')
+            entidad.etiquetar('url-maliciosa')
+    except Exception as _e:
+        log.debug("url_check urlhaus: %s", _e)
+
+@transform(entrada='url', salidas=('email',), nombre='render_js',
+           descripcion='Renderiza la página con navegador headless (playwright): emails del DOM final')
+def _t_render_js(entidad, ctx):
+    url = entidad.valor
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+    if not _url_publica(url):                    # anti-SSRF: no renderizar hosts internos
+        return
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={'width': 1280, 'height': 900})
+            page.goto(url, timeout=20000, wait_until='networkidle')
+            entidad.propiedades['render_titulo'] = page.title()
+            html_render = page.content()
+            browser.close()
+        for em in list(set(re.findall(
+                r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', html_render)))[:15]:
+            ctx.emitir('email', em, etiqueta='en-render')
+    except Exception as _e:
+        log.debug("render_js: %s", _e)
+
+@transform(entrada='archivo', salidas=(), nombre='yara_bulk',
+           descripcion='Escanea una carpeta con yara-rules (solo local)')
+def _t_yara_bulk(entidad, ctx):
+    carpeta = entidad.valor
+    if not os.path.isdir(carpeta) or not _which('yara-rules'):
+        return
+    archivos = []
+    for root, _dirs, files in os.walk(carpeta):
+        for f in files:
+            archivos.append(os.path.join(root, f))
+        if len(archivos) >= 200:
+            break
+    hallazgos = []
+    for archivo in archivos[:200]:
+        try:
+            if os.path.getsize(archivo) > 50_000_000:
+                continue
+            r = subprocess.run(['yara-rules', '/etc/yara/', archivo],
+                               capture_output=True, text=True, timeout=15)
+            salida = (r.stdout + r.stderr).strip()
+        except Exception:
+            continue
+        if salida and 'no rules matched' not in salida.lower():
+            hallazgos.append({'archivo': archivo, 'resultado': salida[:300]})
+            if len(hallazgos) >= 50:
+                break
+    if hallazgos:
+        entidad.propiedades['yara_hallazgos'] = hallazgos[:20]
+        entidad.etiquetar('yara-match')
+
+@transform(entrada='persona', salidas=(), nombre='wordlist',
+           descripcion='Diccionario de contraseñas probable por IA desde el caso (Ollama)')
+def _t_wordlist(entidad, ctx):
+    if not ia.disponible():
+        return
+    contexto = json.dumps(ctx.almacen.to_dict(), default=str)[:3000]
+    prompt = (f'A partir del OSINT del objetivo "{entidad.valor}", genera una wordlist de '
+              f'contraseñas probables: nombres, fechas, organización, combinaciones (nombre+año, '
+              f'nombre+123), leet speak. 30-50 entradas, una por línea, solo las contraseñas.\n\n'
+              f'Datos:\n{contexto}')
+    try:
+        resp = ia.consultar(prompt, max_tokens=600, temp=0.6) or ''
+    except Exception as _e:
+        log.debug("wordlist ia: %s", _e)
+        return
+    palabras = [w.strip() for w in resp.split('\n') if len(w.strip()) >= 6][:50]
+    if not palabras:
+        return
+    entidad.propiedades['wordlist'] = palabras
+    entidad.propiedades['wordlist_total'] = len(palabras)
+    try:
+        slug = _slug_caso(entidad.valor.lower()) or 'objetivo'
+        ruta = os.path.join(CASES_DIR, f'wordlist_{slug}.txt')
+        with open(ruta, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(palabras))
+        entidad.propiedades['wordlist_archivo'] = ruta
+    except Exception as _e:
+        log.debug("wordlist guardar: %s", _e)
+
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
 # SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).
@@ -3665,6 +3797,37 @@ def api_v2_monitor_stop():
     if _monitor:
         _monitor.detener()
     return jsonify({'activo': False})
+
+_PROMPTS_IA = {
+    'escenario': ('OSINT recolectado sobre "{objetivo}". Genera un escenario de pentesting ÉTICO:\n'
+                  '1. VECTORES DE ENTRADA (con evidencia de los datos)\n'
+                  '2. KILL CHAIN probable paso a paso\n'
+                  '3. TÉCNICAS MITRE ATT&CK relevantes (con IDs)\n'
+                  '4. TOP 3 vulnerabilidades más críticas\n'
+                  '5. CONTRAMEDIDAS por vector\n\nDatos:\n{datos}'),
+    'superficie': ('Mapa de superficie de ataque de "{objetivo}":\n'
+                   '1. ACTIVOS EXPUESTOS (IPs, dominios, servicios, tecnologías)\n'
+                   '2. DATOS FILTRADOS encontrados\n3. TECNOLOGÍAS con CVEs conocidos\n'
+                   '4. CONFIGURACIONES DÉBILES\n5. SCORE DE RIESGO 0-10 con justificación\n'
+                   '6. RECOMENDACIONES DE HARDENING\n\nDatos:\n{datos}'),
+    'analizar': ('Analiza TODO el caso OSINT de "{objetivo}" y correlaciona: qué historia cuentan '
+                 'los datos juntos, hallazgos no obvios, y los 3 siguientes pasos de investigación.\n\nDatos:\n{datos}'),
+}
+
+@app.route('/api/v2/ia/<modo>', methods=['POST'])
+def api_v2_ia_modo(modo):
+    """IA a nivel de caso (paso 34 backfill): escenario MITRE / superficie / analizar."""
+    if modo not in _PROMPTS_IA:
+        return _error('modo inválido', 404)
+    if not ia.disponible():
+        return _error('IA (Ollama) no disponible', 503)
+    contexto = json.dumps(_almacen.to_dict(), default=str)[:3500]
+    prompt = _PROMPTS_IA[modo].format(objetivo=_objetivo_del_almacen() or 'el objetivo', datos=contexto)
+    try:
+        resp = ia.consultar(prompt, max_tokens=700, temp=0.4)
+    except Exception as e:
+        return _error(f'IA falló: {e}', 500)
+    return jsonify({'modo': modo, 'resultado': resp})
 
 @app.route('/api/v2/hallazgos/ia', methods=['POST'])
 def api_v2_hallazgos_ia():

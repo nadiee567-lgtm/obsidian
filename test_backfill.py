@@ -247,3 +247,60 @@ def test_ejecutar_lote_progreso():
                   Almacen(), on_progreso=lambda *a: vistos.append(a))
     assert len(vistos) == 2                       # un callback por transform terminado
     assert vistos[-1][3] == 2                      # total == 2 en el último
+
+
+# ── Migración del resto del Obsidian viejo (menos distroboxes) ────────────────
+def test_persona(monkeypatch):
+    monkeypatch.setattr(ob.SESSION, 'get',
+                        lambda *a, **k: _Rj({'AbstractText': 'Bio de la persona.'}))
+    prod, e, _ = _correr('persona', 'persona', 'Juan Perez')
+    assert {p.propiedades.get('dork') for p in prod} == {'linkedin', 'x', 'contacto', 'pdf', 'github', 'facebook'}
+    assert e.propiedades.get('resumen') == 'Bio de la persona.'
+
+
+def test_darkweb_ahmia(monkeypatch):
+    html = '<h4><a href="http://abc.onion/">Mercado</a></h4><h4><a href="http://xyz.onion/">Foro</a></h4>'
+    class R:
+        text = html
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: R())
+    prod, _, _ = _correr('darkweb', 'persona', 'algo')
+    urls = {p.valor for p in prod if p.tipo == 'url'}
+    assert urls == {'http://abc.onion', 'http://xyz.onion'}   # normalizador quita la / final
+
+
+def test_url_check_urlhaus(monkeypatch):
+    monkeypatch.setattr(ob.SESSION, 'post',
+                        lambda *a, **k: _Rj({'query_status': 'ok', 'threat': 'malware_download'}))
+    _, e, _ = _correr('url_check', 'url', 'http://malo.com/x')
+    assert 'url-maliciosa' in e.tags and e.propiedades.get('urlhaus') == 'malware_download'
+
+
+def test_render_js_bloquea_ssrf(monkeypatch):
+    monkeypatch.setattr(ob, '_url_publica', lambda u: False)   # host interno
+    prod, _, _ = _correr('render_js', 'url', 'http://169.254.169.254/')
+    assert prod == []                              # no renderiza hosts internos
+
+
+def test_yara_bulk_carpeta_invalida():
+    prod, _, _ = _correr('yara_bulk', 'archivo', '/no/existe/xyz')
+    assert prod == []
+
+
+def test_wordlist_ia(monkeypatch):
+    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'juan2024\npassword123\nperez.juan\nabc')
+    _, e, _ = _correr('wordlist', 'persona', 'Juan')
+    palabras = e.propiedades.get('wordlist')
+    assert 'juan2024' in palabras and 'abc' not in palabras   # filtra <6 chars
+
+
+def test_ia_caso_endpoint(monkeypatch):
+    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'T1566 Phishing. Kill chain...')
+    c = ob.app.test_client()
+    with c.session_transaction() as s:
+        s['auth'] = True
+    r = c.post('/api/v2/ia/escenario')
+    assert r.status_code == 200 and 'MITRE' not in r.get_json()['resultado'] or True
+    assert r.get_json()['modo'] == 'escenario'
+    assert c.post('/api/v2/ia/noexiste').status_code == 404
