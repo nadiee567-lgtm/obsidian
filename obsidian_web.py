@@ -19,6 +19,7 @@ from core.correlacion import correlacionar, score_riesgo
 from core.reporte import generar_reporte
 from core.exportar import exportar_json, exportar_csv
 from core.monitor import Monitor, snapshot as _snap_estado
+from core.notificar import enviar_ntfy, construir_ntfy
 import core.ia as ia
 
 log = get_logger()
@@ -2911,9 +2912,23 @@ def _monitor_refrescar():
         except Exception as e:
             log.debug("monitor: transform %s falló: %s", t.get('transform'), e)
 
+def _ntfy_topic():
+    """Topic de ntfy: env OBSIDIAN_NTFY o la bóveda (clave 'ntfy_topic')."""
+    t = os.environ.get('OBSIDIAN_NTFY')
+    if t:
+        return t
+    try:
+        return _boveda.obtener('ntfy_topic')
+    except Exception:
+        return None
+
 def _monitor_alerta(cambios):
-    """Hook de alerta. El envío a ntfy (celular) llega en el paso 96."""
+    """Hook de alerta del monitor (paso 95): avisa al celular por ntfy (paso 96)."""
     log.info("MONITOR: %s", cambios.resumen())
+    topic = _ntfy_topic()
+    if topic:
+        enviar_ntfy(topic, cambios.resumen(), titulo='OBSIDIAN · cambio detectado',
+                    prioridad='high', tags='satellite,warning')
 
 def _tareas_monitor_default():
     """Re-corre, sobre la semilla, los transforms que ya construyeron el grafo."""
@@ -2938,7 +2953,23 @@ def api_v2_monitor():
         'intervalo': _monitor.intervalo if _monitor else None,
         'ultimo_ciclo': _monitor.ultimo_ciclo if _monitor else None,
         'tareas': _monitor_tareas,
+        'ntfy': bool(_ntfy_topic()),
         'alertas': _monitor.alertas if _monitor else []})
+
+@app.route('/api/v2/monitor/ntfy', methods=['POST'])
+def api_v2_monitor_ntfy():
+    """Configura el topic de ntfy (bóveda) y manda una notificación de prueba."""
+    d = request.json or {}
+    topic = (d.get('topic', '') or '').strip()
+    if not topic:
+        return _error('topic vacío', 400)
+    try:
+        _boveda.guardar('ntfy_topic', topic)
+    except Exception as e:
+        return _error(f'no se pudo guardar: {e}', 500)
+    ok = enviar_ntfy(topic, 'Notificaciones de OBSIDIAN activadas ✓',
+                     titulo='OBSIDIAN', prioridad='default')
+    return jsonify({'ok': True, 'prueba_enviada': ok})
 
 @app.route('/api/v2/monitor/start', methods=['POST'])
 def api_v2_monitor_start():
