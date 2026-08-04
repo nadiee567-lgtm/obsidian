@@ -17,6 +17,7 @@ from core.workspaces import Gestor
 from core.boveda import Boveda
 from core.correlacion import correlacionar, score_riesgo
 from core.reporte import generar_reporte
+from core.exportar import exportar_json, exportar_csv
 import core.ia as ia
 
 log = get_logger()
@@ -2867,6 +2868,26 @@ def api_v2_reporte():
         meta={'workspace': _ws_activo, 'objetivo': _objetivo_del_almacen()},
         vis_js=vis_js)
     return Response(html_doc, mimetype='text/html')
+
+def _nombre_export():
+    base = _slug_caso(_ws_activo) if _ws_activo else 'caso'
+    return f'obsidian-{base}-{datetime.datetime.now():%Y%m%d}'
+
+@app.route('/api/v2/export/json')
+def api_v2_export_json():
+    """Caso completo en JSON, re-importable (F7 paso 94)."""
+    h = correlacionar(_almacen)
+    data = exportar_json(_almacen, h, score_riesgo(h),
+                         {'workspace': _ws_activo, 'objetivo': _objetivo_del_almacen()})
+    return Response(data, mimetype='application/json',
+                    headers={'Content-Disposition': f'attachment; filename="{_nombre_export()}.json"'})
+
+@app.route('/api/v2/export/csv')
+def api_v2_export_csv():
+    """Entidades en CSV plano, saneado contra inyección de fórmulas (F7 paso 94)."""
+    data = exportar_csv(_almacen)
+    return Response(data, mimetype='text/csv',
+                    headers={'Content-Disposition': f'attachment; filename="{_nombre_export()}.csv"'})
 
 @app.route('/api/v2/hallazgos/ia', methods=['POST'])
 def api_v2_hallazgos_ia():

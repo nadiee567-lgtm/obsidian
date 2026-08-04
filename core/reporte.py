@@ -170,10 +170,19 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
   #grafo{{height:520px;background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:.5rem}}
   footer{{margin-top:3rem;padding-top:1rem;border-top:1px solid var(--line);color:var(--muted);font-size:.78rem}}
   footer .lema{{color:var(--cyan);font-style:italic}}
+  .toolbar{{display:flex;gap:.5rem;justify-content:flex-end;margin-bottom:1rem}}
+  .toolbar button,.toolbar a{{background:var(--panel);color:var(--txt);border:1px solid var(--line);
+    border-radius:6px;padding:.35rem .7rem;font-size:.8rem;cursor:pointer;text-decoration:none;font-family:inherit}}
+  .toolbar button:hover,.toolbar a:hover{{border-color:var(--cyan);color:var(--cyan)}}
   @media print{{body{{background:#fff;color:#111;max-width:none}} .tipo li,.score .barra,#grafo{{background:#f4f4f6}}
-    h2{{border-color:#ccc}} td,th{{border-color:#ddd}} #grafo{{display:none}}}}
+    h2{{border-color:#ccc}} td,th{{border-color:#ddd}} #grafo{{display:none}} .no-print{{display:none}}}}
 </style></head>
 <body>
+  <div class="toolbar no-print">
+    <button onclick="window.print()">🖨 PDF</button>
+    <a href="/api/v2/export/json" download>⬇ JSON</a>
+    <a href="/api/v2/export/csv" download>⬇ CSV</a>
+  </div>
   <h1><span class="sq"></span>OBSIDIAN — Reporte de reconocimiento</h1>
   <div class="meta">Workspace: <b>{_e(ws)}</b> · Objetivo: <b>{_e(objetivo)}</b> ·
     Entidades: <b>{len(almacen)}</b> · Generado: <b>{_e(generado)}</b></div>
