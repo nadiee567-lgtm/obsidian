@@ -152,6 +152,29 @@ def test_criminalip_binaryedge_sin_key(monkeypatch):
     assert _correr('binaryedge', 'ip', '1.2.3.4') == []
 
 
+# ── Pivote por favicon (114) ─────────────────────────────────────────────────
+def test_favicon_pivote(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener',
+                        lambda s: {'fofa': 'a@b.com:k', 'shodan': 'sk'}.get(s))
+    def fake_get(url, *a, **k):
+        if 'fofa' in url:
+            return FakeResp({'error': False, 'results': [['9.9.9.9'], ['8.8.8.8']]})
+        return FakeResp({'matches': [{'ip_str': '7.7.7.7'}, {'ip_str': '9.9.9.9'}]})
+    monkeypatch.setattr(ob.SESSION, 'get', fake_get)
+    alm = Almacen()
+    h = alm.crear('hash', '123456', propiedades={'tipo_hash': 'favicon'})
+    prod = ejecutar_por_nombre('favicon_pivote', h, alm)
+    ips = {e.valor for e in prod if e.tipo == 'ip'}
+    assert ips == {'9.9.9.9', '8.8.8.8', '7.7.7.7'}   # dedup cross-motor de 9.9.9.9
+
+
+def test_favicon_pivote_ignora_hash_no_favicon(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'a@b.com:k')
+    alm = Almacen()
+    h = alm.crear('hash', 'abc', propiedades={'tipo_hash': 'sha1'})
+    assert ejecutar_por_nombre('favicon_pivote', h, alm) == []
+
+
 def test_todos_los_motores_registrados():
     """Los 9 motores de core.motores tienen su transform registrado."""
     from core.transforms import REGISTRO

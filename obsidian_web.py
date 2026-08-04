@@ -2066,8 +2066,8 @@ def _t_wallet_balance(entidad, ctx):
     except Exception as _e:
         log.debug("wallet_balance no disponible: %s", _e)
 
-@transform(entrada='dominio', salidas=(), nombre='favicon_hash',
-           descripcion='Hash mmh3 del favicon — para pivotar infraestructura en Shodan/FOFA (F8)')
+@transform(entrada='dominio', salidas=('hash',), nombre='favicon_hash',
+           descripcion='Hash mmh3 del favicon — nodo pivotable para Shodan/FOFA (F8)')
 def _t_favicon_hash(entidad, ctx):
     try:
         import mmh3
@@ -2079,9 +2079,46 @@ def _t_favicon_hash(entidad, ctx):
         if r.status_code != 200 or not r.content:
             return
         # método estándar de Shodan/FOFA: base64 (con saltos de línea) + mmh3
-        entidad.propiedades['favicon_hash'] = mmh3.hash(codecs.encode(r.content, 'base64'))
+        h = mmh3.hash(codecs.encode(r.content, 'base64'))
+        entidad.propiedades['favicon_hash'] = h
+        ctx.emitir('hash', str(h), etiqueta='favicon', tipo_hash='favicon')   # nodo pivotable
     except Exception as _e:
         log.debug("favicon_hash no disponible: %s", _e)
+
+@transform(entrada='hash', salidas=('ip',), nombre='favicon_pivote', requiere_key=True,
+           descripcion='Enumera IPs que sirven este favicon (FOFA/Shodan) — sin tocar al objetivo (F8)')
+def _t_favicon_pivote(entidad, ctx):
+    if entidad.propiedades.get('tipo_hash') != 'favicon':
+        return
+    h = entidad.valor
+    ips = set()
+    cred = _boveda.obtener('fofa') or os.environ.get('FOFA_KEY', '')
+    if cred and ':' in cred:
+        email, key = cred.split(':', 1)
+        try:
+            qb = base64.b64encode(_motor_query('fofa', {'favicon': h}).encode()).decode()
+            r = SESSION.get('https://fofa.info/api/v1/search/all',
+                            params={'email': email, 'key': key, 'qbase64': qb,
+                                    'fields': 'ip', 'size': 100}, timeout=12)
+            d = r.json() or {}
+            if not d.get('error'):
+                for row in d.get('results', []):
+                    ips.add(row[0] if isinstance(row, list) else row)
+        except Exception as _e:
+            log.debug("favicon_pivote fofa: %s", _e)
+    skey = _boveda.obtener('shodan') or os.environ.get('SHODAN_API_KEY', '')
+    if skey:
+        try:
+            r = SESSION.get('https://api.shodan.io/shodan/host/search',
+                            params={'key': skey, 'query': _motor_query('shodan', {'favicon': h})},
+                            timeout=12)
+            for m in (r.json() or {}).get('matches', []):
+                if m.get('ip_str'):
+                    ips.add(m['ip_str'])
+        except Exception as _e:
+            log.debug("favicon_pivote shodan: %s", _e)
+    for ip in ips:
+        ctx.emitir('ip', ip, etiqueta='mismo-favicon')
 
 @transform(entrada='dominio', salidas=('subdominio',), nombre='wayback',
            descripcion='Snapshot histórico + subdominios viejos del dominio (Wayback Machine)')
