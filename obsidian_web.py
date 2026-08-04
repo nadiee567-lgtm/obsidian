@@ -2697,6 +2697,29 @@ def api_v2_run():
     return jsonify({'producidas': [e.to_dict() for e in producidas],
                     'total_entidades': len(_almacen), 'workspace': _ws_activo})
 
+@app.route('/api/v2/entidad', methods=['POST'])
+def api_v2_entidad():
+    """Agrega una entidad semilla al grafo SIN correr transforms (estilo Maltego:
+    agregas el nodo, luego click derecho → transform). F6."""
+    d = request.json or {}
+    tipo = d.get('tipo', '')
+    valor = (d.get('valor', '') or '').strip()
+    if not tipo_valido(tipo):
+        return _error('tipo de entidad inválido', 400)
+    try:
+        ent = Entidad(tipo, valor)
+    except ValueError as e:
+        return _error(str(e), 400)
+    if not ent.valor_bien_formado():
+        return _error(f'valor con forma inválida para {tipo}', 400)
+    ent = _almacen.agregar(ent)
+    if _ws_activo:
+        try:
+            _gestor.guardar(_ws_activo, _almacen)
+        except Exception as _e:
+            log.warning("autosave falló: %s", _e)
+    return jsonify({'ok': True, 'id': ent.id})
+
 @app.route('/api/v2/grafo')
 def api_v2_grafo():
     """Grafo tipado. ?migrar=1 convierte el case['datos'] viejo al modelo nuevo."""

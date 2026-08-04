@@ -4,82 +4,79 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OBSIDIAN · motor v2</title>
+<script src="/static/vis-network.min.js"></script>
 <style>
   :root{
     --bg:#0b0d12; --panel:#12141c; --panel2:#171a24; --line:#232735;
-    --text:#c8cfdf; --muted:#6b7488; --blue:#7aa2f7; --amber:#e0af68;
-    --green:#9ece6a; --red:#f7768e; --mauve:#bb9af7; --cyan:#7dcfff; --dim:#454b5c;
+    --text:#c8cfdf; --muted:#6b7488; --dim:#454b5c; --blue:#7aa2f7; --amber:#e0af68;
+    --green:#9ece6a; --red:#f7768e; --mauve:#bb9af7; --cyan:#7dcfff;
     --mono:ui-monospace,Menlo,Consolas,monospace;
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5}
-  .wrap{max-width:1100px;margin:0 auto;padding:1.5rem 1.25rem 4rem}
-  h1{font-family:var(--mono);font-size:1.2rem;letter-spacing:.02em;margin:0 0 .2rem}
+  .wrap{max-width:1280px;margin:0 auto;padding:1.1rem 1.1rem 3rem}
+  h1{font-family:var(--mono);font-size:1.15rem;margin:0 0 .15rem}
   h1 .sq{color:var(--blue)}
-  .sub{color:var(--muted);font-size:.82rem;font-family:var(--mono);margin-bottom:1.5rem}
+  .sub{color:var(--muted);font-size:.8rem;font-family:var(--mono);margin-bottom:1.1rem}
   .sub a{color:var(--blue);text-decoration:none}
 
-  .wsbar{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.7rem;font-family:var(--mono);font-size:.8rem}
-  .wslabel{color:var(--muted);letter-spacing:.1em;text-transform:uppercase;font-size:.66rem}
-  .wssep{color:var(--dim)}
-  .wsactivo{color:var(--muted);margin-left:auto} .wsactivo b{color:var(--amber)}
-  .barra{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.9rem}
+  .wsbar{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.6rem;font-family:var(--mono);font-size:.8rem}
+  .wslabel{color:var(--muted);letter-spacing:.1em;text-transform:uppercase;font-size:.64rem}
+  .wssep{color:var(--dim)} .wsactivo{color:var(--muted);margin-left:auto} .wsactivo b{color:var(--amber)}
+
+  .barra{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.8rem}
   select,input,button{font-family:var(--mono);font-size:.85rem;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:.5rem .7rem}
   input{flex:1;min-width:180px}
   button{cursor:pointer;transition:border-color .15s,background .15s}
   button:hover{border-color:var(--blue)}
   button.primary{background:var(--blue);color:#0b0d12;border-color:var(--blue);font-weight:700}
   button:disabled{opacity:.4;cursor:not-allowed}
+  #status{font-family:var(--mono);font-size:.75rem;color:var(--green);min-height:1.05rem;margin:.5rem 0}
+  #status.err{color:var(--red)} #status.run{color:var(--amber)}
 
-  .transforms{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem}
-  .tchip{display:flex;flex-direction:column;gap:.25rem;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.6rem .75rem;min-width:150px}
-  .tchip b{font-family:var(--mono);font-size:.82rem;color:var(--cyan)}
-  .tchip small{color:var(--muted);font-size:.7rem;line-height:1.35}
-  .tchip .key{color:var(--amber);font-size:.65rem;font-family:var(--mono)}
-  .tchip button{margin-top:.3rem;font-size:.72rem;padding:.3rem}
-
-  .cols{display:grid;grid-template-columns:1.4fr 1fr;gap:1rem;margin-top:1.5rem}
-  @media(max-width:760px){.cols{grid-template-columns:1fr}}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1rem}
-  .card h2{font-family:var(--mono);font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 .8rem}
+  .lienzo{display:grid;grid-template-columns:1fr 300px;gap:1rem;margin-top:.6rem}
+  @media(max-width:820px){.lienzo{grid-template-columns:1fr}}
+  #grafo{height:560px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .lateral{display:flex;flex-direction:column;gap:1rem}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.9rem}
+  .card h2{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 .7rem}
   .card h2 span{color:var(--text)}
+  .vacio{color:var(--muted);font-family:var(--mono);font-size:.78rem}
 
-  .grupo{margin-bottom:1rem}
-  .grupo .gt{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem}
-  .ent{display:flex;flex-wrap:wrap;align-items:baseline;gap:.5rem;padding:.4rem .55rem;border-left:2px solid var(--tc,var(--muted));background:var(--panel2);border-radius:0 6px 6px 0;margin-bottom:.35rem}
-  .ent .v{font-family:var(--mono);font-size:.82rem;color:var(--text);word-break:break-all}
-  .tag{font-family:var(--mono);font-size:.62rem;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 .3rem}
-  .prop{font-family:var(--mono);font-size:.68rem;color:var(--muted)}
-  .org{font-family:var(--mono);font-size:.62rem;color:var(--muted)}
+  #detalle .v{font-family:var(--mono);font-size:.9rem;word-break:break-all;color:var(--text)}
+  #detalle .tipo{font-family:var(--mono);font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:var(--tc,var(--muted))}
+  #detalle .kv{font-family:var(--mono);font-size:.74rem;color:#9aa2b5;margin-top:.5rem;word-break:break-all}
+  #detalle .kv b{color:var(--text)}
+  #detalle .tag{display:inline-block;font-family:var(--mono);font-size:.62rem;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 .3rem;margin:.15rem .15rem 0 0}
+  #detalle .hint{color:var(--dim);font-size:.72rem;margin-top:.7rem;font-family:var(--mono)}
 
-  .rel{font-family:var(--mono);font-size:.76rem;color:#aab2c5;padding:.25rem 0;border-bottom:1px solid var(--line)}
-  .rel .a{color:var(--text)} .rel .e{color:var(--amber)} .rel .b{color:var(--cyan)}
-  .vacio{color:var(--muted);font-family:var(--mono);font-size:.8rem}
-  #status{font-family:var(--mono);font-size:.76rem;color:var(--green);min-height:1.1rem;margin-top:.6rem}
-  #status.err{color:var(--red)}
-  .hallcard{margin-top:1rem}
-  .score{font-family:var(--mono);font-size:.68rem;padding:.12rem .5rem;border-radius:5px;margin-left:.5rem;letter-spacing:.05em}
-  .hall{display:flex;align-items:baseline;gap:.6rem;padding:.4rem .55rem;border-left:2px solid var(--sc,var(--muted));background:var(--panel2);border-radius:0 6px 6px 0;margin-bottom:.35rem}
-  .hall .sev{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;color:var(--sc);border:1px solid var(--sc);border-radius:4px;padding:0 .3rem;white-space:nowrap}
-  .hall .msg{font-size:.85rem;color:#c3cbdb}
-  .btnia{font-family:var(--mono);font-size:.7rem;padding:.25rem .6rem;margin-left:.7rem;background:var(--mauve);color:#0b0d12;border:none;border-radius:6px;cursor:pointer;font-weight:700;vertical-align:middle}
-  .btnia:hover{opacity:.85} .btnia:disabled{opacity:.4;cursor:wait}
-  .iaresumen{white-space:pre-wrap;font-size:.86rem;line-height:1.55;color:#d6cdea;background:rgba(187,154,247,.08);border-left:2px solid var(--mauve);border-radius:0 6px 6px 0;padding:.7rem .9rem;margin-bottom:.8rem;display:none}
-  .iaresumen.show{display:block}
+  .score{font-family:var(--mono);font-size:.66rem;padding:.1rem .45rem;border-radius:5px;margin-left:.4rem}
+  .hall{display:flex;gap:.5rem;align-items:baseline;padding:.35rem .5rem;border-left:2px solid var(--sc,var(--muted));background:var(--panel2);border-radius:0 6px 6px 0;margin-bottom:.3rem}
+  .hall .sev{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;color:var(--sc);border:1px solid var(--sc);border-radius:4px;padding:0 .3rem;white-space:nowrap}
+  .hall .msg{font-size:.8rem;color:#c3cbdb}
+  .btnia{font-family:var(--mono);font-size:.66rem;padding:.2rem .5rem;margin-left:.4rem;background:var(--mauve);color:#0b0d12;border:none;border-radius:6px;cursor:pointer;font-weight:700}
+  .btnia:disabled{opacity:.4;cursor:wait}
+  .iaresumen{white-space:pre-wrap;font-size:.8rem;line-height:1.5;color:#d6cdea;background:rgba(187,154,247,.08);border-left:2px solid var(--mauve);border-radius:0 6px 6px 0;padding:.6rem .7rem;margin:.5rem 0}
+
+  #ctx{position:fixed;z-index:100;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:.35rem;display:none;min-width:190px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+  #ctx .titulo{font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:.3rem .5rem}
+  #ctx button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);font-family:var(--mono);font-size:.78rem;padding:.35rem .5rem;border-radius:5px}
+  #ctx button:hover{background:var(--blue);color:#0b0d12}
+  #ctx .key{color:var(--amber);font-size:.6rem}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1><span class="sq">⬛</span> OBSIDIAN · motor v2</h1>
-  <div class="sub">demo del modelo tipado + transforms · <a href="/">← interfaz clásica</a></div>
+  <div class="sub">grafo tipado interactivo · click derecho en un nodo → transforms · <a href="/">← interfaz clásica</a></div>
 
   <div class="wsbar">
     <span class="wslabel">workspace</span>
     <select id="wsSel"></select>
     <button id="btnAbrir">Abrir</button>
     <span class="wssep">·</span>
-    <input id="wsNuevo" placeholder="nombre nuevo" autocomplete="off">
+    <input id="wsNuevo" placeholder="nombre nuevo" autocomplete="off" style="max-width:170px">
     <button id="btnCrear">+ Crear</button>
     <span class="wsactivo">activo: <b id="wsActivo">—</b></span>
   </div>
@@ -93,190 +90,195 @@
       <option value="wallet">wallet (BTC)</option>
       <option value="url">url (imagen/doc)</option>
     </select>
-    <input id="valor" placeholder="example.com" autocomplete="off">
-    <button class="primary" id="btnCargar">Ver transforms →</button>
+    <input id="valor" placeholder="example.com">
+    <button class="primary" id="btnAgregar">+ Agregar al grafo →</button>
   </div>
+  <div id="status">Agrega un objetivo y haz click derecho en su nodo para correr transforms.</div>
 
-  <div class="transforms" id="transforms"></div>
-  <div id="status"></div>
-
-  <div class="cols">
-    <div class="card">
-      <h2>Entidades · <span id="nEnt">0</span></h2>
-      <div id="entidades"><div class="vacio">Corre un transform para ver el grafo tipado.</div></div>
+  <div class="lienzo">
+    <div id="grafo"></div>
+    <div class="lateral">
+      <div class="card">
+        <h2>Detalle</h2>
+        <div id="detalle"><div class="vacio">Click en un nodo para ver su información.</div></div>
+      </div>
+      <div class="card">
+        <h2>Hallazgos · <span id="nHall">0</span><span class="score" id="scoreBadge"></span>
+          <button id="btnIA" class="btnia">🧠 IA</button>
+          <button id="btnEscudo" class="btnia" style="background:var(--cyan)">🛡️</button></h2>
+        <div id="iaResumen"></div>
+        <div id="hallazgos"><div class="vacio">La correlación busca riesgos sola.</div></div>
+      </div>
     </div>
-    <div class="card">
-      <h2>Relaciones · <span id="nRel">0</span></h2>
-      <div id="relaciones"><div class="vacio">—</div></div>
-    </div>
-  </div>
-
-  <div class="card hallcard">
-    <h2>Hallazgos · <span id="nHall">0</span><span class="score" id="scoreBadge"></span>
-      <button id="btnIA" class="btnia">🧠 Analizar con IA</button>
-      <button id="btnEscudo" class="btnia" style="background:var(--cyan)">🛡️ 2º escudo (IA)</button></h2>
-    <div id="iaResumen" class="iaresumen"></div>
-    <div id="revisiones"></div>
-    <div id="hallazgos"><div class="vacio">La correlación busca riesgos sola cuando corres transforms.</div></div>
   </div>
 </div>
 
+<div id="ctx"></div>
+
 <script>
-const COLOR = {objetivo:'#d99a4e',dominio:'#5b9bd5',subdominio:'#7fb8d9',ip:'#d9564b',
-  email:'#6fae7c',usuario:'#cc9a3c',org:'#bb9af7',pais:'#7a85b0',asn:'#7a85b0',
-  puerto:'#8b8b98',tech:'#5fa8a0',repo:'#d99a4e',plataforma:'#c17a52',credencial:'#f7768e'};
-const $ = s => document.querySelector(s);
-const el = (t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
+const COLOR={objetivo:'#d99a4e',dominio:'#5b9bd5',subdominio:'#7fb8d9',ip:'#d9564b',email:'#6fae7c',
+  usuario:'#cc9a3c',telefono:'#c99a6b',persona:'#e0af68',org:'#bb9af7',url:'#5fa8a0',puerto:'#8b8b98',
+  hash:'#9a7ecc',cve:'#f7768e',bucket:'#d9564b',credencial:'#f7768e',asn:'#7a85b0',pais:'#7a85b0',
+  tech:'#5fa8a0',imagen:'#73daca',wallet:'#e0af68',plataforma:'#c17a52',repo:'#d99a4e',subdominio_vuln:'#f7768e'};
+const SHAPE={objetivo:'star',ip:'diamond',email:'triangle',usuario:'hexagon',org:'box',pais:'box',
+  puerto:'square',cve:'triangleDown',tech:'dot',plataforma:'dot',repo:'dot',wallet:'diamond',
+  credencial:'triangleDown',asn:'box'};
+const SEVCOLOR={critico:'#f7768e',alto:'#ff9e64',medio:'#e0af68',bajo:'#7dcfff'};
+const $=s=>document.querySelector(s);
+const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
+let entMap={};   // id -> entidad
 
-function setStatus(msg, err){ const s=$('#status'); s.textContent=msg; s.className = err?'err':''; }
+const nodes=new vis.DataSet(), edges=new vis.DataSet();
+const network=new vis.Network($('#grafo'),{nodes,edges},{
+  nodes:{font:{color:'#c8cfdf',size:13,face:'monospace'},borderWidth:2,size:16},
+  edges:{color:{color:'#3a3f52',highlight:'#7aa2f7'},font:{color:'#8b8b98',size:10,strokeWidth:0,face:'monospace'},
+         arrows:{to:{enabled:true,scaleFactor:.5}},smooth:{type:'continuous'}},
+  physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-55,springLength:110,springConstant:.05},
+           stabilization:{iterations:120}},
+  interaction:{hover:true,navigationButtons:false}
+});
+network.on('stabilizationIterationsDone',()=>network.setOptions({physics:{enabled:false}}));
+network.on('click',p=>{ ocultarCtx(); if(p.nodes.length) mostrarDetalle(p.nodes[0]); });
+network.on('dragStart',ocultarCtx);
+network.on('oncontext',p=>{
+  p.event.preventDefault();
+  const id=network.getNodeAt(p.pointer.DOM);
+  if(id){ network.selectNodes([id]); mostrarDetalle(id); menuTransforms(id,p.event); }
+  else ocultarCtx();
+});
 
-async function cargarTransforms(){
-  const tipo = $('#tipo').value;
-  setStatus('cargando transforms…');
-  const r = await fetch('/api/v2/transforms/'+tipo);
-  const d = await r.json();
-  const cont = $('#transforms'); cont.textContent='';
-  if(!d.transforms.length){ cont.innerHTML='<div class="vacio">Sin transforms para este tipo.</div>'; setStatus(''); return; }
-  d.transforms.forEach(t=>{
-    const c = el('div','tchip');
-    const b = el('b'); b.textContent = t.nombre; c.appendChild(b);
-    if(t.requiere_key){ const k=el('span','key'); k.textContent='⚿ necesita key'; c.appendChild(k); }
-    const s = el('small'); s.textContent = t.descripcion || ('→ '+t.salidas.join(', ')); c.appendChild(s);
-    const btn = el('button'); btn.textContent='Correr'; btn.onclick=()=>correr(t.nombre); c.appendChild(btn);
-    cont.appendChild(c);
-  });
-  setStatus('elige un transform y córrelo.');
-}
-
-async function correr(nombre){
-  const tipo=$('#tipo').value, valor=$('#valor').value.trim();
-  if(!valor){ setStatus('escribe un objetivo primero.', true); return; }
-  setStatus('corriendo '+nombre+' sobre '+valor+'…');
-  const r = await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({tipo,valor,transform:nombre})});
-  const d = await r.json();
-  if(!r.ok){ setStatus('error: '+(d.error||r.status), true); return; }
-  setStatus('✓ '+nombre+': +'+(d.producidas?d.producidas.length:0)+' entidades (total '+d.total_entidades+')');
-  await pintarGrafo();
-}
+function setStatus(msg,cls){ const s=$('#status'); s.textContent=msg; s.className=cls||''; }
 
 async function pintarGrafo(){
-  const r = await fetch('/api/v2/grafo'); const g = await r.json();
-  const idMap = {}; g.entidades.forEach(e=> idMap[e.id]=e);
-  $('#nEnt').textContent = g.entidades.length;
-  $('#nRel').textContent = g.relaciones.length;
-
-  // entidades agrupadas por tipo
-  const porTipo = {};
-  g.entidades.forEach(e=>{ (porTipo[e.tipo]=porTipo[e.tipo]||[]).push(e); });
-  const cont = $('#entidades'); cont.textContent='';
-  if(!g.entidades.length){ cont.innerHTML='<div class="vacio">Corre un transform para ver el grafo tipado.</div>'; }
-  Object.keys(porTipo).sort().forEach(tipo=>{
-    const grupo = el('div','grupo');
-    const gt = el('div','gt'); gt.textContent = tipo+' ('+porTipo[tipo].length+')'; grupo.appendChild(gt);
-    porTipo[tipo].forEach(e=>{
-      const row = el('div','ent'); row.style.setProperty('--tc', COLOR[tipo]||'#6b7488');
-      const v = el('span','v'); v.textContent = e.valor; row.appendChild(v);
-      (e.tags||[]).forEach(t=>{ const tg=el('span','tag'); tg.textContent=t; row.appendChild(tg); });
-      Object.entries(e.propiedades||{}).slice(0,3).forEach(([k,val])=>{
-        const p=el('span','prop'); p.textContent=k+'='+val; row.appendChild(p);
-      });
-      if((e.origenes||[]).length){ const o=el('span','org'); o.textContent='◂ '+e.origenes.join(', '); row.appendChild(o); }
-      grupo.appendChild(row);
-    });
-    cont.appendChild(grupo);
+  const g=await(await fetch('/api/v2/grafo')).json();
+  entMap={}; g.entidades.forEach(e=>entMap[e.id]=e);
+  const idsAhora=new Set(g.entidades.map(e=>e.id));
+  nodes.get().forEach(n=>{ if(!idsAhora.has(n.id)) nodes.remove(n.id); });
+  g.entidades.forEach(e=>{
+    const nodo={id:e.id,label:e.valor.length>26?e.valor.slice(0,26)+'…':e.valor,
+      color:{background:COLOR[e.tipo]||'#8b8b98',border:'#0b0d12'},shape:SHAPE[e.tipo]||'dot',
+      title:e.tipo+': '+e.valor};
+    if(e.tags&&e.tags.length) nodo.color.border=SEVCOLOR.critico;   // resaltar entidades con tags
+    nodes.update(nodo);
   });
-
-  // relaciones
-  const rc = $('#relaciones'); rc.textContent='';
-  if(!g.relaciones.length){ rc.innerHTML='<div class="vacio">—</div>'; }
-  g.relaciones.forEach(rel=>{
-    const a = idMap[rel.origen], b = idMap[rel.destino];
-    if(!a||!b) return;
-    const d = el('div','rel');
-    d.innerHTML = '<span class="a">'+a.valor+'</span> <span class="e">—'+(rel.etiqueta||'→')+'→</span> <span class="b">'+b.valor+'</span>';
-    rc.appendChild(d);
-  });
-  pintarHallazgos();   // la correlación se recalcula cuando cambia el grafo
+  const idsRel=new Set(g.relaciones.map(r=>r.id));
+  edges.get().forEach(x=>{ if(!idsRel.has(x.id)) edges.remove(x.id); });
+  g.relaciones.forEach(r=>edges.update({id:r.id,from:r.origen,to:r.destino,label:r.etiqueta}));
+  pintarHallazgos();
 }
 
-const SEVCOLOR = {critico:'#f7768e', alto:'#ff9e64', medio:'#e0af68', bajo:'#7dcfff'};
+function mostrarDetalle(id){
+  const e=entMap[id]; if(!e) return;
+  const d=$('#detalle'); d.textContent='';
+  const t=el('div','tipo'); t.style.setProperty('--tc',COLOR[e.tipo]); t.textContent=e.tipo; d.appendChild(t);
+  const v=el('div','v'); v.textContent=e.valor; d.appendChild(v);
+  (e.tags||[]).forEach(tg=>{const s=el('span','tag');s.textContent=tg;d.appendChild(s);});
+  Object.entries(e.propiedades||{}).slice(0,8).forEach(([k,val])=>{
+    const kv=el('div','kv'); kv.innerHTML='<b>'+k+':</b> '+String(typeof val==='object'?JSON.stringify(val):val).slice(0,140);
+    d.appendChild(kv);
+  });
+  if((e.origenes||[]).length){const o=el('div','kv');o.innerHTML='<b>fuentes:</b> '+e.origenes.join(', ');d.appendChild(o);}
+  const h=el('div','hint'); h.textContent='↳ click derecho en el nodo para correr transforms'; d.appendChild(h);
+}
+
+async function menuTransforms(id,ev){
+  const e=entMap[id]; if(!e) return;
+  const ctx=$('#ctx'); ctx.textContent='';
+  const tit=el('div','titulo'); tit.textContent='transforms · '+e.tipo; ctx.appendChild(tit);
+  const d=await(await fetch('/api/v2/transforms/'+e.tipo)).json();
+  if(!d.transforms.length){ const b=el('button'); b.textContent='(sin transforms)'; b.disabled=true; ctx.appendChild(b); }
+  d.transforms.forEach(t=>{
+    const b=el('button');
+    b.innerHTML=t.nombre+(t.requiere_key?' <span class="key">⚿</span>':'');
+    b.title=t.descripcion||'';
+    b.onclick=()=>{ ocultarCtx(); correr(e.tipo,e.valor,t.nombre); };
+    ctx.appendChild(b);
+  });
+  ctx.style.left=Math.min(ev.clientX,innerWidth-210)+'px';
+  ctx.style.top=Math.min(ev.clientY,innerHeight-40-d.transforms.length*30)+'px';
+  ctx.style.display='block';
+}
+function ocultarCtx(){ $('#ctx').style.display='none'; }
+document.addEventListener('click',e=>{ if(!$('#ctx').contains(e.target)) ocultarCtx(); });
+
+async function correr(tipo,valor,nombre){
+  setStatus('corriendo '+nombre+' sobre '+valor+'…','run');
+  try{
+    const r=await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({tipo,valor,transform:nombre})});
+    const d=await r.json();
+    if(!r.ok){ setStatus('error: '+(d.error||r.status),'err'); return; }
+    setStatus('✓ '+nombre+': +'+(d.producidas?d.producidas.length:0)+' entidades (total '+d.total_entidades+')');
+    await pintarGrafo();
+  }catch(e){ setStatus('error: '+e.message,'err'); }
+}
+
+async function agregar(){
+  const tipo=$('#tipo').value, valor=$('#valor').value.trim();
+  if(!valor){ setStatus('escribe un objetivo primero.','err'); return; }
+  const r=await fetch('/api/v2/entidad',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tipo,valor})});
+  const d=await r.json();
+  if(!r.ok){ setStatus('error: '+(d.error||r.status),'err'); return; }
+  $('#valor').value=''; setStatus('nodo agregado. Click derecho en él para correr transforms.');
+  await pintarGrafo(); if(d.id){ network.selectNodes([d.id]); mostrarDetalle(d.id); }
+}
+
+// ── hallazgos + IA (paneles) ──
 async function pintarHallazgos(){
-  const d = await (await fetch('/api/v2/hallazgos')).json();
-  $('#nHall').textContent = d.hallazgos.length;
-  const badge = $('#scoreBadge');
-  badge.textContent = 'riesgo '+d.score+'/100';
-  badge.style.background = d.score>=60?'#f7768e':d.score>=25?'#e0af68':'#232735';
-  badge.style.color = d.score>=25?'#0b0d12':'#c8cfdf';
-  const cont = $('#hallazgos'); cont.textContent='';
-  if(!d.hallazgos.length){ cont.innerHTML='<div class="vacio">Sin riesgos detectados (aún).</div>'; return; }
+  const d=await(await fetch('/api/v2/hallazgos')).json();
+  $('#nHall').textContent=d.hallazgos.length;
+  const b=$('#scoreBadge'); b.textContent='riesgo '+d.score+'/100';
+  b.style.background=d.score>=60?'#f7768e':d.score>=25?'#e0af68':'#232735';
+  b.style.color=d.score>=25?'#0b0d12':'#c8cfdf';
+  const c=$('#hallazgos'); c.textContent='';
+  if(!d.hallazgos.length){ c.innerHTML='<div class="vacio">Sin riesgos detectados (aún).</div>'; return; }
   d.hallazgos.forEach(h=>{
-    const row=el('div','hall'); row.style.setProperty('--sc', SEVCOLOR[h.severidad]||'#6b7488');
+    const row=el('div','hall'); row.style.setProperty('--sc',SEVCOLOR[h.severidad]||'#6b7488');
     const s=el('span','sev'); s.textContent=h.severidad; row.appendChild(s);
     const m=el('span','msg'); m.textContent=h.mensaje; row.appendChild(m);
-    cont.appendChild(row);
+    c.appendChild(row);
   });
 }
-
-// ── workspaces (F3) ──
-async function cargarWorkspaces(){
-  const d = await (await fetch('/api/v2/workspaces')).json();
-  const sel = $('#wsSel'); sel.textContent='';
-  d.workspaces.forEach(w=>{ const o=el('option'); o.value=w; o.textContent=w; sel.appendChild(o); });
-  $('#wsActivo').textContent = d.activo || 'ninguno (efímero)';
-  if(d.activo) sel.value = d.activo;
-}
-async function abrirWs(){
-  const n = $('#wsSel').value; if(!n) return;
-  const r = await fetch('/api/v2/workspaces/abrir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
-  if(r.ok){ setStatus('workspace abierto: '+n); await cargarWorkspaces(); await pintarGrafo(); }
-}
-async function crearWs(){
-  const n = $('#wsNuevo').value.trim(); if(!n){ setStatus('escribe un nombre de workspace', true); return; }
-  const r = await fetch('/api/v2/workspaces',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
-  const d = await r.json();
-  if(!r.ok){ setStatus('error: '+(d.error||r.status), true); return; }
-  $('#wsNuevo').value=''; setStatus('workspace creado y activo: '+d.activo);
-  await cargarWorkspaces(); await pintarGrafo();
-}
-$('#btnAbrir').onclick = abrirWs;
-$('#btnCrear').onclick = crearWs;
-$('#wsNuevo').addEventListener('keydown', e=>{ if(e.key==='Enter') crearWs(); });
-
 async function analizarIA(){
-  const btn = $('#btnIA'), out = $('#iaResumen');
-  btn.disabled = true; btn.textContent = '🧠 pensando…';
-  out.className = 'iaresumen show'; out.textContent = 'Ollama está analizando el caso…';
-  try{
-    const d = await (await fetch('/api/v2/hallazgos/ia',{method:'POST'})).json();
-    out.textContent = d.resumen || d.error || 'sin respuesta';
-  }catch(e){ out.textContent = 'Error: '+e.message; }
-  btn.disabled = false; btn.textContent = '🧠 Analizar con IA';
+  const btn=$('#btnIA'),out=$('#iaResumen'); btn.disabled=true; btn.textContent='…';
+  out.innerHTML='<div class="iaresumen">Ollama analizando…</div>';
+  try{ const d=await(await fetch('/api/v2/hallazgos/ia',{method:'POST'})).json();
+    out.innerHTML='<div class="iaresumen">'+(d.resumen||d.error||'')+'</div>'; }
+  catch(e){ out.textContent='Error: '+e.message; }
+  btn.disabled=false; btn.textContent='🧠 IA';
 }
-$('#btnIA').onclick = analizarIA;
-
 async function segundoEscudo(){
-  const btn = $('#btnEscudo'), out = $('#revisiones');
-  btn.disabled = true; btn.textContent = '🛡️ revisando…';
-  out.innerHTML = '<div class="iaresumen show">El 2º escudo (IA) está revisando cada hallazgo con la evidencia…</div>';
-  try{
-    const d = await (await fetch('/api/v2/hallazgos/verificar',{method:'POST'})).json();
-    out.textContent='';
-    if(!d.revisiones.length){ out.innerHTML='<div class="vacio">Sin hallazgos que revisar.</div>'; }
-    d.revisiones.forEach(rev=>{
-      const box = el('div','iaresumen show');
-      box.innerHTML = '<b style="color:var(--cyan)">🛡️ '+rev.hallazgo+'</b>\n'+rev.razon;
-      out.appendChild(box);
-    });
-  }catch(e){ out.innerHTML='<div class="iaresumen show">Error: '+e.message+'</div>'; }
-  btn.disabled = false; btn.textContent = '🛡️ 2º escudo (IA)';
+  const btn=$('#btnEscudo'),out=$('#iaResumen'); btn.disabled=true; btn.textContent='…';
+  out.innerHTML='<div class="iaresumen">2º escudo revisando…</div>';
+  try{ const d=await(await fetch('/api/v2/hallazgos/verificar',{method:'POST'})).json();
+    out.textContent=''; (d.revisiones||[]).forEach(r=>{
+      const x=el('div','iaresumen'); x.innerHTML='<b style="color:var(--cyan)">🛡️ '+r.hallazgo+'</b>\n'+r.razon; out.appendChild(x); }); }
+  catch(e){ out.textContent='Error: '+e.message; }
+  btn.disabled=false; btn.textContent='🛡️';
 }
-$('#btnEscudo').onclick = segundoEscudo;
 
-$('#btnCargar').onclick = cargarTransforms;
-$('#valor').addEventListener('keydown', e=>{ if(e.key==='Enter') cargarTransforms(); });
-cargarWorkspaces();
-pintarGrafo();  // por si ya hay algo en la sesión
+// ── workspaces ──
+async function cargarWorkspaces(){
+  const d=await(await fetch('/api/v2/workspaces')).json();
+  const sel=$('#wsSel'); sel.textContent='';
+  d.workspaces.forEach(w=>{const o=el('option');o.value=w;o.textContent=w;sel.appendChild(o);});
+  $('#wsActivo').textContent=d.activo||'ninguno (efímero)'; if(d.activo)sel.value=d.activo;
+}
+async function abrirWs(){ const n=$('#wsSel').value; if(!n)return;
+  await fetch('/api/v2/workspaces/abrir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
+  setStatus('workspace abierto: '+n); await cargarWorkspaces(); await pintarGrafo(); }
+async function crearWs(){ const n=$('#wsNuevo').value.trim(); if(!n){setStatus('escribe un nombre','err');return;}
+  const r=await fetch('/api/v2/workspaces',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
+  const d=await r.json(); if(!r.ok){setStatus('error: '+(d.error||r.status),'err');return;}
+  $('#wsNuevo').value=''; setStatus('workspace creado: '+d.activo); await cargarWorkspaces(); await pintarGrafo(); }
+
+$('#btnAgregar').onclick=agregar;
+$('#valor').addEventListener('keydown',e=>{ if(e.key==='Enter')agregar(); });
+$('#btnAbrir').onclick=abrirWs; $('#btnCrear').onclick=crearWs;
+$('#wsNuevo').addEventListener('keydown',e=>{ if(e.key==='Enter')crearWs(); });
+$('#btnIA').onclick=analizarIA; $('#btnEscudo').onclick=segundoEscudo;
+cargarWorkspaces(); pintarGrafo();
 </script>
 </body>
 </html>
