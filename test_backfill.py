@@ -117,3 +117,24 @@ def test_http_probe_detecta_panel_login(monkeypatch):
     monkeypatch.setattr(ob, '_fetch_seguro', lambda *a, **k: R())
     _, e, _ = _correr('http_probe', 'dominio', 'admin.x.com')
     assert 'panel-login' in e.tags
+
+
+# ── 59: pivote plataformas ───────────────────────────────────────────────────
+def test_pivote_plataformas():
+    from core.correlacion import correlacionar
+    alm = Almacen()
+    u = alm.crear('usuario', 'nadiee')
+    for i in range(6):
+        p = alm.crear('plataforma', f'plat{i}')
+        alm.relacionar(u.id, p.id, 'presente')
+    r = [x for x in correlacionar(alm) if x.regla == 'pivote-plataformas']
+    assert r and '6 plataformas' in r[0].mensaje
+
+
+def test_pivote_plataformas_pocas_no_dispara():
+    from core.correlacion import correlacionar
+    alm = Almacen()
+    u = alm.crear('usuario', 'x')
+    for i in range(3):                                   # <5 → sin hallazgo
+        alm.relacionar(u.id, alm.crear('plataforma', f'p{i}').id, 'presente')
+    assert not [x for x in correlacionar(alm) if x.regla == 'pivote-plataformas']

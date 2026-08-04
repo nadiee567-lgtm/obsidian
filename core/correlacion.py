@@ -148,6 +148,22 @@ def r_takeover(alm):
                            f'Subdominio vulnerable a takeover: {s.valor}', [s.id])
 
 @regla
+def r_pivote_plataformas(alm):
+    """Un usuario presente en muchas plataformas = pivote fuerte para cruzar
+    identidad (paso 59). Cuenta las plataformas ligadas a cada usuario."""
+    usuarios = {e.id: e for e in alm.de_tipo('usuario')}
+    ids_plat = {e.id for e in alm.de_tipo('plataforma')}
+    conteo = {}
+    for r in alm.relaciones:
+        if r.origen in usuarios and r.destino in ids_plat:
+            conteo[r.origen] = conteo.get(r.origen, 0) + 1
+    for uid, n in conteo.items():
+        if n >= 5:
+            yield Hallazgo('pivote-plataformas', 'bajo',
+                           f'{usuarios[uid].valor} presente en {n} plataformas — pivote fuerte para cruzar identidad',
+                           [uid])
+
+@regla
 def r_login_expuesto(alm):
     """Panel de login/admin accesible (paso 56). Alto por sí solo; CRÍTICO si además
     hay credenciales filtradas en el caso — login + credencial = acceso probable."""
