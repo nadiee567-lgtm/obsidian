@@ -154,7 +154,7 @@ const network=new vis.Network($('#grafo'),{nodes,edges},{
          arrows:{to:{enabled:true,scaleFactor:.5}},smooth:{type:'continuous'}},
   physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-55,springLength:110,springConstant:.05},
            stabilization:{iterations:120}},
-  interaction:{hover:true,navigationButtons:false}
+  interaction:{hover:true,multiselect:true,navigationButtons:false}
 });
 network.on('stabilizationIterationsDone',()=>network.setOptions({physics:{enabled:false}}));
 network.on('click',p=>{ ocultarCtx(); if(p.nodes.length) mostrarDetalle(p.nodes[0]); });
@@ -162,8 +162,10 @@ network.on('dragStart',ocultarCtx);
 network.on('oncontext',p=>{
   p.event.preventDefault();
   const id=network.getNodeAt(p.pointer.DOM);
-  if(id){ network.selectNodes([id]); mostrarDetalle(id); menuTransforms(id,p.event); }
-  else ocultarCtx();
+  if(!id){ ocultarCtx(); return; }
+  let sel=network.getSelectedNodes();
+  if(!sel.includes(id)) sel=[id];        // si clickeas fuera de la selección, solo ese
+  network.selectNodes(sel); mostrarDetalle(id); menuTransforms(sel,p.event);
 });
 
 function setStatus(msg,cls){ const s=$('#status'); s.textContent=msg; s.className=cls||''; }
@@ -249,22 +251,33 @@ async function guardarNota(id,nota){
   await pintarGrafo(); setStatus('nota guardada');
 }
 
-async function menuTransforms(id,ev){
-  const e=entMap[id]; if(!e) return;
+async function menuTransforms(ids,ev){
+  const primero=entMap[ids[0]]; if(!primero) return;
+  const tipo=primero.tipo;
+  const mismos=ids.filter(i=>entMap[i]&&entMap[i].tipo===tipo);   // paso 86: solo del mismo tipo
   const ctx=$('#ctx'); ctx.textContent='';
-  const tit=el('div','titulo'); tit.textContent='transforms · '+e.tipo; ctx.appendChild(tit);
-  const d=await(await fetch('/api/v2/transforms/'+e.tipo)).json();
+  const tit=el('div','titulo'); tit.textContent='transforms · '+tipo+(mismos.length>1?' ('+mismos.length+' nodos)':''); ctx.appendChild(tit);
+  const d=await(await fetch('/api/v2/transforms/'+tipo)).json();
   if(!d.transforms.length){ const b=el('button'); b.textContent='(sin transforms)'; b.disabled=true; ctx.appendChild(b); }
   d.transforms.forEach(t=>{
     const b=el('button');
     b.innerHTML=t.nombre+(t.requiere_key?' <span class="key">⚿</span>':'');
     b.title=t.descripcion||'';
-    b.onclick=()=>{ ocultarCtx(); correr(e.tipo,e.valor,t.nombre); };
+    b.onclick=()=>{ ocultarCtx(); correrEn(mismos,t.nombre); };
     ctx.appendChild(b);
   });
   ctx.style.left=Math.min(ev.clientX,innerWidth-210)+'px';
   ctx.style.top=Math.min(ev.clientY,innerHeight-40-d.transforms.length*30)+'px';
   ctx.style.display='block';
+}
+async function correrEn(ids,nombre){
+  setStatus('corriendo '+nombre+' en '+ids.length+' nodo(s)…','run');
+  let ok=0;
+  for(const i of ids){ const e=entMap[i]; if(!e) continue;
+    try{ const r=await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({tipo:e.tipo,valor:e.valor,transform:nombre})}); if(r.ok)ok++; }catch(_){}
+  }
+  setStatus('✓ '+nombre+' en '+ok+'/'+ids.length+' nodo(s)'); await pintarGrafo();
 }
 function ocultarCtx(){ $('#ctx').style.display='none'; }
 document.addEventListener('click',e=>{ if(!$('#ctx').contains(e.target)) ocultarCtx(); });
