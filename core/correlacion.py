@@ -118,3 +118,13 @@ def r_takeover(alm):
         if 'takeover' in s.tags:
             yield Hallazgo('subdominio-takeover', 'alto',
                            f'Subdominio vulnerable a takeover: {s.valor}', [s.id])
+
+@regla
+def r_nuclei_vuln(alm):
+    """Host con hallazgos de nuclei de severidad alta+."""
+    for tipo in ('dominio', 'subdominio'):
+        for e in alm.de_tipo(tipo):
+            if 'vulnerable' in e.tags:
+                n = len(e.propiedades.get('nuclei', []))
+                yield Hallazgo('vuln-nuclei', 'alto',
+                               f'{e.valor}: {n} hallazgo(s) de nuclei (severidad alta+)', [e.id])

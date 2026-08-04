@@ -2124,6 +2124,71 @@ def _t_email_spoofable(entidad, ctx):
     if not tiene_spf:
         entidad.etiquetar('spoofable')
 
+def _screenshot(entidad):
+    """Captura de la web con navegador headless (paso 68). No captura hosts
+    internos (_url_publica). Guarda el PNG en el static y deja la URL como prop."""
+    if not _url_publica('https://' + entidad.valor):
+        return
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        log.debug("screenshot: falta playwright")
+        return
+    shots = os.path.join(STATIC_DIR, 'screenshots')
+    os.makedirs(shots, exist_ok=True)
+    archivo = hashlib.md5(entidad.valor.encode()).hexdigest()[:12] + '.png'
+    try:
+        with sync_playwright() as p:
+            navegador = p.chromium.launch(headless=True)
+            pagina = navegador.new_page(viewport={'width': 1280, 'height': 800})
+            pagina.goto('https://' + entidad.valor, timeout=15000, wait_until='domcontentloaded')
+            pagina.screenshot(path=os.path.join(shots, archivo))
+            navegador.close()
+        entidad.propiedades['screenshot'] = '/static/screenshots/' + archivo
+        entidad.etiquetar('con-screenshot')
+    except Exception as _e:
+        log.debug("screenshot falló: %s", _e)
+
+@transform(entrada='dominio', salidas=(), nombre='screenshot',
+           descripcion='Captura de pantalla de la web (navegador headless)')
+def _t_screenshot_dom(entidad, ctx):
+    _screenshot(entidad)
+
+@transform(entrada='subdominio', salidas=(), nombre='screenshot_sub',
+           descripcion='Captura de pantalla del subdominio (headless)')
+def _t_screenshot_sub(entidad, ctx):
+    _screenshot(entidad)
+
+def _nuclei(entidad):
+    """Escaneo de vulns con plantillas nuclei (paso 69). Solo hosts públicos.
+    Corre con run_tool (argv, sin shell); severidad media+ para no eternizarse."""
+    if not _which('nuclei') or not _url_publica('https://' + entidad.valor):
+        return
+    out = run_tool(['nuclei', '-u', 'https://' + entidad.valor, '-jsonl', '-silent',
+                    '-severity', 'medium,high,critical', '-timeout', '5'], timeout=150)
+    hallados = []
+    for linea in out.splitlines():
+        try:
+            j = json.loads(linea)
+        except Exception:
+            continue
+        info = j.get('info', {}) or {}
+        hallados.append({'id': j.get('template-id'), 'sev': info.get('severity'), 'nombre': info.get('name')})
+        if info.get('severity') in ('high', 'critical'):
+            entidad.etiquetar('vulnerable')
+    if hallados:
+        entidad.propiedades['nuclei'] = hallados[:20]
+
+@transform(entrada='dominio', salidas=(), nombre='nuclei',
+           descripcion='Escaneo de vulnerabilidades con plantillas (nuclei)')
+def _t_nuclei_dom(entidad, ctx):
+    _nuclei(entidad)
+
+@transform(entrada='subdominio', salidas=(), nombre='nuclei_sub',
+           descripcion='Escaneo de vulns del subdominio (nuclei)')
+def _t_nuclei_sub(entidad, ctx):
+    _nuclei(entidad)
+
 def _http_probe(entidad):
     """Sondea un host por HTTP y enriquece la entidad. Usa _fetch_seguro:
     no sondea IPs internas (SSRF) y revalida redirects."""

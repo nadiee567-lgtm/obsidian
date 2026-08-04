@@ -9,13 +9,14 @@ requests==2.34.2
 beautifulsoup4==4.15.0
 cryptography==50.0.0
 
-# ── Opcional ──────────────────────────────────────────────────────────────────
-# Solo si quieres el módulo render_js (screenshots con navegador headless).
+# ── Opcional (transforms de screenshots / render_js) ─────────────────────────
 # Descomenta y además corre:  playwright install chromium
-# playwright==1.48.0
+# playwright==1.55.0
 
 # ── Herramientas del sistema (NO son pip — instalar con el gestor del SO) ─────
 # Los transforms las usan por línea de comandos. En Debian/Ubuntu/Mint:
 #   sudo apt install dnsutils nmap whois libimage-exiftool-perl
 #   (dig = dnsutils; exiftool = libimage-exiftool-perl)
+# nuclei (escaneo de vulns): binario de github.com/projectdiscovery/nuclei/releases
+#   luego:  nuclei -update-templates
 # Opcionales para OSINT de usuario:  pipx install sherlock-project maigret
