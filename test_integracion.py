@@ -22,7 +22,7 @@ def test_transforms_reales_registrados():
             'dns_ns', 'email_breaches', 'email_spoofable', 'rdap', 'greynoise',
             'dns_txt', 'ssl', 'subdominios_ht', 'http_probe', 'http_probe_sub',
             'screenshot', 'nuclei', 'breaches_xon', 'stealer_hudsonrock',
-            'reputacion_ip', 'abuseipdb', 'wallet_balance', 'ip_blocklist', 'ct_certspotter', 'tech', 'cve_lookup', 'dorks', 'pastes_github', 'sherlock', 'metadata', 'wayback'} <= nombres
+            'reputacion_ip', 'abuseipdb', 'wallet_balance', 'ip_blocklist', 'ct_certspotter', 'tech', 'cve_lookup', 'dorks', 'pastes_github', 'sherlock', 'metadata', 'wayback', 'reverse_whois'} <= nombres
 
 
 def test_transforms_aplicables_por_tipo():

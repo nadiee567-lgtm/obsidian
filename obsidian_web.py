@@ -2467,6 +2467,22 @@ def _t_http_probe_dom(entidad, ctx):
 def _t_http_probe_sub(entidad, ctx):
     _http_probe(entidad)
 
+@transform(entrada='dominio', salidas=('dominio',), nombre='reverse_whois',
+           descripcion='Otros dominios del mismo registrante (ViewDNS, key gratis en la bóveda). Único de F5 sin opción keyless.')
+def _t_reverse_whois(entidad, ctx):
+    key = _boveda.obtener('viewdns') or os.environ.get('VIEWDNS_KEY', '')
+    if not key:
+        return
+    try:
+        d = SESSION.get('https://api.viewdns.info/reversewhois/',
+                        params={'q': entidad.valor, 'apikey': key, 'output': 'json'}, timeout=12).json()
+        for reg in (d.get('response', {}) or {}).get('matches', [])[:50]:
+            dom = reg.get('domain')
+            if dom and dom != entidad.valor:
+                ctx.emitir('dominio', dom, etiqueta='mismo registrante')
+    except Exception as _e:
+        log.debug("reverse_whois no disponible: %s", _e)
+
 @transform(entrada='dominio', salidas=('dominio', 'org'), nombre='rdap',
            descripcion='WHOIS moderno (RDAP, sin key): registrar, name servers, fechas')
 def _t_rdap(entidad, ctx):
