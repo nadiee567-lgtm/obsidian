@@ -2336,6 +2336,42 @@ def _t_abuseipdb(entidad, ctx):
     except Exception as _e:
         log.debug("abuseipdb no disponible: %s", _e)
 
+_BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
+
+def _cargar_blocklist():
+    if _BLOCKLIST['nets'] is not None and time.time() - _BLOCKLIST['ts'] < 21600:
+        return _BLOCKLIST['nets']
+    nets = []
+    for url in ('https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset',
+                'https://feodotracker.abuse.ch/downloads/ipblocklist.txt'):
+        try:
+            for linea in SESSION.get(url, timeout=15).text.splitlines():
+                linea = linea.strip()
+                if not linea or linea.startswith('#'):
+                    continue
+                try:
+                    nets.append(ipaddress.ip_network(linea, strict=False))
+                except ValueError:
+                    pass
+        except Exception as _e:
+            log.debug("blocklist %s no disponible: %s", url, _e)
+    _BLOCKLIST['nets'] = nets
+    _BLOCKLIST['ts'] = time.time()
+    return nets
+
+@transform(entrada='ip', salidas=(), nombre='ip_blocklist',
+           descripcion='¿La IP está en blocklists de amenazas agregadas? (FireHOL+Feodo, keyless, sin rate limit)')
+def _t_ip_blocklist(entidad, ctx):
+    try:
+        ip = ipaddress.ip_address(entidad.valor)
+    except ValueError:
+        return
+    for red in _cargar_blocklist():
+        if ip in red:
+            entidad.etiquetar('en-blocklist', 'malicioso')
+            entidad.propiedades['blocklist'] = str(red)
+            return
+
 @transform(entrada='ip', salidas=('org',), nombre='greynoise',
            descripcion='Threat intel de la IP (GreyNoise Community, keyless pero 25/día; 404=no observada)')
 def _t_greynoise(entidad, ctx):
