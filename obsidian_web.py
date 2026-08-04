@@ -2277,6 +2277,67 @@ def _http_probe(entidad):
         entidad.propiedades['http_redirect'] = str(r.url)
     entidad.etiquetar('http-vivo')
 
+def _tech_detect(entidad):
+    """Fingerprint ligero de tecnologías desde la respuesta HTTP (server,
+    powered-by, meta generator, pistas comunes). No es Wappalyzer, pero sirve."""
+    try:
+        r = _fetch_seguro(entidad.valor, timeout=8, stream=False)
+    except Exception:
+        return set()
+    techs = set()
+    for cab in ('Server', 'X-Powered-By'):
+        v = r.headers.get(cab)
+        if v:
+            techs.add(v.split('/')[0].strip())
+    try:
+        m = re.search(r'<meta[^>]+name=["\']generator["\'][^>]+content=["\']([^"\']+)', r.text[:10000], re.I)
+        if m:
+            techs.add(m.group(1).split()[0])
+    except Exception:
+        pass
+    cuerpo = r.text[:20000].lower()
+    for pista, nombre in [('wp-content', 'WordPress'), ('/_next/', 'Next.js'), ('drupal', 'Drupal'),
+                          ('joomla', 'Joomla'), ('cf-ray', 'Cloudflare'), ('x-shopify', 'Shopify')]:
+        if pista in cuerpo:
+            techs.add(nombre)
+    return {t for t in techs if t and len(t) < 40}
+
+@transform(entrada='dominio', salidas=('tech',), nombre='tech',
+           descripcion='Tecnologías que usa el sitio (fingerprint HTTP)')
+def _t_tech_dom(entidad, ctx):
+    for t in _tech_detect(entidad):
+        ctx.emitir('tech', t, etiqueta='usa')
+
+@transform(entrada='subdominio', salidas=('tech',), nombre='tech_sub',
+           descripcion='Tecnologías del subdominio (fingerprint HTTP)')
+def _t_tech_sub(entidad, ctx):
+    for t in _tech_detect(entidad):
+        ctx.emitir('tech', t, etiqueta='usa')
+
+@transform(entrada='tech', salidas=('cve',), nombre='cve_lookup',
+           descripcion='CVEs críticos asociados a la tecnología (NVD). SIN versión → verificar aplicabilidad')
+def _t_cve_lookup(entidad, ctx):
+    kw = entidad.valor
+    try:
+        d = SESSION.get('https://services.nvd.nist.gov/rest/json/cves/2.0',
+                        params={'keywordSearch': kw, 'cvssV3Severity': 'CRITICAL', 'resultsPerPage': 8},
+                        timeout=15).json()
+    except Exception as _e:
+        log.debug("nvd no disponible: %s", _e)
+        return
+    for v in d.get('vulnerabilities', [])[:15]:
+        cve = v.get('cve', {}) or {}
+        cid = cve.get('id')
+        if not cid:
+            continue
+        # filtro anti-ruido PRECISO: la tech debe estar en el CPE (producto oficial
+        # afectado), no solo mencionada de pasada en la descripción.
+        cpes = json.dumps(cve.get('configurations', [])).lower()
+        if f':{kw.lower()}:' in cpes:
+            e = ctx.emitir('cve', cid, etiqueta='CVE crítico')
+            if e:
+                e.etiquetar('sin-verificar-version')
+
 @transform(entrada='dominio', salidas=(), nombre='http_probe',
            descripcion='Sondeo HTTP: status, título, server, redirect (estilo httpx)')
 def _t_http_probe_dom(entidad, ctx):
