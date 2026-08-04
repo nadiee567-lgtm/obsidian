@@ -229,6 +229,16 @@ function mostrarDetalle(id){
     d.appendChild(kv);
   });
   if((e.origenes||[]).length){const o=el('div','kv');o.innerHTML='<b>fuentes:</b> '+e.origenes.join(', ');d.appendChild(o);}
+  // cadena de evidencia (paso 89): cómo se llegó a este dato
+  if((e.procedencia||[]).length){
+    const p=e.procedencia[0], inp=entMap[p.input];
+    const c=el('div','kv');
+    c.innerHTML='<b>hallado por:</b> '+p.transform+(inp?' ← <span style="color:var(--cyan)">'+inp.valor+'</span>':'');
+    d.appendChild(c);
+    const bc=el('button','tagbtn'); bc.textContent='🔗 resaltar cadena'; bc.style.marginTop='.3rem';
+    bc.onclick=()=>{ const ch=cadenaIds(e.id); network.selectNodes(ch); network.fit({nodes:ch,animation:true}); setStatus('cadena: '+ch.length+' pasos'); };
+    d.appendChild(bc);
+  }
   // etiquetas rápidas del analista (feedback loop)
   const tb=el('div','tagbar');
   [['interesante','#9ece6a'],['sospechoso','#ff9e64'],['descartado','#6b7488'],['falso-positivo','#7dcfff']].forEach(([tg,col])=>{
@@ -241,6 +251,15 @@ function mostrarDetalle(id){
   const ta=el('textarea','nota'); ta.placeholder='nota del analista…'; ta.value=e.propiedades.nota||'';
   ta.onchange=()=>guardarNota(e.id,ta.value); d.appendChild(ta);
   const h=el('div','hint'); h.textContent='↳ click derecho en el nodo para correr transforms'; d.appendChild(h);
+}
+function cadenaIds(id){   // camino hacia atrás por la procedencia hasta la semilla
+  const chain=[id], visto=new Set([id]); let cur=entMap[id];
+  while(cur&&cur.procedencia&&cur.procedencia.length){
+    const inp=cur.procedencia[0].input;
+    if(!inp||visto.has(inp))break;
+    chain.push(inp); visto.add(inp); cur=entMap[inp];
+  }
+  return chain;
 }
 async function toggleTag(id,tag){
   await fetch('/api/v2/entidad/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,tag})});
