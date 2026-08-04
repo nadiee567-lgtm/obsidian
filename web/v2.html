@@ -115,6 +115,7 @@
     <span id="filtros"></span>
     <span style="margin-left:auto"></span>
     <button id="btnTimeline">📅 timeline</button>
+    <button id="btnReporte">📄 reporte</button>
     <button id="btnReacomodar">↻ reacomodar</button>
     <button id="btnExport">⬇ PNG</button>
   </div>
@@ -409,6 +410,7 @@ function timeline(){
   $('#tlCerrar').onclick=()=>ov.style.display='none';
 }
 $('#btnTimeline').onclick=timeline;
+$('#btnReporte').onclick=()=>window.open('/v2/reporte','_blank');
 cargarWorkspaces(); pintarGrafo();
 </script>
 </body>

@@ -16,6 +16,7 @@ from core.migracion import migrar_caso
 from core.workspaces import Gestor
 from core.boveda import Boveda
 from core.correlacion import correlacionar, score_riesgo
+from core.reporte import generar_reporte
 import core.ia as ia
 
 log = get_logger()
@@ -2833,6 +2834,39 @@ def api_v2_hallazgos():
     """Corre el motor de correlación sobre el caso activo (F4 pasos 62, 64)."""
     h = correlacionar(_almacen)
     return jsonify({'hallazgos': [x.to_dict() for x in h], 'score': score_riesgo(h)})
+
+def _objetivo_del_almacen():
+    """Mejor candidato a 'objetivo' del caso para el encabezado del reporte.
+    Prefiere la SEMILLA (entidad sin procedencia = agregada a mano, no derivada
+    por un transform), así el reporte dice el objetivo real y no un dato hijo."""
+    ents = _almacen.entidades
+    if not ents:
+        return None
+    obj = _almacen.de_tipo('objetivo')
+    if obj:
+        return sorted(obj, key=lambda e: e.valor)[0].valor
+    orden = {'dominio': 0, 'ip': 1, 'email': 2, 'usuario': 3, 'url': 4, 'wallet': 5}
+    semillas = [e for e in ents if not e.procedencia]     # sin procedencia = semilla
+    cand = [e for e in (semillas or ents) if e.tipo in orden] or (semillas or ents)
+    return sorted(cand, key=lambda e: (orden.get(e.tipo, 9), e.valor))[0].valor
+
+@app.route('/api/v2/reporte')
+@app.route('/v2/reporte')
+def api_v2_reporte():
+    """Reporte HTML autocontenido del caso activo (F7 paso 93): resumen de riesgo,
+    hallazgos, inventario de entidades y grafo embebido. ?grafo=0 lo omite (más liviano)."""
+    h = correlacionar(_almacen)
+    vis_js = None
+    if request.args.get('grafo', '1') != '0':
+        ruta_vis = os.path.join(STATIC_DIR, _VIS)
+        if os.path.exists(ruta_vis):
+            with open(ruta_vis, encoding='utf-8') as f:
+                vis_js = f.read()
+    html_doc = generar_reporte(
+        _almacen, hallazgos=h, score=score_riesgo(h),
+        meta={'workspace': _ws_activo, 'objetivo': _objetivo_del_almacen()},
+        vis_js=vis_js)
+    return Response(html_doc, mimetype='text/html')
 
 @app.route('/api/v2/hallazgos/ia', methods=['POST'])
 def api_v2_hallazgos_ia():
