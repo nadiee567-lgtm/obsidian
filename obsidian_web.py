@@ -2483,6 +2483,14 @@ def _http_probe(entidad):
     if str(r.url).rstrip('/') not in (f'https://{entidad.valor}', f'http://{entidad.valor}'):
         entidad.propiedades['http_redirect'] = str(r.url)
     entidad.etiquetar('http-vivo')
+    # detección de panel de login/admin (paso 56)
+    cuerpo = (r.text[:8000] or '').lower()
+    titulo = (entidad.propiedades.get('http_title', '') or '').lower()
+    señales = ('login', 'log in', 'sign in', 'iniciar sesión', 'admin', 'dashboard',
+               'wp-admin', 'phpmyadmin', 'authentication', 'panel')
+    if (any(s in titulo for s in señales)
+            or 'type="password"' in cuerpo or "type='password'" in cuerpo):
+        entidad.etiquetar('panel-login')
 
 def _tech_detect(entidad):
     """Fingerprint ligero de tecnologías desde la respuesta HTTP (server,

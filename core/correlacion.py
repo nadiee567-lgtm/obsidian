@@ -148,6 +148,21 @@ def r_takeover(alm):
                            f'Subdominio vulnerable a takeover: {s.valor}', [s.id])
 
 @regla
+def r_login_expuesto(alm):
+    """Panel de login/admin accesible (paso 56). Alto por sí solo; CRÍTICO si además
+    hay credenciales filtradas en el caso — login + credencial = acceso probable."""
+    hay_cred = (any('filtrado' in e.tags or 'stealer-infectado' in e.tags
+                    for e in alm.de_tipo('email'))
+                or bool(alm.de_tipo('credencial')))
+    for tipo in ('dominio', 'subdominio'):
+        for e in alm.de_tipo(tipo):
+            if 'panel-login' in e.tags:
+                sev = 'critico' if hay_cred else 'alto'
+                extra = ' + hay credenciales filtradas en el caso' if hay_cred else ''
+                yield Hallazgo('login-expuesto', sev,
+                               f'Panel de login/admin expuesto: {e.valor}{extra}', [e.id])
+
+@regla
 def r_secreto_github(alm):
     """Credencial/secreto hardcodeado hallado en un commit de GitHub (paso 60)."""
     for c in alm.de_tipo('credencial'):

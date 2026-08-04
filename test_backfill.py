@@ -94,3 +94,26 @@ def test_github_sec_y_regla(monkeypatch):
     assert creds and 'secreto-github' in creds[0].tags
     h = correlacionar(alm)
     assert any(x.regla == 'secreto-github' and x.severidad == 'critico' for x in h)
+
+
+# ── 56: login/panel expuesto + credencial ────────────────────────────────────
+def test_login_expuesto_regla():
+    from core.correlacion import correlacionar
+    alm = Almacen()
+    alm.crear('dominio', 'admin.x.com').etiquetar('panel-login')
+    r = [x for x in correlacionar(alm) if x.regla == 'login-expuesto']
+    assert r and r[0].severidad == 'alto'
+    alm.crear('email', 'a@x.com').etiquetar('filtrado')     # login + credencial
+    r2 = [x for x in correlacionar(alm) if x.regla == 'login-expuesto']
+    assert r2 and r2[0].severidad == 'critico'
+
+
+def test_http_probe_detecta_panel_login(monkeypatch):
+    class R:
+        status_code = 200
+        url = 'https://admin.x.com'
+        headers = {}
+        text = '<html><title>Admin</title><input type="password" name="pw"></html>'
+    monkeypatch.setattr(ob, '_fetch_seguro', lambda *a, **k: R())
+    _, e, _ = _correr('http_probe', 'dominio', 'admin.x.com')
+    assert 'panel-login' in e.tags
