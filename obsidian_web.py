@@ -2577,6 +2577,42 @@ def api_v2_hallazgos_ia():
         log.warning("IA correlación falló: %s", e)
         return _error('Ollama no disponible (¿está corriendo en :11434?)', 503)
 
+@app.route('/api/v2/hallazgos/verificar', methods=['POST'])
+def api_v2_verificar():
+    """SEGUNDO ESCUDO: la IA revisa cada hallazgo con la EVIDENCIA real, explica
+    por qué es (o no) peligroso y marca probables falsos positivos. SUGIERE, no
+    borra — el humano confirma. Idea de Sebastian (LLM-como-verificador)."""
+    h = correlacionar(_almacen)
+    if not h:
+        return jsonify({'revisiones': []})
+    idmap = {e.id: e for e in _almacen.entidades}
+    revisiones = []
+    for hall in h[:6]:   # límite para no eternizarse
+        ev = []
+        for eid in hall.entidades:
+            e = idmap.get(eid)
+            if e:
+                ev.append(f"{e.tipo} {e.valor} | props: {e.propiedades} | tags: {sorted(e.tags)} | fuentes: {sorted(e.origenes)}")
+        prompt = (
+            "Eres un analista de seguridad revisando una alerta AUTOMÁTICA. Sé MUY escéptico "
+            "con señales de una sola fuente: pueden ser falsos positivos (CDNs como Cloudflare, "
+            "nodos TOR, hosting compartido no son maliciosos por sí solos).\n\n"
+            f"ALERTA [{hall.severidad}]: {hall.mensaje}\n"
+            "EVIDENCIA REAL recolectada:\n" + ("\n".join(ev) or "(sin evidencia extra)") + "\n\n"
+            "En español, 2-3 frases: ¿riesgo real o probable falso positivo? ¿POR QUÉ (basándote "
+            "en la evidencia)? ¿Qué debería verificar el usuario?")
+        try:
+            r = SESSION.post(f'{OLLAMA}/api/chat', json={
+                'model': 'qwen2.5:3b', 'messages': [{'role': 'user', 'content': prompt}],
+                'stream': False, 'options': {'num_ctx': 2048, 'num_predict': 220, 'temperature': 0.3}},
+                timeout=(10, 120))
+            razon = (r.json().get('message', {}) or {}).get('content', '').strip()
+        except Exception as e:
+            log.warning("verificar IA falló: %s", e)
+            razon = 'IA no disponible (¿Ollama en :11434?)'
+        revisiones.append({'hallazgo': hall.mensaje, 'severidad': hall.severidad, 'razon': razon})
+    return jsonify({'revisiones': revisiones})
+
 @app.route('/v2')
 def v2_page():
     """Página demo del motor v2: correr transforms y ver el grafo tipado.

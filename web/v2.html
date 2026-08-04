@@ -112,8 +112,10 @@
 
   <div class="card hallcard">
     <h2>Hallazgos · <span id="nHall">0</span><span class="score" id="scoreBadge"></span>
-      <button id="btnIA" class="btnia">🧠 Analizar con IA</button></h2>
+      <button id="btnIA" class="btnia">🧠 Analizar con IA</button>
+      <button id="btnEscudo" class="btnia" style="background:var(--cyan)">🛡️ 2º escudo (IA)</button></h2>
     <div id="iaResumen" class="iaresumen"></div>
+    <div id="revisiones"></div>
     <div id="hallazgos"><div class="vacio">La correlación busca riesgos sola cuando corres transforms.</div></div>
   </div>
 </div>
@@ -251,6 +253,24 @@ async function analizarIA(){
   btn.disabled = false; btn.textContent = '🧠 Analizar con IA';
 }
 $('#btnIA').onclick = analizarIA;
+
+async function segundoEscudo(){
+  const btn = $('#btnEscudo'), out = $('#revisiones');
+  btn.disabled = true; btn.textContent = '🛡️ revisando…';
+  out.innerHTML = '<div class="iaresumen show">El 2º escudo (IA) está revisando cada hallazgo con la evidencia…</div>';
+  try{
+    const d = await (await fetch('/api/v2/hallazgos/verificar',{method:'POST'})).json();
+    out.textContent='';
+    if(!d.revisiones.length){ out.innerHTML='<div class="vacio">Sin hallazgos que revisar.</div>'; }
+    d.revisiones.forEach(rev=>{
+      const box = el('div','iaresumen show');
+      box.innerHTML = '<b style="color:var(--cyan)">🛡️ '+rev.hallazgo+'</b>\n'+rev.razon;
+      out.appendChild(box);
+    });
+  }catch(e){ out.innerHTML='<div class="iaresumen show">Error: '+e.message+'</div>'; }
+  btn.disabled = false; btn.textContent = '🛡️ 2º escudo (IA)';
+}
+$('#btnEscudo').onclick = segundoEscudo;
 
 $('#btnCargar').onclick = cargarTransforms;
 $('#valor').addEventListener('keydown', e=>{ if(e.key==='Enter') cargarTransforms(); });
