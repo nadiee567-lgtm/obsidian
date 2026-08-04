@@ -10,7 +10,7 @@ from core.config import HOME, HOME_INIT, CASES_DIR, STATIC_DIR, CASES_DB, PORT, 
 from core.validacion import (_SHELL_PELIGROSOS, _MODULO_TIPO, _es_ip, _validar,
                              _objetivo_seguro, _slug_caso, _ruta_caso_segura, _url_publica)
 from core.registro import get_logger
-from core.modelo import Almacen, Entidad, tipo_valido
+from core.modelo import Almacen, Entidad, tipo_valido, TIPOS
 from core.transforms import transform, REGISTRO, ejecutar_por_nombre, ejecutar_lote
 from core.migracion import migrar_caso
 from core.workspaces import Gestor
@@ -20,6 +20,7 @@ from core.reporte import generar_reporte
 from core.exportar import exportar_json, exportar_csv
 from core.monitor import Monitor, snapshot as _snap_estado
 from core.notificar import enviar_ntfy, construir_ntfy
+from core.estado import render_estado
 import core.ia as ia
 
 log = get_logger()
@@ -2716,6 +2717,53 @@ def api_v2_run():
         return _error(str(e), 400)
     return jsonify({'producidas': [e.to_dict() for e in producidas],
                     'total_entidades': len(_almacen), 'workspace': _ws_activo})
+
+def _estado_datos():
+    """Recolecta la salud del sistema (toca disco/procesos)."""
+    por_tipo = {}
+    con_key = []
+    total = 0
+    for tp in TIPOS:
+        ts = REGISTRO.aplicables(tp)
+        if ts:
+            por_tipo[tp] = len(ts)
+            total += len(ts)
+            con_key += [t.nombre for t in ts if t.requiere_key]
+    def _existe(cmd):
+        return shutil.which(cmd) is not None
+    try:
+        import playwright  # noqa: F401
+        pw = True
+    except Exception:
+        pw = False
+    herramientas = {'dig': _existe('dig'), 'nmap': _existe('nmap'),
+                    'whois': _existe('whois'), 'exiftool': _existe('exiftool'),
+                    'nuclei': _existe('nuclei'), 'tailscale': _existe('tailscale'),
+                    'playwright': pw}
+    try:
+        keys = _boveda.servicios()
+    except Exception:
+        keys = []
+    return {
+        'generado': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'transforms': {'total': total, 'por_tipo': por_tipo, 'con_key': sorted(set(con_key))},
+        'herramientas': herramientas,
+        'keys': keys,
+        'ia': {'disponible': ia.disponible(), 'modelo': ia.MODELO},
+        'workspaces': len(_gestor.listar()),
+        'monitor': bool(_monitor and _monitor.activo),
+        'ntfy': bool(_ntfy_topic()),
+    }
+
+@app.route('/api/v2/estado')
+def api_v2_estado():
+    """Salud del sistema en JSON (paso 105)."""
+    return jsonify(_estado_datos())
+
+@app.route('/v2/estado')
+def v2_estado():
+    """Página de estado del sistema (paso 105)."""
+    return Response(render_estado(_estado_datos()), mimetype='text/html')
 
 @app.route('/api/v2/recon', methods=['POST'])
 def api_v2_recon():
