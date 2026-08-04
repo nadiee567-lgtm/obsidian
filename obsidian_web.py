@@ -21,6 +21,7 @@ from core.exportar import exportar_json, exportar_csv
 from core.monitor import Monitor, snapshot as _snap_estado
 from core.notificar import enviar_ntfy, construir_ntfy
 from core.estado import render_estado
+from core.motores import traducir as _motor_query, traducir_todos, MOTORES
 import core.ia as ia
 
 log = get_logger()
@@ -2639,6 +2640,29 @@ def _t_censys(entidad, ctx):
                 ctx.emitir('tech', prod, etiqueta='censys')
     except Exception as _e:
         log.debug("censys no disponible: %s", _e)
+
+@transform(entrada='ip', salidas=('puerto', 'tech'), nombre='zoomeye',
+           requiere_key=True,
+           descripcion='Servicios de la IP en ZoomEye (motor CN, key en la bóveda)')
+def _t_zoomeye(entidad, ctx):
+    key = _boveda.obtener('zoomeye') or os.environ.get('ZOOMEYE_KEY', '')
+    if not key:
+        return
+    try:
+        r = SESSION.get('https://api.zoomeye.org/host/search',
+                        params={'query': _motor_query('zoomeye', {'ip': entidad.valor})},
+                        headers={'API-KEY': key}, timeout=12)
+        for m in (r.json() or {}).get('matches', []):
+            pi = m.get('portinfo', {}) or {}
+            p = pi.get('port') or m.get('port')
+            if p:
+                ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='zoomeye',
+                           servicio=pi.get('service', ''))
+            app = pi.get('app')
+            if app:
+                ctx.emitir('tech', app, etiqueta='zoomeye')
+    except Exception as _e:
+        log.debug("zoomeye no disponible: %s", _e)
 
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 

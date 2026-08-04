@@ -47,3 +47,19 @@ def test_censys_sin_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
     monkeypatch.setenv('CENSYS_API', '')
     assert _correr('censys', 'ip', '1.2.3.4') == []
+
+
+# ── ZoomEye CN (109) ─────────────────────────────────────────────────────────
+def test_zoomeye(monkeypatch):
+    resp = {'matches': [{'portinfo': {'port': 80, 'service': 'http', 'app': 'nginx'}},
+                        {'portinfo': {'port': 443, 'service': 'https', 'app': 'nginx'}}]}
+    _con_key(monkeypatch, resp)
+    prod = _correr('zoomeye', 'ip', '1.2.3.4')
+    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:80', '1.2.3.4:443'}
+    assert 'nginx' in {e.valor for e in prod if e.tipo == 'tech'}
+
+
+def test_zoomeye_sin_key(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setenv('ZOOMEYE_KEY', '')
+    assert _correr('zoomeye', 'ip', '1.2.3.4') == []
