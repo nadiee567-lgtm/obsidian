@@ -22,7 +22,7 @@ from core.monitor import Monitor, snapshot as _snap_estado
 from core.notificar import enviar_ntfy, construir_ntfy
 from core.estado import render_estado
 from core.motores import traducir as _motor_query, traducir_todos, MOTORES
-from core.imagen import enlaces_reverse
+from core.imagen import enlaces_reverse, enlaces_facial
 import core.ia as ia
 
 log = get_logger()
@@ -2832,6 +2832,12 @@ def _t_binaryedge(entidad, ctx):
 def _t_reverse_image(entidad, ctx):
     for motor, enlace in enlaces_reverse(entidad.valor).items():
         ctx.emitir('url', enlace, etiqueta=f'reverse:{motor}', motor=motor)
+
+@transform(entrada='url', salidas=('url',), nombre='busqueda_facial',
+           descripcion='Reconocimiento facial: Yandex (por URL) + FaceCheck/PimEyes (subir a mano) (F9)')
+def _t_busqueda_facial(entidad, ctx):
+    for motor, info in enlaces_facial(entidad.valor).items():
+        ctx.emitir('url', info['url'], etiqueta=f'facial:{motor}', motor=motor, modo=info['modo'])
 
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 

@@ -7,7 +7,7 @@ from urllib.parse import quote
 import obsidian_web as ob
 from core.modelo import Almacen
 from core.transforms import ejecutar_por_nombre
-from core.imagen import enlaces_reverse
+from core.imagen import enlaces_reverse, enlaces_facial
 
 
 def test_enlaces_reverse_todos_los_motores():
@@ -29,3 +29,19 @@ def test_reverse_image_transform():
     prod = ejecutar_por_nombre('reverse_image', e, alm)
     assert {p.propiedades.get('motor') for p in prod} == {'yandex', 'google', 'tineye', 'bing'}
     assert all(p.tipo == 'url' for p in prod)
+
+
+def test_enlaces_facial():
+    d = enlaces_facial('https://x.com/cara.jpg')
+    assert set(d) == {'yandex', 'facecheck', 'pimeyes'}
+    assert d['yandex']['modo'] == 'url' and 'yandex.com' in d['yandex']['url']
+    assert d['facecheck']['modo'] == 'upload'          # honesto: es por subida manual
+    assert d['pimeyes']['modo'] == 'upload'
+
+
+def test_busqueda_facial_transform():
+    alm = Almacen()
+    e = alm.crear('url', 'https://x.com/cara.jpg')
+    prod = ejecutar_por_nombre('busqueda_facial', e, alm)
+    motores = {p.propiedades.get('motor'): p.propiedades.get('modo') for p in prod}
+    assert motores == {'yandex': 'url', 'facecheck': 'upload', 'pimeyes': 'upload'}
