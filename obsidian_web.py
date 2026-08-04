@@ -2283,6 +2283,44 @@ def _t_rdap(entidad, ctx):
     except Exception as _e:
         log.debug("rdap no disponible: %s", _e)
 
+@transform(entrada='ip', salidas=(), nombre='reputacion_ip',
+           descripcion='Reputación de la IP: proxy/VPN, hosting/datacenter, móvil (ip-api, keyless)')
+def _t_reputacion_ip(entidad, ctx):
+    try:
+        d = SESSION.get(f'http://ip-api.com/json/{entidad.valor}?fields=status,proxy,hosting,mobile',
+                        timeout=8).json()
+        if d.get('status') != 'success':
+            return
+        if d.get('proxy'):
+            entidad.etiquetar('proxy-vpn')
+        if d.get('hosting'):
+            entidad.etiquetar('hosting')
+        if d.get('mobile'):
+            entidad.etiquetar('movil')
+        entidad.propiedades['proxy'] = bool(d.get('proxy'))
+        entidad.propiedades['hosting'] = bool(d.get('hosting'))
+    except Exception as _e:
+        log.debug("reputacion_ip no disponible: %s", _e)
+
+@transform(entrada='ip', salidas=(), nombre='abuseipdb',
+           descripcion='Score de abuso de la IP (AbuseIPDB, key gratis en la bóveda)')
+def _t_abuseipdb(entidad, ctx):
+    key = _boveda.obtener('abuseipdb') or os.environ.get('ABUSEIPDB_KEY', '')
+    if not key:
+        return
+    try:
+        r = SESSION.get('https://api.abuseipdb.com/api/v2/check',
+                        params={'ipAddress': entidad.valor, 'maxAgeInDays': 90},
+                        headers={'Key': key, 'Accept': 'application/json'}, timeout=8)
+        d = (r.json() or {}).get('data', {}) or {}
+        score = d.get('abuseConfidenceScore')
+        if score is not None:
+            entidad.propiedades['abuse_score'] = score
+            if score >= 50:
+                entidad.etiquetar('abusiva')
+    except Exception as _e:
+        log.debug("abuseipdb no disponible: %s", _e)
+
 @transform(entrada='ip', salidas=('org',), nombre='greynoise',
            descripcion='Threat intel de la IP (GreyNoise Community, keyless pero 25/día; 404=no observada)')
 def _t_greynoise(entidad, ctx):
