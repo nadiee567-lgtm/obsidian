@@ -2050,6 +2050,33 @@ def _t_wallet_balance(entidad, ctx):
     except Exception as _e:
         log.debug("wallet_balance no disponible: %s", _e)
 
+@transform(entrada='dominio', salidas=('subdominio',), nombre='wayback',
+           descripcion='Snapshot histórico + subdominios viejos del dominio (Wayback Machine)')
+def _t_wayback(entidad, ctx):
+    # 1. ¿hay snapshot? (endpoint 'available', confiable)
+    try:
+        snap = ((SESSION.get(f'http://archive.org/wayback/available?url={entidad.valor}', timeout=8).json()
+                 .get('archived_snapshots', {}) or {}).get('closest', {}))
+        if snap.get('available'):
+            entidad.propiedades['wayback_desde'] = (snap.get('timestamp', '') or '')[:8]
+            entidad.propiedades['wayback_url'] = snap.get('url')
+            entidad.etiquetar('archivado')
+    except Exception as _e:
+        log.debug("wayback available: %s", _e)
+    # 2. subdominios históricos (CDX; puede estar bloqueado en algunos entornos)
+    try:
+        filas = SESSION.get('http://web.archive.org/cdx/search/cdx',
+                            params={'url': f'*.{entidad.valor}', 'output': 'json', 'limit': 300,
+                                    'collapse': 'urlkey', 'fl': 'original'}, timeout=15).json()
+        vistos = set()
+        for fila in (filas[1:] if isinstance(filas, list) else []):
+            host = (urlparse(fila[0] if isinstance(fila, list) else fila).hostname or '').lstrip('*.')
+            if host.endswith(entidad.valor) and host != entidad.valor and host not in vistos:
+                vistos.add(host)
+                ctx.emitir('subdominio', host, etiqueta='histórico (wayback)')
+    except Exception as _e:
+        log.debug("wayback cdx: %s", _e)
+
 @transform(entrada='dominio', salidas=('subdominio', 'ip'), nombre='subdominios_ht',
            descripcion='Subdominios (+ su IP) vía HackerTarget hostsearch (keyless)')
 def _t_subdominios_ht(entidad, ctx):
