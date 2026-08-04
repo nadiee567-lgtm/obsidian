@@ -89,11 +89,21 @@ def r_cert_vencido(alm):
 
 @regla
 def r_ip_maliciosa(alm):
-    """IP marcada como maliciosa por threat intel (paso 57)."""
+    """IP con clasificación maliciosa de threat intel real (GreyNoise). Paso 57."""
     for ip in alm.de_tipo('ip'):
         if 'malicioso' in ip.tags:
             yield Hallazgo('ip-maliciosa', 'critico',
                            f'IP {ip.valor} clasificada como maliciosa (GreyNoise)', [ip.id])
+
+@regla
+def r_ip_listada(alm):
+    """IP presente en un feed de amenazas. SEÑAL con fuente, para verificar —
+    no un veredicto (los feeds tienen falsos positivos)."""
+    for ip in alm.de_tipo('ip'):
+        if 'listado-amenaza' in ip.tags:
+            fuente = ip.propiedades.get('amenaza_fuente', 'feed de amenazas')
+            yield Hallazgo('ip-listada', 'alto',
+                           f'IP {ip.valor} listada en {fuente} — verificar (posible falso positivo)', [ip.id])
 
 @regla
 def r_email_filtrado(alm):

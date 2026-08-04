@@ -2338,38 +2338,45 @@ def _t_abuseipdb(entidad, ctx):
 
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
+# SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).
+# NO usar agregadores ruidosos tipo FireHOL: licencias mixtas + falsos positivos
+# graves (bloquean países enteros, incluyen TOR que NO es malicioso). Un match
+# aquí es SEÑAL con fuente, no un veredicto "malicioso".
+_FEEDS_AMENAZA = [
+    ('Feodo Tracker (C2 de botnet)', 'https://feodotracker.abuse.ch/downloads/ipblocklist.txt'),
+]
+
 def _cargar_blocklist():
     if _BLOCKLIST['nets'] is not None and time.time() - _BLOCKLIST['ts'] < 21600:
         return _BLOCKLIST['nets']
     nets = []
-    for url in ('https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset',
-                'https://feodotracker.abuse.ch/downloads/ipblocklist.txt'):
+    for fuente, url in _FEEDS_AMENAZA:
         try:
             for linea in SESSION.get(url, timeout=15).text.splitlines():
                 linea = linea.strip()
                 if not linea or linea.startswith('#'):
                     continue
                 try:
-                    nets.append(ipaddress.ip_network(linea, strict=False))
+                    nets.append((ipaddress.ip_network(linea, strict=False), fuente))
                 except ValueError:
                     pass
         except Exception as _e:
-            log.debug("blocklist %s no disponible: %s", url, _e)
+            log.debug("feed %s no disponible: %s", url, _e)
     _BLOCKLIST['nets'] = nets
     _BLOCKLIST['ts'] = time.time()
     return nets
 
 @transform(entrada='ip', salidas=(), nombre='ip_blocklist',
-           descripcion='¿La IP está en blocklists de amenazas agregadas? (FireHOL+Feodo, keyless, sin rate limit)')
+           descripcion='¿La IP está en feeds de amenaza CC0 de alta confianza? (abuse.ch, keyless)')
 def _t_ip_blocklist(entidad, ctx):
     try:
         ip = ipaddress.ip_address(entidad.valor)
     except ValueError:
         return
-    for red in _cargar_blocklist():
+    for red, fuente in _cargar_blocklist():
         if ip in red:
-            entidad.etiquetar('en-blocklist', 'malicioso')
-            entidad.propiedades['blocklist'] = str(red)
+            entidad.etiquetar('listado-amenaza')   # señal, NO veredicto 'malicioso'
+            entidad.propiedades['amenaza_fuente'] = fuente
             return
 
 @transform(entrada='ip', salidas=('org',), nombre='greynoise',
