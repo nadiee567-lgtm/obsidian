@@ -58,6 +58,11 @@
   .vacio{color:var(--muted);font-family:var(--mono);font-size:.8rem}
   #status{font-family:var(--mono);font-size:.76rem;color:var(--green);min-height:1.1rem;margin-top:.6rem}
   #status.err{color:var(--red)}
+  .hallcard{margin-top:1rem}
+  .score{font-family:var(--mono);font-size:.68rem;padding:.12rem .5rem;border-radius:5px;margin-left:.5rem;letter-spacing:.05em}
+  .hall{display:flex;align-items:baseline;gap:.6rem;padding:.4rem .55rem;border-left:2px solid var(--sc,var(--muted));background:var(--panel2);border-radius:0 6px 6px 0;margin-bottom:.35rem}
+  .hall .sev{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;color:var(--sc);border:1px solid var(--sc);border-radius:4px;padding:0 .3rem;white-space:nowrap}
+  .hall .msg{font-size:.85rem;color:#c3cbdb}
 </style>
 </head>
 <body>
@@ -98,6 +103,11 @@
       <h2>Relaciones · <span id="nRel">0</span></h2>
       <div id="relaciones"><div class="vacio">—</div></div>
     </div>
+  </div>
+
+  <div class="card hallcard">
+    <h2>Hallazgos · <span id="nHall">0</span><span class="score" id="scoreBadge"></span></h2>
+    <div id="hallazgos"><div class="vacio">La correlación busca riesgos sola cuando corres transforms.</div></div>
   </div>
 </div>
 
@@ -176,6 +186,25 @@ async function pintarGrafo(){
     const d = el('div','rel');
     d.innerHTML = '<span class="a">'+a.valor+'</span> <span class="e">—'+(rel.etiqueta||'→')+'→</span> <span class="b">'+b.valor+'</span>';
     rc.appendChild(d);
+  });
+  pintarHallazgos();   // la correlación se recalcula cuando cambia el grafo
+}
+
+const SEVCOLOR = {critico:'#f7768e', alto:'#ff9e64', medio:'#e0af68', bajo:'#7dcfff'};
+async function pintarHallazgos(){
+  const d = await (await fetch('/api/v2/hallazgos')).json();
+  $('#nHall').textContent = d.hallazgos.length;
+  const badge = $('#scoreBadge');
+  badge.textContent = 'riesgo '+d.score+'/100';
+  badge.style.background = d.score>=60?'#f7768e':d.score>=25?'#e0af68':'#232735';
+  badge.style.color = d.score>=25?'#0b0d12':'#c8cfdf';
+  const cont = $('#hallazgos'); cont.textContent='';
+  if(!d.hallazgos.length){ cont.innerHTML='<div class="vacio">Sin riesgos detectados (aún).</div>'; return; }
+  d.hallazgos.forEach(h=>{
+    const row=el('div','hall'); row.style.setProperty('--sc', SEVCOLOR[h.severidad]||'#6b7488');
+    const s=el('span','sev'); s.textContent=h.severidad; row.appendChild(s);
+    const m=el('span','msg'); m.textContent=h.mensaje; row.appendChild(m);
+    cont.appendChild(row);
   });
 }
 

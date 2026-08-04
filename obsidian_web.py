@@ -15,6 +15,7 @@ from core.transforms import transform, REGISTRO, ejecutar_por_nombre
 from core.migracion import migrar_caso
 from core.workspaces import Gestor
 from core.boveda import Boveda
+from core.correlacion import correlacionar, score_riesgo
 
 log = get_logger()
 
@@ -2293,6 +2294,12 @@ def api_v2_keys():
         return jsonify({'ok': True, 'servicios': _boveda.servicios()})
     _boveda.borrar(servicio)   # DELETE
     return jsonify({'ok': True, 'servicios': _boveda.servicios()})
+
+@app.route('/api/v2/hallazgos')
+def api_v2_hallazgos():
+    """Corre el motor de correlación sobre el caso activo (F4 pasos 62, 64)."""
+    h = correlacionar(_almacen)
+    return jsonify({'hallazgos': [x.to_dict() for x in h], 'score': score_riesgo(h)})
 
 @app.route('/v2')
 def v2_page():
