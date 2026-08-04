@@ -1983,6 +1983,23 @@ def _t_ptr(entidad, ctx):
         if linea and not linea.startswith(';'):
             ctx.emitir('dominio', linea, etiqueta='PTR')
 
+@transform(entrada='dominio', salidas=(), nombre='dorks',
+           descripcion='Genera Google dorks útiles del dominio (archivos, paneles, índices, backups)')
+def _t_dorks(entidad, ctx):
+    from urllib.parse import quote_plus
+    d = entidad.valor
+    plantillas = [
+        ('Archivos expuestos', f'site:{d} (filetype:pdf OR filetype:xls OR filetype:doc)'),
+        ('Índices de directorios', f'site:{d} intitle:"index of"'),
+        ('Paneles de login/admin', f'site:{d} (inurl:login OR inurl:admin)'),
+        ('Config/backups/secretos', f'site:{d} (ext:env OR ext:sql OR ext:bak OR ext:log)'),
+        ('Subdominios', f'site:*.{d}'),
+        ('Mensajes de error', f'site:{d} ("stack trace" OR "sql syntax" OR "warning")'),
+    ]
+    entidad.propiedades['dorks'] = [
+        {'que': q, 'url': f'https://www.google.com/search?q={quote_plus(query)}'}
+        for q, query in plantillas]
+
 @transform(entrada='wallet', salidas=(), nombre='wallet_balance',
            descripcion='Balance y actividad de una wallet BTC (blockchain.info, keyless)')
 def _t_wallet_balance(entidad, ctx):
