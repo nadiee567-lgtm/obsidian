@@ -2089,6 +2089,17 @@ def _t_geo_ip(entidad, ctx):
     except Exception as _e:
         log.debug("geo_ip no disponible: %s", _e)
 
+@transform(entrada='usuario', salidas=('plataforma',), nombre='sherlock',
+           descripcion='Cuentas del usuario en 400+ plataformas (Sherlock)')
+def _t_sherlock(entidad, ctx):
+    if not _which('sherlock'):
+        return
+    out = run_tool(['sherlock', entidad.valor, '--timeout', '5', '--print-found', '--no-color'], timeout=150)
+    for linea in out.splitlines():
+        m = re.match(r'\[\+\]\s*(.+?):\s*(https?://\S+)', linea.strip())
+        if m:
+            ctx.emitir('plataforma', m.group(1).strip(), etiqueta='perfil', url=m.group(2).strip())
+
 @transform(entrada='usuario', salidas=('email', 'repo'), nombre='github_usuario',
            descripcion='Email y repos públicos del usuario en GitHub')
 def _t_github(entidad, ctx):
