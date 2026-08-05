@@ -25,6 +25,7 @@ from core.motores import traducir as _motor_query, traducir_todos, MOTORES
 from core.tareas import GestorTareas
 from core.personas import GestorPersonas
 from core.extraccion import extraer_entidades
+from core import multiidioma as _ml
 from core.imagen import (enlaces_reverse, enlaces_facial, parse_gps,
                          enlaces_cronolocalizacion, enlaces_satelital, enlaces_landmark,
                          phash as _phash, ela as _ela)
@@ -3666,6 +3667,12 @@ def _t_extraer_wallets(entidad, ctx):
     for cadena, rx in _WALLET_RE.items():
         for addr in list(set(rx.findall(texto)))[:30]:
             ctx.emitir('wallet', addr, etiqueta=cadena, cadena=cadena)
+
+@transform(entrada='usuario', salidas=('url',), nombre='plataformas_regionales',
+           descripcion='Perfiles en plataformas regionales: VK, Weibo, Douyin, OK, Telegram (F15 paso 171)')
+def _t_plataformas_regionales(entidad, ctx):
+    for plat, url in _ml.perfiles_regionales(entidad.valor).items():
+        ctx.emitir('url', url, etiqueta=f'plataforma:{plat}', plataforma=plat)
 
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
