@@ -3297,6 +3297,23 @@ def _t_onion_fetch(entidad, ctx):
         ctx.emitir('url', 'http://' + on, etiqueta='onion-link')
     entidad.etiquetar('onion-vivo')
 
+_HAYSTAK_ONION = ('http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion')
+
+@transform(entrada='persona', salidas=('url',), nombre='haystak',
+           descripcion='Búsqueda dark web en Haystak (por Tor) — enlaces .onion (F10 paso 129)')
+def _t_haystak(entidad, ctx):
+    if not _tor_disponible():
+        entidad.propiedades['haystak'] = 'requiere Tor (arranca el servicio tor)'
+        return
+    from urllib.parse import quote as _q
+    try:
+        r = _fetch_tor(f'{_HAYSTAK_ONION}/?q={_q(entidad.valor)}', timeout=30)
+    except Exception as _e:
+        log.debug("haystak: %s", _e)
+        return
+    for on in list(set(re.findall(r'[a-z2-7]{16,56}\.onion', r.text)))[:15]:
+        ctx.emitir('url', 'http://' + on, etiqueta='haystak')
+
 def _descargar_imagen(url):
     """Baja una imagen a un archivo temporal (anti-SSRF). Devuelve la ruta o None."""
     try:

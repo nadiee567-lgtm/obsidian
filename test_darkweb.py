@@ -36,3 +36,20 @@ def test_onion_fetch_tor_caido(monkeypatch):
     monkeypatch.setattr(ob, '_tor_disponible', lambda: False)
     prod, e = _correr('onion_fetch', 'url', 'http://xxxxabcdefgh2345.onion/')
     assert prod == [] and 'Tor no disponible' in e.propiedades.get('tor', '')
+
+
+# ── 129: Ahmia + Haystak ─────────────────────────────────────────────────────
+def test_haystak(monkeypatch):
+    class R:
+        text = 'resultados: abcdefghij234567.onion y zzzz2233abcdefgh.onion'
+    monkeypatch.setattr(ob, '_tor_disponible', lambda: True)
+    monkeypatch.setattr(ob, '_fetch_tor', lambda url, **k: R())
+    prod, _ = _correr('haystak', 'persona', 'objetivo')
+    onions = {x.valor for x in prod if x.tipo == 'url'}
+    assert any('.onion' in o for o in onions) and len(onions) == 2
+
+
+def test_haystak_sin_tor(monkeypatch):
+    monkeypatch.setattr(ob, '_tor_disponible', lambda: False)
+    prod, e = _correr('haystak', 'persona', 'objetivo')
+    assert prod == [] and 'requiere Tor' in e.propiedades.get('haystak', '')
