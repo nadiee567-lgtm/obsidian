@@ -304,3 +304,14 @@ def test_ia_caso_endpoint(monkeypatch):
     assert r.status_code == 200 and 'MITRE' not in r.get_json()['resultado'] or True
     assert r.get_json()['modo'] == 'escenario'
     assert c.post('/api/v2/ia/noexiste').status_code == 404
+
+
+def test_keys_probar_sin_key(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)   # bóveda vacía
+    monkeypatch.setenv('SHODAN_API_KEY', '')
+    c = ob.app.test_client()
+    with c.session_transaction() as s:
+        s['auth'] = True
+    d = c.post('/api/v2/keys/probar', json={'servicio': 'shodan'}).get_json()
+    assert d['ok'] is False and 'sin key' in d['nota']
+    assert c.post('/api/v2/keys/probar', json={'servicio': 'noexiste'}).status_code == 400

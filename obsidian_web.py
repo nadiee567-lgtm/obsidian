@@ -3697,6 +3697,43 @@ def api_v2_keys():
     _boveda.borrar(servicio)   # DELETE
     return jsonify({'ok': True, 'servicios': _boveda.servicios()})
 
+# Servicio -> (transform, tipo, valor de prueba conocido con datos)
+_TEST_SERVICIO = {
+    'shodan': ('shodan', 'ip', '8.8.8.8'), 'censys': ('censys', 'ip', '8.8.8.8'),
+    'zoomeye': ('zoomeye', 'ip', '8.8.8.8'), 'fofa': ('fofa', 'ip', '8.8.8.8'),
+    'quake': ('quake', 'ip', '8.8.8.8'), 'hunter': ('hunter', 'ip', '8.8.8.8'),
+    'netlas': ('netlas', 'ip', '8.8.8.8'), 'criminalip': ('criminalip', 'ip', '8.8.8.8'),
+    'binaryedge': ('binaryedge', 'ip', '8.8.8.8'),
+    'virustotal': ('passivedns', 'dominio', 'google.com'),
+    'abuseipdb': ('abuseipdb', 'ip', '8.8.8.8'),
+    'github': ('github_usuario', 'usuario', 'torvalds'),
+    'viewdns': ('reverse_whois', 'dominio', 'google.com'),
+    'hibp': ('email_breaches', 'email', 'test@example.com'),
+}
+
+@app.route('/api/v2/keys/probar', methods=['POST'])
+def api_v2_keys_probar():
+    """Verifica una key REAL: corre su transform sobre un objetivo conocido y dice
+    si el parser produjo datos (así se confirma cada buscador contra su API real)."""
+    servicio = ((request.json or {}).get('servicio', '') or '').strip().lower()
+    mapeo = _TEST_SERVICIO.get(servicio)
+    if not mapeo:
+        return _error('servicio sin prueba definida', 400)
+    nombre, tipo, valor = mapeo
+    tiene = bool(_boveda.obtener(servicio))
+    alm = Almacen()
+    try:
+        n = len(ejecutar_por_nombre(nombre, alm.crear(tipo, valor), alm))
+    except Exception as e:
+        return jsonify({'servicio': servicio, 'ok': False, 'nota': f'error: {e}'})
+    if n > 0:
+        return jsonify({'servicio': servicio, 'ok': True, 'entidades': n,
+                        'nota': f'✓ funcionó — {n} entidad(es) reales'})
+    if not tiene:
+        return jsonify({'servicio': servicio, 'ok': False, 'nota': 'sin key configurada'})
+    return jsonify({'servicio': servicio, 'ok': False, 'entidades': 0,
+                    'nota': 'key presente pero 0 resultados (¿inválida, sin cuota, o esquema distinto?)'})
+
 @app.route('/api/v2/hallazgos')
 def api_v2_hallazgos():
     """Corre el motor de correlación sobre el caso activo (F4 pasos 62, 64)."""

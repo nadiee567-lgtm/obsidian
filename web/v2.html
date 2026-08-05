@@ -95,12 +95,22 @@
   .iabtns{display:flex;gap:.3rem;margin:.4rem 0}
   .iabtns button{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem;font-size:.68rem;font-family:var(--mono);cursor:pointer}
   .iabtns button:hover{border-color:var(--mauve);color:var(--mauve)}
+  #keys{display:none;position:fixed;z-index:95;top:50%;left:50%;transform:translate(-50%,-50%);width:min(620px,92vw);max-height:78vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #keys h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .8rem} #keys h2 span{color:var(--muted);font-size:.7rem}
+  #keys .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
+  .krow{display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--line);font-size:.76rem;flex-wrap:wrap}
+  .krow .ks{font-family:var(--mono);min-width:6rem;color:var(--cyan)}
+  .krow input{flex:1;min-width:9rem;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem .4rem;font-family:var(--mono);font-size:.72rem}
+  .krow button{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem .5rem;font-size:.7rem;cursor:pointer}
+  .krow button:hover{border-color:var(--cyan);color:var(--cyan)}
+  .krow .kst{flex-basis:100%;color:var(--muted);font-size:.7rem;padding-left:6.4rem}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1><span class="sq">⬛</span> OBSIDIAN · motor v2</h1>
-  <div class="sub">grafo tipado interactivo · click derecho en un nodo → transforms · <a href="/v2/estado">estado del sistema</a> · <a href="/">← interfaz clásica</a></div>
+  <div class="sub">grafo tipado interactivo · click derecho en un nodo → transforms · <a href="#" id="btnKeys">🔑 API keys</a> · <a href="/v2/estado">estado del sistema</a> · <a href="/">← interfaz clásica</a></div>
+  <div id="keys"></div>
 
   <div class="wsbar">
     <span class="wslabel">workspace</span>
@@ -461,6 +471,33 @@ function timeline(){
 }
 $('#btnTimeline').onclick=timeline;
 $('#btnReporte').onclick=()=>window.open('/v2/reporte','_blank');
+const SERVICIOS_KEY=[
+  ['shodan','key de Shodan'],['censys','id:secret'],['zoomeye','API-KEY'],['fofa','email:key'],
+  ['quake','token'],['hunter','api-key'],['netlas','api-key'],['criminalip','api-key'],
+  ['binaryedge','api-key'],['virustotal','api-key (passivedns)'],['abuseipdb','api-key'],
+  ['github','token (mejores límites)'],['viewdns','api-key'],['hibp','api-key (de pago)']];
+async function panelKeys(){
+  const ov=$('#keys');
+  let conf=new Set(); try{ conf=new Set((await (await fetch('/api/v2/keys')).json()).servicios||[]); }catch(_){}
+  ov.innerHTML='<span class="cerrar" id="kCerrar">✕</span><h2>🔑 API keys · <span>bóveda cifrada · la key nunca sale de tu máquina</span></h2>';
+  SERVICIOS_KEY.forEach(([s,hint])=>{
+    const row=el('div','krow'); const ok=conf.has(s);
+    const lab=el('span','ks'); lab.innerHTML=esc(s)+(ok?' <b style="color:var(--green)">●</b>':''); row.appendChild(lab);
+    const inp=el('input'); inp.type='password'; inp.placeholder=ok?'(configurada) — nueva para reemplazar':hint; row.appendChild(inp);
+    const g=el('button'); g.textContent='guardar'; g.onclick=async()=>{ if(!inp.value)return;
+      await fetch('/api/v2/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({servicio:s,valor:inp.value})});
+      inp.value=''; setStatus('🔑 '+s+' guardada'); panelKeys(); }; row.appendChild(g);
+    const st=el('span','kst');
+    const p=el('button'); p.textContent='probar'; p.onclick=async()=>{ st.textContent='probando '+s+'…'; st.style.color='var(--muted)';
+      try{ const d=await (await fetch('/api/v2/keys/probar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({servicio:s})})).json();
+        st.textContent=d.nota||''; st.style.color=d.ok?'var(--green)':'var(--amber)'; }catch(e){ st.textContent='error: '+e.message; } };
+    row.appendChild(p);
+    if(ok){ const b=el('button'); b.textContent='borrar'; b.onclick=async()=>{ await fetch('/api/v2/keys',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({servicio:s})}); panelKeys(); }; row.appendChild(b); }
+    row.appendChild(st); ov.appendChild(row);
+  });
+  ov.style.display='block'; $('#kCerrar').onclick=()=>ov.style.display='none';
+}
+$('#btnKeys').onclick=(e)=>{ e.preventDefault(); panelKeys(); };
 async function iaCaso(modo){
   const out=$('#iaResumen'); out.innerHTML='<div class="iaresumen">IA ('+esc(modo)+') analizando el caso…</div>';
   try{ const r=await fetch('/api/v2/ia/'+modo,{method:'POST'}); const d=await r.json();
