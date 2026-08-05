@@ -475,7 +475,8 @@ const SERVICIOS_KEY=[
   ['shodan','key de Shodan'],['censys','id:secret'],['zoomeye','API-KEY'],['fofa','email:key'],
   ['quake','token'],['hunter','api-key'],['netlas','api-key'],['criminalip','api-key'],
   ['binaryedge','api-key'],['virustotal','api-key (passivedns)'],['abuseipdb','api-key'],
-  ['github','token (mejores límites)'],['viewdns','api-key'],['hibp','api-key (de pago)']];
+  ['github','token (mejores límites)'],['viewdns','api-key'],
+  ['hibp','opcional y DE PAGO — ya tienes breaches_xon + stealer_hudsonrock GRATIS']];
 async function panelKeys(){
   const ov=$('#keys');
   let conf=new Set(); try{ conf=new Set((await (await fetch('/api/v2/keys')).json()).servicios||[]); }catch(_){}
