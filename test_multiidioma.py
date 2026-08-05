@@ -38,3 +38,10 @@ def test_registros_regionales():
     prod, _ = _correr('registros_regionales', 'org', 'ACME Corp')
     regs = {p.propiedades.get('registro') for p in prod if p.tipo == 'url'}
     assert {'china_qcc', 'rusia_rusprofile', 'opencorporates'} == regs
+
+
+# ── 174: motores locales ─────────────────────────────────────────────────────
+def test_motores_locales():
+    prod, _ = _correr('motores_locales', 'persona', 'Ivan Petrov')
+    motores = {p.propiedades.get('motor') for p in prod if p.tipo == 'url'}
+    assert {'yandex', 'baidu', 'sogou'} == motores

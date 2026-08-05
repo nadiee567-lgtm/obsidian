@@ -3668,6 +3668,12 @@ def _t_extraer_wallets(entidad, ctx):
         for addr in list(set(rx.findall(texto)))[:30]:
             ctx.emitir('wallet', addr, etiqueta=cadena, cadena=cadena)
 
+@transform(entrada='persona', salidas=('url',), nombre='motores_locales',
+           descripcion='Búsqueda en motores locales: Yandex, Baidu, Sogou (indexan otra internet) (F15 paso 174)')
+def _t_motores_locales(entidad, ctx):
+    for motor, url in _ml.motores_locales(entidad.valor).items():
+        ctx.emitir('url', url, etiqueta=f'motor:{motor}', motor=motor)
+
 @transform(entrada='org', salidas=('url',), nombre='registros_regionales',
            descripcion='Registros de empresas por región: QCC (China), RusProfile (Rusia), OpenCorporates (F15 paso 173)')
 def _t_registros_regionales(entidad, ctx):
