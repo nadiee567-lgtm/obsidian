@@ -46,3 +46,16 @@ def test_traducir_sin_ia(monkeypatch):
     with c.session_transaction() as s:
         s['auth'] = True
     assert c.post('/api/v2/traducir', json={'texto': 'x'}).status_code == 503
+
+
+# ── 163: resumen del caso en lenguaje natural (modo IA) ───────────────────────
+def test_resumen_modo_ia(monkeypatch):
+    import obsidian_web as ob
+    assert 'resumen' in ob._PROMPTS_IA
+    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'El objetivo tiene 3 subdominios expuestos.')
+    c = ob.app.test_client()
+    with c.session_transaction() as s:
+        s['auth'] = True
+    d = c.post('/api/v2/ia/resumen').get_json()
+    assert d['modo'] == 'resumen' and 'subdominios' in d['resultado']

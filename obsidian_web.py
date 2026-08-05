@@ -4567,6 +4567,8 @@ _PROMPTS_IA = {
                    '6. RECOMENDACIONES DE HARDENING\n\nDatos:\n{datos}'),
     'analizar': ('Analiza TODO el caso OSINT de "{objetivo}" y correlaciona: qué historia cuentan '
                  'los datos juntos, hallazgos no obvios, y los 3 siguientes pasos de investigación.\n\nDatos:\n{datos}'),
+    'resumen': ('Resume el caso OSINT de "{objetivo}" en UN párrafo claro y entendible para alguien '
+                'no técnico: qué se encontró y qué significa.\n\nDatos:\n{datos}'),
     'geoloc': ('Geolocaliza al objetivo/foto de "{objetivo}" a partir de TODAS las pistas de texto del '
                'caso (EXIF/GPS, OCR, idiomas, dominios, títulos): da 3-5 CANDIDATOS de ubicación '
                '(país/ciudad/zona) con el razonamiento y qué verificar. Nota: sin visión, razona sobre '
