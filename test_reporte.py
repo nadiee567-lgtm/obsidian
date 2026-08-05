@@ -21,7 +21,7 @@ def test_reporte_tiene_secciones():
     h = [Hallazgo('ip-listada', 'alto', 'IP en feed de amenazas', [ip.id])]
     html = generar_reporte(alm, hallazgos=h, score=20,
                            meta={'workspace': 'caso-1', 'objetivo': 'objetivo.com'})
-    for txt in ('Resumen de riesgo', 'Hallazgos', 'Inventario de entidades',
+    for txt in ('Risk summary', 'Findings', 'Entity inventory',
                 'objetivo.com', '93.184.216.34', 'ip-listada', '20/100', 'caso-1'):
         assert txt in html, f'falta en el reporte: {txt}'
 
@@ -29,13 +29,13 @@ def test_reporte_tiene_secciones():
 def test_reporte_sin_hallazgos():
     alm, _, _ = _almacen_demo()
     html = generar_reporte(alm, hallazgos=[], score=0)
-    assert 'Sin riesgos detectados' in html
+    assert 'No risks detected' in html
     assert '0/100' in html
 
 
 def test_reporte_almacen_vacio():
     html = generar_reporte(Almacen(), hallazgos=[], score=0)
-    assert 'Sin entidades' in html
+    assert 'No entities' in html
 
 
 def test_reporte_escapa_xss():
@@ -55,7 +55,7 @@ def test_reporte_grafo_embebido():
     alm, d, ip = _almacen_demo()
     # vis_js falso: solo comprobamos que se embebe y arma los datasets
     html = generar_reporte(alm, hallazgos=[], score=0, vis_js='/*VISLIB*/')
-    assert 'Grafo de relaciones' in html
+    assert 'Relationship graph' in html
     assert '/*VISLIB*/' in html
     assert 'vis.Network' in html
     assert d.id in html and ip.id in html                    # nodos por id

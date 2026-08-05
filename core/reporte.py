@@ -1,13 +1,12 @@
-"""Generador de reportes HTML de OBSIDIAN — F7 paso 93.
+"""OBSIDIAN HTML report generator -- F7 step 93.
 
-Toma un Almacen (modelo tipado) + los hallazgos de correlación y produce un
-informe HTML AUTOCONTENIDO: resumen de riesgo, hallazgos ordenados por severidad,
-inventario de entidades por tipo, y el grafo embebido (vis-network inline, sin CDN
-— compatible con QuimichNet que bloquea CDNs).
+Takes a Store (typed model) + correlation findings and produces a SELF-CONTAINED
+HTML report: risk summary, findings ordered by severity, entity inventory by type,
+and the embedded graph (vis-network inline, no CDN).
 
-Módulo PURO: no toca Flask ni red. TODO valor dinámico (datos crudos del objetivo)
-va por html.escape → mismo cuidado anti-XSS que el resto de OBSIDIAN, un reporte
-también se abre en un navegador."""
+PURE module: no Flask, no network. EVERY dynamic value (raw target data) goes
+through html.escape -> same anti-XSS care as the rest of OBSIDIAN; a report also
+opens in a browser."""
 from __future__ import annotations
 import html
 import json
@@ -20,7 +19,7 @@ _SEV_ORDEN = {'critico': 4, 'alto': 3, 'medio': 2, 'bajo': 1}
 
 
 def _e(v) -> str:
-    """Escapa cualquier dato del objetivo antes de meterlo al HTML."""
+    """Escapes any target data before putting it into the HTML."""
     return html.escape(str(v), quote=True)
 
 
@@ -34,7 +33,7 @@ def _resumen_severidad(hallazgos) -> dict:
 
 
 def _grafo_data(almacen) -> tuple:
-    """Nodos/aristas para vis-network, con el mismo color por tipo que /v2."""
+    """Nodes/edges for vis-network, with the same per-type color as /v2."""
     nodos, aristas = [], []
     for e in almacen.entidades:
         color = TIPOS.get(e.tipo, {}).get('color', '#8b8b98')
@@ -46,29 +45,29 @@ def _grafo_data(almacen) -> tuple:
 
 
 def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) -> str:
-    """Devuelve el HTML completo del reporte.
+    """Returns the full report HTML.
 
-    almacen   — Almacen tipado (fuente de entidades/relaciones)
-    hallazgos — lista de Hallazgo de correlacion.correlacionar() (o None)
-    score     — puntaje de riesgo 0-100 (correlacion.score_riesgo)
-    meta      — {'workspace','objetivo','generado'} opcional
-    vis_js    — contenido de vis-network.min.js para embeber (o None: sin grafo)
+    almacen   -- typed Store (source of entities/relations)
+    hallazgos -- list of Hallazgo from correlacion.correlacionar() (or None)
+    score     -- risk score 0-100 (correlacion.score_riesgo)
+    meta      -- {'workspace','objetivo','generado'} optional
+    vis_js    -- vis-network.min.js content to embed (or None: no graph)
     """
     hallazgos = list(hallazgos or [])
     hallazgos.sort(key=lambda h: -_SEV_ORDEN.get(getattr(h, 'severidad', ''), 0))
     meta = meta or {}
     generado = meta.get('generado') or datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-    ws = meta.get('workspace') or 'efímero'
+    ws = meta.get('workspace') or 'ephemeral'
     objetivo = meta.get('objetivo') or '—'
     conteo = _resumen_severidad(hallazgos)
 
-    # ── barra de score con color según nivel ──
+    # ── score bar colored by level ──
     if score >= 70:   score_col = _SEV_COLOR['critico']
     elif score >= 40: score_col = _SEV_COLOR['alto']
     elif score >= 15: score_col = _SEV_COLOR['medio']
     else:             score_col = _SEV_COLOR['bajo']
 
-    # ── hallazgos ──
+    # ── findings ──
     if hallazgos:
         filas = []
         for h in hallazgos:
@@ -81,13 +80,13 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
                 f'<td>{_e(getattr(h, "mensaje", ""))}</td>'
                 f'<td class="num">{n_ent}</td></tr>')
         hallazgos_html = (
-            '<table class="hallazgos"><thead><tr><th>Severidad</th><th>Regla</th>'
-            '<th>Detalle</th><th>Entidades</th></tr></thead><tbody>'
+            '<table class="hallazgos"><thead><tr><th>Severity</th><th>Rule</th>'
+            '<th>Detail</th><th>Entities</th></tr></thead><tbody>'
             + ''.join(filas) + '</tbody></table>')
     else:
-        hallazgos_html = '<p class="vacio">Sin riesgos detectados por el motor de correlación.</p>'
+        hallazgos_html = '<p class="vacio">No risks detected by the correlation engine.</p>'
 
-    # ── inventario de entidades por tipo ──
+    # ── entity inventory by type ──
     bloques = []
     for tipo, info in TIPOS.items():
         ents = almacen.de_tipo(tipo)
@@ -105,18 +104,18 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
             fuentes = ', '.join(_e(o) for o in sorted(e.origenes)) or '—'
             items.append(
                 f'<li><span class="val">{_e(e.valor)}</span> {tags}'
-                f'<div class="fuente">fuentes: {fuentes}</div>{extra}</li>')
+                f'<div class="fuente">sources: {fuentes}</div>{extra}</li>')
         bloques.append(
             f'<section class="tipo"><h3><span class="dot" style="background:{color}"></span>'
             f'{_e(info["etiqueta"])} <span class="cnt">{len(ents)}</span></h3>'
             f'<ul>{"".join(items)}</ul></section>')
-    inventario_html = ''.join(bloques) or '<p class="vacio">Sin entidades.</p>'
+    inventario_html = ''.join(bloques) or '<p class="vacio">No entities.</p>'
 
-    # ── grafo embebido (opcional, autocontenido) ──
+    # ── embedded graph (optional, self-contained) ──
     if vis_js:
         nodos, aristas = _grafo_data(almacen)
         grafo_html = f'''
-  <h2>Grafo de relaciones</h2>
+  <h2>Relationship graph</h2>
   <div id="grafo"></div>
   <script>{vis_js}</script>
   <script>
@@ -136,9 +135,9 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
         for s in ('critico', 'alto', 'medio', 'bajo'))
 
     return f'''<!doctype html>
-<html lang="es"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OBSIDIAN · Reporte · {_e(ws)}</title>
+<title>OBSIDIAN · Report · {_e(ws)}</title>
 <style>
   :root{{--bg:#1e1e2e;--panel:#181825;--line:#313244;--txt:#cdd6f4;--muted:#6c7086;--cyan:#89dceb;--amber:#fab387}}  /* Catppuccin Mocha */
   *{{box-sizing:border-box}} body{{margin:0;background:var(--bg);color:var(--txt);
@@ -183,26 +182,26 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
     <a href="/api/v2/export/json" download>⬇ JSON</a>
     <a href="/api/v2/export/csv" download>⬇ CSV</a>
   </div>
-  <h1><span class="sq"></span>OBSIDIAN — Reporte de reconocimiento</h1>
-  <div class="meta">Workspace: <b>{_e(ws)}</b> · Objetivo: <b>{_e(objetivo)}</b> ·
-    Entidades: <b>{len(almacen)}</b> · Generado: <b>{_e(generado)}</b></div>
+  <h1><span class="sq"></span>OBSIDIAN — Reconnaissance report</h1>
+  <div class="meta">Workspace: <b>{_e(ws)}</b> · Target: <b>{_e(objetivo)}</b> ·
+    Entities: <b>{len(almacen)}</b> · Generated: <b>{_e(generado)}</b></div>
 
-  <h2>Resumen de riesgo</h2>
+  <h2>Risk summary</h2>
   <div class="score">
     <div class="n" style="color:{score_col}">{int(score)}/100</div>
     <div class="barra"><div class="fill" style="width:{max(0,min(100,int(score)))}%;background:{score_col}"></div></div>
   </div>
   <div class="chips">{chips}</div>
 
-  <h2>Hallazgos</h2>
+  <h2>Findings</h2>
   {hallazgos_html}
 
-  <h2>Inventario de entidades</h2>
+  <h2>Entity inventory</h2>
   {inventario_html}
   {grafo_html}
 
   <footer>
-    Generado por <b>OBSIDIAN</b> · {_e(generado)}<br>
-    <span class="lema">La seguridad no debería tener un precio exorbitante.</span>
+    Generated by <b>OBSIDIAN</b> · {_e(generado)}<br>
+    <span class="lema">Security should not come at an exorbitant price.</span>
   </footer>
 </body></html>'''
