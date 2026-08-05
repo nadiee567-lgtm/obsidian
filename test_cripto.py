@@ -82,3 +82,16 @@ def test_riesgo_wallet_limpia(monkeypatch):
     monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
     _, e, _ = _correr('riesgo_wallet', 'wallet', _GENESIS)   # no está en la lista
     assert 'ransomware' not in e.tags
+
+
+# ── 142: multi-cadena (Ethereum) ─────────────────────────────────────────────
+def test_eth_balance(monkeypatch):
+    # 0xDE0B6B3A7640000 = 1 ETH en wei
+    monkeypatch.setattr(ob.SESSION, 'post', lambda *a, **k: _R(data={'result': '0xDE0B6B3A7640000'}))
+    _, e, _ = _correr('eth_balance', 'wallet', '0x' + 'a' * 40)
+    assert abs(e.propiedades.get('eth_balance') - 1.0) < 1e-9 and e.propiedades.get('cadena') == 'eth'
+
+
+def test_eth_balance_ignora_btc():
+    _, e, _ = _correr('eth_balance', 'wallet', _GENESIS)     # BTC -> no aplica
+    assert 'eth_balance' not in e.propiedades

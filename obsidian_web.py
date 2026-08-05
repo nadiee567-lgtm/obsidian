@@ -3580,6 +3580,23 @@ def _t_tx_grafo(entidad, ctx):
     for c in list(contrapartes)[:30]:
         ctx.emitir('wallet', c, etiqueta='tx', cadena='btc')
 
+_ES_ETH = re.compile(r'0x[a-fA-F0-9]{40}\Z')
+
+@transform(entrada='wallet', salidas=(), nombre='eth_balance',
+           descripcion='Saldo de una wallet Ethereum (RPC público cloudflare-eth, keyless) (F11 paso 142)')
+def _t_eth_balance(entidad, ctx):
+    if not _ES_ETH.match(entidad.valor):
+        return                                       # solo direcciones ETH
+    try:
+        d = SESSION.post('https://cloudflare-eth.com',
+                         json={'jsonrpc': '2.0', 'method': 'eth_getBalance',
+                               'params': [entidad.valor, 'latest'], 'id': 1}, timeout=10).json() or {}
+        wei = int(d.get('result', '0x0'), 16)
+        entidad.propiedades['eth_balance'] = wei / 1e18
+        entidad.propiedades['cadena'] = 'eth'
+    except Exception as _e:
+        log.debug("eth_balance no disponible: %s", _e)
+
 _RANSOM = {'addrs': None, 'ts': 0}
 
 def _ransom_addrs():
