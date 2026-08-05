@@ -82,3 +82,12 @@ def test_normalizar_telefono():
     assert normalizar_telefono('55 1234 5678', 'MX') == '+525512345678'
     assert normalizar_telefono('(415) 555-2671', 'US') == '+14155552671'
     assert normalizar_telefono('') == ''
+
+
+# ── 178: zona horaria local (cronolocalización) ──────────────────────────────
+def test_zona_horaria():
+    from core.multiidioma import zona_horaria
+    assert zona_horaria('MX')['tz'] == 'America/Mexico_City'
+    assert zona_horaria('RU')['tz'] == 'Europe/Moscow'
+    assert zona_horaria('XX')['tz'] == 'UTC'          # país desconocido
+    assert zona_horaria('CN')['hora_local'] is not None

@@ -22,6 +22,28 @@ def normalizar_telefono(numero: str, pais: str = 'US') -> str:
     return '+' + d
 
 
+_PAIS_TZ = {
+    'MX': 'America/Mexico_City', 'US': 'America/New_York', 'RU': 'Europe/Moscow',
+    'CN': 'Asia/Shanghai', 'ES': 'Europe/Madrid', 'AR': 'America/Argentina/Buenos_Aires',
+    'BR': 'America/Sao_Paulo', 'CO': 'America/Bogota', 'PE': 'America/Lima',
+    'CL': 'America/Santiago', 'JP': 'Asia/Tokyo', 'KR': 'Asia/Seoul', 'GB': 'Europe/London',
+    'DE': 'Europe/Berlin', 'FR': 'Europe/Paris', 'IN': 'Asia/Kolkata',
+}
+
+
+def zona_horaria(pais: str) -> dict:
+    """Zona horaria y hora local del país, para la cronolocalización (paso 178)."""
+    import datetime
+    tz = _PAIS_TZ.get((pais or '').upper(), 'UTC')
+    hora = None
+    try:
+        from zoneinfo import ZoneInfo
+        hora = datetime.datetime.now(ZoneInfo(tz)).strftime('%Y-%m-%d %H:%M %Z')
+    except Exception:
+        pass
+    return {'tz': tz, 'hora_local': hora}
+
+
 def perfiles_regionales(usuario: str) -> dict:
     """Perfiles/búsquedas del usuario en plataformas regionales (paso 171)."""
     u = quote(usuario)

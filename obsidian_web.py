@@ -4618,6 +4618,11 @@ _PROMPTS_IA = {
 _FUENTE_POR_IDIOMA = {'ru': 'Yandex / VK', 'zh': 'Baidu / Weibo', 'ar': 'Google (árabe)',
                       'ja': 'Yahoo Japan', 'ko': 'Naver', 'es_en': 'Google'}
 
+@app.route('/api/v2/zona_horaria', methods=['POST'])
+def api_v2_zona_horaria():
+    """Zona horaria y hora local de un país, para la cronolocalización (F15 paso 178)."""
+    return jsonify(_ml.zona_horaria((request.json or {}).get('pais', '')))
+
 @app.route('/api/v2/normalizar_telefono', methods=['POST'])
 def api_v2_normalizar_telefono():
     """Normaliza un teléfono a +E.164 según el país (F15 paso 177)."""
