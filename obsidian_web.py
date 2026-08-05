@@ -4600,6 +4600,24 @@ def api_v2_extraer_texto():
                 log.warning("autosave extraer_texto: %s", _e)
     return jsonify({'agregadas': agregadas, 'total': len(agregadas)})
 
+@app.route('/api/v2/consulta', methods=['POST'])
+def api_v2_consulta():
+    """Consulta en lenguaje natural → plan de transforms (F14 paso 165)."""
+    if not ia.disponible():
+        return _error('IA (Ollama) no disponible', 503)
+    pregunta = ((request.json or {}).get('pregunta', '') or '').strip()
+    if not pregunta:
+        return _error('pregunta vacía', 400)
+    disponibles = sorted({t.nombre for tp in TIPOS for t in REGISTRO.aplicables(tp)})
+    prompt = (f'Eres OBSIDIAN, un motor OSINT. Transforms disponibles: {", ".join(disponibles)}.\n'
+              f'El usuario pide: "{pregunta}". Devuelve un PLAN concreto: qué transforms correr, '
+              f'sobre qué entidad y en qué orden. Sé específico.')
+    try:
+        resp = ia.consultar(prompt, max_tokens=600, temp=0.3)
+    except Exception as e:
+        return _error(f'IA falló: {e}', 500)
+    return jsonify({'pregunta': pregunta, 'plan': resp})
+
 @app.route('/api/v2/traducir', methods=['POST'])
 def api_v2_traducir():
     """Traduce texto extranjero (chino/ruso/árabe…) al español con Ollama (F14 paso 162)."""

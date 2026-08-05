@@ -65,3 +65,16 @@ def test_resumen_modo_ia(monkeypatch):
 def test_modos_ia_extra():
     import obsidian_web as ob
     assert {'siguiente', 'narrativa', 'clasificar'} <= set(ob._PROMPTS_IA)
+
+
+# ── 165: consulta en lenguaje natural -> plan ─────────────────────────────────
+def test_consulta_nl(monkeypatch):
+    import obsidian_web as ob
+    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: '1. dns_a sobre el dominio\n2. crtsh')
+    c = ob.app.test_client()
+    with c.session_transaction() as s:
+        s['auth'] = True
+    d = c.post('/api/v2/consulta', json={'pregunta': 'encuentra todo sobre acme.com'}).get_json()
+    assert 'plan' in d and 'dns_a' in d['plan']
+    assert c.post('/api/v2/consulta', json={'pregunta': ''}).status_code == 400
