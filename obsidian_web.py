@@ -3801,6 +3801,7 @@ def _correr_transform_interno(tipo, valor, nombre):
     if _PROXIES['pool']:
         _rotar_proxy()                                      # OPSEC: rota proxy por transform (154)
     _higiene_request()                                      # OPSEC: randomiza UA (155)
+    _jitter()                                               # OPSEC: espaciado entre requests (156)
     with _almacen_lock:
         semilla = _almacen.agregar(semilla)
         producidas = ejecutar_por_nombre(nombre, semilla, _almacen)
@@ -4117,6 +4118,25 @@ def api_v2_opsec_higiene():
     if request.method == 'POST':
         _OPSEC_HIGIENE['on'] = bool((request.json or {}).get('on'))
     return jsonify({'higiene': _OPSEC_HIGIENE['on']})
+
+_OPSEC_JITTER = {'min': 0.0, 'max': 0.0}
+
+def _jitter():
+    """Espera un tiempo aleatorio entre requests para parecer tráfico normal (F13 paso 156)."""
+    lo, hi = _OPSEC_JITTER['min'], _OPSEC_JITTER['max']
+    if hi <= 0:
+        return 0.0
+    d = lo + (hi - lo) * (secrets.randbelow(1000) / 1000.0)
+    time.sleep(d)
+    return d
+
+@app.route('/api/v2/opsec/jitter', methods=['GET', 'POST'])
+def api_v2_opsec_jitter():
+    if request.method == 'POST':
+        d = request.json or {}
+        _OPSEC_JITTER['min'] = max(0.0, float(d.get('min', 0)))
+        _OPSEC_JITTER['max'] = max(0.0, float(d.get('max', 0)))
+    return jsonify(dict(_OPSEC_JITTER))
 
 _PROXIES = {'pool': [], 'i': 0}
 

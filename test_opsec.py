@@ -54,3 +54,17 @@ def test_higiene_request():
         ob._OPSEC_HIGIENE['on'] = False
         if prev:
             ob.SESSION.headers['User-Agent'] = prev
+
+
+# ── 156: jitter / throttling ─────────────────────────────────────────────────
+def test_jitter():
+    import obsidian_web as ob
+    assert ob._jitter() == 0.0                       # sin config, no espera
+    try:
+        ob._OPSEC_JITTER['min'] = 0.01
+        ob._OPSEC_JITTER['max'] = 0.03
+        d = ob._jitter()
+        assert 0.01 <= d <= 0.03
+    finally:
+        ob._OPSEC_JITTER['min'] = 0.0
+        ob._OPSEC_JITTER['max'] = 0.0
