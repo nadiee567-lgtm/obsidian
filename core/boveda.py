@@ -1,11 +1,11 @@
-"""Bóveda de API keys cifrada — F3 paso 51.
+"""Encrypted API key vault -- F3 step 51.
 
-Cifra las keys con Fernet (AES-128, el estándar de `cryptography`). La clave
-maestra vive en un archivo local con permisos 0600; el archivo cifrado
-(vault.enc) es inútil sin ella. Los valores NUNCA se exponen — solo se listan
-los nombres de servicio. Nada de cifrado casero.
+Encrypts keys with Fernet (AES-128, the `cryptography` standard). The master key
+lives in a local file with 0600 permissions; the encrypted file (vault.enc) is
+useless without it. Values are NEVER exposed -- only service names are listed.
+No home-made crypto.
 
-Módulo PURO (sin Flask). Clase parametrizada por directorio, para poder testear."""
+PURE module (no Flask). Class parameterized by directory, so it's testable."""
 import os
 import json
 
@@ -34,7 +34,7 @@ class Boveda:
             with open(self.enc_file, 'rb') as f:
                 return json.loads(self._fernet().decrypt(f.read()).decode())
         except Exception:
-            return {}   # clave equivocada o archivo corrupto → vacío, no crashea
+            return {}   # wrong key or corrupt file -> empty, does not crash
 
     def _escribir(self, d):
         token = self._fernet().encrypt(json.dumps(d).encode())
@@ -42,7 +42,7 @@ class Boveda:
             f.write(token)
         os.chmod(self.enc_file, 0o600)
 
-    # -- API pública --
+    # -- public API --
     def guardar(self, servicio, valor):
         d = self._leer()
         d[servicio] = valor
@@ -52,7 +52,7 @@ class Boveda:
         return self._leer().get(servicio)
 
     def servicios(self):
-        """Solo los NOMBRES de servicio configurados — nunca los valores."""
+        """Only the configured service NAMES -- never the values."""
         return sorted(self._leer().keys())
 
     def borrar(self, servicio):

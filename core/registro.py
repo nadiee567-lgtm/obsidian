@@ -1,8 +1,9 @@
-"""Logging central de OBSIDIAN — paso 10 del roadmap.
+"""OBSIDIAN central logging -- roadmap step 10.
 
-Reemplaza los print(..., file=sys.stderr) regados por el código. Todo va a un
-archivo con niveles (~/.obsidian/obsidian.log); a la consola solo lo importante
-(WARNING+), para no ensuciar la terminal con cada fuente OSINT que falla."""
+Replaces the print(..., file=sys.stderr) calls scattered through the code.
+Everything goes to a file with levels (~/.obsidian/obsidian.log); only what
+matters (WARNING+) reaches the console, so the terminal isn't cluttered by every
+OSINT source that fails."""
 import logging, os
 from core.config import HOME
 
@@ -14,8 +15,8 @@ _FMT = logging.Formatter('%(asctime)s %(levelname)-7s %(message)s', '%Y-%m-%d %H
 
 
 def get_logger(nombre='obsidian'):
-    """Devuelve el logger de OBSIDIAN, configurado una sola vez.
-    Archivo = DEBUG (todo, para diagnóstico); consola = WARNING (solo lo grave)."""
+    """Returns the OBSIDIAN logger, configured only once.
+    File = DEBUG (everything, for diagnostics); console = WARNING (only serious)."""
     log = logging.getLogger(nombre)
     if not log.handlers:
         log.setLevel(logging.DEBUG)

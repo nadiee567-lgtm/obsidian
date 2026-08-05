@@ -1,7 +1,7 @@
-"""Configuración central de OBSIDIAN — paso 9 del roadmap.
+"""OBSIDIAN central configuration -- roadmap step 9.
 
-Rutas, puertos y constantes en un solo lugar en vez de regadas por el código.
-Puerto y host se pueden sobreescribir por variable de entorno."""
+Paths, ports and constants in a single place instead of scattered through the
+code. Port and host can be overridden by environment variable."""
 import os
 
 HOME       = os.path.expanduser('~')
@@ -14,5 +14,5 @@ PORT       = int(os.environ.get('OBSIDIAN_PORT', 8767))
 HOST       = os.environ.get('OBSIDIAN_HOST', '127.0.0.1')
 VIS_FILE   = 'vis-network.min.js'
 
-# F3: cada workspace (caso) es una base SQLite aislada dentro de esta carpeta.
+# F3: each workspace (case) is an isolated SQLite database inside this folder.
 WORKSPACES_DIR = os.path.join(HOME, '.obsidian', 'workspaces')
