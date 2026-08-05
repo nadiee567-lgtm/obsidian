@@ -3802,6 +3802,7 @@ def _correr_transform_interno(tipo, valor, nombre):
         _rotar_proxy()                                      # OPSEC: rota proxy por transform (154)
     _higiene_request()                                      # OPSEC: randomiza UA (155)
     _jitter()                                               # OPSEC: espaciado entre requests (156)
+    _registrar_huella(nombre, tipo, valor)                  # OPSEC: registra tu huella (160)
     with _almacen_lock:
         semilla = _almacen.agregar(semilla)
         producidas = ejecutar_por_nombre(nombre, semilla, _almacen)
@@ -4099,6 +4100,22 @@ _OPSEC = {'anonimo': False}
 def _set_anonimo(on):
     _OPSEC['anonimo'] = bool(on)
     SESSION.proxies = {'http': TOR_PROXY, 'https': TOR_PROXY} if on else {}
+
+_HUELLA = []
+
+def _registrar_huella(nombre, tipo, valor):
+    """Anota qué transform corriste sobre qué objetivo y si iba anonimizado —
+    tu huella/exposición al investigar (F13 paso 160)."""
+    _HUELLA.insert(0, {'ts': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                       'transform': nombre, 'objetivo': f'{tipo}:{valor}',
+                       'anonimo': _OPSEC['anonimo'] or bool(_PROXIES['pool'])})
+    del _HUELLA[500:]
+
+@app.route('/api/v2/opsec/huella')
+def api_v2_opsec_huella():
+    """Tu huella: qué tocaste y cuánto fue sin anonimizar (exposición). Paso 160."""
+    expuestos = sum(1 for h in _HUELLA if not h['anonimo'])
+    return jsonify({'total': len(_HUELLA), 'expuestos': expuestos, 'huella': _HUELLA[:100]})
 
 _KEY_ROT = {}
 

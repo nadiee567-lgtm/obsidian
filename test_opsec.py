@@ -108,3 +108,14 @@ def test_key_rotativa(monkeypatch):
     assert ob._key_rotativa('x') == 'solo'                # una sola: tal cual
     monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
     assert ob._key_rotativa('x') is None
+
+
+# ── 160: registro de tu propia huella ────────────────────────────────────────
+def test_registrar_huella():
+    import obsidian_web as ob
+    ob._HUELLA.clear()
+    ob._OPSEC['anonimo'] = False
+    ob._PROXIES['pool'] = []
+    ob._registrar_huella('crtsh', 'dominio', 'x.com')
+    assert ob._HUELLA[0]['transform'] == 'crtsh' and ob._HUELLA[0]['anonimo'] is False
+    assert ob._HUELLA[0]['objetivo'] == 'dominio:x.com'
