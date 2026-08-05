@@ -99,3 +99,16 @@ def test_deteccion_ia(monkeypatch):
         s['auth'] = True
     d = c.post('/api/v2/deteccion_ia', json={'texto': 'lorem ipsum...'}).get_json()
     assert 'evaluacion' in d and 'INDICIO' in d['aviso']   # honestidad: no da certeza
+
+
+# ── 170: chat sobre el caso ───────────────────────────────────────────────────
+def test_chat_caso(monkeypatch):
+    import obsidian_web as ob
+    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'La IP 1.2.3.4 aloja el dominio.')
+    c = ob.app.test_client()
+    with c.session_transaction() as s:
+        s['auth'] = True
+    d = c.post('/api/v2/chat', json={'pregunta': '¿relación entre la ip y el dominio?'}).get_json()
+    assert 'respuesta' in d and '1.2.3.4' in d['respuesta']
+    assert c.post('/api/v2/chat', json={'pregunta': ''}).status_code == 400

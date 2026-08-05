@@ -4600,6 +4600,24 @@ def api_v2_extraer_texto():
                 log.warning("autosave extraer_texto: %s", _e)
     return jsonify({'agregadas': agregadas, 'total': len(agregadas)})
 
+@app.route('/api/v2/chat', methods=['POST'])
+def api_v2_chat():
+    """Chat sobre el caso: pregúntale a la IA usando los datos del grafo (F14 paso 170)."""
+    if not ia.disponible():
+        return _error('IA (Ollama) no disponible', 503)
+    pregunta = ((request.json or {}).get('pregunta', '') or '').strip()
+    if not pregunta:
+        return _error('pregunta vacía', 400)
+    contexto = json.dumps(_almacen.to_dict(), default=str)[:3500]
+    prompt = (f'Eres un analista con acceso a este caso OSINT. Responde la pregunta usando SOLO estos '
+              f'datos; si la respuesta no está en ellos, dilo claramente.\n\nDatos:\n{contexto}\n\n'
+              f'Pregunta: {pregunta}')
+    try:
+        resp = ia.consultar(prompt, max_tokens=500, temp=0.3)
+    except Exception as e:
+        return _error(f'IA falló: {e}', 500)
+    return jsonify({'pregunta': pregunta, 'respuesta': resp})
+
 @app.route('/api/v2/deteccion_ia', methods=['POST'])
 def api_v2_deteccion_ia():
     """Indicio (NO prueba) de texto generado por IA (F14 paso 169). Para imágenes,
