@@ -4072,6 +4072,7 @@ def api_v2_workspace_abrir():
     except KeyError:
         return _error('workspace no encontrado', 404)
     _ws_activo = _slug_caso(nombre)
+    _aplicar_perfil_opsec(_ws_activo)                # modo no-atribución (157)
     return jsonify({'ok': True, 'activo': _ws_activo, 'total_entidades': len(_almacen)})
 
 @app.route('/api/v2/workspaces/historial')
@@ -4172,6 +4173,52 @@ def api_v2_opsec_anonimo():
             return _error('Tor no disponible (arranca el servicio tor)', 503)
         _set_anonimo(on)
     return jsonify({'anonimo': _OPSEC['anonimo'], 'tor': _tor_disponible()})
+
+# ── Modo no-atribución: perfil OPSEC por workspace (F13 paso 157) ────────────
+_OPSEC_PROFILES = os.path.join(HOME, '.obsidian', 'opsec_profiles.json')
+
+def _leer_perfiles():
+    try:
+        with open(_OPSEC_PROFILES, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _aplicar_perfil_opsec(ws):
+    """Aísla el caso con su propia identidad de red: aplica el perfil OPSEC del
+    workspace (persona, proxies, anónimo, higiene, jitter)."""
+    p = _leer_perfiles().get(ws, {})
+    _OPSEC_HIGIENE['on'] = bool(p.get('higiene'))
+    _OPSEC_JITTER['min'] = float(p.get('jitter_min', 0) or 0)
+    _OPSEC_JITTER['max'] = float(p.get('jitter_max', 0) or 0)
+    _PROXIES['pool'] = list(p.get('proxies', []) or [])
+    _PROXIES['i'] = 0
+    _set_anonimo(bool(p.get('anonimo')) and _tor_disponible())
+    _OPSEC['persona'] = p.get('persona')
+    return p
+
+@app.route('/api/v2/opsec/perfil', methods=['GET', 'POST'])
+def api_v2_opsec_perfil():
+    """Perfil OPSEC (identidad de red) asociado a un workspace (F13 paso 157)."""
+    if request.method == 'POST':
+        d = request.json or {}
+        ws = _slug_caso(d.get('workspace', '') or '')
+        if not ws:
+            return _error('falta el workspace', 400)
+        perfiles = _leer_perfiles()
+        perfiles[ws] = d.get('perfil', {}) or {}
+        try:
+            os.makedirs(os.path.dirname(_OPSEC_PROFILES), exist_ok=True)
+            with open(_OPSEC_PROFILES, 'w', encoding='utf-8') as f:
+                json.dump(perfiles, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            return _error(f'no se pudo guardar: {e}', 500)
+        if ws == _ws_activo:
+            _aplicar_perfil_opsec(ws)
+        return jsonify({'ok': True})
+    return jsonify({'perfil': _leer_perfiles().get(_ws_activo, {}), 'activo': _ws_activo,
+                    'estado': {'anonimo': _OPSEC['anonimo'], 'higiene': _OPSEC_HIGIENE['on'],
+                               'proxies': len(_PROXIES['pool']), 'persona': _OPSEC.get('persona')}})
 
 _personas = GestorPersonas(os.path.join(HOME, '.obsidian', 'personas.json'))
 

@@ -68,3 +68,23 @@ def test_jitter():
     finally:
         ob._OPSEC_JITTER['min'] = 0.0
         ob._OPSEC_JITTER['max'] = 0.0
+
+
+# ── 157: modo no-atribución (perfil OPSEC por workspace) ─────────────────────
+def test_perfil_opsec_por_workspace(tmp_path, monkeypatch):
+    import json
+    import obsidian_web as ob
+    pf = tmp_path / 'op.json'
+    pf.write_text(json.dumps({'caso1': {'higiene': True, 'jitter_min': 0.01,
+                                        'jitter_max': 0.02, 'proxies': ['http://p:8080']}}))
+    monkeypatch.setattr(ob, '_OPSEC_PROFILES', str(pf))
+    try:
+        ob._aplicar_perfil_opsec('caso1')
+        assert ob._OPSEC_HIGIENE['on'] is True
+        assert ob._OPSEC_JITTER['max'] == 0.02
+        assert ob._PROXIES['pool'] == ['http://p:8080']
+    finally:
+        ob._OPSEC_HIGIENE['on'] = False
+        ob._OPSEC_JITTER['min'] = ob._OPSEC_JITTER['max'] = 0.0
+        ob._PROXIES['pool'] = []
+        ob.SESSION.proxies = {}
