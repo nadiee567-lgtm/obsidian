@@ -89,3 +89,26 @@ def test_canal_leaks_sin_creds(monkeypatch):
     monkeypatch.setattr(ob, '_tg_mensajes', lambda u, limite=100: (False, 'falta api_id:api_hash ...'))
     prod, e = _correr('canal_leaks', 'usuario', 'x')
     assert prod == [] and 'api_id' in e.propiedades.get('canal_leaks', '')
+
+
+# ── 132: stealer logs a nivel dominio (keyless, Hudson Rock) ──────────────────
+class _RjD:
+    def __init__(self, data):
+        self._d = data
+    def json(self):
+        return self._d
+
+
+def test_stealer_dominio(monkeypatch):
+    monkeypatch.setattr(ob.SESSION, 'get',
+                        lambda *a, **k: _RjD({'data': {'employees': 12, 'users': 340}}))
+    _, e = _correr('stealer_dominio', 'dominio', 'acme.com')
+    assert 'stealer-expuesto' in e.tags
+    assert e.propiedades.get('stealer_empleados') == 12 and e.propiedades.get('stealer_usuarios') == 340
+
+
+def test_stealer_dominio_limpio(monkeypatch):
+    monkeypatch.setattr(ob.SESSION, 'get',
+                        lambda *a, **k: _RjD({'data': {'employees': 0, 'users': 0}}))
+    _, e = _correr('stealer_dominio', 'dominio', 'acme.com')
+    assert 'stealer-expuesto' not in e.tags

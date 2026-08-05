@@ -2388,6 +2388,26 @@ def _t_stealer(entidad, ctx):
     except Exception as _e:
         log.debug("hudsonrock no disponible: %s", _e)
 
+@transform(entrada='dominio', salidas=(), nombre='stealer_dominio',
+           descripcion='Exposición del dominio en stealer logs (empleados/usuarios infectados, HudsonRock keyless) (F10 paso 132)')
+def _t_stealer_dominio(entidad, ctx):
+    try:
+        d = SESSION.get('https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-domain',
+                        params={'domain': entidad.valor}, timeout=10).json() or {}
+        data = d.get('data', d) or {}
+        emp = data.get('employees') or data.get('total_employees') or 0
+        usr = data.get('users') or data.get('total_users') or 0
+        if isinstance(emp, dict):
+            emp = emp.get('total', 0)
+        if isinstance(usr, dict):
+            usr = usr.get('total', 0)
+        if emp or usr:
+            entidad.propiedades['stealer_empleados'] = emp
+            entidad.propiedades['stealer_usuarios'] = usr
+            entidad.etiquetar('stealer-expuesto')
+    except Exception as _e:
+        log.debug("stealer_dominio no disponible: %s", _e)
+
 @transform(entrada='email', salidas=(), nombre='email_spoofable',
            descripcion='Revisa el SPF del dominio del email (riesgo de spoofing)')
 def _t_email_spoofable(entidad, ctx):
