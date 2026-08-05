@@ -4588,34 +4588,34 @@ def api_v2_monitor_stop():
     return jsonify({'activo': False})
 
 _PROMPTS_IA = {
-    'escenario': ('OSINT recolectado sobre "{objetivo}". Genera un escenario de pentesting ÉTICO:\n'
-                  '1. VECTORES DE ENTRADA (con evidencia de los datos)\n'
-                  '2. KILL CHAIN probable paso a paso\n'
-                  '3. TÉCNICAS MITRE ATT&CK relevantes (con IDs)\n'
-                  '4. TOP 3 vulnerabilidades más críticas\n'
-                  '5. CONTRAMEDIDAS por vector\n\nDatos:\n{datos}'),
-    'superficie': ('Mapa de superficie de ataque de "{objetivo}":\n'
-                   '1. ACTIVOS EXPUESTOS (IPs, dominios, servicios, tecnologías)\n'
-                   '2. DATOS FILTRADOS encontrados\n3. TECNOLOGÍAS con CVEs conocidos\n'
-                   '4. CONFIGURACIONES DÉBILES\n5. SCORE DE RIESGO 0-10 con justificación\n'
-                   '6. RECOMENDACIONES DE HARDENING\n\nDatos:\n{datos}'),
-    'analizar': ('Analiza TODO el caso OSINT de "{objetivo}" y correlaciona: qué historia cuentan '
-                 'los datos juntos, hallazgos no obvios, y los 3 siguientes pasos de investigación.\n\nDatos:\n{datos}'),
-    'resumen': ('Resume el caso OSINT de "{objetivo}" en UN párrafo claro y entendible para alguien '
-                'no técnico: qué se encontró y qué significa.\n\nDatos:\n{datos}'),
-    'siguiente': ('Eres un analista OSINT. Dado el caso de "{objetivo}", sugiere los PRÓXIMOS 3-5 '
-                  'pasos concretos de investigación (qué correr y por qué), priorizados.\n\nDatos:\n{datos}'),
-    'narrativa': ('Escribe un INFORME legible (narrativa en prosa) del caso de "{objetivo}" a partir de '
-                  'los datos: contexto, hallazgos y conclusión. Tono profesional.\n\nDatos:\n{datos}'),
-    'clasificar': ('Ordena los hallazgos del caso de "{objetivo}" por RELEVANCIA real para un atacante '
-                   '(no solo severidad), y explica brevemente el orden.\n\nDatos:\n{datos}'),
-    'geoloc': ('Geolocaliza al objetivo/foto de "{objetivo}" a partir de TODAS las pistas de texto del '
-               'caso (EXIF/GPS, OCR, idiomas, dominios, títulos): da 3-5 CANDIDATOS de ubicación '
-               '(país/ciudad/zona) con el razonamiento y qué verificar. Nota: sin visión, razona sobre '
-               'pistas textuales.\n\nDatos:\n{datos}'),
+    'escenario': ('OSINT collected on "{objetivo}". Generate an ETHICAL pentesting scenario:\n'
+                  '1. ENTRY VECTORS (with evidence from the data)\n'
+                  '2. Probable KILL CHAIN step by step\n'
+                  '3. Relevant MITRE ATT&CK TECHNIQUES (with IDs)\n'
+                  '4. TOP 3 most critical vulnerabilities\n'
+                  '5. COUNTERMEASURES per vector\n\nData:\n{datos}'),
+    'superficie': ('Attack surface map of "{objetivo}":\n'
+                   '1. EXPOSED ASSETS (IPs, domains, services, technologies)\n'
+                   '2. LEAKED DATA found\n3. TECHNOLOGIES with known CVEs\n'
+                   '4. WEAK CONFIGURATIONS\n5. RISK SCORE 0-10 with justification\n'
+                   '6. HARDENING RECOMMENDATIONS\n\nData:\n{datos}'),
+    'analizar': ('Analyze the WHOLE OSINT case of "{objetivo}" and correlate: what story the data tells '
+                 'together, non-obvious findings, and the next 3 investigation steps.\n\nData:\n{datos}'),
+    'resumen': ('Summarize the OSINT case of "{objetivo}" in ONE clear paragraph understandable to a '
+                'non-technical person: what was found and what it means.\n\nData:\n{datos}'),
+    'siguiente': ('You are an OSINT analyst. Given the case of "{objetivo}", suggest the NEXT 3-5 '
+                  'concrete investigation steps (what to run and why), prioritized.\n\nData:\n{datos}'),
+    'narrativa': ('Write a readable REPORT (prose narrative) of the case of "{objetivo}" from the data: '
+                  'context, findings and conclusion. Professional tone.\n\nData:\n{datos}'),
+    'clasificar': ('Rank the findings of the case of "{objetivo}" by real RELEVANCE to an attacker '
+                   '(not just severity), and briefly explain the order.\n\nData:\n{datos}'),
+    'geoloc': ('Geolocate the target/photo of "{objetivo}" from ALL the textual clues in the case '
+               '(EXIF/GPS, OCR, languages, domains, titles): give 3-5 location CANDIDATES '
+               '(country/city/area) with the reasoning and what to verify. Note: with no vision, reason '
+               'over textual clues.\n\nData:\n{datos}'),
 }
 
-_FUENTE_POR_IDIOMA = {'ru': 'Yandex / VK', 'zh': 'Baidu / Weibo', 'ar': 'Google (árabe)',
+_FUENTE_POR_IDIOMA = {'ru': 'Yandex / VK', 'zh': 'Baidu / Weibo', 'ar': 'Google (Arabic)',
                       'ja': 'Yahoo Japan', 'ko': 'Naver', 'es_en': 'Google'}
 
 @app.route('/api/v2/zona_horaria', methods=['POST'])
