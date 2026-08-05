@@ -3580,6 +3580,18 @@ def _t_tx_grafo(entidad, ctx):
     for c in list(contrapartes)[:30]:
         ctx.emitir('wallet', c, etiqueta='tx', cadena='btc')
 
+@transform(entrada='wallet', salidas=('url',), nombre='exchange_attrib',
+           descripcion='Atribución a exchanges: enlaces a Blockchair/WalletExplorer/Arkham/OXT (F11 paso 140)')
+def _t_exchange_attrib(entidad, ctx):
+    from urllib.parse import quote as _q
+    a = _q(entidad.valor)
+    enlaces = {'blockchair': f'https://blockchair.com/search?q={a}',
+               'walletexplorer': f'https://www.walletexplorer.com/address/{a}',
+               'arkham': f'https://intel.arkm.com/explorer/address/{a}',
+               'oxt': f'https://oxt.me/address/{a}'}
+    for herr, url in enlaces.items():
+        ctx.emitir('url', url, etiqueta=f'attrib:{herr}', herramienta=herr)
+
 @transform(entrada='wallet', salidas=('wallet',), nombre='cluster_wallets',
            descripcion='Clustering por co-inputs: direcciones del mismo dueño (heurística, blockchain.info) (F11 paso 139)')
 def _t_cluster_wallets(entidad, ctx):

@@ -59,3 +59,10 @@ def test_cluster_wallets(monkeypatch):
     hermanas = [e for e in prod if e.tipo == 'wallet']
     assert {e.valor for e in hermanas} == {'hermana1'}          # co-input, no el destino
     assert 'mismo-dueño' in hermanas[0].tags
+
+
+# ── 140: atribución a exchanges (enlaces a herramientas) ─────────────────────
+def test_exchange_attrib():
+    prod, _, _ = _correr('exchange_attrib', 'wallet', _GENESIS)
+    herrs = {e.propiedades.get('herramienta') for e in prod if e.tipo == 'url'}
+    assert herrs == {'blockchair', 'walletexplorer', 'arkham', 'oxt'}
