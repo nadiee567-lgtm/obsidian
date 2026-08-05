@@ -132,3 +132,21 @@ def test_pastes_psbdmp_muerto(monkeypatch):
     prod, _ = _correr('pastes', 'email', 'a@b.com')
     urls = {x.valor for x in prod if x.tipo == 'url'}
     assert len(urls) == 4                                  # aún salen los 4 dorks
+
+
+# ── 134: filtraciones históricas (Intelligence X, keyed) ─────────────────────
+def test_intelx(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'fakekey')
+    monkeypatch.setattr(ob.SESSION, 'post', lambda *a, **k: _RjD({'id': 'search-123'}))
+    monkeypatch.setattr(ob.SESSION, 'get',
+                        lambda *a, **k: _RjD({'records': [{'systemid': 'sys-a', 'name': 'leak1',
+                                                           'bucket': 'leaks'}]}))
+    prod, _ = _correr('intelx', 'email', 'a@b.com')
+    assert 'https://intelx.io/?did=sys-a' in {x.valor for x in prod if x.tipo == 'url'}
+
+
+def test_intelx_sin_key(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setenv('INTELX_KEY', '')
+    prod, _ = _correr('intelx', 'email', 'a@b.com')
+    assert prod == []

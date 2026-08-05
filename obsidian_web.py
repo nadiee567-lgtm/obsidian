@@ -2388,6 +2388,30 @@ def _t_stealer(entidad, ctx):
     except Exception as _e:
         log.debug("hudsonrock no disponible: %s", _e)
 
+@transform(entrada='email', salidas=('url',), nombre='intelx', requiere_key=True,
+           descripcion='Búsqueda histórica de filtraciones por selector (Intelligence X, key en bóveda) (F10 paso 134)')
+def _t_intelx(entidad, ctx):
+    key = _boveda.obtener('intelx') or os.environ.get('INTELX_KEY', '')
+    if not key:
+        return
+    try:
+        sid = (SESSION.post('https://2.intelx.io/intelligent/search',
+                            headers={'x-key': key, 'Content-Type': 'application/json'},
+                            json={'term': entidad.valor, 'maxresults': 20, 'media': 0,
+                                  'sort': 2, 'terminate': []}, timeout=12).json() or {}).get('id')
+        if not sid:
+            return
+        recs = (SESSION.get('https://2.intelx.io/intelligent/search/result',
+                            headers={'x-key': key}, params={'id': sid}, timeout=12).json()
+                or {}).get('records', [])
+        for rec in recs[:20]:
+            sysid = rec.get('systemid')
+            if sysid:
+                ctx.emitir('url', f'https://intelx.io/?did={sysid}', etiqueta='intelx',
+                           nombre=(rec.get('name') or '')[:120], bucket=rec.get('bucket', ''))
+    except Exception as _e:
+        log.debug("intelx no disponible: %s", _e)
+
 @transform(entrada='email', salidas=('url',), nombre='pastes',
            descripcion='Monitoreo de pastes: psbdmp + dorks a Pastebin/Ghostbin/etc (keyless) (F10 paso 133)')
 def _t_pastes(entidad, ctx):
