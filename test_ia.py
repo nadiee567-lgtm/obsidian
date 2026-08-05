@@ -59,3 +59,9 @@ def test_resumen_modo_ia(monkeypatch):
         s['auth'] = True
     d = c.post('/api/v2/ia/resumen').get_json()
     assert d['modo'] == 'resumen' and 'subdominios' in d['resultado']
+
+
+# ── 164/166/167: modos IA (siguiente paso, narrativa, clasificación) ─────────
+def test_modos_ia_extra():
+    import obsidian_web as ob
+    assert {'siguiente', 'narrativa', 'clasificar'} <= set(ob._PROMPTS_IA)

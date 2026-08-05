@@ -4569,6 +4569,12 @@ _PROMPTS_IA = {
                  'los datos juntos, hallazgos no obvios, y los 3 siguientes pasos de investigación.\n\nDatos:\n{datos}'),
     'resumen': ('Resume el caso OSINT de "{objetivo}" en UN párrafo claro y entendible para alguien '
                 'no técnico: qué se encontró y qué significa.\n\nDatos:\n{datos}'),
+    'siguiente': ('Eres un analista OSINT. Dado el caso de "{objetivo}", sugiere los PRÓXIMOS 3-5 '
+                  'pasos concretos de investigación (qué correr y por qué), priorizados.\n\nDatos:\n{datos}'),
+    'narrativa': ('Escribe un INFORME legible (narrativa en prosa) del caso de "{objetivo}" a partir de '
+                  'los datos: contexto, hallazgos y conclusión. Tono profesional.\n\nDatos:\n{datos}'),
+    'clasificar': ('Ordena los hallazgos del caso de "{objetivo}" por RELEVANCIA real para un atacante '
+                   '(no solo severidad), y explica brevemente el orden.\n\nDatos:\n{datos}'),
     'geoloc': ('Geolocaliza al objetivo/foto de "{objetivo}" a partir de TODAS las pistas de texto del '
                'caso (EXIF/GPS, OCR, idiomas, dominios, títulos): da 3-5 CANDIDATOS de ubicación '
                '(país/ciudad/zona) con el razonamiento y qué verificar. Nota: sin visión, razona sobre '
