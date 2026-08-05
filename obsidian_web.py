@@ -55,8 +55,8 @@ def _manejar_error(e):
         return e   # páginas normales: 404/405 HTML por defecto
     log.exception("error no controlado en %s %s", request.method, request.path)
     if request.path.startswith('/api/'):
-        return _error('Error interno del servidor', 500)
-    return 'Error interno del servidor', 500
+        return _error('Internal server error', 500)
+    return 'Internal server error', 500
 
 def _db_init():
     con = sqlite3.connect(CASES_DB)
@@ -3829,10 +3829,10 @@ def _correr_transform_interno(tipo, valor, nombre):
     """Corre un transform y persiste (autosave). Compartido por /run y el monitor.
     Lanza ValueError/KeyError; el llamador decide qué hacer con el error."""
     if not tipo_valido(tipo):
-        raise ValueError('tipo de entidad inválido')
+        raise ValueError('invalid entity type')
     semilla = Entidad(tipo, (valor or '').strip())          # puede lanzar ValueError
     if not semilla.valor_bien_formado():
-        raise ValueError(f'valor con forma inválida para {tipo}')
+        raise ValueError(f'malformed value for {tipo}')
     if _PROXIES['pool']:
         _rotar_proxy()                                      # OPSEC: rota proxy por transform (154)
     _higiene_request()                                      # OPSEC: randomiza UA (155)
@@ -3951,7 +3951,7 @@ def api_v2_recon():
     tipo = d.get('tipo', '')
     valor = (d.get('valor', '') or '').strip()
     if not tipo_valido(tipo):
-        return _error('tipo de entidad inválido', 400)
+        return _error('invalid entity type', 400)
     con_keys = bool(d.get('con_keys'))
     with _almacen_lock:
         _almacen.crear(tipo, valor)
@@ -3976,7 +3976,7 @@ def api_v2_recon_async():
     tipo = d.get('tipo', '')
     valor = (d.get('valor', '') or '').strip()
     if not tipo_valido(tipo):
-        return _error('tipo de entidad inválido', 400)
+        return _error('invalid entity type', 400)
     con_keys = bool(d.get('con_keys'))
 
     def trabajo(emit):
@@ -4004,13 +4004,13 @@ def api_v2_recon_async():
 def api_v2_tarea(tid):
     est = _tareas.estado(tid)
     if not est:
-        return _error('tarea no encontrada', 404)
+        return _error('task not found', 404)
     return jsonify({'id': est['id'], 'estado': est['estado'], 'resultado': est['resultado']})
 
 @app.route('/api/v2/tarea/<tid>/stream')
 def api_v2_tarea_stream(tid):
     if not _tareas.estado(tid):
-        return _error('tarea no encontrada', 404)
+        return _error('task not found', 404)
     def gen():
         for ev in _tareas.stream(tid):
             yield f'data: {json.dumps(ev)}\n\n'
@@ -4024,13 +4024,13 @@ def api_v2_entidad():
     tipo = d.get('tipo', '')
     valor = (d.get('valor', '') or '').strip()
     if not tipo_valido(tipo):
-        return _error('tipo de entidad inválido', 400)
+        return _error('invalid entity type', 400)
     try:
         ent = Entidad(tipo, valor)
     except ValueError as e:
         return _error(str(e), 400)
     if not ent.valor_bien_formado():
-        return _error(f'valor con forma inválida para {tipo}', 400)
+        return _error(f'malformed value for {tipo}', 400)
     ent = _almacen.agregar(ent)
     if _ws_activo:
         try:
@@ -4052,7 +4052,7 @@ def api_v2_nota():
     d = request.json or {}
     e = _almacen.obtener(d.get('id', ''))
     if not e:
-        return _error('entidad no encontrada', 404)
+        return _error('entity not found', 404)
     e.propiedades['nota'] = (d.get('nota', '') or '')[:1000]
     _autosave()
     return jsonify({'ok': True})
@@ -4063,10 +4063,10 @@ def api_v2_tag():
     d = request.json or {}
     e = _almacen.obtener(d.get('id', ''))
     if not e:
-        return _error('entidad no encontrada', 404)
+        return _error('entity not found', 404)
     tag = (d.get('tag', '') or '').strip()[:30]
     if not tag:
-        return _error('falta la etiqueta', 400)
+        return _error('missing tag', 400)
     e.tags.discard(tag) if tag in e.tags else e.tags.add(tag)
     _autosave()
     return jsonify({'ok': True, 'tags': sorted(e.tags)})
@@ -4106,7 +4106,7 @@ def api_v2_workspace_abrir():
     try:
         _almacen = _gestor.cargar(nombre)
     except KeyError:
-        return _error('workspace no encontrado', 404)
+        return _error('workspace not found', 404)
     _ws_activo = _slug_caso(nombre)
     _aplicar_perfil_opsec(_ws_activo)                # modo no-atribución (157)
     return jsonify({'ok': True, 'activo': _ws_activo, 'total_entidades': len(_almacen)})
@@ -4120,12 +4120,12 @@ def api_v2_ws_historial():
 def api_v2_ws_snapshot():
     """Crear (POST) o listar (GET) snapshots del workspace activo (F3 paso 49)."""
     if not _ws_activo:
-        return _error('no hay workspace activo', 400)
+        return _error('no active workspace', 400)
     if request.method == 'POST':
         try:
             sid = _gestor.snapshot(_ws_activo)
         except KeyError:
-            return _error('workspace no encontrado', 404)
+            return _error('workspace not found', 404)
         return jsonify({'ok': True, 'snapshot': sid})
     return jsonify({'snapshots': _gestor.listar_snapshots(_ws_activo)})
 
@@ -4209,8 +4209,8 @@ def api_v2_opsec_fuga():
         pass
     fuga = _evaluar_fuga(anon, ip_session, ip_real)
     return jsonify({'anonimo': anon, 'ip_via_obsidian': ip_session, 'ip_real': ip_real, 'fuga': fuga,
-                    'nota': '⚠ FUGA: tu IP real se expone pese al modo anónimo' if fuga
-                    else ('ok — tráfico anonimizado' if anon else 'modo anónimo apagado')})
+                    'nota': '⚠ LEAK: your real IP is exposed despite anonymous mode' if fuga
+                    else ('ok -- traffic anonymized' if anon else 'anonymous mode off')})
 
 _OPSEC_JITTER = {'min': 0.0, 'max': 0.0}
 
@@ -4262,7 +4262,7 @@ def api_v2_opsec_anonimo():
     if request.method == 'POST':
         on = bool((request.json or {}).get('on'))
         if on and not _tor_disponible():
-            return _error('Tor no disponible (arranca el servicio tor)', 503)
+            return _error('Tor unavailable (start the tor service)', 503)
         _set_anonimo(on)
     return jsonify({'anonimo': _OPSEC['anonimo'], 'tor': _tor_disponible()})
 
@@ -4296,7 +4296,7 @@ def api_v2_opsec_perfil():
         d = request.json or {}
         ws = _slug_caso(d.get('workspace', '') or '')
         if not ws:
-            return _error('falta el workspace', 400)
+            return _error('missing workspace', 400)
         perfiles = _leer_perfiles()
         perfiles[ws] = d.get('perfil', {}) or {}
         try:
@@ -4304,7 +4304,7 @@ def api_v2_opsec_perfil():
             with open(_OPSEC_PROFILES, 'w', encoding='utf-8') as f:
                 json.dump(perfiles, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            return _error(f'no se pudo guardar: {e}', 500)
+            return _error(f'could not save: {e}', 500)
         if ws == _ws_activo:
             _aplicar_perfil_opsec(ws)
         return jsonify({'ok': True})
@@ -4325,7 +4325,7 @@ def api_v2_personas():
     d = request.json or {}
     nombre = (d.get('nombre', '') or '').strip()
     if not nombre:
-        return _error('falta el nombre de la persona', 400)
+        return _error('missing persona name', 400)
     if request.method == 'POST':
         _personas.crear(nombre, d.get('datos', {}))
         return jsonify({'ok': True, 'personas': _personas.listar()})
@@ -4341,11 +4341,11 @@ def api_v2_keys():
     d = request.json or {}
     servicio = (d.get('servicio', '') or '').strip().lower()
     if not servicio:
-        return _error('falta el servicio', 400)
+        return _error('missing service', 400)
     if request.method == 'POST':
         valor = d.get('valor', '')
         if not valor:
-            return _error('falta el valor de la key', 400)
+            return _error('missing key value', 400)
         _boveda.guardar(servicio, valor)
         return jsonify({'ok': True, 'servicios': _boveda.servicios()})
     _boveda.borrar(servicio)   # DELETE
@@ -4372,7 +4372,7 @@ def api_v2_keys_probar():
     servicio = ((request.json or {}).get('servicio', '') or '').strip().lower()
     mapeo = _TEST_SERVICIO.get(servicio)
     if not mapeo:
-        return _error('servicio sin prueba definida', 400)
+        return _error('service has no defined test', 400)
     nombre, tipo, valor = mapeo
     tiene = bool(_boveda.obtener(servicio))
     alm = Almacen()
@@ -4382,11 +4382,11 @@ def api_v2_keys_probar():
         return jsonify({'servicio': servicio, 'ok': False, 'nota': f'error: {e}'})
     if n > 0:
         return jsonify({'servicio': servicio, 'ok': True, 'entidades': n,
-                        'nota': f'✓ funcionó — {n} entidad(es) reales'})
+                        'nota': f'✓ worked -- {n} real entity(ies)'})
     if not tiene:
-        return jsonify({'servicio': servicio, 'ok': False, 'nota': 'sin key configurada'})
+        return jsonify({'servicio': servicio, 'ok': False, 'nota': 'no key configured'})
     return jsonify({'servicio': servicio, 'ok': False, 'entidades': 0,
-                    'nota': 'key presente pero 0 resultados (¿inválida, sin cuota, o esquema distinto?)'})
+                    'nota': 'key present but 0 results (invalid, out of quota, or different schema?)'})
 
 _TIPOS_ACTIVO = ('dominio', 'subdominio', 'ip', 'puerto', 'tech', 'url', 'cve', 'bucket', 'org')
 
@@ -4409,14 +4409,14 @@ def api_v2_diff_historico():
     """Cómo cambió la superficie del objetivo vs un snapshot anterior (F12 paso 151).
     Sin ?snapshot devuelve la lista de snapshots disponibles."""
     if not _ws_activo:
-        return _error('sin workspace activo', 400)
+        return _error('no active workspace', 400)
     sid = request.args.get('snapshot')
     if not sid:
         return jsonify({'snapshots': _gestor.listar_snapshots(_ws_activo)})
     try:
         viejo = _gestor.cargar_snapshot(_ws_activo, sid)
     except KeyError:
-        return _error('snapshot no encontrado', 404)
+        return _error('snapshot not found', 404)
     ids_v = {e.id: e for e in viejo.entidades}
     ids_n = {e.id: e for e in _almacen.entidades}
     agregados = [{'tipo': e.tipo, 'valor': e.valor} for i, e in ids_n.items() if i not in ids_v]
@@ -4557,11 +4557,11 @@ def api_v2_monitor_ntfy():
     d = request.json or {}
     topic = (d.get('topic', '') or '').strip()
     if not topic:
-        return _error('topic vacío', 400)
+        return _error('empty topic', 400)
     try:
         _boveda.guardar('ntfy_topic', topic)
     except Exception as e:
-        return _error(f'no se pudo guardar: {e}', 500)
+        return _error(f'could not save: {e}', 500)
     ok = enviar_ntfy(topic, 'Notificaciones de OBSIDIAN activadas ✓',
                      titulo='OBSIDIAN', prioridad='default')
     return jsonify({'ok': True, 'prueba_enviada': ok})
@@ -4573,7 +4573,7 @@ def api_v2_monitor_start():
     intervalo = max(30, int(d.get('intervalo', 300)))     # mínimo 30s (no martillar)
     _monitor_tareas = d.get('tareas') or _tareas_monitor_default()
     if not _monitor_tareas:
-        return _error('nada que monitorear: agrega un objetivo y corre transforms primero', 400)
+        return _error('nothing to monitor: add a target and run transforms first', 400)
     if _monitor and _monitor.activo:
         _monitor.detener()
     _monitor = Monitor(_monitor_snapshot, _monitor_refrescar,
@@ -4658,10 +4658,10 @@ def api_v2_extraer_texto():
 def api_v2_chat():
     """Chat sobre el caso: pregúntale a la IA usando los datos del grafo (F14 paso 170)."""
     if not ia.disponible():
-        return _error('IA (Ollama) no disponible', 503)
+        return _error('AI (Ollama) unavailable', 503)
     pregunta = ((request.json or {}).get('pregunta', '') or '').strip()
     if not pregunta:
-        return _error('pregunta vacía', 400)
+        return _error('empty question', 400)
     contexto = json.dumps(_almacen.to_dict(), default=str)[:3500]
     prompt = (f'Eres un analista con acceso a este caso OSINT. Responde la pregunta usando SOLO estos '
               f'datos; si la respuesta no está en ellos, dilo claramente.\n\nDatos:\n{contexto}\n\n'
@@ -4669,7 +4669,7 @@ def api_v2_chat():
     try:
         resp = ia.consultar(prompt, max_tokens=500, temp=0.3)
     except Exception as e:
-        return _error(f'IA falló: {e}', 500)
+        return _error(f'AI failed: {e}', 500)
     return jsonify({'pregunta': pregunta, 'respuesta': resp})
 
 @app.route('/api/v2/deteccion_ia', methods=['POST'])
@@ -4677,16 +4677,16 @@ def api_v2_deteccion_ia():
     """Indicio (NO prueba) de texto generado por IA (F14 paso 169). Para imágenes,
     usa el transform 'ela' (126). No existe método keyless fiable — es orientativo."""
     if not ia.disponible():
-        return _error('IA (Ollama) no disponible', 503)
+        return _error('AI (Ollama) unavailable', 503)
     texto = ((request.json or {}).get('texto', '') or '')[:3000]
     if not texto.strip():
-        return _error('texto vacío', 400)
+        return _error('empty text', 400)
     try:
         resp = ia.consultar('¿Este texto parece generado por IA? Da SEÑALES concretas (uniformidad, '
                             'frases genéricas, falta de detalle específico) y un veredicto tentativo. '
                             f'No inventes certeza.\n\n{texto}', max_tokens=400, temp=0.3)
     except Exception as e:
-        return _error(f'IA falló: {e}', 500)
+        return _error(f'AI failed: {e}', 500)
     return jsonify({'evaluacion': resp,
                     'aviso': 'INDICIO, no prueba. No hay detección de IA/deepfake keyless fiable; '
                              'para imágenes usa el transform ela (Error Level Analysis).'})
@@ -4695,10 +4695,10 @@ def api_v2_deteccion_ia():
 def api_v2_consulta():
     """Consulta en lenguaje natural → plan de transforms (F14 paso 165)."""
     if not ia.disponible():
-        return _error('IA (Ollama) no disponible', 503)
+        return _error('AI (Ollama) unavailable', 503)
     pregunta = ((request.json or {}).get('pregunta', '') or '').strip()
     if not pregunta:
-        return _error('pregunta vacía', 400)
+        return _error('empty question', 400)
     disponibles = sorted({t.nombre for tp in TIPOS for t in REGISTRO.aplicables(tp)})
     prompt = (f'Eres OBSIDIAN, un motor OSINT. Transforms disponibles: {", ".join(disponibles)}.\n'
               f'El usuario pide: "{pregunta}". Devuelve un PLAN concreto: qué transforms correr, '
@@ -4706,37 +4706,37 @@ def api_v2_consulta():
     try:
         resp = ia.consultar(prompt, max_tokens=600, temp=0.3)
     except Exception as e:
-        return _error(f'IA falló: {e}', 500)
+        return _error(f'AI failed: {e}', 500)
     return jsonify({'pregunta': pregunta, 'plan': resp})
 
 @app.route('/api/v2/traducir', methods=['POST'])
 def api_v2_traducir():
     """Traduce texto extranjero (chino/ruso/árabe…) al español con Ollama (F14 paso 162)."""
     if not ia.disponible():
-        return _error('IA (Ollama) no disponible', 503)
+        return _error('AI (Ollama) unavailable', 503)
     texto = ((request.json or {}).get('texto', '') or '')[:4000]
     if not texto.strip():
-        return _error('texto vacío', 400)
+        return _error('empty text', 400)
     try:
         resp = ia.consultar(f'Traduce al español. Devuelve SOLO la traducción, sin notas '
                             f'ni comillas:\n\n{texto}', max_tokens=800, temp=0.2)
     except Exception as e:
-        return _error(f'IA falló: {e}', 500)
+        return _error(f'AI failed: {e}', 500)
     return jsonify({'traduccion': resp})
 
 @app.route('/api/v2/ia/<modo>', methods=['POST'])
 def api_v2_ia_modo(modo):
     """IA a nivel de caso (paso 34 backfill): escenario MITRE / superficie / analizar."""
     if modo not in _PROMPTS_IA:
-        return _error('modo inválido', 404)
+        return _error('invalid mode', 404)
     if not ia.disponible():
-        return _error('IA (Ollama) no disponible', 503)
+        return _error('AI (Ollama) unavailable', 503)
     contexto = json.dumps(_almacen.to_dict(), default=str)[:3500]
     prompt = _PROMPTS_IA[modo].format(objetivo=_objetivo_del_almacen() or 'el objetivo', datos=contexto)
     try:
         resp = ia.consultar(prompt, max_tokens=700, temp=0.4)
     except Exception as e:
-        return _error(f'IA falló: {e}', 500)
+        return _error(f'AI failed: {e}', 500)
     return jsonify({'modo': modo, 'resultado': resp})
 
 @app.route('/api/v2/hallazgos/ia', methods=['POST'])
@@ -4745,7 +4745,7 @@ def api_v2_hallazgos_ia():
     sugiere el siguiente paso a partir de los hallazgos del caso."""
     h = correlacionar(_almacen)
     if not h:
-        return jsonify({'resumen': 'Sin hallazgos que analizar todavía. Corre más transforms.'})
+        return jsonify({'resumen': 'No findings to analyze yet. Run more transforms.'})
     conteo = {}
     for e in _almacen.entidades:
         conteo[e.tipo] = conteo.get(e.tipo, 0) + 1
@@ -4759,10 +4759,10 @@ def api_v2_hallazgos_ia():
         f"concreto de investigación. Directo, sin relleno.")
     try:
         texto = ia.consultar(prompt, max_tokens=300)
-        return jsonify({'resumen': texto or 'La IA no devolvió texto.'})
+        return jsonify({'resumen': texto or 'The AI returned no text.'})
     except Exception as e:
         log.warning("IA correlación falló: %s", e)
-        return _error('Ollama no disponible (¿está corriendo en :11434?)', 503)
+        return _error('Ollama unavailable (is it running on :11434?)', 503)
 
 @app.route('/api/v2/hallazgos/verificar', methods=['POST'])
 def api_v2_verificar():
