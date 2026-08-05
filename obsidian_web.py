@@ -4592,6 +4592,21 @@ def api_v2_extraer_texto():
                 log.warning("autosave extraer_texto: %s", _e)
     return jsonify({'agregadas': agregadas, 'total': len(agregadas)})
 
+@app.route('/api/v2/traducir', methods=['POST'])
+def api_v2_traducir():
+    """Traduce texto extranjero (chino/ruso/árabe…) al español con Ollama (F14 paso 162)."""
+    if not ia.disponible():
+        return _error('IA (Ollama) no disponible', 503)
+    texto = ((request.json or {}).get('texto', '') or '')[:4000]
+    if not texto.strip():
+        return _error('texto vacío', 400)
+    try:
+        resp = ia.consultar(f'Traduce al español. Devuelve SOLO la traducción, sin notas '
+                            f'ni comillas:\n\n{texto}', max_tokens=800, temp=0.2)
+    except Exception as e:
+        return _error(f'IA falló: {e}', 500)
+    return jsonify({'traduccion': resp})
+
 @app.route('/api/v2/ia/<modo>', methods=['POST'])
 def api_v2_ia_modo(modo):
     """IA a nivel de caso (paso 34 backfill): escenario MITRE / superficie / analizar."""

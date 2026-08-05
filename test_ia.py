@@ -24,3 +24,25 @@ def test_extraer_wallets_de_texto():
     txt = 'paga a 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
     tipos = {t for t, _ in extraer_entidades(txt)}
     assert 'wallet' in tipos
+
+
+# ── 162: traducción de fuentes extranjeras ───────────────────────────────────
+def test_traducir(monkeypatch):
+    import obsidian_web as ob
+    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'Hola mundo')
+    c = ob.app.test_client()
+    with c.session_transaction() as s:
+        s['auth'] = True
+    d = c.post('/api/v2/traducir', json={'texto': '你好世界'}).get_json()
+    assert d['traduccion'] == 'Hola mundo'
+    assert c.post('/api/v2/traducir', json={'texto': ''}).status_code == 400
+
+
+def test_traducir_sin_ia(monkeypatch):
+    import obsidian_web as ob
+    monkeypatch.setattr(ob.ia, 'disponible', lambda: False)
+    c = ob.app.test_client()
+    with c.session_transaction() as s:
+        s['auth'] = True
+    assert c.post('/api/v2/traducir', json={'texto': 'x'}).status_code == 503
