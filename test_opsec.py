@@ -96,3 +96,15 @@ def test_evaluar_fuga():
     assert ob._evaluar_fuga(True, '1.2.3.4', '1.2.3.4') is True     # anónimo pero misma IP = FUGA
     assert ob._evaluar_fuga(True, '9.9.9.9', '1.2.3.4') is False    # IP distinta = ok
     assert ob._evaluar_fuga(False, '1.2.3.4', '1.2.3.4') is False   # no anónimo = no aplica
+
+
+# ── 159: rotación de API keys ────────────────────────────────────────────────
+def test_key_rotativa(monkeypatch):
+    import obsidian_web as ob
+    ob._KEY_ROT.clear()
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'k1|k2|k3')
+    assert [ob._key_rotativa('shodan') for _ in range(4)] == ['k1', 'k2', 'k3', 'k1']  # round-robin
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'solo')
+    assert ob._key_rotativa('x') == 'solo'                # una sola: tal cual
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    assert ob._key_rotativa('x') is None

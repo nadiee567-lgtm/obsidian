@@ -2108,7 +2108,7 @@ def _pivote_ips(campos):
     """Busca en FOFA + Shodan por `campos` unificados y devuelve el set de IPs que
     coinciden. Base de los pivotes (favicon, cert). Dedup cross-motor gratis (set)."""
     ips = set()
-    cred = _boveda.obtener('fofa') or os.environ.get('FOFA_KEY', '')
+    cred = _key_rotativa('fofa') or os.environ.get('FOFA_KEY', '')
     if cred and ':' in cred:
         email, key = cred.split(':', 1)
         try:
@@ -2122,7 +2122,7 @@ def _pivote_ips(campos):
                     ips.add(row[0] if isinstance(row, list) else row)
         except Exception as _e:
             log.debug("pivote fofa: %s", _e)
-    skey = _boveda.obtener('shodan') or os.environ.get('SHODAN_API_KEY', '')
+    skey = _key_rotativa('shodan') or os.environ.get('SHODAN_API_KEY', '')
     if skey:
         try:
             r = SESSION.get('https://api.shodan.io/shodan/host/search',
@@ -2315,7 +2315,7 @@ def _t_dns_ns(entidad, ctx):
            descripcion='Brechas donde apareció el email (HIBP; requiere HIBP_API_KEY real)')
 def _t_email_breaches(entidad, ctx):
     try:
-        hibp_key = _boveda.obtener('hibp') or os.environ.get('HIBP_API_KEY', '')
+        hibp_key = _key_rotativa('hibp') or os.environ.get('HIBP_API_KEY', '')
         r = SESSION.get(
             f'https://haveibeenpwned.com/api/v3/breachedaccount/{requests.utils.quote(entidad.valor)}',
             timeout=8,
@@ -2333,7 +2333,7 @@ def _pastes_github(entidad):
     """Menciones del objetivo + indicadores de secreto en código público de
     GitHub (donde de verdad se filtran credenciales). psbdmp murió; esta es la
     ruta real, pero necesita un token gratis de GitHub (en la bóveda)."""
-    token = _boveda.obtener('github') or os.environ.get('GITHUB_TOKEN', '')
+    token = _key_rotativa('github') or os.environ.get('GITHUB_TOKEN', '')
     if not token:
         return
     try:
@@ -2410,7 +2410,7 @@ def _t_breaches(entidad, ctx):
                     fuentes.add(nombre)
     except Exception as _e:
         log.debug("breaches leakcheck: %s", _e)
-    hibp = _boveda.obtener('hibp') or os.environ.get('HIBP_API_KEY', '')
+    hibp = _key_rotativa('hibp') or os.environ.get('HIBP_API_KEY', '')
     if hibp:                                          # HIBP (de pago, opcional)
         try:
             r = SESSION.get(f'https://haveibeenpwned.com/api/v3/breachedaccount/{email}',
@@ -2428,7 +2428,7 @@ def _t_breaches(entidad, ctx):
 @transform(entrada='email', salidas=('url',), nombre='intelx', requiere_key=True,
            descripcion='Búsqueda histórica de filtraciones por selector (Intelligence X, key en bóveda) (F10 paso 134)')
 def _t_intelx(entidad, ctx):
-    key = _boveda.obtener('intelx') or os.environ.get('INTELX_KEY', '')
+    key = _key_rotativa('intelx') or os.environ.get('INTELX_KEY', '')
     if not key:
         return
     try:
@@ -2667,7 +2667,7 @@ def _t_http_probe_sub(entidad, ctx):
 @transform(entrada='dominio', salidas=('dominio',), nombre='reverse_whois',
            descripcion='Otros dominios del mismo registrante (ViewDNS, key gratis en la bóveda). Único de F5 sin opción keyless.')
 def _t_reverse_whois(entidad, ctx):
-    key = _boveda.obtener('viewdns') or os.environ.get('VIEWDNS_KEY', '')
+    key = _key_rotativa('viewdns') or os.environ.get('VIEWDNS_KEY', '')
     if not key:
         return
     try:
@@ -2733,7 +2733,7 @@ def _t_reputacion_ip(entidad, ctx):
 @transform(entrada='ip', salidas=(), nombre='abuseipdb',
            descripcion='Score de abuso de la IP (AbuseIPDB, key gratis en la bóveda)')
 def _t_abuseipdb(entidad, ctx):
-    key = _boveda.obtener('abuseipdb') or os.environ.get('ABUSEIPDB_KEY', '')
+    key = _key_rotativa('abuseipdb') or os.environ.get('ABUSEIPDB_KEY', '')
     if not key:
         return
     try:
@@ -2753,7 +2753,7 @@ def _t_abuseipdb(entidad, ctx):
            requiere_key=True,
            descripcion='Puertos/servicios/org de la IP (Shodan, key en la bóveda)')
 def _t_shodan(entidad, ctx):
-    key = _boveda.obtener('shodan') or os.environ.get('SHODAN_API_KEY', '')
+    key = _key_rotativa('shodan') or os.environ.get('SHODAN_API_KEY', '')
     if not key:
         return
     try:
@@ -2779,7 +2779,7 @@ def _t_shodan(entidad, ctx):
            requiere_key=True,
            descripcion='Servicios de la IP (Censys, key "id:secret" en la bóveda)')
 def _t_censys(entidad, ctx):
-    cred = _boveda.obtener('censys') or os.environ.get('CENSYS_API', '')
+    cred = _key_rotativa('censys') or os.environ.get('CENSYS_API', '')
     if not cred or ':' not in cred:
         return
     cid, secret = cred.split(':', 1)
@@ -2809,7 +2809,7 @@ def _t_censys(entidad, ctx):
            requiere_key=True,
            descripcion='Servicios de la IP en ZoomEye (motor CN, key en la bóveda)')
 def _t_zoomeye(entidad, ctx):
-    key = _boveda.obtener('zoomeye') or os.environ.get('ZOOMEYE_KEY', '')
+    key = _key_rotativa('zoomeye') or os.environ.get('ZOOMEYE_KEY', '')
     if not key:
         return
     try:
@@ -2832,7 +2832,7 @@ def _t_zoomeye(entidad, ctx):
            requiere_key=True,
            descripcion='Hosts/dominios en FOFA (motor CN, key "email:key" en la bóveda)')
 def _t_fofa(entidad, ctx):
-    cred = _boveda.obtener('fofa') or os.environ.get('FOFA_KEY', '')
+    cred = _key_rotativa('fofa') or os.environ.get('FOFA_KEY', '')
     if not cred or ':' not in cred:
         return
     email, key = cred.split(':', 1)
@@ -2859,7 +2859,7 @@ def _t_fofa(entidad, ctx):
            requiere_key=True,
            descripcion='Servicios de la IP en Quake/360 (motor CN, key en la bóveda)')
 def _t_quake(entidad, ctx):
-    key = _boveda.obtener('quake') or os.environ.get('QUAKE_KEY', '')
+    key = _key_rotativa('quake') or os.environ.get('QUAKE_KEY', '')
     if not key:
         return
     try:
@@ -2881,7 +2881,7 @@ def _t_quake(entidad, ctx):
            requiere_key=True,
            descripcion='Hosts/dominios en Hunter.how (motor CN, key en la bóveda)')
 def _t_hunter(entidad, ctx):
-    key = _boveda.obtener('hunter') or os.environ.get('HUNTER_KEY', '')
+    key = _key_rotativa('hunter') or os.environ.get('HUNTER_KEY', '')
     if not key:
         return
     q = base64.urlsafe_b64encode(_motor_query('hunter', {'ip': entidad.valor}).encode()).decode()
@@ -2901,7 +2901,7 @@ def _t_hunter(entidad, ctx):
            requiere_key=True,
            descripcion='Respuestas de la IP en Netlas (key en la bóveda)')
 def _t_netlas(entidad, ctx):
-    key = _boveda.obtener('netlas') or os.environ.get('NETLAS_KEY', '')
+    key = _key_rotativa('netlas') or os.environ.get('NETLAS_KEY', '')
     if not key:
         return
     try:
@@ -2919,7 +2919,7 @@ def _t_netlas(entidad, ctx):
            requiere_key=True,
            descripcion='Puertos/exposición de la IP (Criminal IP, key en la bóveda)')
 def _t_criminalip(entidad, ctx):
-    key = _boveda.obtener('criminalip') or os.environ.get('CRIMINALIP_KEY', '')
+    key = _key_rotativa('criminalip') or os.environ.get('CRIMINALIP_KEY', '')
     if not key:
         return
     try:
@@ -2937,7 +2937,7 @@ def _t_criminalip(entidad, ctx):
            requiere_key=True,
            descripcion='Puertos expuestos de la IP (BinaryEdge, key en la bóveda)')
 def _t_binaryedge(entidad, ctx):
-    key = _boveda.obtener('binaryedge') or os.environ.get('BINARYEDGE_KEY', '')
+    key = _key_rotativa('binaryedge') or os.environ.get('BINARYEDGE_KEY', '')
     if not key:
         return
     try:
@@ -2976,7 +2976,7 @@ def _t_telefono_dorks(entidad, ctx):
     }
     for nombre, q in dorks.items():
         ctx.emitir('url', f'https://www.google.com/search?q={_q(q)}', etiqueta=f'dork:{nombre}', dork=nombre)
-    key = _boveda.obtener('numverify') or os.environ.get('NUMVERIFY_KEY', '')
+    key = _key_rotativa('numverify') or os.environ.get('NUMVERIFY_KEY', '')
     if key:
         try:
             r = SESSION.get('http://apilayer.net/api/validate',
@@ -3107,7 +3107,7 @@ def _t_takeover(entidad, ctx):
 @transform(entrada='dominio', salidas=('ip',), nombre='passivedns', requiere_key=True,
            descripcion='Historial de IPs del dominio (Passive DNS via VirusTotal, key en la bóveda) (F2 paso 34)')
 def _t_passivedns(entidad, ctx):
-    key = _boveda.obtener('virustotal') or os.environ.get('VT_API_KEY', '')
+    key = _key_rotativa('virustotal') or os.environ.get('VT_API_KEY', '')
     if not key:
         return
     try:
@@ -3137,7 +3137,7 @@ _SECRET_PATTERNS = [
            descripcion='Secretos hardcodeados en commits de repos públicos del usuario (F4 paso 60)')
 def _t_github_sec(entidad, ctx):
     user = entidad.valor
-    tok = _boveda.obtener('github') or os.environ.get('GITHUB_TOKEN', '')
+    tok = _key_rotativa('github') or os.environ.get('GITHUB_TOKEN', '')
     hdr = {'Authorization': f'token {tok}'} if tok else {}
     try:
         rr = SESSION.get(f'https://api.github.com/users/{user}/repos?per_page=20', headers=hdr, timeout=8)
@@ -4099,6 +4099,22 @@ _OPSEC = {'anonimo': False}
 def _set_anonimo(on):
     _OPSEC['anonimo'] = bool(on)
     SESSION.proxies = {'http': TOR_PROXY, 'https': TOR_PROXY} if on else {}
+
+_KEY_ROT = {}
+
+def _key_rotativa(servicio):
+    """Key de un servicio, rotando entre varias cuentas si se guardó 'k1|k2|k3'
+    (reparte carga entre cuentas del mismo servicio). Paso 159. Retrocompatible:
+    una sola key se devuelve tal cual."""
+    raw = _boveda.obtener(servicio)
+    if not raw or '|' not in raw:
+        return raw
+    keys = [k.strip() for k in raw.split('|') if k.strip()]
+    if not keys:
+        return None
+    i = _KEY_ROT.get(servicio, 0)
+    _KEY_ROT[servicio] = i + 1
+    return keys[i % len(keys)]
 
 _USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
