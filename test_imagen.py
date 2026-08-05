@@ -116,3 +116,53 @@ def test_ocr_sin_tesseract(monkeypatch):
 
 def test_geoloc_es_modo_ia():
     assert 'geoloc' in ob._PROMPTS_IA
+
+
+# ── F9 126-127: ELA + pHash (necesitan Pillow) ───────────────────────────────
+def _img_grad():
+    import tempfile
+    from PIL import Image
+    p = tempfile.mktemp(suffix='.png')
+    img = Image.new('L', (16, 16))
+    img.putdata([(i * 7 + j * 3) % 256 for i in range(16) for j in range(16)])
+    img.save(p)
+    return p
+
+
+def test_phash_estable():
+    from core.imagen import phash
+    import os as _os
+    a, b = _img_grad(), _img_grad()
+    ha, hb = phash(a), phash(b)
+    assert ha and len(ha) == 16 and ha == hb        # misma imagen -> mismo hash
+    _os.unlink(a); _os.unlink(b)
+
+
+def test_ela_genera_imagen():
+    from core.imagen import ela
+    import os as _os
+    import tempfile
+    src, out = _img_grad(), tempfile.mktemp(suffix='.png')
+    md = ela(src, out)
+    assert md is not None and _os.path.exists(out)
+    _os.unlink(src); _os.unlink(out)
+
+
+def test_phash_transform(monkeypatch):
+    from core.transforms import ejecutar_por_nombre
+    monkeypatch.setattr(ob, '_descargar_imagen', lambda url: _img_grad())
+    alm = Almacen()
+    u = alm.crear('url', 'https://x.com/a.jpg')
+    prod = ejecutar_por_nombre('phash', u, alm)
+    hs = [e for e in prod if e.tipo == 'hash']
+    assert hs and hs[0].propiedades.get('tipo_hash') == 'phash'
+    assert u.propiedades.get('phash')
+
+
+def test_ela_transform(monkeypatch):
+    from core.transforms import ejecutar_por_nombre
+    monkeypatch.setattr(ob, '_descargar_imagen', lambda url: _img_grad())
+    alm = Almacen()
+    u = alm.crear('url', 'https://x.com/a.jpg')
+    ejecutar_por_nombre('ela', u, alm)
+    assert 'ela-generado' in u.tags and u.propiedades.get('ela_img')

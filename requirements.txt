@@ -21,3 +21,4 @@ cryptography==50.0.0
 #   luego:  nuclei -update-templates
 # Opcionales para OSINT de usuario:  pipx install sherlock-project maigret
 mmh3==5.2.1
+Pillow==12.3.0        # opcional: ELA (126) + pHash (127) de imágenes

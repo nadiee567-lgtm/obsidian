@@ -24,7 +24,8 @@ from core.estado import render_estado
 from core.motores import traducir as _motor_query, traducir_todos, MOTORES
 from core.tareas import GestorTareas
 from core.imagen import (enlaces_reverse, enlaces_facial, parse_gps,
-                         enlaces_cronolocalizacion, enlaces_satelital, enlaces_landmark)
+                         enlaces_cronolocalizacion, enlaces_satelital, enlaces_landmark,
+                         phash as _phash, ela as _ela)
 import core.ia as ia
 
 log = get_logger()
@@ -3250,6 +3251,59 @@ def _t_ocr(entidad, ctx):
         if texto:
             entidad.propiedades['ocr'] = texto[:1000]
             entidad.etiquetar('tiene-texto')
+    finally:
+        try:
+            os.unlink(fn)
+        except OSError:
+            pass
+
+def _descargar_imagen(url):
+    """Baja una imagen a un archivo temporal (anti-SSRF). Devuelve la ruta o None."""
+    try:
+        r = _fetch_seguro(url, timeout=10, stream=True)
+    except Exception:
+        return None
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.img') as f:
+        for chunk in r.iter_content(8192):
+            f.write(chunk)
+            if f.tell() > 15_000_000:
+                break
+        return f.name
+
+@transform(entrada='url', salidas=(), nombre='ela', requiere_key=False,
+           descripcion='Detección de edición por Error Level Analysis (genera imagen ELA) (F9 paso 126)')
+def _t_ela(entidad, ctx):
+    fn = _descargar_imagen(entidad.valor)
+    if not fn:
+        return
+    try:
+        salida_dir = os.path.join(STATIC_DIR, 'ela')
+        os.makedirs(salida_dir, exist_ok=True)
+        nombre_img = f'{hashlib.md5(entidad.valor.encode()).hexdigest()[:10]}.png'
+        max_diff = _ela(fn, os.path.join(salida_dir, nombre_img))
+        if max_diff is not None:
+            entidad.propiedades['ela_img'] = f'/static/ela/{nombre_img}'
+            entidad.propiedades['ela_max_diff'] = max_diff
+            entidad.etiquetar('ela-generado')
+            if max_diff >= 50:                       # heurístico: revisar visualmente
+                entidad.etiquetar('revisar-edicion')
+    finally:
+        try:
+            os.unlink(fn)
+        except OSError:
+            pass
+
+@transform(entrada='url', salidas=('hash',), nombre='phash',
+           descripcion='Hash perceptual (dHash): agrupa la misma imagen reusada en varios perfiles (F9 paso 127)')
+def _t_phash(entidad, ctx):
+    fn = _descargar_imagen(entidad.valor)
+    if not fn:
+        return
+    try:
+        h = _phash(fn)
+        if h:
+            entidad.propiedades['phash'] = h
+            ctx.emitir('hash', h, etiqueta='phash', tipo_hash='phash')
     finally:
         try:
             os.unlink(fn)
