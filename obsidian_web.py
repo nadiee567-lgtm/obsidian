@@ -3668,6 +3668,13 @@ def _t_extraer_wallets(entidad, ctx):
         for addr in list(set(rx.findall(texto)))[:30]:
             ctx.emitir('wallet', addr, etiqueta=cadena, cadena=cadena)
 
+@transform(entrada='persona', salidas=('persona',), nombre='transliterar',
+           descripcion='Variantes del nombre en cirílico/latino para buscar en cada alfabeto (F15 paso 172)')
+def _t_transliterar(entidad, ctx):
+    for alfabeto, variante in _ml.transliterar(entidad.valor).items():
+        if variante and variante.lower() != entidad.valor.lower():
+            ctx.emitir('persona', variante, etiqueta=f'translit:{alfabeto}')
+
 @transform(entrada='usuario', salidas=('url',), nombre='plataformas_regionales',
            descripcion='Perfiles en plataformas regionales: VK, Weibo, Douyin, OK, Telegram (F15 paso 171)')
 def _t_plataformas_regionales(entidad, ctx):

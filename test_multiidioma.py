@@ -18,3 +18,16 @@ def test_plataformas_regionales():
     prod, _ = _correr('plataformas_regionales', 'usuario', 'nadiee')
     plats = {p.propiedades.get('plataforma') for p in prod if p.tipo == 'url'}
     assert {'vk', 'ok', 'weibo', 'douyin', 'telegram'} == plats
+
+
+# ── 172: transliteración de nombres ──────────────────────────────────────────
+def test_transliterar_funciones():
+    from core.multiidioma import cirilico_a_latino, latino_a_cirilico
+    assert cirilico_a_latino('Иван') == 'ivan'
+    assert latino_a_cirilico('ivan') == 'иван'
+
+
+def test_transliterar_transform():
+    prod, _ = _correr('transliterar', 'persona', 'Иван')
+    variantes = {p.valor for p in prod if p.tipo == 'persona'}
+    assert 'ivan' in variantes                    # variante latina
