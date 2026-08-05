@@ -23,6 +23,7 @@ from core.notificar import enviar_ntfy, construir_ntfy
 from core.estado import render_estado
 from core.motores import traducir as _motor_query, traducir_todos, MOTORES
 from core.tareas import GestorTareas
+from core.personas import GestorPersonas
 from core.imagen import (enlaces_reverse, enlaces_facial, parse_gps,
                          enlaces_cronolocalizacion, enlaces_satelital, enlaces_landmark,
                          phash as _phash, ela as _ela)
@@ -4086,6 +4087,26 @@ def api_v2_ws_snapshot():
             return _error('workspace no encontrado', 404)
         return jsonify({'ok': True, 'snapshot': sid})
     return jsonify({'snapshots': _gestor.listar_snapshots(_ws_activo)})
+
+_personas = GestorPersonas(os.path.join(HOME, '.obsidian', 'personas.json'))
+
+@app.route('/api/v2/personas', methods=['GET', 'POST', 'DELETE'])
+def api_v2_personas():
+    """Bóveda de sock puppets: identidades de investigación no atribuibles (F13 paso 152)."""
+    if request.method == 'GET':
+        nombre = request.args.get('nombre')
+        if nombre:
+            return jsonify({'persona': _personas.obtener(nombre)})
+        return jsonify({'personas': _personas.listar()})
+    d = request.json or {}
+    nombre = (d.get('nombre', '') or '').strip()
+    if not nombre:
+        return _error('falta el nombre de la persona', 400)
+    if request.method == 'POST':
+        _personas.crear(nombre, d.get('datos', {}))
+        return jsonify({'ok': True, 'personas': _personas.listar()})
+    _personas.borrar(nombre)   # DELETE
+    return jsonify({'ok': True, 'personas': _personas.listar()})
 
 @app.route('/api/v2/keys', methods=['GET', 'POST', 'DELETE'])
 def api_v2_keys():
