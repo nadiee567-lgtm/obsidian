@@ -3257,6 +3257,46 @@ def _t_ocr(entidad, ctx):
         except OSError:
             pass
 
+# ── Ruteo .onion por Tor (F10 paso 128) — aprovecha el tor del sistema/QuimichNet ─
+TOR_PROXY = os.environ.get('OBSIDIAN_TOR', 'socks5h://127.0.0.1:9050')
+
+def _tor_disponible():
+    try:
+        with socket.create_connection(('127.0.0.1', 9050), timeout=2):
+            return True
+    except Exception:
+        return False
+
+def _fetch_tor(url, timeout=25):
+    """GET a través de Tor (socks5h resuelve .onion por el propio Tor)."""
+    return SESSION.get(url, proxies={'http': TOR_PROXY, 'https': TOR_PROXY},
+                       timeout=timeout, headers={'User-Agent': 'Mozilla/5.0'})
+
+@transform(entrada='url', salidas=('email', 'url'), nombre='onion_fetch',
+           descripcion='Abre un sitio .onion por Tor y extrae título, emails y enlaces .onion (F10 paso 128)')
+def _t_onion_fetch(entidad, ctx):
+    url = entidad.valor
+    if '.onion' not in url:
+        return                                       # SOLO .onion (no SSRF a IPs internas)
+    if not url.startswith('http'):
+        url = 'http://' + url
+    if not _tor_disponible():
+        entidad.propiedades['tor'] = 'Tor no disponible (arranca el servicio tor / QuimichNet)'
+        return
+    try:
+        r = _fetch_tor(url)
+    except Exception as _e:
+        log.debug("onion_fetch: %s", _e)
+        return
+    m = re.search(r'<title[^>]*>(.*?)</title>', r.text[:8000], re.I | re.S)
+    if m:
+        entidad.propiedades['onion_titulo'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
+    for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', r.text)))[:15]:
+        ctx.emitir('email', em, etiqueta='en-onion')
+    for on in list(set(re.findall(r'[a-z2-7]{16,56}\.onion', r.text)))[:15]:
+        ctx.emitir('url', 'http://' + on, etiqueta='onion-link')
+    entidad.etiquetar('onion-vivo')
+
 def _descargar_imagen(url):
     """Baja una imagen a un archivo temporal (anti-SSRF). Devuelve la ruta o None."""
     try:
