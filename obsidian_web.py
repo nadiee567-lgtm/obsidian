@@ -3798,6 +3798,8 @@ def _correr_transform_interno(tipo, valor, nombre):
     semilla = Entidad(tipo, (valor or '').strip())          # puede lanzar ValueError
     if not semilla.valor_bien_formado():
         raise ValueError(f'valor con forma inválida para {tipo}')
+    if _PROXIES['pool']:
+        _rotar_proxy()                                      # OPSEC: rota proxy por transform (154)
     with _almacen_lock:
         semilla = _almacen.agregar(semilla)
         producidas = ejecutar_por_nombre(nombre, semilla, _almacen)
@@ -4094,6 +4096,31 @@ _OPSEC = {'anonimo': False}
 def _set_anonimo(on):
     _OPSEC['anonimo'] = bool(on)
     SESSION.proxies = {'http': TOR_PROXY, 'https': TOR_PROXY} if on else {}
+
+_PROXIES = {'pool': [], 'i': 0}
+
+def _rotar_proxy():
+    """Pone en el SESSION el siguiente proxy del pool (round-robin). Paso 154."""
+    pool = _PROXIES['pool']
+    if not pool:
+        return None
+    p = pool[_PROXIES['i'] % len(pool)]
+    _PROXIES['i'] += 1
+    SESSION.proxies = {'http': p, 'https': p}
+    return p
+
+@app.route('/api/v2/opsec/proxies', methods=['GET', 'POST', 'DELETE'])
+def api_v2_opsec_proxies():
+    """Pool de proxies que rota por transform (F13 paso 154)."""
+    if request.method == 'POST':
+        _PROXIES['pool'] = [p for p in ((request.json or {}).get('pool') or []) if p]
+        _PROXIES['i'] = 0
+        return jsonify({'pool_size': len(_PROXIES['pool'])})
+    if request.method == 'DELETE':
+        _PROXIES['pool'] = []
+        SESSION.proxies = {}
+        return jsonify({'pool_size': 0})
+    return jsonify({'pool_size': len(_PROXIES['pool']), 'actual': SESSION.proxies.get('https')})
 
 @app.route('/api/v2/opsec/anonimo', methods=['GET', 'POST'])
 def api_v2_opsec_anonimo():

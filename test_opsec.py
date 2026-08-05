@@ -26,3 +26,17 @@ def test_modo_anonimo_toggle():
         assert ob.SESSION.proxies == {} and not ob._OPSEC['anonimo']
     finally:
         ob._set_anonimo(False)                       # no dejar el proxy puesto
+
+
+# ── 154: rotación de proxies ─────────────────────────────────────────────────
+def test_rotacion_proxies():
+    import obsidian_web as ob
+    try:
+        ob._PROXIES['pool'] = ['http://p1:8080', 'http://p2:8080']
+        ob._PROXIES['i'] = 0
+        p1, p2, p3 = ob._rotar_proxy(), ob._rotar_proxy(), ob._rotar_proxy()
+        assert (p1, p2, p3) == ('http://p1:8080', 'http://p2:8080', 'http://p1:8080')  # round-robin
+        assert ob.SESSION.proxies['https'] == 'http://p1:8080'
+    finally:
+        ob._PROXIES['pool'] = []
+        ob.SESSION.proxies = {}
