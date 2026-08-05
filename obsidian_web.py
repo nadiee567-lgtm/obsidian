@@ -4143,6 +4143,22 @@ def api_v2_keys_probar():
     return jsonify({'servicio': servicio, 'ok': False, 'entidades': 0,
                     'nota': 'key presente pero 0 resultados (¿inválida, sin cuota, o esquema distinto?)'})
 
+_TIPOS_ACTIVO = ('dominio', 'subdominio', 'ip', 'puerto', 'tech', 'url', 'cve', 'bucket', 'org')
+
+@app.route('/api/v2/inventario')
+def api_v2_inventario():
+    """Inventario de activos internet-facing del objetivo, en un solo lugar (F12 paso 144)."""
+    inv = {}
+    for t in _TIPOS_ACTIVO:
+        ents = _almacen.de_tipo(t)
+        if ents:
+            inv[t] = [{'valor': e.valor, 'tags': sorted(e.tags),
+                       'props': {k: e.propiedades[k] for k in list(e.propiedades)[:4]}}
+                      for e in sorted(ents, key=lambda x: x.valor)]
+    return jsonify({'objetivo': _objetivo_del_almacen(),
+                    'total_activos': sum(len(v) for v in inv.values()),
+                    'inventario': inv})
+
 @app.route('/api/v2/hallazgos')
 def api_v2_hallazgos():
     """Corre el motor de correlación sobre el caso activo (F4 pasos 62, 64)."""
