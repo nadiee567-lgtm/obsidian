@@ -95,3 +95,17 @@ def test_eth_balance(monkeypatch):
 def test_eth_balance_ignora_btc():
     _, e, _ = _correr('eth_balance', 'wallet', _GENESIS)     # BTC -> no aplica
     assert 'eth_balance' not in e.propiedades
+
+
+# ── 143: alertas de movimiento (vía el monitor existente) ────────────────────
+def test_monitor_detecta_movimiento_wallet():
+    """Vigilar una wallet = el monitor diffea su balance; un movimiento => alerta."""
+    from core.monitor import snapshot, diff
+    alm = Almacen()
+    w = alm.crear('wallet', _GENESIS, propiedades={'btc_balance': 1.5, 'btc_tx': 10})
+    antes = snapshot(alm)
+    w.propiedades['btc_balance'] = 3.0                 # entró/salió dinero
+    w.propiedades['btc_tx'] = 11
+    cambios = diff(antes, snapshot(alm))
+    campos = {c['campo'] for c in cambios.cambios_prop}
+    assert {'btc_balance', 'btc_tx'} <= campos and cambios.hay()
