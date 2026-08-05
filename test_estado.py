@@ -20,14 +20,14 @@ def _datos():
 
 def test_render_muestra_datos():
     html = render_estado(_datos())
-    for txt in ('estado del sistema', '39', 'dominio', 'qwen2.5:3b', 'github', 'abuseipdb', 'dig'):
+    for txt in ('system status', '39', 'dominio', 'qwen2.5:3b', 'github', 'abuseipdb', 'dig'):
         assert txt in html, f'falta: {txt}'
 
 
 def test_render_sin_keys():
     d = _datos(); d['keys'] = []
     html = render_estado(d)
-    assert 'ninguna' in html
+    assert 'none' in html
 
 
 def test_render_escapa_xss():
@@ -41,4 +41,4 @@ def test_render_escapa_xss():
 def test_render_ia_no_disponible():
     d = _datos(); d['ia'] = {'disponible': False, 'modelo': '?'}
     html = render_estado(d)
-    assert 'estado del sistema' in html      # no revienta con ia caída
+    assert 'system status' in html      # no revienta con ia caída

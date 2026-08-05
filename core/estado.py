@@ -1,9 +1,8 @@
-"""Página de estado del sistema — F7 paso 105.
+"""System status page -- F7 step 105.
 
-Render PURO (testeable) de la salud de OBSIDIAN: transforms disponibles, keys
-configuradas, herramientas de sistema presentes, IA local, workspaces y monitor.
-La recolección de datos (que toca el sistema) vive en el endpoint; aquí solo se
-pinta el dict."""
+PURE (testable) render of OBSIDIAN's health: available transforms, configured keys,
+present system tools, local AI, workspaces and monitor. Data collection (which
+touches the system) lives in the endpoint; here we only paint the dict."""
 from __future__ import annotations
 import html
 
@@ -14,7 +13,7 @@ def _e(v) -> str:
 
 def _punto(ok: bool) -> str:
     col = '#a6e3a1' if ok else '#6c7086'
-    txt = 'sí' if ok else 'no'
+    txt = 'yes' if ok else 'no'
     return f'<span class="dot" style="background:{col}"></span>{txt}'
 
 
@@ -29,15 +28,15 @@ def render_estado(data: dict) -> str:
         f'<tr><td>{_e(nombre)}</td><td>{_punto(ok)}</td></tr>' for nombre, ok in herr.items())
 
     keys = data.get('keys', [])
-    keys_html = (', '.join(_e(k) for k in keys)) if keys else '<span class="muted">ninguna</span>'
+    keys_html = (', '.join(_e(k) for k in keys)) if keys else '<span class="muted">none</span>'
 
     ia = data.get('ia', {})
     ia_ok = ia.get('disponible')
 
     return f'''<!doctype html>
-<html lang="es"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OBSIDIAN · estado del sistema</title>
+<title>OBSIDIAN · system status</title>
 <style>
   :root{{--bg:#1e1e2e;--panel:#181825;--line:#313244;--txt:#cdd6f4;--muted:#6c7086;--blue:#89b4fa;--green:#a6e3a1}}
   *{{box-sizing:border-box}} body{{margin:0;background:var(--bg);color:var(--txt);
@@ -59,26 +58,26 @@ def render_estado(data: dict) -> str:
   @media print{{body{{background:#fff;color:#111}}}}
 </style></head>
 <body>
-  <h1><span class="sq"></span>OBSIDIAN — estado del sistema</h1>
-  <div class="meta">Generado: {_e(data.get('generado', '—'))} · <a href="/v2">← al grafo</a></div>
+  <h1><span class="sq"></span>OBSIDIAN — system status</h1>
+  <div class="meta">Generated: {_e(data.get('generado', '—'))} · <a href="/v2">← to graph</a></div>
 
   <div class="grid">
     <div class="kpi"><div class="n">{t.get('total', 0)}</div><div class="l">transforms</div></div>
     <div class="kpi"><div class="n">{data.get('workspaces', 0)}</div><div class="l">workspaces</div></div>
     <div class="kpi"><div class="n">{len(keys)}</div><div class="l">API keys</div></div>
-    <div class="kpi"><div class="n">{'●' if data.get('monitor') else '○'}</div><div class="l">monitor {'activo' if data.get('monitor') else 'apagado'}</div></div>
+    <div class="kpi"><div class="n">{'●' if data.get('monitor') else '○'}</div><div class="l">monitor {'active' if data.get('monitor') else 'off'}</div></div>
   </div>
 
-  <h2>Transforms por tipo de entidad</h2>
-  <div>{tipos_html or '<span class="muted">ninguno</span>'}</div>
+  <h2>Transforms by entity type</h2>
+  <div>{tipos_html or '<span class="muted">none</span>'}</div>
 
-  <h2>Herramientas de sistema</h2>
+  <h2>System tools</h2>
   <table>{herr_html}</table>
 
-  <h2>IA local (Ollama)</h2>
-  <p>{_punto(bool(ia_ok))} — modelo: <code>{_e(ia.get('modelo', '?'))}</code></p>
+  <h2>Local AI (Ollama)</h2>
+  <p>{_punto(bool(ia_ok))} — model: <code>{_e(ia.get('modelo', '?'))}</code></p>
 
-  <h2>Integraciones</h2>
-  <p>API keys configuradas: {keys_html}</p>
-  <p>Notificaciones ntfy: {_punto(bool(data.get('ntfy')))}</p>
+  <h2>Integrations</h2>
+  <p>Configured API keys: {keys_html}</p>
+  <p>ntfy notifications: {_punto(bool(data.get('ntfy')))}</p>
 </body></html>'''
