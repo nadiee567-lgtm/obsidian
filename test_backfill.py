@@ -146,7 +146,7 @@ def test_pivote_plataformas():
         p = alm.crear('plataforma', f'plat{i}')
         alm.relacionar(u.id, p.id, 'presente')
     r = [x for x in correlacionar(alm) if x.regla == 'pivote-plataformas']
-    assert r and '6 plataformas' in r[0].mensaje
+    assert r and '6 platforms' in r[0].mensaje
 
 
 def test_pivote_plataformas_pocas_no_dispara():
