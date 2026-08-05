@@ -124,6 +124,16 @@ def score_riesgo(hallazgos) -> int:
     return min(100, sum(_PESO.get(h.severidad, 0) for h in hallazgos))
 
 
+def score_exposicion(conteos: dict, riesgo: int) -> int:
+    """Score 0-100 de exposición (paso 149): combina el TAMAÑO de la superficie
+    (cuántos activos internet-facing) con el RIESGO (hallazgos). Más superficie +
+    más riesgo = más expuesto."""
+    superficie = min(50, conteos.get('subdominio', 0) * 1 + conteos.get('ip', 0) * 2
+                     + conteos.get('puerto', 0) * 2 + conteos.get('bucket', 0) * 5
+                     + conteos.get('url', 0))
+    return min(100, superficie + riesgo // 2)
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # Reglas de fábrica (disparan con los datos que ya producen los transforms)
 # ════════════════════════════════════════════════════════════════════════════

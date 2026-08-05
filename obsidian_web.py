@@ -15,7 +15,7 @@ from core.transforms import transform, REGISTRO, ejecutar_por_nombre, ejecutar_l
 from core.migracion import migrar_caso
 from core.workspaces import Gestor
 from core.boveda import Boveda
-from core.correlacion import correlacionar, score_riesgo, cargar_reglas_yaml
+from core.correlacion import correlacionar, score_riesgo, cargar_reglas_yaml, score_exposicion
 from core.reporte import generar_reporte
 from core.exportar import exportar_json, exportar_csv
 from core.monitor import Monitor, snapshot as _snap_estado
@@ -4158,6 +4158,15 @@ def api_v2_inventario():
     return jsonify({'objetivo': _objetivo_del_almacen(),
                     'total_activos': sum(len(v) for v in inv.values()),
                     'inventario': inv})
+
+@app.route('/api/v2/exposicion')
+def api_v2_exposicion():
+    """Score de exposición del objetivo: tamaño de la superficie + riesgo (F12 paso 149)."""
+    conteos = {t: len(_almacen.de_tipo(t)) for t in _TIPOS_ACTIVO}
+    h = correlacionar(_almacen)
+    riesgo = score_riesgo(h)
+    return jsonify({'exposicion': score_exposicion(conteos, riesgo), 'riesgo': riesgo,
+                    'superficie': conteos, 'hallazgos': len(h)})
 
 @app.route('/api/v2/hallazgos')
 def api_v2_hallazgos():

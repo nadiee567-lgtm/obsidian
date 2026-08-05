@@ -81,3 +81,21 @@ def test_cve_lookup_tech(monkeypatch):
     prod = ejecutar_por_nombre('cve_lookup', alm.crear('tech', 'nginx'), alm)
     cids = {x.valor for x in prod if x.tipo == 'cve'}
     assert cids == {'CVE-2021-1234'}             # filtro CPE anti-ruido: solo el de nginx
+
+
+# ── 149: scoring de exposición ───────────────────────────────────────────────
+def test_score_exposicion():
+    from core.correlacion import score_exposicion
+    assert score_exposicion({}, 0) == 0
+    # superficie: 10 subdom + 3 puertos(*2) = 16 ; riesgo 40//2 = 20 -> 36
+    assert score_exposicion({'subdominio': 10, 'puerto': 3}, 40) == 36
+    assert score_exposicion({'subdominio': 999}, 100) == 100          # se topa en 100
+
+
+def test_exposicion_endpoint(monkeypatch):
+    alm = Almacen()
+    for i in range(5):
+        alm.crear('subdominio', f's{i}.x.com')
+    c = _cliente_con(alm, monkeypatch)
+    d = c.get('/api/v2/exposicion').get_json()
+    assert d['superficie']['subdominio'] == 5 and 0 <= d['exposicion'] <= 100
