@@ -53,3 +53,18 @@ def test_haystak_sin_tor(monkeypatch):
     monkeypatch.setattr(ob, '_tor_disponible', lambda: False)
     prod, e = _correr('haystak', 'persona', 'objetivo')
     assert prod == [] and 'requiere Tor' in e.propiedades.get('haystak', '')
+
+
+# ── 130: Telegram (Telethon) — caminos de degradado (el activo necesita cuenta) ─
+def test_telegram_sin_credenciales(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setenv('TELEGRAM_API', '')
+    prod, e = _correr('telegram', 'usuario', 'durov')
+    assert prod == [] and 'api_id:api_hash' in e.propiedades.get('telegram', '')
+
+
+def test_telegram_sin_sesion(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: '123:abchash')
+    monkeypatch.setattr(ob.os.path, 'exists', lambda p: not str(p).endswith('telegram.session'))
+    prod, e = _correr('telegram', 'usuario', 'durov')
+    assert prod == [] and 'login' in e.propiedades.get('telegram', '')

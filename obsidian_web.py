@@ -3297,6 +3297,50 @@ def _t_onion_fetch(entidad, ctx):
         ctx.emitir('url', 'http://' + on, etiqueta='onion-link')
     entidad.etiquetar('onion-vivo')
 
+_TG_SESION = os.path.join(HOME, '.obsidian', 'telegram.session')
+
+@transform(entrada='usuario', salidas=('email', 'url'), nombre='telegram',
+           requiere_key=True,
+           descripcion='Menciones/enlaces del usuario o canal en Telegram (Telethon) (F10 paso 130)')
+def _t_telegram(entidad, ctx):
+    cred = _boveda.obtener('telegram') or os.environ.get('TELEGRAM_API', '')
+    if not cred or ':' not in cred:
+        entidad.propiedades['telegram'] = 'falta api_id:api_hash (gratis en my.telegram.org) en la bóveda'
+        return
+    if not os.path.exists(_TG_SESION):
+        entidad.propiedades['telegram'] = 'falta login una vez: python telegram_login.py'
+        return
+    api_id, api_hash = cred.split(':', 1)
+    try:
+        import asyncio
+        from telethon import TelegramClient
+
+        async def _run():
+            cli = TelegramClient(_TG_SESION, int(api_id), api_hash)
+            await cli.connect()
+            if not await cli.is_user_authorized():
+                return None
+            objetivo = await cli.get_entity(entidad.valor)
+            textos = []
+            async for m in cli.iter_messages(objetivo, limit=30):
+                if m.text:
+                    textos.append(m.text)
+            await cli.disconnect()
+            return getattr(objetivo, 'id', None), '\n'.join(textos)
+
+        res = asyncio.run(_run())
+        if not res:
+            entidad.propiedades['telegram'] = 'sesión no autorizada — re-login'
+            return
+        tid, texto = res
+        entidad.propiedades['telegram_id'] = tid
+        for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', texto)))[:15]:
+            ctx.emitir('email', em, etiqueta='en-telegram')
+        for u in list(set(re.findall(r'https?://[^\s"\'<>]+', texto)))[:15]:
+            ctx.emitir('url', u[:200], etiqueta='en-telegram')
+    except Exception as _e:
+        log.debug("telegram: %s", _e)
+
 _HAYSTAK_ONION = ('http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion')
 
 @transform(entrada='persona', salidas=('url',), nombre='haystak',
