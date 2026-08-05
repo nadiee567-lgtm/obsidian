@@ -209,6 +209,25 @@ def r_takeover(alm):
                            f'Subdominio vulnerable a takeover: {s.valor}', [s.id])
 
 @regla
+def r_infra_compartida(alm):
+    """Activos que comparten favicon o cert = probablemente la misma organización
+    (paso 147). Agrupa dominios/subdominios/ips por atributo compartido."""
+    from collections import defaultdict
+    for campo, etiqueta in (('favicon_hash', 'favicon'), ('cert_cn', 'cert')):
+        grupos = defaultdict(list)
+        for tipo in ('dominio', 'subdominio', 'ip'):
+            for e in alm.de_tipo(tipo):
+                v = e.propiedades.get(campo)
+                if v:
+                    grupos[str(v)].append(e)
+        for v, ents in grupos.items():
+            if len(ents) >= 2:
+                yield Hallazgo('infra-compartida', 'bajo',
+                               f'{len(ents)} activos comparten {etiqueta} ({v[:40]}) — misma '
+                               f'infraestructura: ' + ', '.join(e.valor for e in ents[:4]),
+                               [e.id for e in ents])
+
+@regla
 def r_wallet_ransomware(alm):
     """Wallet ligada a ransomware (paso 141)."""
     for w in alm.de_tipo('wallet'):

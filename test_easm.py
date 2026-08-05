@@ -40,3 +40,21 @@ def test_descubrimiento_y_cambios_via_monitor():
     valores = {e['valor'] for e in cambios.nuevas_entidades}
     assert {'nuevo.x.com', '1.2.3.4:22'} <= valores
     assert any(c['campo'] == 'cert_expira' for c in cambios.cambios_prop)
+
+
+# ── 147: clustering de infraestructura ───────────────────────────────────────
+def test_infra_compartida():
+    from core.correlacion import correlacionar
+    alm = Almacen()
+    alm.crear('dominio', 'a.com', propiedades={'favicon_hash': '123456'})
+    alm.crear('dominio', 'b.com', propiedades={'favicon_hash': '123456'})   # mismo favicon
+    alm.crear('dominio', 'c.com', propiedades={'favicon_hash': '999'})       # distinto
+    r = [x for x in correlacionar(alm) if x.regla == 'infra-compartida']
+    assert len(r) == 1 and len(r[0].entidades) == 2                          # a.com y b.com
+
+
+def test_infra_compartida_sin_grupo():
+    from core.correlacion import correlacionar
+    alm = Almacen()
+    alm.crear('dominio', 'solo.com', propiedades={'favicon_hash': '111'})
+    assert not [x for x in correlacionar(alm) if x.regla == 'infra-compartida']
