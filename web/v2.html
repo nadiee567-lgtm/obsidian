@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OBSIDIAN · motor v2</title>
+<title>OBSIDIAN · engine v2</title>
 <script src="/static/vis-network.min.js"></script>
 <style>
   :root{
@@ -108,18 +108,18 @@
 </head>
 <body>
 <div class="wrap">
-  <h1><span class="sq">⬛</span> OBSIDIAN · motor v2</h1>
-  <div class="sub">grafo tipado interactivo · click derecho en un nodo → transforms · <a href="#" id="btnKeys">🔑 API keys</a> · <a href="/v2/estado">estado del sistema</a> · <a href="/">← interfaz clásica</a></div>
+  <h1><span class="sq">⬛</span> OBSIDIAN · engine v2</h1>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnKeys">🔑 API keys</a> · <a href="/v2/estado">system status</a> · <a href="/">← classic interface</a></div>
   <div id="keys"></div>
 
   <div class="wsbar">
     <span class="wslabel">workspace</span>
     <select id="wsSel"></select>
-    <button id="btnAbrir">Abrir</button>
+    <button id="btnAbrir">Open</button>
     <span class="wssep">·</span>
-    <input id="wsNuevo" placeholder="nombre nuevo" autocomplete="off" style="max-width:170px">
-    <button id="btnCrear">+ Crear</button>
-    <span class="wsactivo">activo: <b id="wsActivo">—</b></span>
+    <input id="wsNuevo" placeholder="new name" autocomplete="off" style="max-width:170px">
+    <button id="btnCrear">+ Create</button>
+    <span class="wsactivo">active: <b id="wsActivo">—</b></span>
   </div>
 
   <div class="barra">
@@ -132,17 +132,17 @@
       <option value="url">url (imagen/doc)</option>
     </select>
     <input id="valor" placeholder="example.com">
-    <button class="primary" id="btnAgregar">+ Agregar al grafo →</button>
+    <button class="primary" id="btnAgregar">+ Add to graph →</button>
   </div>
-  <div id="status">Agrega un objetivo y haz click derecho en su nodo para correr transforms.</div>
+  <div id="status">Add a target and right-click its node to run transforms.</div>
 
   <div class="gtools">
-    <input id="buscar" placeholder="🔎 buscar nodo…" autocomplete="off">
+    <input id="buscar" placeholder="🔎 search node…" autocomplete="off">
     <span id="filtros"></span>
     <span style="margin-left:auto"></span>
     <button id="btnTimeline">📅 timeline</button>
-    <button id="btnReporte">📄 reporte</button>
-    <button id="btnReacomodar">↻ reacomodar</button>
+    <button id="btnReporte">📄 report</button>
+    <button id="btnReacomodar">↻ re-layout</button>
     <button id="btnExport">⬇ PNG</button>
   </div>
   <div id="timeline"></div>
@@ -151,29 +151,29 @@
     <div id="grafo"></div>
     <div class="lateral">
       <div class="card">
-        <h2>Detalle</h2>
-        <div id="detalle"><div class="vacio">Click en un nodo para ver su información.</div></div>
+        <h2>Detail</h2>
+        <div id="detalle"><div class="vacio">Click a node to see its info.</div></div>
       </div>
       <div class="card">
-        <h2>Hallazgos · <span id="nHall">0</span><span class="score" id="scoreBadge"></span>
+        <h2>Findings · <span id="nHall">0</span><span class="score" id="scoreBadge"></span>
           <button id="btnIA" class="btnia">🧠 IA</button>
           <button id="btnEscudo" class="btnia" style="background:var(--cyan)">🛡️</button></h2>
         <div id="iaResumen"></div>
         <div class="iabtns">
-          <button onclick="iaCaso('escenario')">🎯 escenario</button>
-          <button onclick="iaCaso('superficie')">🗺️ superficie</button>
-          <button onclick="iaCaso('analizar')">🧩 analizar</button>
+          <button onclick="iaCaso('escenario')">🎯 scenario</button>
+          <button onclick="iaCaso('superficie')">🗺️ surface</button>
+          <button onclick="iaCaso('analizar')">🧩 analyze</button>
           <button onclick="iaCaso('geoloc')">📍 geoloc</button>
         </div>
-        <div id="hallazgos"><div class="vacio">La correlación busca riesgos sola.</div></div>
+        <div id="hallazgos"><div class="vacio">Correlation looks for risks on its own.</div></div>
       </div>
       <div class="card">
-        <h2>Monitor <span id="monEstado" class="score">apagado</span></h2>
+        <h2>Monitor <span id="monEstado" class="score">off</span></h2>
         <div class="monctl">
           <input id="monIntervalo" type="number" min="1" value="10" title="minutos"> min
-          <button id="btnMonitor">▶ vigilar</button>
+          <button id="btnMonitor">▶ watch</button>
         </div>
-        <div id="monInfo" class="vacio">Re-escanea el objetivo cada N minutos y avisa si algo cambia.</div>
+        <div id="monInfo" class="vacio">Re-scans the target every N minutes and alerts if something changes.</div>
         <div id="monAlertas"></div>
       </div>
     </div>
@@ -213,7 +213,7 @@ network.on('oncontext',p=>{
   const id=network.getNodeAt(p.pointer.DOM);
   if(!id){ ocultarCtx(); return; }
   let sel=network.getSelectedNodes();
-  if(!sel.includes(id)) sel=[id];        // si clickeas fuera de la selección, solo ese
+  if(!sel.includes(id)) sel=[id];        // if you click outside the selection, just that one
   network.selectNodes(sel); mostrarDetalle(id); menuTransforms(sel,p.event);
 });
 
@@ -280,17 +280,17 @@ function mostrarDetalle(id){
     d.appendChild(kv);
   });
   if((e.origenes||[]).length){const o=el('div','kv');o.innerHTML='<b>fuentes:</b> '+e.origenes.map(esc).join(', ');d.appendChild(o);}
-  // cadena de evidencia (paso 89): cómo se llegó a este dato
+  // evidence chain (step 89): how this datum was reached
   if((e.procedencia||[]).length){
     const p=e.procedencia[0], inp=entMap[p.input];
     const c=el('div','kv');
     c.innerHTML='<b>hallado por:</b> '+esc(p.transform)+(inp?' ← <span style="color:var(--cyan)">'+esc(inp.valor)+'</span>':'');
     d.appendChild(c);
-    const bc=el('button','tagbtn'); bc.textContent='🔗 resaltar cadena'; bc.style.marginTop='.3rem';
-    bc.onclick=()=>{ const ch=cadenaIds(e.id); network.selectNodes(ch); network.fit({nodes:ch,animation:true}); setStatus('cadena: '+ch.length+' pasos'); };
+    const bc=el('button','tagbtn'); bc.textContent='🔗 highlight chain'; bc.style.marginTop='.3rem';
+    bc.onclick=()=>{ const ch=cadenaIds(e.id); network.selectNodes(ch); network.fit({nodes:ch,animation:true}); setStatus('chain: '+ch.length+' pasos'); };
     d.appendChild(bc);
   }
-  // etiquetas rápidas del analista (feedback loop)
+  // quick analyst tags (feedback loop)
   const tb=el('div','tagbar');
   [['interesante','#9ece6a'],['sospechoso','#ff9e64'],['descartado','#6b7488'],['falso-positivo','#7dcfff']].forEach(([tg,col])=>{
     const b=el('button','tagbtn'); b.textContent=tg;
@@ -299,20 +299,20 @@ function mostrarDetalle(id){
   });
   d.appendChild(tb);
   // nota del analista
-  const ta=el('textarea','nota'); ta.placeholder='nota del analista…'; ta.value=e.propiedades.nota||'';
+  const ta=el('textarea','nota'); ta.placeholder='analyst note…'; ta.value=e.propiedades.nota||'';
   ta.onchange=()=>guardarNota(e.id,ta.value); d.appendChild(ta);
   // MÓDULOS: transforms aplicables a este nodo, visibles y a un click
   const modBox=el('div','modbox');
-  const mt=el('div','modtit'); mt.textContent='MÓDULOS · '+e.tipo; modBox.appendChild(mt);
+  const mt=el('div','modtit'); mt.textContent='MODULES · '+e.tipo; modBox.appendChild(mt);
   d.appendChild(modBox);
   cargarModulos(e.tipo, e.valor, modBox);
-  const h=el('div','hint'); h.textContent='↳ click en un módulo para correrlo (o click derecho en el nodo)'; d.appendChild(h);
+  const h=el('div','hint'); h.textContent='↳ click a module to run it (or right-click the node)'; d.appendChild(h);
 }
 const _transformsCache={};
 async function cargarModulos(tipo, valor, cont){
   let lista=_transformsCache[tipo];
   if(!lista){ try{ lista=(await (await fetch('/api/v2/transforms/'+tipo)).json()).transforms||[]; _transformsCache[tipo]=lista; }catch(_){ lista=[]; } }
-  if(!lista.length){ const x=el('div','vacio'); x.textContent='(sin módulos para este tipo)'; cont.appendChild(x); return; }
+  if(!lista.length){ const x=el('div','vacio'); x.textContent='(no modules for this type)'; cont.appendChild(x); return; }
   const grid=el('div','modgrid');
   lista.forEach(t=>{
     const b=el('button','modbtn');
@@ -322,7 +322,7 @@ async function cargarModulos(tipo, valor, cont){
   });
   cont.appendChild(grid);
 }
-function cadenaIds(id){   // camino hacia atrás por la procedencia hasta la semilla
+function cadenaIds(id){   // walk backward through provenance to the seed
   const chain=[id], visto=new Set([id]); let cur=entMap[id];
   while(cur&&cur.procedencia&&cur.procedencia.length){
     const inp=cur.procedencia[0].input;
@@ -337,7 +337,7 @@ async function toggleTag(id,tag){
 }
 async function guardarNota(id,nota){
   await fetch('/api/v2/entidad/nota',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,nota})});
-  await pintarGrafo(); setStatus('nota guardada');
+  await pintarGrafo(); setStatus('note saved');
 }
 
 async function menuTransforms(ids,ev){
@@ -347,7 +347,7 @@ async function menuTransforms(ids,ev){
   const ctx=$('#ctx'); ctx.textContent='';
   const tit=el('div','titulo'); tit.textContent='transforms · '+tipo+(mismos.length>1?' ('+mismos.length+' nodos)':''); ctx.appendChild(tit);
   const d=await(await fetch('/api/v2/transforms/'+tipo)).json();
-  if(!d.transforms.length){ const b=el('button'); b.textContent='(sin transforms)'; b.disabled=true; ctx.appendChild(b); }
+  if(!d.transforms.length){ const b=el('button'); b.textContent='(no transforms)'; b.disabled=true; ctx.appendChild(b); }
   d.transforms.forEach(t=>{
     const b=el('button');
     b.innerHTML=t.nombre+(t.requiere_key?' <span class="key">⚿</span>':'');
@@ -360,7 +360,7 @@ async function menuTransforms(ids,ev){
   ctx.style.display='block';
 }
 async function correrEn(ids,nombre){
-  setStatus('corriendo '+nombre+' en '+ids.length+' nodo(s)…','run');
+  setStatus('running '+nombre+' en '+ids.length+' nodo(s)…','run');
   let ok=0;
   for(const i of ids){ const e=entMap[i]; if(!e) continue;
     try{ const r=await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -372,14 +372,14 @@ function ocultarCtx(){ $('#ctx').style.display='none'; }
 document.addEventListener('click',e=>{ if(!$('#ctx').contains(e.target)) ocultarCtx(); });
 
 async function correr(tipo,valor,nombre,requiereKey){
-  setStatus('corriendo '+nombre+' sobre '+valor+'…','run');
+  setStatus('running '+nombre+' sobre '+valor+'…','run');
   try{
     const r=await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({tipo,valor,transform:nombre})});
     const d=await r.json();
     if(!r.ok){ setStatus('error: '+(d.error||r.status),'err'); return; }
     const n=d.producidas?d.producidas.length:0;
-    if(n===0 && requiereKey){ setStatus('⚿ '+nombre+' no dio nada — necesita API key. Ábrela en 🔑 API keys (arriba). Sin key, usa los módulos sin ⚿ (son gratis).','err'); }
+    if(n===0 && requiereKey){ setStatus('⚿ '+nombre+' returned nothing — needs an API key. Open it in 🔑 API keys (top). Without a key, use the modules without ⚿ (free).','err'); }
     else setStatus('✓ '+nombre+': +'+n+' entidades (total '+d.total_entidades+')');
     await pintarGrafo();
   }catch(e){ setStatus('error: '+e.message,'err'); }
@@ -387,12 +387,12 @@ async function correr(tipo,valor,nombre,requiereKey){
 
 async function agregar(){
   const tipo=$('#tipo').value, valor=$('#valor').value.trim();
-  if(!valor){ setStatus('escribe un objetivo primero.','err'); return; }
+  if(!valor){ setStatus('type a target first.','err'); return; }
   const r=await fetch('/api/v2/entidad',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({tipo,valor})});
   const d=await r.json();
   if(!r.ok){ setStatus('error: '+(d.error||r.status),'err'); return; }
-  $('#valor').value=''; setStatus('nodo agregado. Click derecho en él para correr transforms.');
+  $('#valor').value=''; setStatus('node added. Right-click it to run transforms.');
   await pintarGrafo(); if(d.id){ network.selectNodes([d.id]); mostrarDetalle(d.id); }
 }
 
@@ -400,11 +400,11 @@ async function agregar(){
 async function pintarHallazgos(){
   const d=await(await fetch('/api/v2/hallazgos')).json();
   $('#nHall').textContent=d.hallazgos.length;
-  const b=$('#scoreBadge'); b.textContent='riesgo '+d.score+'/100';
+  const b=$('#scoreBadge'); b.textContent='risk '+d.score+'/100';
   b.style.background=d.score>=60?'#f7768e':d.score>=25?'#e0af68':'#232735';
   b.style.color=d.score>=25?'#0b0d12':'#c8cfdf';
   const c=$('#hallazgos'); c.textContent='';
-  if(!d.hallazgos.length){ c.innerHTML='<div class="vacio">Sin riesgos detectados (aún).</div>'; return; }
+  if(!d.hallazgos.length){ c.innerHTML='<div class="vacio">No risks detected (yet).</div>'; return; }
   d.hallazgos.forEach(h=>{
     const row=el('div','hall'); row.style.setProperty('--sc',SEVCOLOR[h.severidad]||'#6b7488');
     const s=el('span','sev'); s.textContent=h.severidad; row.appendChild(s);
@@ -414,7 +414,7 @@ async function pintarHallazgos(){
 }
 async function analizarIA(){
   const btn=$('#btnIA'),out=$('#iaResumen'); btn.disabled=true; btn.textContent='…';
-  out.innerHTML='<div class="iaresumen">Ollama analizando…</div>';
+  out.innerHTML='<div class="iaresumen">Ollama analyzing…</div>';
   try{ const d=await(await fetch('/api/v2/hallazgos/ia',{method:'POST'})).json();
     out.innerHTML='<div class="iaresumen">'+(d.resumen||d.error||'')+'</div>'; }
   catch(e){ out.textContent='Error: '+e.message; }
@@ -422,7 +422,7 @@ async function analizarIA(){
 }
 async function segundoEscudo(){
   const btn=$('#btnEscudo'),out=$('#iaResumen'); btn.disabled=true; btn.textContent='…';
-  out.innerHTML='<div class="iaresumen">2º escudo revisando…</div>';
+  out.innerHTML='<div class="iaresumen">2nd shield reviewing…</div>';
   try{ const d=await(await fetch('/api/v2/hallazgos/verificar',{method:'POST'})).json();
     out.textContent=''; (d.revisiones||[]).forEach(r=>{
       const x=el('div','iaresumen'); x.innerHTML='<b style="color:var(--cyan)">🛡️ '+r.hallazgo+'</b>\n'+r.razon; out.appendChild(x); }); }
@@ -435,7 +435,7 @@ async function cargarWorkspaces(){
   const d=await(await fetch('/api/v2/workspaces')).json();
   const sel=$('#wsSel'); sel.textContent='';
   d.workspaces.forEach(w=>{const o=el('option');o.value=w;o.textContent=w;sel.appendChild(o);});
-  $('#wsActivo').textContent=d.activo||'ninguno (efímero)'; if(d.activo)sel.value=d.activo;
+  $('#wsActivo').textContent=d.activo||'none (ephemeral)'; if(d.activo)sel.value=d.activo;
 }
 async function abrirWs(){ const n=$('#wsSel').value; if(!n)return;
   await fetch('/api/v2/workspaces/abrir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
@@ -464,7 +464,7 @@ function timeline(){
   ent.sort((a,b)=>a.f-b.f);
   const ov=$('#timeline');
   ov.innerHTML='<span class="cerrar" id="tlCerrar">✕</span><h2>📅 Timeline · <span>'+ent.length+' eventos</span></h2>';
-  if(!ent.length) ov.innerHTML+='<div class="vacio">Sin fechas aún. Corre rdap / ssl / wayback en algún nodo.</div>';
+  if(!ent.length) ov.innerHTML+='<div class="vacio">No dates yet. Run rdap / ssl / wayback on a node.</div>';
   ent.forEach(x=>{ const r=el('div','tlrow');
     r.innerHTML='<span class="tlf">'+x.f.toISOString().slice(0,10)+'</span><span class="tle">'+x.ev+'</span><span class="tlq">'+esc(x.quien)+'</span>';
     ov.appendChild(r); });
@@ -474,11 +474,11 @@ function timeline(){
 $('#btnTimeline').onclick=timeline;
 $('#btnReporte').onclick=()=>window.open('/v2/reporte','_blank');
 const SERVICIOS_KEY=[
-  ['shodan','key de Shodan'],['censys','id:secret'],['zoomeye','API-KEY'],['fofa','email:key'],
+  ['shodan','Shodan key'],['censys','id:secret'],['zoomeye','API-KEY'],['fofa','email:key'],
   ['quake','token'],['hunter','api-key'],['netlas','api-key'],['criminalip','api-key'],
   ['binaryedge','api-key'],['virustotal','api-key (passivedns)'],['abuseipdb','api-key'],
-  ['github','token (mejores límites)'],['viewdns','api-key'],
-  ['hibp','opcional y DE PAGO — ya tienes breaches_xon + stealer_hudsonrock GRATIS']];
+  ['github','token (better limits)'],['viewdns','api-key'],
+  ['hibp','optional and PAID — you already have breaches_xon + stealer_hudsonrock FREE']];
 const OBTENER={shodan:'https://account.shodan.io/register',censys:'https://accounts.censys.io/register',
   zoomeye:'https://www.zoomeye.org/',fofa:'https://en.fofa.info/',quake:'https://quake.360.net/',
   hunter:'https://hunter.how/',netlas:'https://app.netlas.io/registration/',criminalip:'https://www.criminalip.io/',
@@ -488,7 +488,7 @@ const OBTENER={shodan:'https://account.shodan.io/register',censys:'https://accou
 async function panelKeys(){
   const ov=$('#keys');
   let conf=new Set(); try{ conf=new Set((await (await fetch('/api/v2/keys')).json()).servicios||[]); }catch(_){}
-  ov.innerHTML='<span class="cerrar" id="kCerrar">✕</span><h2>🔑 API keys · <span>bóveda cifrada · la key nunca sale de tu máquina</span></h2>';
+  ov.innerHTML='<span class="cerrar" id="kCerrar">✕</span><h2>🔑 API keys · <span>encrypted vault · the key never leaves your machine</span></h2>';
   SERVICIOS_KEY.forEach(([s,hint])=>{
     const row=el('div','krow'); const ok=conf.has(s);
     const lab=el('span','ks'); lab.innerHTML=esc(s)+(ok?' <b style="color:var(--green)">●</b>':''); row.appendChild(lab);
@@ -497,8 +497,8 @@ async function panelKeys(){
       await fetch('/api/v2/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({servicio:s,valor:inp.value})});
       inp.value=''; setStatus('🔑 '+s+' guardada'); panelKeys(); }; row.appendChild(g);
     const st=el('span','kst');
-    if(OBTENER[s]){ const o=el('a'); o.textContent='obtener'; o.href=OBTENER[s]; o.target='_blank'; o.style.cssText='color:var(--muted);font-size:.68rem;text-decoration:underline'; row.appendChild(o); }
-    const p=el('button'); p.textContent='probar'; p.onclick=async()=>{ st.textContent='probando '+s+'…'; st.style.color='var(--muted)';
+    if(OBTENER[s]){ const o=el('a'); o.textContent='get'; o.href=OBTENER[s]; o.target='_blank'; o.style.cssText='color:var(--muted);font-size:.68rem;text-decoration:underline'; row.appendChild(o); }
+    const p=el('button'); p.textContent='probar'; p.onclick=async()=>{ st.textContent='testing '+s+'…'; st.style.color='var(--muted)';
       try{ const d=await (await fetch('/api/v2/keys/probar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({servicio:s})})).json();
         st.textContent=d.nota||''; st.style.color=d.ok?'var(--green)':'var(--amber)'; }catch(e){ st.textContent='error: '+e.message; } };
     row.appendChild(p);
@@ -509,9 +509,9 @@ async function panelKeys(){
 }
 $('#btnKeys').onclick=(e)=>{ e.preventDefault(); panelKeys(); };
 async function iaCaso(modo){
-  const out=$('#iaResumen'); out.innerHTML='<div class="iaresumen">IA ('+esc(modo)+') analizando el caso…</div>';
+  const out=$('#iaResumen'); out.innerHTML='<div class="iaresumen">AI ('+esc(modo)+') analyzing the case…</div>';
   try{ const r=await fetch('/api/v2/ia/'+modo,{method:'POST'}); const d=await r.json();
-    out.innerHTML='<div class="iaresumen">'+esc(d.resultado||d.error||'sin respuesta')+'</div>'; }
+    out.innerHTML='<div class="iaresumen">'+esc(d.resultado||d.error||'no response')+'</div>'; }
   catch(e){ out.textContent='Error: '+e.message; }
 }
 
@@ -519,8 +519,8 @@ async function pintarMonitor(d){
   const est=$('#monEstado'), info=$('#monInfo'), al=$('#monAlertas'), btn=$('#btnMonitor');
   est.textContent = d.activo?'vigilando':'apagado'; est.className='score '+(d.activo?'on':'off');
   btn.textContent = d.activo?'■ detener':'▶ vigilar';
-  if(d.activo){ info.className=''; info.textContent='cada '+Math.round(d.intervalo/60)+' min · '+(d.tareas||[]).length+' transform(s)'+(d.ultimo_ciclo?' · último: '+d.ultimo_ciclo:''); }
-  else if(!(d.alertas||[]).length){ info.className='vacio'; info.textContent='Re-escanea el objetivo cada N minutos y avisa si algo cambia.'; }
+  if(d.activo){ info.className=''; info.textContent='cada '+Math.round(d.intervalo/60)+' min · '+(d.tareas||[]).length+' transform(s)'+(d.ultimo_ciclo?' · last: '+d.ultimo_ciclo:''); }
+  else if(!(d.alertas||[]).length){ info.className='vacio'; info.textContent='Re-scans the target every N minutes and alerts if something changes.'; }
   else { info.className='vacio'; info.textContent=''; }
   al.textContent='';
   (d.alertas||[]).forEach(a=>{ const x=el('div','alerta');
@@ -529,17 +529,17 @@ async function pintarMonitor(d){
 async function cargarMonitor(){ try{ pintarMonitor(await (await fetch('/api/v2/monitor')).json()); }catch(_){} }
 $('#btnMonitor').onclick=async()=>{
   const d=await (await fetch('/api/v2/monitor')).json();
-  if(d.activo){ await fetch('/api/v2/monitor/stop',{method:'POST'}); setStatus('monitor detenido'); }
+  if(d.activo){ await fetch('/api/v2/monitor/stop',{method:'POST'}); setStatus('monitor stopped'); }
   else{
     const min=Math.max(1,parseInt($('#monIntervalo').value)||10);
     const r=await fetch('/api/v2/monitor/start',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({intervalo:min*60})});
     const j=await r.json();
-    if(!r.ok){ setStatus('error: '+(j.error||r.status),'err'); } else setStatus('👁 monitor activo cada '+min+' min');
+    if(!r.ok){ setStatus('error: '+(j.error||r.status),'err'); } else setStatus('👁 monitor active every '+min+' min');
   }
   cargarMonitor();
 };
-cargarMonitor(); setInterval(cargarMonitor, 20000);   // refresca alertas periódicamente
+cargarMonitor(); setInterval(cargarMonitor, 20000);   // refresh alerts periodically
 cargarWorkspaces(); pintarGrafo();
 </script>
 </body>
