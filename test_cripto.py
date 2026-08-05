@@ -47,3 +47,15 @@ def test_tx_grafo(monkeypatch):
 def test_tx_grafo_ignora_no_btc():
     prod, _, _ = _correr('tx_grafo', 'wallet', '0x' + 'a' * 40)   # ETH -> no aplica aún
     assert prod == []
+
+
+# ── 139: clustering por co-inputs ────────────────────────────────────────────
+def test_cluster_wallets(monkeypatch):
+    tx_json = {'txs': [{'inputs': [{'prev_out': {'addr': _GENESIS}},
+                                   {'prev_out': {'addr': 'hermana1'}}],
+                        'out': [{'addr': 'destino'}]}]}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=tx_json))
+    prod, _, _ = _correr('cluster_wallets', 'wallet', _GENESIS)
+    hermanas = [e for e in prod if e.tipo == 'wallet']
+    assert {e.valor for e in hermanas} == {'hermana1'}          # co-input, no el destino
+    assert 'mismo-dueño' in hermanas[0].tags

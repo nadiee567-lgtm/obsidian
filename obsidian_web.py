@@ -3580,6 +3580,29 @@ def _t_tx_grafo(entidad, ctx):
     for c in list(contrapartes)[:30]:
         ctx.emitir('wallet', c, etiqueta='tx', cadena='btc')
 
+@transform(entrada='wallet', salidas=('wallet',), nombre='cluster_wallets',
+           descripcion='Clustering por co-inputs: direcciones del mismo dueño (heurística, blockchain.info) (F11 paso 139)')
+def _t_cluster_wallets(entidad, ctx):
+    addr = entidad.valor
+    if not _ES_BTC.match(addr):
+        return
+    try:
+        d = SESSION.get(f'https://blockchain.info/rawaddr/{addr}',
+                        params={'limit': 20}, timeout=12).json() or {}
+    except Exception as _e:
+        log.debug("cluster_wallets no disponible: %s", _e)
+        return
+    mismo = set()
+    for tx in d.get('txs', [])[:20]:
+        inputs = [(i.get('prev_out') or {}).get('addr') for i in tx.get('inputs', [])]
+        inputs = [a for a in inputs if a]
+        if addr in inputs:                           # el seed gastó junto con estas → mismo dueño
+            mismo.update(a for a in inputs if a != addr)
+    for a in list(mismo)[:30]:
+        w = ctx.emitir('wallet', a, etiqueta='mismo-dueño', cadena='btc')
+        if w:
+            w.etiquetar('mismo-dueño')
+
 @transform(entrada='url', salidas=('wallet',), nombre='extraer_wallets',
            descripcion='Extrae direcciones BTC/ETH de una página (F11 paso 137)')
 def _t_extraer_wallets(entidad, ctx):
