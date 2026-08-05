@@ -317,7 +317,7 @@ async function cargarModulos(tipo, valor, cont){
   lista.forEach(t=>{
     const b=el('button','modbtn');
     b.innerHTML=esc(t.nombre)+(t.requiere_key?' <span class="key">⚿</span>':'');
-    b.title=t.descripcion||''; b.onclick=()=>correr(tipo, valor, t.nombre);
+    b.title=(t.descripcion||'')+(t.requiere_key?' · necesita API key (🔑)':''); b.onclick=()=>correr(tipo, valor, t.nombre, t.requiere_key);
     grid.appendChild(b);
   });
   cont.appendChild(grid);
@@ -371,14 +371,16 @@ async function correrEn(ids,nombre){
 function ocultarCtx(){ $('#ctx').style.display='none'; }
 document.addEventListener('click',e=>{ if(!$('#ctx').contains(e.target)) ocultarCtx(); });
 
-async function correr(tipo,valor,nombre){
+async function correr(tipo,valor,nombre,requiereKey){
   setStatus('corriendo '+nombre+' sobre '+valor+'…','run');
   try{
     const r=await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({tipo,valor,transform:nombre})});
     const d=await r.json();
     if(!r.ok){ setStatus('error: '+(d.error||r.status),'err'); return; }
-    setStatus('✓ '+nombre+': +'+(d.producidas?d.producidas.length:0)+' entidades (total '+d.total_entidades+')');
+    const n=d.producidas?d.producidas.length:0;
+    if(n===0 && requiereKey){ setStatus('⚿ '+nombre+' no dio nada — necesita API key. Ábrela en 🔑 API keys (arriba). Sin key, usa los módulos sin ⚿ (son gratis).','err'); }
+    else setStatus('✓ '+nombre+': +'+n+' entidades (total '+d.total_entidades+')');
     await pintarGrafo();
   }catch(e){ setStatus('error: '+e.message,'err'); }
 }
@@ -477,6 +479,12 @@ const SERVICIOS_KEY=[
   ['binaryedge','api-key'],['virustotal','api-key (passivedns)'],['abuseipdb','api-key'],
   ['github','token (mejores límites)'],['viewdns','api-key'],
   ['hibp','opcional y DE PAGO — ya tienes breaches_xon + stealer_hudsonrock GRATIS']];
+const OBTENER={shodan:'https://account.shodan.io/register',censys:'https://accounts.censys.io/register',
+  zoomeye:'https://www.zoomeye.org/',fofa:'https://en.fofa.info/',quake:'https://quake.360.net/',
+  hunter:'https://hunter.how/',netlas:'https://app.netlas.io/registration/',criminalip:'https://www.criminalip.io/',
+  binaryedge:'https://www.binaryedge.io/',virustotal:'https://www.virustotal.com/gui/join-us',
+  abuseipdb:'https://www.abuseipdb.com/register',github:'https://github.com/settings/tokens',
+  viewdns:'https://viewdns.info/api/',hibp:'https://haveibeenpwned.com/API/Key'};
 async function panelKeys(){
   const ov=$('#keys');
   let conf=new Set(); try{ conf=new Set((await (await fetch('/api/v2/keys')).json()).servicios||[]); }catch(_){}
@@ -489,6 +497,7 @@ async function panelKeys(){
       await fetch('/api/v2/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({servicio:s,valor:inp.value})});
       inp.value=''; setStatus('🔑 '+s+' guardada'); panelKeys(); }; row.appendChild(g);
     const st=el('span','kst');
+    if(OBTENER[s]){ const o=el('a'); o.textContent='obtener'; o.href=OBTENER[s]; o.target='_blank'; o.style.cssText='color:var(--muted);font-size:.68rem;text-decoration:underline'; row.appendChild(o); }
     const p=el('button'); p.textContent='probar'; p.onclick=async()=>{ st.textContent='probando '+s+'…'; st.style.color='var(--muted)';
       try{ const d=await (await fetch('/api/v2/keys/probar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({servicio:s})})).json();
         st.textContent=d.nota||''; st.style.color=d.ok?'var(--green)':'var(--amber)'; }catch(e){ st.textContent='error: '+e.message; } };
