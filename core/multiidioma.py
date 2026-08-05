@@ -59,6 +59,24 @@ def transliterar(nombre: str) -> dict:
 
 
 # ── Detección de idioma por alfabeto (paso 175) ──────────────────────────────
+def registros_regionales(org: str) -> dict:
+    """Registros de empresas/personas por región (paso 173)."""
+    q = quote(org)
+    return {
+        'china_qcc': f'https://www.qcc.com/web/search?key={q}',
+        'rusia_rusprofile': f'https://www.rusprofile.ru/search?query={q}',
+        'opencorporates': f'https://opencorporates.com/companies?q={q}',   # global, incl. LatAm
+    }
+
+
+def motores_locales(consulta: str) -> dict:
+    """Motores de búsqueda locales (paso 174): ven otra internet que Google."""
+    q = quote(consulta)
+    return {'yandex': f'https://yandex.com/search/?text={q}',
+            'baidu': f'https://www.baidu.com/s?wd={q}',
+            'sogou': f'https://www.sogou.com/web?query={q}'}
+
+
 def detectar_idioma(texto: str) -> str:
     """Idioma probable por el rango Unicode dominante. Keyless, sin librerías."""
     conteo = {'ru': 0, 'zh': 0, 'ar': 0, 'ja': 0, 'ko': 0, 'es_en': 0}

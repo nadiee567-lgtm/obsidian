@@ -31,3 +31,10 @@ def test_transliterar_transform():
     prod, _ = _correr('transliterar', 'persona', 'Иван')
     variantes = {p.valor for p in prod if p.tipo == 'persona'}
     assert 'ivan' in variantes                    # variante latina
+
+
+# ── 173: registros regionales ────────────────────────────────────────────────
+def test_registros_regionales():
+    prod, _ = _correr('registros_regionales', 'org', 'ACME Corp')
+    regs = {p.propiedades.get('registro') for p in prod if p.tipo == 'url'}
+    assert {'china_qcc', 'rusia_rusprofile', 'opencorporates'} == regs

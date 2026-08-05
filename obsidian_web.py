@@ -3668,6 +3668,12 @@ def _t_extraer_wallets(entidad, ctx):
         for addr in list(set(rx.findall(texto)))[:30]:
             ctx.emitir('wallet', addr, etiqueta=cadena, cadena=cadena)
 
+@transform(entrada='org', salidas=('url',), nombre='registros_regionales',
+           descripcion='Registros de empresas por región: QCC (China), RusProfile (Rusia), OpenCorporates (F15 paso 173)')
+def _t_registros_regionales(entidad, ctx):
+    for reg, url in _ml.registros_regionales(entidad.valor).items():
+        ctx.emitir('url', url, etiqueta=f'registro:{reg}', registro=reg)
+
 @transform(entrada='persona', salidas=('persona',), nombre='transliterar',
            descripcion='Variantes del nombre en cirílico/latino para buscar en cada alfabeto (F15 paso 172)')
 def _t_transliterar(entidad, ctx):
