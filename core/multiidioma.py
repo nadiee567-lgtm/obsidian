@@ -4,7 +4,22 @@ Un dato clave puede estar solo en chino o ruso. Estas utilidades PURAS ayudan a
 buscarlo donde está: plataformas regionales, transliteración de nombres, detección
 de idioma por alfabeto, motores locales y dorks por idioma."""
 from __future__ import annotations
+import re
 from urllib.parse import quote
+
+_PAIS_PREFIJO = {'MX': '52', 'US': '1', 'RU': '7', 'CN': '86', 'ES': '34',
+                 'AR': '54', 'CO': '57', 'BR': '55', 'PE': '51', 'CL': '56'}
+
+
+def normalizar_telefono(numero: str, pais: str = 'US') -> str:
+    """Normaliza un teléfono a formato +E.164 según el país (paso 177)."""
+    d = re.sub(r'\D', '', numero or '')
+    if not d:
+        return ''
+    pref = _PAIS_PREFIJO.get((pais or '').upper(), '')
+    if pref and not d.startswith(pref):
+        d = pref + d.lstrip('0')
+    return '+' + d
 
 
 def perfiles_regionales(usuario: str) -> dict:

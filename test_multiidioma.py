@@ -74,3 +74,11 @@ def test_dorks_idioma_transform():
     prod, _ = _correr('dorks_idioma', 'persona', 'Иван Петров')   # cirílico -> ru
     idiomas = {p.propiedades.get('idioma') for p in prod if p.tipo == 'url'}
     assert idiomas == {'ru'}
+
+
+# ── 177: normalización por país ──────────────────────────────────────────────
+def test_normalizar_telefono():
+    from core.multiidioma import normalizar_telefono
+    assert normalizar_telefono('55 1234 5678', 'MX') == '+525512345678'
+    assert normalizar_telefono('(415) 555-2671', 'US') == '+14155552671'
+    assert normalizar_telefono('') == ''

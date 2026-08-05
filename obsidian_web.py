@@ -4618,6 +4618,12 @@ _PROMPTS_IA = {
 _FUENTE_POR_IDIOMA = {'ru': 'Yandex / VK', 'zh': 'Baidu / Weibo', 'ar': 'Google (árabe)',
                       'ja': 'Yahoo Japan', 'ko': 'Naver', 'es_en': 'Google'}
 
+@app.route('/api/v2/normalizar_telefono', methods=['POST'])
+def api_v2_normalizar_telefono():
+    """Normaliza un teléfono a +E.164 según el país (F15 paso 177)."""
+    d = request.json or {}
+    return jsonify({'e164': _ml.normalizar_telefono(d.get('numero', ''), d.get('pais', 'US'))})
+
 @app.route('/api/v2/idioma', methods=['POST'])
 def api_v2_idioma():
     """Detecta el idioma del texto y sugiere la fuente/motor correcto (F15 paso 175)."""
