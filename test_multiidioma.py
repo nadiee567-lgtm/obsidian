@@ -61,3 +61,16 @@ def test_idioma_endpoint(monkeypatch):
         s['auth'] = True
     d = c.post('/api/v2/idioma', json={'texto': 'Привет'}).get_json()
     assert d['idioma'] == 'ru' and 'Yandex' in d['fuente_sugerida']
+
+
+# ── 176: dorks por idioma/región ─────────────────────────────────────────────
+def test_dorks_por_idioma():
+    from core.multiidioma import dorks_por_idioma
+    ru = dorks_por_idioma('Ivan', 'ru')
+    assert any('почта' in d for d in ru) and any('vk.com' in d for d in ru)
+
+
+def test_dorks_idioma_transform():
+    prod, _ = _correr('dorks_idioma', 'persona', 'Иван Петров')   # cirílico -> ru
+    idiomas = {p.propiedades.get('idioma') for p in prod if p.tipo == 'url'}
+    assert idiomas == {'ru'}

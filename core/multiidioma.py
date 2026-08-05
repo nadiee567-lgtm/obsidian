@@ -59,6 +59,21 @@ def transliterar(nombre: str) -> dict:
 
 
 # ── Detección de idioma por alfabeto (paso 175) ──────────────────────────────
+_DORK_TERMS = {
+    'ru': {'contacto': 'контакты', 'email': 'почта', 'telefono': 'телефон', 'sites': ['vk.com', 'ok.ru']},
+    'zh': {'contacto': '联系', 'email': '邮箱', 'telefono': '电话', 'sites': ['weibo.com', 'zhihu.com']},
+    'es_en': {'contacto': 'contact', 'email': 'email', 'telefono': 'phone', 'sites': ['linkedin.com']},
+}
+
+
+def dorks_por_idioma(objetivo: str, idioma: str = 'es_en') -> list:
+    """Dorks adaptados al idioma/región (paso 176)."""
+    t = _DORK_TERMS.get(idioma, _DORK_TERMS['es_en'])
+    dorks = [f'"{objetivo}" {t["contacto"]}', f'"{objetivo}" {t["email"]}', f'"{objetivo}" {t["telefono"]}']
+    dorks += [f'"{objetivo}" site:{s}' for s in t['sites']]
+    return dorks
+
+
 def registros_regionales(org: str) -> dict:
     """Registros de empresas/personas por región (paso 173)."""
     q = quote(org)

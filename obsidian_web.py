@@ -3668,6 +3668,14 @@ def _t_extraer_wallets(entidad, ctx):
         for addr in list(set(rx.findall(texto)))[:30]:
             ctx.emitir('wallet', addr, etiqueta=cadena, cadena=cadena)
 
+@transform(entrada='persona', salidas=('url',), nombre='dorks_idioma',
+           descripcion='Dorks adaptados al idioma del nombre (cirílico/chino/latino) (F15 paso 176)')
+def _t_dorks_idioma(entidad, ctx):
+    from urllib.parse import quote as _q
+    idioma = _ml.detectar_idioma(entidad.valor)
+    for d in _ml.dorks_por_idioma(entidad.valor, idioma):
+        ctx.emitir('url', f'https://www.google.com/search?q={_q(d)}', etiqueta=f'dork:{idioma}', idioma=idioma)
+
 @transform(entrada='persona', salidas=('url',), nombre='motores_locales',
            descripcion='Búsqueda en motores locales: Yandex, Baidu, Sogou (indexan otra internet) (F15 paso 174)')
 def _t_motores_locales(entidad, ctx):
