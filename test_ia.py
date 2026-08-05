@@ -78,3 +78,12 @@ def test_consulta_nl(monkeypatch):
     d = c.post('/api/v2/consulta', json={'pregunta': 'encuentra todo sobre acme.com'}).get_json()
     assert 'plan' in d and 'dns_a' in d['plan']
     assert c.post('/api/v2/consulta', json={'pregunta': ''}).status_code == 400
+
+
+# ── 168: conectar con NEXO (ruteo de modelo por tarea) ────────────────────────
+def test_elegir_modelo_nexo():
+    from core.ia import elegir_modelo
+    assert elegir_modelo('busca un exploit para esta vuln') == 'dolphin-llama3'   # seguridad
+    assert elegir_modelo('recon del dominio y sus subdominios') == 'qwen2.5:3b'   # osint
+    assert elegir_modelo('scan de 8.8.8.8') == 'dolphin-llama3'                   # IP -> seguridad
+    assert elegir_modelo('hola qué tal') == 'qwen2.5:1.5b'                        # sin señal -> rápido
