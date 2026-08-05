@@ -1,11 +1,11 @@
-"""Bóveda de sock puppets — F13 paso 152.
+"""Sock puppet vault -- F13 step 152.
 
-Gestiona las personas de investigación no atribuibles (identidades falsas que un
-investigador OSINT usa para no exponerse). Guarda nombre, email, usuario, notas…
-en un JSON local. NO son credenciales secretas (para eso está core/boveda.py con
-cifrado); son identidades de trabajo, por eso van en claro pero fuera del repo.
+Manages non-attributable research personas (fake identities an OSINT investigator
+uses to avoid exposing themselves). Stores name, email, username, notes... in a
+local JSON. These are NOT secret credentials (that's core/boveda.py, encrypted);
+they are working identities, hence stored in the clear but outside the repo.
 
-Módulo PURO."""
+PURE module."""
 from __future__ import annotations
 import datetime
 import json

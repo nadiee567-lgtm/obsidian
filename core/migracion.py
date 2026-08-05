@@ -1,10 +1,10 @@
-"""Migración del formato viejo al modelo tipado — F1 paso 24.
+"""Migration from the old format to the typed model -- F1 step 24.
 
-Convierte el `case['datos']` plano (dict por módulo: {tipo, objetivo, resultados})
-en un Almacen de entidades/relaciones tipadas. Replica el mapeo que ya hacía
-_build_grafo, para no perder los casos existentes al pasar al modelo nuevo.
+Converts the flat `case['datos']` (per-module dict: {tipo, objetivo, resultados})
+into a Store of typed entities/relations. Replicates the mapping _build_grafo
+already did, so existing cases aren't lost when moving to the new model.
 
-Defensivo: un módulo malformado se salta, no tumba la migración completa."""
+Defensive: a malformed module is skipped, it does not take down the whole migration."""
 import re
 
 from core.modelo import Almacen
@@ -13,7 +13,7 @@ _RE_IP = re.compile(r'\d+\.\d+\.\d+\.\d+')
 
 
 def migrar_caso(case: dict) -> Almacen:
-    """case (dict con 'objetivo' y 'datos') → Almacen tipado."""
+    """case (dict with 'objetivo' and 'datos') -> typed Store."""
     alm = Almacen()
     objetivo = case.get('objetivo')
     raiz = alm.crear('objetivo', objetivo, origenes={'caso'}) if objetivo else None
@@ -26,7 +26,7 @@ def migrar_caso(case: dict) -> Almacen:
         try:
             _MIGRADORES.get(tipo, lambda *a: None)(alm, raiz, valor, res, clave)
         except Exception:
-            continue   # módulo malformado: se salta
+            continue   # malformed module: skipped
     return alm
 
 
@@ -78,7 +78,7 @@ def _mig_usuario(alm, raiz, valor, res, origen):
         if plat:
             e = alm.crear('plataforma', plat, origenes={origen},
                           propiedades={'url': p.get('url', '')})
-            _rel(alm, u, e, 'perfil')
+            _rel(alm, u, e, 'profile')
     gh = res.get('github', {}) or {}
     if gh.get('email') and gh['email'] != 'oculto':
         _rel(alm, u, alm.crear('email', gh['email'], origenes={origen}), 'email')
@@ -145,7 +145,7 @@ def _mig_github_secrets(alm, raiz, valor, res, origen):
                       propiedades={'tipo_secreto': h.get('tipo'), 'repo': h.get('repo'),
                                    'commit': h.get('commit')})
         e.etiquetar('expuesto')
-        _rel(alm, raiz, e, 'secreto expuesto')
+        _rel(alm, raiz, e, 'exposed secret')
 
 
 def _mig_passivedns(alm, raiz, valor, res, origen):
@@ -154,7 +154,7 @@ def _mig_passivedns(alm, raiz, valor, res, origen):
     for h in res.get('historial', [])[:30]:
         if h.get('ip'):
             _rel(alm, d, alm.crear('ip', h['ip'], origenes={origen}),
-                 f"resolvió {h.get('fecha', '?')}")
+                 f"resolved {h.get('fecha', '?')}")
 
 
 def _mig_favicon(alm, raiz, valor, res, origen):
@@ -163,7 +163,7 @@ def _mig_favicon(alm, raiz, valor, res, origen):
             e = alm.crear('ip', m['ip'], origenes={origen},
                           propiedades={'org': m.get('org')})
             e.etiquetar('favicon-compartido')
-            _rel(alm, raiz, e, 'favicon compartido')
+            _rel(alm, raiz, e, 'shared favicon')
 
 
 _MIGRADORES = {

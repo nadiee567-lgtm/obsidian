@@ -1,10 +1,10 @@
-"""Notificaciones push por ntfy.sh — F7 paso 96.
+"""Push notifications via ntfy.sh -- F7 step 96.
 
-Cuando el monitor detecta un cambio, avisa al celular de Sebastian (ya usa ntfy,
-topic tiger-sebastian). Sin topic configurado no hace nada (degrada en silencio).
+When the monitor detects a change, it pings the user's phone (ntfy). With no topic
+configured it does nothing (degrades silently).
 
-`construir_ntfy` es PURO (arma url/headers/cuerpo) y por eso testeable; `enviar_ntfy`
-solo lo manda con requests, aislando cualquier fallo de red."""
+`construir_ntfy` is PURE (builds url/headers/body), hence testable; `enviar_ntfy`
+just sends it with requests, isolating any network failure."""
 from __future__ import annotations
 import requests
 
@@ -14,7 +14,7 @@ DEFAULT_SERVER = 'https://ntfy.sh'
 def construir_ntfy(topic: str, mensaje: str, titulo: str = 'OBSIDIAN',
                    server: str = DEFAULT_SERVER, prioridad: str = 'default',
                    tags: str = 'satellite') -> tuple:
-    """Devuelve (url, headers, cuerpo_bytes) para el POST a ntfy. No manda nada."""
+    """Returns (url, headers, body_bytes) for the ntfy POST. Sends nothing."""
     url = f"{server.rstrip('/')}/{topic.lstrip('/')}"
     headers = {'Title': titulo, 'Priority': prioridad, 'Tags': tags}
     return url, headers, mensaje.encode('utf-8')
@@ -23,7 +23,7 @@ def construir_ntfy(topic: str, mensaje: str, titulo: str = 'OBSIDIAN',
 def enviar_ntfy(topic: str, mensaje: str, titulo: str = 'OBSIDIAN',
                 server: str = DEFAULT_SERVER, prioridad: str = 'default',
                 tags: str = 'satellite', timeout: int = 6) -> bool:
-    """Manda la notificación. Devuelve True si salió, False si no (sin lanzar)."""
+    """Sends the notification. Returns True if it went out, False otherwise (no raise)."""
     if not topic:
         return False
     url, headers, cuerpo = construir_ntfy(topic, mensaje, titulo, server, prioridad, tags)

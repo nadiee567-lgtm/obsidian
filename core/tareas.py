@@ -1,12 +1,12 @@
-"""Cola de tareas en background + eventos para SSE — F2 paso 37.
+"""Background task queue + events for SSE -- F2 step 37.
 
-Una tarea larga (recon de muchos transforms) no debe bloquear la request HTTP: se
-lanza en un hilo, devuelve un id al instante, y el cliente escucha el progreso en
-vivo por Server-Sent Events. Módulo PURO (no sabe de Flask): expone eventos como
-una cola que el endpoint SSE drena.
+A long task (recon of many transforms) must not block the HTTP request: it is
+launched in a thread, returns an id immediately, and the client listens to live
+progress via Server-Sent Events. PURE module (knows nothing of Flask): exposes
+events as a queue that the SSE endpoint drains.
 
-El trabajo recibe un `emit(evento)` para publicar progreso. Al terminar se pone un
-evento {'tipo':'fin'}."""
+The job receives an `emit(event)` to publish progress. When it finishes an event
+{'tipo':'fin'} is enqueued."""
 from __future__ import annotations
 import queue
 import threading
@@ -19,7 +19,7 @@ class GestorTareas:
         self._lock = threading.Lock()
 
     def crear(self, trabajo) -> str:
-        """Lanza `trabajo(emit)` en un hilo. Devuelve el id de la tarea."""
+        """Launches `trabajo(emit)` in a thread. Returns the task id."""
         tid = uuid.uuid4().hex[:12]
         est = {'id': tid, 'estado': 'corriendo', 'eventos': queue.Queue(), 'resultado': None}
         with self._lock:
@@ -43,7 +43,7 @@ class GestorTareas:
             return self._tareas.get(tid)
 
     def stream(self, tid: str):
-        """Genera los eventos de la tarea hasta el 'fin' (bloqueante). Un consumidor."""
+        """Yields the task's events until 'fin' (blocking). Single consumer."""
         est = self.estado(tid)
         if not est:
             return

@@ -1,10 +1,10 @@
-"""Persistencia del modelo tipado en SQLite — F1 paso 20.
+"""Typed-model persistence in SQLite -- F1 step 20.
 
-Guarda un Almacen (entidades + relaciones) en tablas SQLite, una fila por
-entidad — consultable, a diferencia de un blob JSON. Base de los workspaces
-(F3), donde cada caso tendrá su propia DB.
+Saves a Store (entities + relations) into SQLite tables, one row per entity --
+queryable, unlike a JSON blob. Foundation of workspaces (F3), where each case
+will have its own DB.
 
-Módulo PURO respecto a Flask: recibe la ruta de la DB, no depende del server."""
+PURE module with respect to Flask: takes the DB path, does not depend on the server."""
 import sqlite3
 import json
 import datetime
@@ -49,7 +49,7 @@ def _conectar(db_path):
 
 
 def guardar_almacen(almacen: Almacen, db_path: str) -> None:
-    """Vuelca el almacén completo a la DB (upsert por id)."""
+    """Dumps the full store to the DB (upsert by id)."""
     con = _conectar(db_path)
     with con:
         for e in almacen.entidades:
@@ -73,10 +73,10 @@ def guardar_almacen(almacen: Almacen, db_path: str) -> None:
 
 
 def cargar_almacen(db_path: str) -> Almacen:
-    """Reconstruye un Almacen desde la DB. Carga SILENCIOSA (sin bus): no dispara
-    eventos, porque cargar de disco no es 'descubrir' datos nuevos."""
+    """Rebuilds a Store from the DB. SILENT load (no bus): does not fire events,
+    because loading from disk is not 'discovering' new data."""
     con = _conectar(db_path)
-    alm = Almacen()   # sin bus -> agregar() no publica
+    alm = Almacen()   # no bus -> agregar() does not publish
     for row in con.execute(
         "SELECT tipo,valor,propiedades,origenes,tags,procedencia,confianza,creada FROM entidades"
     ):
@@ -97,9 +97,9 @@ def cargar_almacen(db_path: str) -> Almacen:
     return alm
 
 
-# ── Historial / auditoría por caso (F3 paso 48) ──────────────────────────────
+# ── Per-case history / audit (F3 step 48) ────────────────────────────────────
 def registrar_evento(db_path: str, transform: str, entrada: str, salidas: int) -> None:
-    """Anota que se corrió un transform (qué, cuándo, cuántos resultados)."""
+    """Records that a transform ran (what, when, how many results)."""
     con = _conectar(db_path)
     with con:
         con.execute(
@@ -110,7 +110,7 @@ def registrar_evento(db_path: str, transform: str, entrada: str, salidas: int) -
 
 
 def leer_historial(db_path: str, limite: int = 100) -> list:
-    """Historial del caso, más reciente primero."""
+    """Case history, most recent first."""
     con = _conectar(db_path)
     con.row_factory = sqlite3.Row
     filas = con.execute(
