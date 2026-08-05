@@ -66,3 +66,19 @@ def test_exchange_attrib():
     prod, _, _ = _correr('exchange_attrib', 'wallet', _GENESIS)
     herrs = {e.propiedades.get('herramienta') for e in prod if e.tipo == 'url'}
     assert herrs == {'blockchair', 'walletexplorer', 'arkham', 'oxt'}
+
+
+# ── 141: scoring de riesgo (ransomware) + regla ──────────────────────────────
+def test_riesgo_wallet_y_regla(monkeypatch):
+    from core.correlacion import correlacionar
+    monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
+    prod, e, alm = _correr('riesgo_wallet', 'wallet', '1BadRansomAddr')
+    assert 'ransomware' in e.tags
+    h = correlacionar(alm)
+    assert any(x.regla == 'wallet-ransomware' and x.severidad == 'critico' for x in h)
+
+
+def test_riesgo_wallet_limpia(monkeypatch):
+    monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
+    _, e, _ = _correr('riesgo_wallet', 'wallet', _GENESIS)   # no está en la lista
+    assert 'ransomware' not in e.tags

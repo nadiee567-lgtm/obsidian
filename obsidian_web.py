@@ -3580,6 +3580,27 @@ def _t_tx_grafo(entidad, ctx):
     for c in list(contrapartes)[:30]:
         ctx.emitir('wallet', c, etiqueta='tx', cadena='btc')
 
+_RANSOM = {'addrs': None, 'ts': 0}
+
+def _ransom_addrs():
+    """Direcciones de ransomware conocidas (Ransomwhere, CC0). Caché 6h."""
+    if _RANSOM['addrs'] is not None and time.time() - _RANSOM['ts'] < 21600:
+        return _RANSOM['addrs']
+    try:
+        d = SESSION.get('https://api.ransomwhe.re/addresses', timeout=20).json() or {}
+        _RANSOM['addrs'] = {x.get('address') for x in d.get('result', []) if x.get('address')}
+        _RANSOM['ts'] = time.time()
+    except Exception as _e:
+        log.debug("ransomwhere no disponible: %s", _e)
+    return _RANSOM['addrs'] or set()
+
+@transform(entrada='wallet', salidas=(), nombre='riesgo_wallet',
+           descripcion='Riesgo de la dirección: ¿ligada a ransomware? (Ransomwhere, CC0, keyless) (F11 paso 141)')
+def _t_riesgo_wallet(entidad, ctx):
+    if entidad.valor in _ransom_addrs():
+        entidad.etiquetar('ransomware')
+        entidad.propiedades['riesgo'] = 'ligada a ransomware (Ransomwhere)'
+
 @transform(entrada='wallet', salidas=('url',), nombre='exchange_attrib',
            descripcion='Atribución a exchanges: enlaces a Blockchair/WalletExplorer/Arkham/OXT (F11 paso 140)')
 def _t_exchange_attrib(entidad, ctx):

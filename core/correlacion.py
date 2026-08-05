@@ -209,6 +209,14 @@ def r_takeover(alm):
                            f'Subdominio vulnerable a takeover: {s.valor}', [s.id])
 
 @regla
+def r_wallet_ransomware(alm):
+    """Wallet ligada a ransomware (paso 141)."""
+    for w in alm.de_tipo('wallet'):
+        if 'ransomware' in w.tags:
+            yield Hallazgo('wallet-ransomware', 'critico',
+                           f'Wallet ligada a ransomware: {w.valor}', [w.id])
+
+@regla
 def r_leak_login(alm):
     """Credencial filtrada + panel de login expuesto = camino de acceso probable
     (paso 136). Empareja explícitamente cada email 'filtrado' con cada panel
