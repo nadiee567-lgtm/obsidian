@@ -24,6 +24,7 @@ from core.estado import render_estado
 from core.motores import traducir as _motor_query, traducir_todos, MOTORES
 from core.tareas import GestorTareas
 from core.personas import GestorPersonas
+from core.extraccion import extraer_entidades
 from core.imagen import (enlaces_reverse, enlaces_facial, parse_gps,
                          enlaces_cronolocalizacion, enlaces_satelital, enlaces_landmark,
                          phash as _phash, ela as _ela)
@@ -4571,6 +4572,25 @@ _PROMPTS_IA = {
                '(país/ciudad/zona) con el razonamiento y qué verificar. Nota: sin visión, razona sobre '
                'pistas textuales.\n\nDatos:\n{datos}'),
 }
+
+@app.route('/api/v2/extraer_texto', methods=['POST'])
+def api_v2_extraer_texto():
+    """Pega texto → entidades tipadas al grafo (F14 paso 161, regex determinista)."""
+    texto = (request.json or {}).get('texto', '')
+    agregadas = []
+    with _almacen_lock:
+        for tipo, valor in extraer_entidades(texto):
+            try:
+                e = _almacen.crear(tipo, valor)
+                agregadas.append({'tipo': e.tipo, 'valor': e.valor})
+            except Exception:
+                pass
+        if _ws_activo:
+            try:
+                _gestor.guardar(_ws_activo, _almacen)
+            except Exception as _e:
+                log.warning("autosave extraer_texto: %s", _e)
+    return jsonify({'agregadas': agregadas, 'total': len(agregadas)})
 
 @app.route('/api/v2/ia/<modo>', methods=['POST'])
 def api_v2_ia_modo(modo):
