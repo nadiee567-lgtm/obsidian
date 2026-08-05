@@ -64,6 +64,34 @@ python obsidian_cli.py export json -w caso1 -o caso.json
 
 ---
 
+## API keys (opcional) y alternativas gratis
+
+**OBSIDIAN es keyless-first: sin ninguna API key ya obtienes ~90% del valor.** La mayoría
+de los transforms (DNS, RDAP, Certificate Transparency, subdominios, HTTP, nuclei, brechas,
+reputación de IP, favicon, wayback…) no necesitan nada. Solo unos pocos piden key, y son
+**extras opcionales** — en la interfaz aparecen marcados con **⚿**.
+
+Cada usuario pone **sus propias** keys (modelo *bring-your-own-key*) en la bóveda cifrada,
+desde el panel **🔑 API keys** de la web. La key nunca sale de tu máquina.
+
+**Transforms que piden key, y qué usar gratis si no la tienes:**
+
+| Necesita key | Qué hace | Alternativa GRATIS (keyless) ya incluida |
+|---|---|---|
+| **Shodan / Censys / ZoomEye / FOFA / Quake / Hunter / Netlas / Criminal IP / BinaryEdge** | Buscadores de internet (puertos, servicios, infra de una IP) | `puertos` (nmap), `geo_ip`, `reputacion_ip`, `ip_blocklist`, `greynoise` |
+| **HIBP** *(única de pago)* | Email en filtraciones de datos | `breaches_xon` (XposedOrNot), `stealer_hudsonrock` |
+| **VirusTotal** (passivedns) | Historial de IPs de un dominio | `crtsh`, `subdominios_ht`, `rdap` |
+| **ViewDNS** (reverse_whois) | Otros dominios del mismo dueño | — |
+
+**Sobre las keys de pago:** casi todos los buscadores tienen **tier gratis** (Censys, FOFA,
+Netlas). Shodan gratis es limitado; su Membership es un **pago único** (no suscripción), y es
+gratis con el [GitHub Student Pack](https://education.github.com/pack) si eres estudiante.
+No necesitas comprar nada para usar OBSIDIAN a fondo.
+
+> *La seguridad no debería tener un precio exorbitante.*
+
+---
+
 ## Arquitectura
 
 ```
