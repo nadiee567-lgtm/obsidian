@@ -2388,6 +2388,42 @@ def _t_stealer(entidad, ctx):
     except Exception as _e:
         log.debug("hudsonrock no disponible: %s", _e)
 
+@transform(entrada='email', salidas=('org',), nombre='breaches',
+           descripcion='Agregador de brechas: XposedOrNot + LeakCheck (keyless) + HIBP (si hay key), unificados (F10 paso 135)')
+def _t_breaches(entidad, ctx):
+    email = entidad.valor
+    fuentes = set()
+    try:                                             # XposedOrNot (keyless)
+        d = SESSION.get(f'https://api.xposedornot.com/v1/check-email/{email}', timeout=10).json() or {}
+        br = d.get('breaches')
+        if isinstance(br, list) and br and isinstance(br[0], list):
+            fuentes.update(b for b in br[0] if b)
+    except Exception as _e:
+        log.debug("breaches xon: %s", _e)
+    try:                                             # LeakCheck público (keyless)
+        d = SESSION.get('https://leakcheck.io/api/public', params={'check': email}, timeout=10).json() or {}
+        if d.get('success'):
+            for s in d.get('sources', []):
+                nombre = s.get('name') if isinstance(s, dict) else s
+                if nombre:
+                    fuentes.add(nombre)
+    except Exception as _e:
+        log.debug("breaches leakcheck: %s", _e)
+    hibp = _boveda.obtener('hibp') or os.environ.get('HIBP_API_KEY', '')
+    if hibp:                                          # HIBP (de pago, opcional)
+        try:
+            r = SESSION.get(f'https://haveibeenpwned.com/api/v3/breachedaccount/{email}',
+                            headers={'hibp-api-key': hibp, 'User-Agent': 'OBSIDIAN'}, timeout=10)
+            if r.status_code == 200:
+                fuentes.update(b['Name'] for b in (r.json() or []) if b.get('Name'))
+        except Exception as _e:
+            log.debug("breaches hibp: %s", _e)
+    if fuentes:
+        entidad.etiquetar('filtrado')
+        entidad.propiedades['brechas'] = sorted(fuentes)
+        for f in sorted(fuentes)[:30]:
+            ctx.emitir('org', f, etiqueta='brecha')
+
 @transform(entrada='email', salidas=('url',), nombre='intelx', requiere_key=True,
            descripcion='Búsqueda histórica de filtraciones por selector (Intelligence X, key en bóveda) (F10 paso 134)')
 def _t_intelx(entidad, ctx):

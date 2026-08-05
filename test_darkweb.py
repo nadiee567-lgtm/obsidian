@@ -150,3 +150,27 @@ def test_intelx_sin_key(monkeypatch):
     monkeypatch.setenv('INTELX_KEY', '')
     prod, _ = _correr('intelx', 'email', 'a@b.com')
     assert prod == []
+
+
+# ── 135: agregador de breaches (keyless-first, unifica fuentes) ──────────────
+def test_breaches_agrega_y_dedup(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)   # sin HIBP
+    monkeypatch.setenv('HIBP_API_KEY', '')
+    def fake_get(url, *a, **k):
+        if 'xposedornot' in url:
+            return _RjD({'breaches': [['Adobe', 'LinkedIn']]})
+        if 'leakcheck' in url:
+            return _RjD({'success': True, 'sources': [{'name': 'Canva'}, {'name': 'Adobe'}]})
+        return _RjD({})
+    monkeypatch.setattr(ob.SESSION, 'get', fake_get)
+    prod, e = _correr('breaches', 'email', 'a@b.com')
+    orgs = {x.valor for x in prod if x.tipo == 'org'}
+    assert orgs == {'Adobe', 'LinkedIn', 'Canva'}    # unificado y dedup (Adobe una vez)
+    assert 'filtrado' in e.tags
+
+
+def test_breaches_limpio(monkeypatch):
+    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _RjD({}))
+    prod, e = _correr('breaches', 'email', 'nadie@limpio.com')
+    assert prod == [] and 'filtrado' not in e.tags
