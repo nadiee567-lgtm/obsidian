@@ -2388,6 +2388,23 @@ def _t_stealer(entidad, ctx):
     except Exception as _e:
         log.debug("hudsonrock no disponible: %s", _e)
 
+@transform(entrada='email', salidas=('url',), nombre='pastes',
+           descripcion='Monitoreo de pastes: psbdmp + dorks a Pastebin/Ghostbin/etc (keyless) (F10 paso 133)')
+def _t_pastes(entidad, ctx):
+    from urllib.parse import quote as _q
+    q = entidad.valor
+    try:
+        d = SESSION.get(f'https://psbdmp.ws/api/v3/search/{_q(q)}', timeout=8).json() or {}
+        for p in (d.get('data') or [])[:10]:
+            pid = p.get('id')
+            if pid:
+                ctx.emitir('url', f'https://pastebin.com/{pid}', etiqueta='paste', fuente='psbdmp')
+    except Exception as _e:
+        log.debug("psbdmp no disponible: %s", _e)
+    for sitio in ('pastebin.com', 'ghostbin.com', 'rentry.co', 'justpaste.it'):
+        ctx.emitir('url', f'https://www.google.com/search?q={_q(f"{q} site:{sitio}")}',
+                   etiqueta=f'paste-dork:{sitio}', sitio=sitio)
+
 @transform(entrada='dominio', salidas=(), nombre='stealer_dominio',
            descripcion='Exposición del dominio en stealer logs (empleados/usuarios infectados, HudsonRock keyless) (F10 paso 132)')
 def _t_stealer_dominio(entidad, ctx):

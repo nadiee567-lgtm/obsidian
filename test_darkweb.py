@@ -112,3 +112,23 @@ def test_stealer_dominio_limpio(monkeypatch):
                         lambda *a, **k: _RjD({'data': {'employees': 0, 'users': 0}}))
     _, e = _correr('stealer_dominio', 'dominio', 'acme.com')
     assert 'stealer-expuesto' not in e.tags
+
+
+# ── 133: monitoreo de pastes (psbdmp + dorks keyless) ────────────────────────
+def test_pastes(monkeypatch):
+    monkeypatch.setattr(ob.SESSION, 'get',
+                        lambda *a, **k: _RjD({'data': [{'id': 'abc123'}, {'id': 'def456'}]}))
+    prod, _ = _correr('pastes', 'email', 'a@b.com')
+    urls = {x.valor for x in prod if x.tipo == 'url'}
+    assert 'https://pastebin.com/abc123' in urls          # de psbdmp
+    assert any('site%3Apastebin.com' in u for u in urls)  # dork (url-encodeado, correcto)
+    assert len(urls) >= 6                                  # 2 pastes + 4 dorks
+
+
+def test_pastes_psbdmp_muerto(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError('psbdmp caído')
+    monkeypatch.setattr(ob.SESSION, 'get', boom)
+    prod, _ = _correr('pastes', 'email', 'a@b.com')
+    urls = {x.valor for x in prod if x.tipo == 'url'}
+    assert len(urls) == 4                                  # aún salen los 4 dorks
