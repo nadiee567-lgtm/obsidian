@@ -116,6 +116,15 @@ class Gestor:
         return sorted((os.path.splitext(os.path.basename(p))[0]
                        for p in glob.glob(os.path.join(d, '*.db'))), reverse=True)
 
+    def cargar_snapshot(self, nombre, snap_id):
+        """Carga el Almacen de un snapshot SIN restaurarlo (para diff histórico, paso 151)."""
+        d = self._dir_snaps(nombre)
+        sid = _slug_caso(snap_id)
+        ruta = os.path.join(d, sid + '.db') if (d and sid) else None
+        if not ruta or not os.path.exists(ruta):
+            raise KeyError('snapshot no encontrado')
+        return cargar_almacen(ruta)
+
     def restaurar(self, nombre, snap_id):
         """Vuelve el caso a un snapshot anterior (hace snapshot del actual antes)."""
         r = self._ruta(nombre)

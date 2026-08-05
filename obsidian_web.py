@@ -4159,6 +4159,26 @@ def api_v2_inventario():
                     'total_activos': sum(len(v) for v in inv.values()),
                     'inventario': inv})
 
+@app.route('/api/v2/diff_historico')
+def api_v2_diff_historico():
+    """Cómo cambió la superficie del objetivo vs un snapshot anterior (F12 paso 151).
+    Sin ?snapshot devuelve la lista de snapshots disponibles."""
+    if not _ws_activo:
+        return _error('sin workspace activo', 400)
+    sid = request.args.get('snapshot')
+    if not sid:
+        return jsonify({'snapshots': _gestor.listar_snapshots(_ws_activo)})
+    try:
+        viejo = _gestor.cargar_snapshot(_ws_activo, sid)
+    except KeyError:
+        return _error('snapshot no encontrado', 404)
+    ids_v = {e.id: e for e in viejo.entidades}
+    ids_n = {e.id: e for e in _almacen.entidades}
+    agregados = [{'tipo': e.tipo, 'valor': e.valor} for i, e in ids_n.items() if i not in ids_v]
+    removidos = [{'tipo': e.tipo, 'valor': e.valor} for i, e in ids_v.items() if i not in ids_n]
+    return jsonify({'snapshot': sid, 'agregados': agregados, 'removidos': removidos,
+                    'total_antes': len(viejo), 'total_ahora': len(_almacen)})
+
 @app.route('/api/v2/exposicion')
 def api_v2_exposicion():
     """Score de exposición del objetivo: tamaño de la superficie + riesgo (F12 paso 149)."""

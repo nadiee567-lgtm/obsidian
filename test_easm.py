@@ -111,3 +111,20 @@ def test_shadow_it():
     r = [x for x in correlacionar(alm) if x.regla == 'shadow-it']
     sev = {x.severidad for x in r}
     assert len(r) == 2 and sev == {'alto', 'medio'}                    # bucket + subdom roto
+
+
+# ── 151: diff histórico de superficie ────────────────────────────────────────
+def test_diff_historico(tmp_path):
+    from core.workspaces import Gestor
+    g = Gestor(str(tmp_path))
+    g.crear('caso')
+    alm = Almacen()
+    alm.crear('subdominio', 'a.x.com')
+    g.guardar('caso', alm)
+    sid = g.snapshot('caso')                     # foto histórica: 1 activo
+    alm.crear('subdominio', 'b.x.com')           # apareció un activo nuevo
+    g.guardar('caso', alm)
+    viejo = g.cargar_snapshot('caso', sid)
+    assert len(viejo) == 1
+    nuevos = {e.id for e in g.cargar('caso').entidades} - {e.id for e in viejo.entidades}
+    assert len(nuevos) == 1                       # b.x.com apareció desde el snapshot
