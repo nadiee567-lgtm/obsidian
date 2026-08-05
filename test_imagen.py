@@ -72,3 +72,47 @@ def test_metadata_exif_como_entidades(monkeypatch):
     assert 'Jane Doe' in personas
     assert urls and 'maps' in urls[0].valor          # GPS -> link de mapa pivotable
     assert 'tiene-gps' in e.tags
+
+
+# ── F9 121-125: geo/imagen ───────────────────────────────────────────────────
+def test_parse_gps():
+    from core.imagen import parse_gps
+    r = parse_gps("40 deg 26' 46.0\" N, 79 deg 58' 56.0\" W")
+    assert r and abs(r[0] - 40.446) < 0.01 and abs(r[1] + 79.982) < 0.01
+    assert parse_gps('nada') is None
+
+
+def test_cronolocalizacion(monkeypatch):
+    from core.transforms import ejecutar_por_nombre
+    alm = Almacen()
+    u = alm.crear('url', 'https://x.com/f.jpg', propiedades={'gps': "40 deg 26' N, 79 deg 58' W"})
+    prod = ejecutar_por_nombre('cronolocalizacion', u, alm)
+    assert {p.propiedades.get('herramienta') for p in prod} == {'suncalc', 'shadowmap'}
+    assert any('40' in p.valor for p in prod)         # coords en el link
+
+
+def test_satelital_requiere_gps():
+    from core.transforms import ejecutar_por_nombre
+    alm = Almacen()
+    u = alm.crear('url', 'https://x.com/f.jpg')       # sin GPS
+    assert ejecutar_por_nombre('satelital', u, alm) == []
+
+
+def test_landmarks():
+    from core.transforms import ejecutar_por_nombre
+    alm = Almacen()
+    u = alm.crear('url', 'https://x.com/f.jpg')
+    prod = ejecutar_por_nombre('landmarks', u, alm)
+    assert {p.propiedades.get('herramienta') for p in prod} == {'google_lens', 'mapillary', 'wikimapia'}
+
+
+def test_ocr_sin_tesseract(monkeypatch):
+    from core.transforms import ejecutar_por_nombre
+    monkeypatch.setattr(ob, '_which', lambda x: False)
+    alm = Almacen()
+    u = alm.crear('url', 'https://x.com/f.jpg')
+    assert ejecutar_por_nombre('ocr', u, alm) == []   # degrada sin tesseract
+
+
+def test_geoloc_es_modo_ia():
+    assert 'geoloc' in ob._PROMPTS_IA

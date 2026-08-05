@@ -23,7 +23,8 @@ from core.notificar import enviar_ntfy, construir_ntfy
 from core.estado import render_estado
 from core.motores import traducir as _motor_query, traducir_todos, MOTORES
 from core.tareas import GestorTareas
-from core.imagen import enlaces_reverse, enlaces_facial
+from core.imagen import (enlaces_reverse, enlaces_facial, parse_gps,
+                         enlaces_cronolocalizacion, enlaces_satelital, enlaces_landmark)
 import core.ia as ia
 
 log = get_logger()
@@ -3203,6 +3204,58 @@ def _t_wordlist(entidad, ctx):
     except Exception as _e:
         log.debug("wordlist guardar: %s", _e)
 
+@transform(entrada='url', salidas=('url',), nombre='cronolocalizacion',
+           descripcion='Cronolocalización por sombras: SunCalc/ShadowMap (técnica Bellingcat) (F9 paso 121)')
+def _t_cronolocalizacion(entidad, ctx):
+    coords = parse_gps(entidad.propiedades.get('gps', ''))
+    enlaces = enlaces_cronolocalizacion(*(coords if coords else (None, None)))
+    for herr, url in enlaces.items():
+        ctx.emitir('url', url, etiqueta=f'sol:{herr}', herramienta=herr)
+
+@transform(entrada='url', salidas=('url',), nombre='satelital',
+           descripcion='Cruce satelital de la ubicación (Google Earth/Sentinel/Bing) — requiere GPS (F9 paso 122)')
+def _t_satelital(entidad, ctx):
+    coords = parse_gps(entidad.propiedades.get('gps', ''))
+    if not coords:
+        return
+    for herr, url in enlaces_satelital(*coords).items():
+        ctx.emitir('url', url, etiqueta=f'satelite:{herr}', herramienta=herr)
+
+@transform(entrada='url', salidas=('url',), nombre='landmarks',
+           descripcion='Matching de puntos de referencia por imagen (Google Lens/Mapillary/Wikimapia) (F9 paso 123)')
+def _t_landmarks(entidad, ctx):
+    for herr, url in enlaces_landmark(entidad.valor).items():
+        ctx.emitir('url', url, etiqueta=f'landmark:{herr}', herramienta=herr)
+
+@transform(entrada='url', salidas=(), nombre='ocr',
+           descripcion='OCR cirílico/chino/latino de la imagen (tesseract, langs rus+chi_sim+eng) (F9 paso 125)')
+def _t_ocr(entidad, ctx):
+    if not _which('tesseract'):
+        return                                       # degrada: falta tesseract + langs
+    try:
+        r = _fetch_seguro(entidad.valor, timeout=10, stream=True)
+    except Exception:
+        return
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.img') as f:
+        for chunk in r.iter_content(8192):
+            f.write(chunk)
+            if f.tell() > 15_000_000:
+                break
+        fn = f.name
+    try:
+        out = run_tool(['tesseract', fn, 'stdout', '-l', 'rus+chi_sim+eng'], timeout=25)
+        texto = (out or '').strip()
+        if not texto:                                # langs no instalados → intenta solo eng
+            texto = (run_tool(['tesseract', fn, 'stdout'], timeout=25) or '').strip()
+        if texto:
+            entidad.propiedades['ocr'] = texto[:1000]
+            entidad.etiquetar('tiene-texto')
+    finally:
+        try:
+            os.unlink(fn)
+        except OSError:
+            pass
+
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
 # SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).
@@ -3812,6 +3865,10 @@ _PROMPTS_IA = {
                    '6. RECOMENDACIONES DE HARDENING\n\nDatos:\n{datos}'),
     'analizar': ('Analiza TODO el caso OSINT de "{objetivo}" y correlaciona: qué historia cuentan '
                  'los datos juntos, hallazgos no obvios, y los 3 siguientes pasos de investigación.\n\nDatos:\n{datos}'),
+    'geoloc': ('Geolocaliza al objetivo/foto de "{objetivo}" a partir de TODAS las pistas de texto del '
+               'caso (EXIF/GPS, OCR, idiomas, dominios, títulos): da 3-5 CANDIDATOS de ubicación '
+               '(país/ciudad/zona) con el razonamiento y qué verificar. Nota: sin visión, razona sobre '
+               'pistas textuales.\n\nDatos:\n{datos}'),
 }
 
 @app.route('/api/v2/ia/<modo>', methods=['POST'])

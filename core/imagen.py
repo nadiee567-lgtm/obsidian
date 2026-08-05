@@ -7,7 +7,46 @@ búsqueda inversa POR URL de imagen — keyless, el analista hace click.
 
 Módulo PURO."""
 from __future__ import annotations
+import re
 from urllib.parse import quote
+
+
+def parse_gps(texto: str):
+    """Convierte GPS de exiftool (DMS, '40 deg 26\\' 46\" N, 79 deg 58\\' 56\" W')
+    a decimal (lat, lon). Devuelve None si no se puede."""
+    m = re.findall(r"(\d+(?:\.\d+)?)\s*deg\s*(\d+(?:\.\d+)?)'?\s*(\d+(?:\.\d+)?)?\"?\s*([NSEW])",
+                   texto or '')
+    if len(m) < 2:
+        return None
+    def dec(d, mi, s, h):
+        v = float(d) + float(mi) / 60 + (float(s) if s else 0) / 3600
+        return -v if h in ('S', 'W') else v
+    return (round(dec(*m[0]), 6), round(dec(*m[1]), 6))
+
+
+def enlaces_cronolocalizacion(lat=None, lon=None) -> dict:
+    """Herramientas de sol/sombra (técnica Bellingcat). Con coords si se conocen."""
+    if lat is not None and lon is not None:
+        return {'suncalc': f'https://www.suncalc.org/#/{lat},{lon},15',
+                'shadowmap': f'https://shadowmap.org/?lat={lat}&lng={lon}'}
+    return {'suncalc': 'https://www.suncalc.org/', 'shadowmap': 'https://shadowmap.org/'}
+
+
+def enlaces_satelital(lat, lon) -> dict:
+    """Vistas satelitales/aéreas para verificar una ubicación."""
+    return {
+        'google_earth': f'https://earth.google.com/web/@{lat},{lon},0a,1000d',
+        'sentinel': f'https://apps.sentinel-hub.com/eo-browser/?lat={lat}&lng={lon}&zoom=15',
+        'bing_aerial': f'https://www.bing.com/maps?cp={lat}~{lon}&style=h&lvl=17',
+    }
+
+
+def enlaces_landmark(url_imagen: str) -> dict:
+    """Reconocimiento de puntos de referencia (edificios/señales) por imagen."""
+    u = quote(url_imagen, safe='')
+    return {'google_lens': f'https://lens.google.com/uploadbyurl?url={u}',
+            'mapillary': 'https://www.mapillary.com/app/',
+            'wikimapia': 'https://wikimapia.org/'}
 
 
 def enlaces_reverse(url_imagen: str) -> dict:
