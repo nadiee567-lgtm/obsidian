@@ -87,3 +87,15 @@ def test_elegir_modelo_nexo():
     assert elegir_modelo('recon del dominio y sus subdominios') == 'qwen2.5:3b'   # osint
     assert elegir_modelo('scan de 8.8.8.8') == 'dolphin-llama3'                   # IP -> seguridad
     assert elegir_modelo('hola qué tal') == 'qwen2.5:1.5b'                        # sin señal -> rápido
+
+
+# ── 169: detección de IA (indicio, no prueba) ─────────────────────────────────
+def test_deteccion_ia(monkeypatch):
+    import obsidian_web as ob
+    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'Texto muy uniforme, posible IA.')
+    c = ob.app.test_client()
+    with c.session_transaction() as s:
+        s['auth'] = True
+    d = c.post('/api/v2/deteccion_ia', json={'texto': 'lorem ipsum...'}).get_json()
+    assert 'evaluacion' in d and 'INDICIO' in d['aviso']   # honestidad: no da certeza

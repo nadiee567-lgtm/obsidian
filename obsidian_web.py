@@ -4600,6 +4600,25 @@ def api_v2_extraer_texto():
                 log.warning("autosave extraer_texto: %s", _e)
     return jsonify({'agregadas': agregadas, 'total': len(agregadas)})
 
+@app.route('/api/v2/deteccion_ia', methods=['POST'])
+def api_v2_deteccion_ia():
+    """Indicio (NO prueba) de texto generado por IA (F14 paso 169). Para imágenes,
+    usa el transform 'ela' (126). No existe método keyless fiable — es orientativo."""
+    if not ia.disponible():
+        return _error('IA (Ollama) no disponible', 503)
+    texto = ((request.json or {}).get('texto', '') or '')[:3000]
+    if not texto.strip():
+        return _error('texto vacío', 400)
+    try:
+        resp = ia.consultar('¿Este texto parece generado por IA? Da SEÑALES concretas (uniformidad, '
+                            'frases genéricas, falta de detalle específico) y un veredicto tentativo. '
+                            f'No inventes certeza.\n\n{texto}', max_tokens=400, temp=0.3)
+    except Exception as e:
+        return _error(f'IA falló: {e}', 500)
+    return jsonify({'evaluacion': resp,
+                    'aviso': 'INDICIO, no prueba. No hay detección de IA/deepfake keyless fiable; '
+                             'para imágenes usa el transform ela (Error Level Analysis).'})
+
 @app.route('/api/v2/consulta', methods=['POST'])
 def api_v2_consulta():
     """Consulta en lenguaje natural → plan de transforms (F14 paso 165)."""
