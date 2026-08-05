@@ -3800,6 +3800,7 @@ def _correr_transform_interno(tipo, valor, nombre):
         raise ValueError(f'valor con forma inválida para {tipo}')
     if _PROXIES['pool']:
         _rotar_proxy()                                      # OPSEC: rota proxy por transform (154)
+    _higiene_request()                                      # OPSEC: randomiza UA (155)
     with _almacen_lock:
         semilla = _almacen.agregar(semilla)
         producidas = ejecutar_por_nombre(nombre, semilla, _almacen)
@@ -4096,6 +4097,26 @@ _OPSEC = {'anonimo': False}
 def _set_anonimo(on):
     _OPSEC['anonimo'] = bool(on)
     SESSION.proxies = {'http': TOR_PROXY, 'https': TOR_PROXY} if on else {}
+
+_USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+    'Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1',
+]
+_OPSEC_HIGIENE = {'on': False}
+
+def _higiene_request():
+    """Randomiza el User-Agent para no parecer un bot (F13 paso 155)."""
+    if _OPSEC_HIGIENE['on']:
+        SESSION.headers['User-Agent'] = secrets.choice(_USER_AGENTS)
+
+@app.route('/api/v2/opsec/higiene', methods=['GET', 'POST'])
+def api_v2_opsec_higiene():
+    if request.method == 'POST':
+        _OPSEC_HIGIENE['on'] = bool((request.json or {}).get('on'))
+    return jsonify({'higiene': _OPSEC_HIGIENE['on']})
 
 _PROXIES = {'pool': [], 'i': 0}
 

@@ -40,3 +40,17 @@ def test_rotacion_proxies():
     finally:
         ob._PROXIES['pool'] = []
         ob.SESSION.proxies = {}
+
+
+# ── 155: higiene de request (UA aleatorio) ───────────────────────────────────
+def test_higiene_request():
+    import obsidian_web as ob
+    prev = ob.SESSION.headers.get('User-Agent')
+    try:
+        ob._OPSEC_HIGIENE['on'] = True
+        ob._higiene_request()
+        assert ob.SESSION.headers['User-Agent'] in ob._USER_AGENTS
+    finally:
+        ob._OPSEC_HIGIENE['on'] = False
+        if prev:
+            ob.SESSION.headers['User-Agent'] = prev
