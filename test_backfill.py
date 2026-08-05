@@ -119,6 +119,24 @@ def test_http_probe_detecta_panel_login(monkeypatch):
     assert 'panel-login' in e.tags
 
 
+# ── 136: correlación leak -> login ───────────────────────────────────────────
+def test_leak_login():
+    from core.correlacion import correlacionar
+    alm = Almacen()
+    e = alm.crear('email', 'admin@acme.com'); e.etiquetar('filtrado')
+    p = alm.crear('subdominio', 'panel.acme.com'); p.etiquetar('panel-login')
+    r = [x for x in correlacionar(alm) if x.regla == 'leak-login']
+    assert r and r[0].severidad == 'critico'
+    assert e.id in r[0].entidades and p.id in r[0].entidades   # nombra ambos
+
+
+def test_leak_login_sin_filtrado():
+    from core.correlacion import correlacionar
+    alm = Almacen()
+    alm.crear('subdominio', 'panel.acme.com').etiquetar('panel-login')   # panel pero sin credencial
+    assert not [x for x in correlacionar(alm) if x.regla == 'leak-login']
+
+
 # ── 59: pivote plataformas ───────────────────────────────────────────────────
 def test_pivote_plataformas():
     from core.correlacion import correlacionar

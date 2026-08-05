@@ -209,6 +209,22 @@ def r_takeover(alm):
                            f'Subdominio vulnerable a takeover: {s.valor}', [s.id])
 
 @regla
+def r_leak_login(alm):
+    """Credencial filtrada + panel de login expuesto = camino de acceso probable
+    (paso 136). Empareja explícitamente cada email 'filtrado' con cada panel
+    'panel-login' del caso, nombrando ambos — el vector de ataque concreto."""
+    filtrados = [e for e in alm.de_tipo('email') if 'filtrado' in e.tags]
+    if not filtrados:
+        return
+    paneles = [e for tipo in ('dominio', 'subdominio')
+               for e in alm.de_tipo(tipo) if 'panel-login' in e.tags]
+    for panel in paneles:
+        for cred in filtrados[:3]:
+            yield Hallazgo('leak-login', 'critico',
+                           f'Credencial filtrada ({cred.valor}) + panel expuesto ({panel.valor}) '
+                           f'= posible acceso a la cuenta', [cred.id, panel.id])
+
+@regla
 def r_pivote_plataformas(alm):
     """Un usuario presente en muchas plataformas = pivote fuerte para cruzar
     identidad (paso 59). Cuenta las plataformas ligadas a cada usuario."""
