@@ -4,6 +4,14 @@ Correr:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_easm.py -q
 """
 import obsidian_web as ob
 from core.modelo import Almacen
+from core.transforms import ejecutar_por_nombre
+
+
+class _R:
+    def __init__(self, data=None):
+        self._data = data
+    def json(self):
+        return self._data
 
 
 def _cliente_con(alm, monkeypatch):
@@ -58,3 +66,18 @@ def test_infra_compartida_sin_grupo():
     alm = Almacen()
     alm.crear('dominio', 'solo.com', propiedades={'favicon_hash': '111'})
     assert not [x for x in correlacionar(alm) if x.regla == 'infra-compartida']
+
+
+# ── 148: mapa tech -> CVE (cve_lookup, con filtro CPE anti-ruido) ─────────────
+def test_cve_lookup_tech(monkeypatch):
+    resp = {'vulnerabilities': [
+        {'cve': {'id': 'CVE-2021-1234',
+                 'configurations': [{'nodes': [{'cpeMatch': [{'criteria': 'cpe:2.3:a:nginx:nginx:1.0'}]}]}]}},
+        {'cve': {'id': 'CVE-2021-9999',      # apache, NO debe salir para tech=nginx
+                 'configurations': [{'nodes': [{'cpeMatch': [{'criteria': 'cpe:2.3:a:apache:httpd:2.4'}]}]}]}},
+    ]}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=resp))
+    alm = Almacen()
+    prod = ejecutar_por_nombre('cve_lookup', alm.crear('tech', 'nginx'), alm)
+    cids = {x.valor for x in prod if x.tipo == 'cve'}
+    assert cids == {'CVE-2021-1234'}             # filtro CPE anti-ruido: solo el de nginx
