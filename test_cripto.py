@@ -29,3 +29,21 @@ def test_extraer_wallets(monkeypatch):
     prod, _, _ = _correr('extraer_wallets', 'url', 'https://x.com')
     ws = {e.valor for e in prod if e.tipo == 'wallet'}
     assert '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa' in ws and eth in ws
+
+
+# ── 138: grafo de transacciones ──────────────────────────────────────────────
+_GENESIS = '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
+
+
+def test_tx_grafo(monkeypatch):
+    tx_json = {'txs': [{'inputs': [{'prev_out': {'addr': 'inp111'}}],
+                        'out': [{'addr': 'out222'}, {'addr': _GENESIS}]}]}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=tx_json))
+    prod, _, _ = _correr('tx_grafo', 'wallet', _GENESIS)
+    ws = {e.valor for e in prod if e.tipo == 'wallet'}
+    assert ws == {'inp111', 'out222'}                # contrapartes, sin la propia
+
+
+def test_tx_grafo_ignora_no_btc():
+    prod, _, _ = _correr('tx_grafo', 'wallet', '0x' + 'a' * 40)   # ETH -> no aplica aún
+    assert prod == []

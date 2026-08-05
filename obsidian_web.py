@@ -3553,6 +3553,33 @@ _WALLET_RE = {
     'eth': re.compile(r'\b0x[a-fA-F0-9]{40}\b'),
 }
 
+_ES_BTC = re.compile(r'(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\Z')
+
+@transform(entrada='wallet', salidas=('wallet',), nombre='tx_grafo',
+           descripcion='Contrapartes de transacciones de una wallet BTC (blockchain.info, keyless) (F11 paso 138)')
+def _t_tx_grafo(entidad, ctx):
+    addr = entidad.valor
+    if not _ES_BTC.match(addr):
+        return                                       # solo BTC por ahora (keyless)
+    try:
+        d = SESSION.get(f'https://blockchain.info/rawaddr/{addr}',
+                        params={'limit': 5}, timeout=12).json() or {}
+    except Exception as _e:
+        log.debug("tx_grafo no disponible: %s", _e)
+        return
+    contrapartes = set()
+    for tx in d.get('txs', [])[:5]:
+        for inp in tx.get('inputs', []):
+            a = (inp.get('prev_out') or {}).get('addr')
+            if a and a != addr:
+                contrapartes.add(a)
+        for out in tx.get('out', []):
+            a = out.get('addr')
+            if a and a != addr:
+                contrapartes.add(a)
+    for c in list(contrapartes)[:30]:
+        ctx.emitir('wallet', c, etiqueta='tx', cadena='btc')
+
 @transform(entrada='url', salidas=('wallet',), nombre='extraer_wallets',
            descripcion='Extrae direcciones BTC/ETH de una página (F11 paso 137)')
 def _t_extraer_wallets(entidad, ctx):
