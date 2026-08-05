@@ -99,3 +99,15 @@ def test_exposicion_endpoint(monkeypatch):
     c = _cliente_con(alm, monkeypatch)
     d = c.get('/api/v2/exposicion').get_json()
     assert d['superficie']['subdominio'] == 5 and 0 <= d['exposicion'] <= 100
+
+
+# ── 150: Shadow IT / activos olvidados ───────────────────────────────────────
+def test_shadow_it():
+    from core.correlacion import correlacionar
+    alm = Almacen()
+    alm.crear('bucket', 'acme-backups').etiquetar('publico')           # storage abierto
+    alm.crear('subdominio', 'viejo.acme.com', propiedades={'http_status': 503})  # roto
+    alm.crear('subdominio', 'vivo.acme.com', propiedades={'http_status': 200})   # sano
+    r = [x for x in correlacionar(alm) if x.regla == 'shadow-it']
+    sev = {x.severidad for x in r}
+    assert len(r) == 2 and sev == {'alto', 'medio'}                    # bucket + subdom roto

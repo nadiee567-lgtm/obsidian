@@ -219,6 +219,20 @@ def r_takeover(alm):
                            f'Subdominio vulnerable a takeover: {s.valor}', [s.id])
 
 @regla
+def r_shadow_it(alm):
+    """Shadow IT / activos olvidados (paso 150): buckets públicos (almacenamiento
+    expuesto) y subdominios rotos (HTTP 5xx = olvidados/mal mantenidos)."""
+    for b in alm.de_tipo('bucket'):
+        if 'publico' in b.tags:
+            yield Hallazgo('shadow-it', 'alto',
+                           f'Bucket público — almacenamiento expuesto: {b.valor}', [b.id])
+    for s in alm.de_tipo('subdominio'):
+        st = s.propiedades.get('http_status')
+        if isinstance(st, int) and st >= 500:
+            yield Hallazgo('shadow-it', 'medio',
+                           f'Subdominio roto/olvidado (HTTP {st}): {s.valor}', [s.id])
+
+@regla
 def r_infra_compartida(alm):
     """Activos que comparten favicon o cert = probablemente la misma organización
     (paso 147). Agrupa dominios/subdominios/ips por atributo compartido."""
