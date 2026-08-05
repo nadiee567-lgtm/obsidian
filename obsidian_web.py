@@ -4120,6 +4120,30 @@ def api_v2_opsec_higiene():
         _OPSEC_HIGIENE['on'] = bool((request.json or {}).get('on'))
     return jsonify({'higiene': _OPSEC_HIGIENE['on']})
 
+def _evaluar_fuga(anon, ip_session, ip_real):
+    """LEAK si el modo anónimo está on pero la IP vista por Obsidian == la IP real
+    (o sea, el tráfico NO sale por Tor/proxy). Puro/testeable. Paso 158."""
+    return bool(anon and ip_session and ip_real and ip_session == ip_real)
+
+@app.route('/api/v2/opsec/fuga')
+def api_v2_opsec_fuga():
+    """Detección de fuga de IP/DNS antes de un transform sensible (F13 paso 158).
+    (WebRTC solo aplica en navegador — aquí se cubre la fuga de IP del server.)"""
+    anon = _OPSEC['anonimo'] or bool(_PROXIES['pool'])
+    ip_session = ip_real = None
+    try:
+        ip_session = SESSION.get('https://api.ipify.org', timeout=8).text.strip()   # con proxy/Tor
+    except Exception:
+        pass
+    try:
+        ip_real = requests.get('https://api.ipify.org', timeout=8).text.strip()     # directo, sin proxy
+    except Exception:
+        pass
+    fuga = _evaluar_fuga(anon, ip_session, ip_real)
+    return jsonify({'anonimo': anon, 'ip_via_obsidian': ip_session, 'ip_real': ip_real, 'fuga': fuga,
+                    'nota': '⚠ FUGA: tu IP real se expone pese al modo anónimo' if fuga
+                    else ('ok — tráfico anonimizado' if anon else 'modo anónimo apagado')})
+
 _OPSEC_JITTER = {'min': 0.0, 'max': 0.0}
 
 def _jitter():

@@ -88,3 +88,11 @@ def test_perfil_opsec_por_workspace(tmp_path, monkeypatch):
         ob._OPSEC_JITTER['min'] = ob._OPSEC_JITTER['max'] = 0.0
         ob._PROXIES['pool'] = []
         ob.SESSION.proxies = {}
+
+
+# ── 158: detección de fugas ──────────────────────────────────────────────────
+def test_evaluar_fuga():
+    import obsidian_web as ob
+    assert ob._evaluar_fuga(True, '1.2.3.4', '1.2.3.4') is True     # anónimo pero misma IP = FUGA
+    assert ob._evaluar_fuga(True, '9.9.9.9', '1.2.3.4') is False    # IP distinta = ok
+    assert ob._evaluar_fuga(False, '1.2.3.4', '1.2.3.4') is False   # no anónimo = no aplica
