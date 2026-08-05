@@ -3548,6 +3548,23 @@ def _t_phash(entidad, ctx):
         except OSError:
             pass
 
+_WALLET_RE = {
+    'btc': re.compile(r'\b(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b'),
+    'eth': re.compile(r'\b0x[a-fA-F0-9]{40}\b'),
+}
+
+@transform(entrada='url', salidas=('wallet',), nombre='extraer_wallets',
+           descripcion='Extrae direcciones BTC/ETH de una página (F11 paso 137)')
+def _t_extraer_wallets(entidad, ctx):
+    try:
+        r = _fetch_seguro(entidad.valor, timeout=10, stream=False)
+    except Exception:
+        return
+    texto = r.text[:200000]
+    for cadena, rx in _WALLET_RE.items():
+        for addr in list(set(rx.findall(texto)))[:30]:
+            ctx.emitir('wallet', addr, etiqueta=cadena, cadena=cadena)
+
 _BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
 
 # SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).

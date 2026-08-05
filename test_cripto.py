@@ -1,0 +1,31 @@
+"""Tests de F11 — cripto y rastreo financiero.
+
+Correr:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_cripto.py -q
+"""
+import obsidian_web as ob
+from core.modelo import Almacen
+from core.transforms import ejecutar_por_nombre
+
+
+class _R:
+    def __init__(self, text='', data=None):
+        self.text = text
+        self._data = data
+    def json(self):
+        return self._data
+
+
+def _correr(nombre, tipo, valor):
+    alm = Almacen()
+    e = alm.crear(tipo, valor)
+    return ejecutar_por_nombre(nombre, e, alm), e, alm
+
+
+# ── 137: extracción de wallets ───────────────────────────────────────────────
+def test_extraer_wallets(monkeypatch):
+    eth = '0x' + 'a' * 40
+    txt = f'donar a 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa o a {eth} gracias'
+    monkeypatch.setattr(ob, '_fetch_seguro', lambda *a, **k: _R(text=txt))
+    prod, _, _ = _correr('extraer_wallets', 'url', 'https://x.com')
+    ws = {e.valor for e in prod if e.tipo == 'wallet'}
+    assert '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa' in ws and eth in ws
