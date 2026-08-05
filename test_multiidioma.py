@@ -45,3 +45,19 @@ def test_motores_locales():
     prod, _ = _correr('motores_locales', 'persona', 'Ivan Petrov')
     motores = {p.propiedades.get('motor') for p in prod if p.tipo == 'url'}
     assert {'yandex', 'baidu', 'sogou'} == motores
+
+
+# ── 175: detección de idioma y ruteo ─────────────────────────────────────────
+def test_detectar_idioma():
+    from core.multiidioma import detectar_idioma
+    assert detectar_idioma('Привет мир') == 'ru'
+    assert detectar_idioma('你好世界') == 'zh'
+    assert detectar_idioma('hola mundo') == 'es_en'
+
+
+def test_idioma_endpoint(monkeypatch):
+    c = ob.app.test_client()
+    with c.session_transaction() as s:
+        s['auth'] = True
+    d = c.post('/api/v2/idioma', json={'texto': 'Привет'}).get_json()
+    assert d['idioma'] == 'ru' and 'Yandex' in d['fuente_sugerida']

@@ -4607,6 +4607,15 @@ _PROMPTS_IA = {
                'pistas textuales.\n\nDatos:\n{datos}'),
 }
 
+_FUENTE_POR_IDIOMA = {'ru': 'Yandex / VK', 'zh': 'Baidu / Weibo', 'ar': 'Google (árabe)',
+                      'ja': 'Yahoo Japan', 'ko': 'Naver', 'es_en': 'Google'}
+
+@app.route('/api/v2/idioma', methods=['POST'])
+def api_v2_idioma():
+    """Detecta el idioma del texto y sugiere la fuente/motor correcto (F15 paso 175)."""
+    idioma = _ml.detectar_idioma((request.json or {}).get('texto', ''))
+    return jsonify({'idioma': idioma, 'fuente_sugerida': _FUENTE_POR_IDIOMA.get(idioma, 'Google')})
+
 @app.route('/api/v2/extraer_texto', methods=['POST'])
 def api_v2_extraer_texto():
     """Pega texto → entidades tipadas al grafo (F14 paso 161, regex determinista)."""
