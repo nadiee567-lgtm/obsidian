@@ -4088,6 +4088,23 @@ def api_v2_ws_snapshot():
         return jsonify({'ok': True, 'snapshot': sid})
     return jsonify({'snapshots': _gestor.listar_snapshots(_ws_activo)})
 
+# ── OPSEC: modo anónimo (todo el tráfico por Tor) — F13 paso 153 ─────────────
+_OPSEC = {'anonimo': False}
+
+def _set_anonimo(on):
+    _OPSEC['anonimo'] = bool(on)
+    SESSION.proxies = {'http': TOR_PROXY, 'https': TOR_PROXY} if on else {}
+
+@app.route('/api/v2/opsec/anonimo', methods=['GET', 'POST'])
+def api_v2_opsec_anonimo():
+    """Enruta TODO el tráfico de Obsidian por Tor para no exponer tu IP (F13 paso 153)."""
+    if request.method == 'POST':
+        on = bool((request.json or {}).get('on'))
+        if on and not _tor_disponible():
+            return _error('Tor no disponible (arranca el servicio tor)', 503)
+        _set_anonimo(on)
+    return jsonify({'anonimo': _OPSEC['anonimo'], 'tor': _tor_disponible()})
+
 _personas = GestorPersonas(os.path.join(HOME, '.obsidian', 'personas.json'))
 
 @app.route('/api/v2/personas', methods=['GET', 'POST', 'DELETE'])
@@ -4640,6 +4657,8 @@ for _rl_nombre in ('crtsh', 'ct_certspotter', 'shodan', 'censys', 'zoomeye', 'fo
 
 if __name__ == '__main__':
     _cargar_reglas_usuario()
+    if os.environ.get('OBSIDIAN_ANONIMO') and _tor_disponible():
+        _set_anonimo(True)
     host = os.environ.get('OBSIDIAN_HOST', '127.0.0.1')
     ts = _tailscale_ip()
     lineas = [f"   Este equipo: http://localhost:{PORT}"]

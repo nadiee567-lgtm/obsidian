@@ -14,3 +14,15 @@ def test_gestor_personas(tmp_path):
     assert p['email'] == 'juan@proton.me' and 'creada' in p
     assert g.borrar('juan_investigador') is True and g.listar() == []
     assert g.borrar('no_existe') is False
+
+
+# ── 153: ruteo por Tor/SOCKS5 (modo anónimo) ─────────────────────────────────
+def test_modo_anonimo_toggle():
+    import obsidian_web as ob
+    try:
+        ob._set_anonimo(True)
+        assert ob.SESSION.proxies.get('https', '').startswith('socks5h') and ob._OPSEC['anonimo']
+        ob._set_anonimo(False)
+        assert ob.SESSION.proxies == {} and not ob._OPSEC['anonimo']
+    finally:
+        ob._set_anonimo(False)                       # no dejar el proxy puesto
