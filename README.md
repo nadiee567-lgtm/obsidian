@@ -1,167 +1,180 @@
 # ⬛ OBSIDIAN
 
-**Framework de OSINT y reconocimiento — datos tipados, transforms, grafo interactivo y correlación de riesgos.**
+**OSINT & reconnaissance framework — typed data, transforms, interactive graph and risk correlation.**
 
-> *La seguridad no debería tener un precio exorbitante.*
+> *Security should not come at an exorbitant price.*
 
-OBSIDIAN toma la idea de Maltego (entidades → transforms → grafo) y la de SpiderFoot
-(eventos tipados + motor de correlación) y las junta en una herramienta local, sin
-dependencias de nube y apoyada en fuentes **keyless** siempre que se puede. Corre un
-transform sobre un objetivo, el grafo se expande solo, el motor busca riesgos y un
-monitor te avisa al celular cuando algo cambia.
+OBSIDIAN takes the idea of Maltego (entities → transforms → graph) and SpiderFoot
+(typed events + correlation engine) and combines them into a local tool with no cloud
+dependencies, backed by **keyless** sources whenever possible. Run a transform on a
+target, the graph expands on its own, the engine looks for risks, and a monitor pings
+your phone when something changes.
 
-![Grafo interactivo](docs/img/grafo.jpg)
-
----
-
-## Qué hace
-
-- **Modelo de datos tipado** — 23 tipos de entidad (dominio, ip, email, subdominio,
-  usuario, wallet…), IDs deterministas, dedup y merge automáticos, procedencia de cada dato.
-- **Motor de transforms** — ~39 transforms: DNS, RDAP, Certificate Transparency,
-  subdominios, HTTP probing, screenshots, nuclei, tech/CVE, brechas, infostealers,
-  reputación de IP, favicon hash, wayback, WHOIS inverso, metadata EXIF y más.
-- **Grafo interactivo** (`/v2`) — click-derecho en un nodo corre transforms, colores por
-  tipo, filtros, pivoteo multi-entidad, cadenas de evidencia, timeline y export PNG.
-- **Correlación de riesgos** — reglas deterministas (puerto sensible, cert vencido, IP
-  maliciosa, email filtrado, takeover…) + un **segundo escudo** de IA que explica *por qué*
-  algo es peligroso y atrapa falsos positivos.
-- **Workspaces** — casos aislados en SQLite, autosave, historial, snapshots y bóveda
-  cifrada (Fernet) para las API keys.
-- **Monitoreo continuo** — re-escanea el objetivo cada N minutos y alerta los cambios
-  (nuevo subdominio, puerto abierto, cert vencido) por **ntfy** al celular.
-- **Reportes y export** — informe HTML autocontenido con el grafo embebido, y export
-  JSON / CSV / PDF.
-- **CLI** — todo lo anterior, scriptable desde la terminal.
-
-![Reporte](docs/img/reporte.jpg)
+![Interactive graph](docs/img/grafo.jpg)
 
 ---
 
-## Arranque rápido
+## What it does
+
+- **Typed data model** — 23 entity types (domain, ip, email, subdomain, username,
+  wallet…), deterministic IDs, automatic dedup and merge, provenance for every datum.
+- **Transform engine** — 89 transforms: DNS, RDAP, Certificate Transparency, subdomains,
+  HTTP probing, screenshots, nuclei, tech/CVE, breaches, infostealers, IP reputation,
+  favicon hash, wayback, reverse WHOIS, EXIF metadata, and much more.
+- **Interactive graph** (`/v2`) — right-click a node to run transforms, per-type colors,
+  filters, multi-entity pivoting, evidence chains, timeline and PNG export.
+- **Risk correlation** — deterministic rules (sensitive port, expired cert, malicious IP,
+  leaked email, takeover…) + an AI **second shield** that explains *why* something is
+  dangerous and catches false positives.
+- **Multi-engine search** — Shodan, Censys, ZoomEye, FOFA, Quake, Hunter, Netlas,
+  Criminal IP, BinaryEdge behind one unified query that is translated to each engine's
+  dialect (the Chinese engines see infra Shodan doesn't).
+- **Crypto tracing** — extract wallets, transaction graph, common-input clustering,
+  ransomware scoring (Ransomwhere), multi-chain (BTC + ETH).
+- **EASM** — asset inventory, continuous discovery, infra clustering, exposure scoring,
+  shadow IT, historical surface diff.
+- **OPSEC** — sock puppets, global Tor routing, proxy rotation, UA hygiene, jitter,
+  per-case network identity, IP-leak detection, API-key rotation, footprint log.
+- **AI layer** — text entity extraction, foreign-source translation, natural-language
+  query → plan, case chat, deepfake heuristic, NEXO-style model routing (Ollama, local).
+- **Multilingual** — regional platforms (VK/Weibo), Cyrillic↔Latin transliteration,
+  local engines (Yandex/Baidu), language detection, per-region dorks.
+- **Workspaces** — isolated SQLite cases, autosave, history, snapshots and an encrypted
+  vault (Fernet) for API keys.
+- **Continuous monitoring** — re-scans the target every N minutes and alerts on changes
+  (new subdomain, open port, expired cert) to your phone via **ntfy**.
+- **Reports & export** — self-contained HTML report with the embedded graph, plus
+  JSON / CSV / PDF export.
+- **CLI** — everything above, scriptable from the terminal.
+
+![Report](docs/img/reporte.jpg)
+
+---
+
+## Quick start
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 
-# corre la web (bind local por defecto)
-OBSIDIAN_PASSWORD=tu_clave python obsidian_web.py
-# abre http://localhost:8767/v2
+# run the web UI (local bind by default)
+OBSIDIAN_PASSWORD=your_password python obsidian_web.py
+# open http://localhost:8767/v2
 ```
 
-Herramientas de sistema opcionales que enriquecen algunos transforms: `dig`, `nmap`,
-`whois`, `exiftool`, `nuclei`, y `playwright` (para screenshots).
+Optional system tools that enrich some transforms: `dig`, `nmap`, `whois`, `exiftool`,
+`nuclei`, `tesseract`, `tor`, and `playwright` (for screenshots).
 
 ### CLI
 
 ```bash
-python obsidian_cli.py transforms dominio            # transforms de un tipo
-python obsidian_cli.py run dominio github.com dns_a  # un transform
-python obsidian_cli.py recon dominio github.com -w caso1   # todos los aplicables
-python obsidian_cli.py report -w caso1 -o reporte.html
-python obsidian_cli.py export json -w caso1 -o caso.json
+python obsidian_cli.py transforms dominio            # transforms for a type
+python obsidian_cli.py run dominio github.com dns_a  # a single transform
+python obsidian_cli.py recon dominio github.com -w case1   # all applicable, in parallel
+python obsidian_cli.py report -w case1 -o report.html
+python obsidian_cli.py export json -w case1 -o case.json
 ```
 
 ---
 
-## API keys (opcional) y alternativas gratis
+## API keys (optional) and free alternatives
 
-**OBSIDIAN es keyless-first: sin ninguna API key ya obtienes ~90% del valor.** La mayoría
-de los transforms (DNS, RDAP, Certificate Transparency, subdominios, HTTP, nuclei, brechas,
-reputación de IP, favicon, wayback…) no necesitan nada. Solo unos pocos piden key, y son
-**extras opcionales** — en la interfaz aparecen marcados con **⚿**.
+**OBSIDIAN is keyless-first: with no API key at all you already get ~90% of the value.**
+Most transforms (DNS, RDAP, Certificate Transparency, subdomains, HTTP, nuclei, breaches,
+IP reputation, favicon, wayback…) need nothing. Only a few ask for a key, and they are
+**optional extras** — marked with **⚿** in the UI.
 
-Cada usuario pone **sus propias** keys (modelo *bring-your-own-key*) en la bóveda cifrada,
-desde el panel **🔑 API keys** de la web. La key nunca sale de tu máquina.
+Each user supplies **their own** keys (*bring-your-own-key*) in the encrypted vault, from
+the **🔑 API keys** panel. The key never leaves your machine.
 
-**Transforms que piden key, y qué usar gratis si no la tienes:**
+**Transforms that need a key, and what to use for free if you don't have it:**
 
-| Necesita key | Qué hace | Alternativa GRATIS (keyless) ya incluida |
+| Needs a key | What it does | FREE (keyless) alternative already included |
 |---|---|---|
-| **Shodan / Censys / ZoomEye / FOFA / Quake / Hunter / Netlas / Criminal IP / BinaryEdge** | Buscadores de internet (puertos, servicios, infra de una IP) | `puertos` (nmap), `geo_ip`, `reputacion_ip`, `ip_blocklist`, `greynoise` |
-| **HIBP** *(única de pago)* | Email en filtraciones de datos | `breaches_xon` (XposedOrNot), `stealer_hudsonrock` |
-| **VirusTotal** (passivedns) | Historial de IPs de un dominio | `crtsh`, `subdominios_ht`, `rdap` |
-| **ViewDNS** (reverse_whois) | Otros dominios del mismo dueño | — |
+| **Shodan / Censys / ZoomEye / FOFA / Quake / Hunter / Netlas / Criminal IP / BinaryEdge** | Internet search engines (ports, services, IP infra) | `puertos` (nmap), `geo_ip`, `reputacion_ip`, `ip_blocklist`, `greynoise` |
+| **HIBP** *(the only paid one)* | Email in data breaches | `breaches_xon` (XposedOrNot), `stealer_hudsonrock` |
+| **VirusTotal** (passivedns) | IP history of a domain | `crtsh`, `subdominios_ht`, `rdap` |
+| **ViewDNS** (reverse_whois) | Other domains of the same owner | — |
 
-**Sobre las keys de pago:** casi todos los buscadores tienen **tier gratis** (Censys, FOFA,
-Netlas). Shodan gratis es limitado; su Membership es un **pago único** (no suscripción), y es
-gratis con el [GitHub Student Pack](https://education.github.com/pack) si eres estudiante.
-No necesitas comprar nada para usar OBSIDIAN a fondo.
+**About paid keys:** almost every search engine has a **free tier** (Censys, FOFA, Netlas).
+Shodan's free tier is limited; its Membership is a **one-time payment** (not a subscription),
+and it's free with the [GitHub Student Pack](https://education.github.com/pack) if you're a
+student. You do not need to buy anything to use OBSIDIAN to the fullest.
 
-> *La seguridad no debería tener un precio exorbitante.*
+> *Security should not come at an exorbitant price.*
 
 ---
 
-## Arquitectura
+## Architecture
 
 ```
-obsidian_web.py     servidor Flask + los transforms (endpoints /api/v2/*)
-obsidian_cli.py     el mismo motor desde terminal
-web/                v2.html (grafo), app.html / login.html (UI clásica)
+obsidian_web.py     Flask server + the transforms (endpoints /api/v2/*)
+obsidian_cli.py     the same engine from the terminal
+web/                v2.html (graph), app.html / login.html (classic UI)
 core/
-  modelo.py         Entidad, Relacion, Almacen (dedup, eventos)
-  transforms.py     @transform, Contexto.emitir, ejecutar, Machine, Corredor (caché)
+  modelo.py         Entidad, Relacion, Almacen (dedup, events)
+  transforms.py     @transform, Contexto.emitir, ejecutar, Machine, Corredor (cache)
   correlacion.py    @regla, correlacionar, score_riesgo
-  reporte.py        reporte HTML autocontenido
-  exportar.py       JSON / CSV (saneado anti-inyección de fórmulas)
-  monitor.py        snapshot + diff + Monitor (hilo)
-  notificar.py      push por ntfy.sh
-  workspaces.py     Gestor de casos (SQLite, snapshots, historial)
-  boveda.py         bóveda cifrada de API keys (Fernet)
-  ia.py             puerta única a la IA local (Ollama)
-  validacion.py     allowlist por tipo, anti-SSRF, anti-path-traversal
+  reporte.py        self-contained HTML report
+  exportar.py       JSON / CSV (sanitized against formula injection)
+  monitor.py        snapshot + diff + Monitor (thread)
+  notificar.py      push via ntfy.sh
+  workspaces.py     case manager (SQLite, snapshots, history)
+  boveda.py         encrypted API key vault (Fernet)
+  ia.py             single door to the local AI (Ollama)
+  validacion.py     per-type allowlist, anti-SSRF, anti-path-traversal
 ```
 
-El núcleo (`core/`) no sabe de Flask: es lógica pura y testeable. La web y el CLI son
-dos frentes sobre el mismo motor.
+The core (`core/`) knows nothing about Flask: it's pure, testable logic. The web UI and
+the CLI are two fronts over the same engine.
 
 ---
 
-## Escribir un transform
+## Writing a transform
 
-Un transform toma **una** entidad de entrada y emite **cero o más** de salida. El decorador
-lo registra; `ctx.emitir` crea la entidad, la deduplica, la relaciona con la entrada y le
-anota la procedencia — todo automático.
+A transform takes **one** input entity and emits **zero or more** output entities. The
+decorator registers it; `ctx.emitir` creates the entity, deduplicates it, relates it to the
+input and records its provenance — all automatic.
 
 ```python
 from core.transforms import transform
 
-@transform(entrada='dominio', salidas=('ip',), descripcion='Resuelve el registro A')
+@transform(entrada='dominio', salidas=('ip',), descripcion='A records (dig)')
 def dns_a(entidad, ctx):
-    for ip in resolver_A(entidad.valor):          # tu lógica
-        ctx.emitir('ip', ip, etiqueta='resuelve')
+    for ip in resolve_A(entidad.valor):           # your logic
+        ctx.emitir('ip', ip, etiqueta='resolves')
 ```
 
-- `entrada` — tipo de entidad sobre el que corre.
-- `salidas` — tipos que puede producir (para el menú de la UI).
-- `requiere_key=True` — si necesita una API key (se lee de la bóveda).
-- Si el transform revienta, el motor **aísla el fallo**: devuelve lo que alcanzó a emitir,
-  no tumba el caso.
+- `entrada` — entity type it runs on.
+- `salidas` — types it can produce (for the UI menu).
+- `requiere_key=True` — if it needs an API key (read from the vault).
+- If the transform crashes, the engine **isolates the failure**: it returns whatever it
+  emitted, it does not take down the case.
 
-Los transforms viven en `obsidian_web.py`; un plugin externo puede cargarse con
-`cargar_plugins`.
+Transforms live in `obsidian_web.py`; an external plugin can be loaded with `cargar_plugins`.
 
 ---
 
-## Seguridad
+## Security
 
-Diseñado asumiendo que **los datos del objetivo no son de confianza**:
+Designed assuming **the target's data is untrusted**:
 
-- Validación por **allowlist** por tipo y ejecución de herramientas por `argv` (sin shell) —
-  no hay inyección de argumentos.
-- **Anti-SSRF**: se rechazan IPs privadas/loopback/link-local y se revalida cada redirect.
-- **Anti-path-traversal** en nombres de caso.
-- El grafo y el reporte **escapan** todo dato del objetivo (anti-XSS almacenado).
-- El CSV **neutraliza inyección de fórmulas** (`=+-@`).
-- API keys en **bóveda cifrada** (Fernet, archivo 0600), nunca en texto plano ni en el repo.
+- Per-type **allowlist** validation and tool execution via `argv` (no shell) —
+  no argument injection.
+- **Anti-SSRF**: private/loopback/link-local IPs are rejected and every redirect is
+  revalidated.
+- **Anti-path-traversal** in case names.
+- The graph and the report **escape** all target data (stored XSS protection).
+- The CSV **neutralizes formula injection** (`=+-@`).
+- API keys in an **encrypted vault** (Fernet, 0600 file), never in plaintext or in the repo.
 
 ---
 
 ## Tests
 
 ```bash
-python -m pytest -q      # 108 tests
+python -m pytest -q      # 267 tests
 ```
 
-Cubren el modelo, los transforms, la seguridad (con payloads reales), correlación,
-workspaces, bóveda, reporte, export, monitor, notificaciones y CLI.
+They cover the model, the transforms, security (with real payloads), correlation,
+workspaces, vault, report, export, monitor, notifications, OPSEC, AI, multilingual and CLI.
