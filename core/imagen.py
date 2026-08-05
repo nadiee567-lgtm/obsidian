@@ -1,19 +1,19 @@
-"""Utilidades de imagen para OSINT — F9.
+"""Image utilities for OSINT -- F9.
 
-Búsqueda inversa multi-motor (paso 118): cada motor indexa cosas distintas.
-Yandex es el mejor para rostros y Europa del Este; TinEye para rastrear el origen
-y ediciones; Google/Bing para contexto general. Aquí se arman los deep-links de
-búsqueda inversa POR URL de imagen — keyless, el analista hace click.
+Multi-engine reverse search (step 118): each engine indexes different things.
+Yandex is best for faces and Eastern Europe; TinEye for tracing the origin and
+edits; Google/Bing for general context. Here we build the reverse-search deep
+links BY image URL -- keyless, the analyst clicks through.
 
-Módulo PURO."""
+PURE module."""
 from __future__ import annotations
 import re
 from urllib.parse import quote
 
 
 def parse_gps(texto: str):
-    """Convierte GPS de exiftool (DMS, '40 deg 26\\' 46\" N, 79 deg 58\\' 56\" W')
-    a decimal (lat, lon). Devuelve None si no se puede."""
+    """Converts exiftool GPS (DMS, '40 deg 26\\' 46\" N, 79 deg 58\\' 56\" W')
+    to decimal (lat, lon). Returns None if it can't."""
     m = re.findall(r"(\d+(?:\.\d+)?)\s*deg\s*(\d+(?:\.\d+)?)'?\s*(\d+(?:\.\d+)?)?\"?\s*([NSEW])",
                    texto or '')
     if len(m) < 2:
@@ -25,7 +25,7 @@ def parse_gps(texto: str):
 
 
 def enlaces_cronolocalizacion(lat=None, lon=None) -> dict:
-    """Herramientas de sol/sombra (técnica Bellingcat). Con coords si se conocen."""
+    """Sun/shadow tools (Bellingcat technique). With coords if known."""
     if lat is not None and lon is not None:
         return {'suncalc': f'https://www.suncalc.org/#/{lat},{lon},15',
                 'shadowmap': f'https://shadowmap.org/?lat={lat}&lng={lon}'}
@@ -33,7 +33,7 @@ def enlaces_cronolocalizacion(lat=None, lon=None) -> dict:
 
 
 def enlaces_satelital(lat, lon) -> dict:
-    """Vistas satelitales/aéreas para verificar una ubicación."""
+    """Satellite/aerial views to verify a location."""
     return {
         'google_earth': f'https://earth.google.com/web/@{lat},{lon},0a,1000d',
         'sentinel': f'https://apps.sentinel-hub.com/eo-browser/?lat={lat}&lng={lon}&zoom=15',
@@ -42,7 +42,7 @@ def enlaces_satelital(lat, lon) -> dict:
 
 
 def enlaces_landmark(url_imagen: str) -> dict:
-    """Reconocimiento de puntos de referencia (edificios/señales) por imagen."""
+    """Landmark recognition (buildings/signs) by image."""
     u = quote(url_imagen, safe='')
     return {'google_lens': f'https://lens.google.com/uploadbyurl?url={u}',
             'mapillary': 'https://www.mapillary.com/app/',
@@ -50,8 +50,8 @@ def enlaces_landmark(url_imagen: str) -> dict:
 
 
 def phash(ruta: str):
-    """Hash perceptual dHash (16 hex) de la imagen — paso 127. Agrupa la MISMA
-    imagen aunque cambie de tamaño o formato. None si falta Pillow o la imagen es mala."""
+    """Perceptual dHash (16 hex) of the image -- step 127. Groups the SAME image
+    even if it changes size or format. None if Pillow is missing or the image is bad."""
     try:
         from PIL import Image
     except ImportError:
@@ -69,9 +69,9 @@ def phash(ruta: str):
 
 
 def ela(ruta: str, salida: str, calidad: int = 90):
-    """Error Level Analysis — paso 126. Guarda una imagen ELA en `salida` y devuelve
-    el max diff (0-255): regiones editadas muestran un nivel de error distinto al
-    re-comprimir (heurístico, para inspección visual del analista). None si falta Pillow."""
+    """Error Level Analysis -- step 126. Saves an ELA image to `salida` and returns
+    the max diff (0-255): edited regions show a different error level after
+    re-compression (heuristic, for the analyst's visual review). None if Pillow is missing."""
     try:
         import io
         from PIL import Image, ImageChops, ImageEnhance
@@ -91,7 +91,7 @@ def ela(ruta: str, salida: str, calidad: int = 90):
 
 
 def enlaces_reverse(url_imagen: str) -> dict:
-    """{motor: url_de_busqueda_inversa} para la imagen dada."""
+    """{engine: reverse_search_url} for the given image."""
     u = quote(url_imagen, safe='')
     return {
         'yandex':  f'https://yandex.com/images/search?rpt=imageview&url={u}',
@@ -101,9 +101,9 @@ def enlaces_reverse(url_imagen: str) -> dict:
     }
 
 
-# Motores de reconocimiento FACIAL (paso 119). 'modo':
-#   url    = busca por la URL de la imagen directamente (automático)
-#   upload = requiere subir la imagen a mano (no aceptan URL)
+# FACIAL recognition engines (step 119). 'modo':
+#   url    = searches by the image URL directly (automatic)
+#   upload = requires uploading the image manually (they don't accept a URL)
 _FACE = {
     'yandex':    ('url',    'https://yandex.com/images/search?rpt=imageview&url={u}'),
     'facecheck': ('upload', 'https://facecheck.id/'),
@@ -112,8 +112,8 @@ _FACE = {
 
 
 def enlaces_facial(url_imagen: str) -> dict:
-    """{motor: {'url', 'modo'}} para búsqueda facial. Yandex es el mejor gratis
-    (sobre todo Europa del Este) y funciona por URL; FaceCheck/PimEyes son por
-    subida manual — se devuelve su landing para que el analista suba la imagen."""
+    """{engine: {'url', 'modo'}} for facial search. Yandex is the best free one
+    (especially Eastern Europe) and works by URL; FaceCheck/PimEyes are manual
+    upload -- their landing page is returned so the analyst uploads the image."""
     u = quote(url_imagen, safe='')
     return {motor: {'url': tpl.format(u=u), 'modo': modo} for motor, (modo, tpl) in _FACE.items()}

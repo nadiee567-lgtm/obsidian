@@ -1,14 +1,14 @@
-"""Extracción de entidades tipadas de texto libre — F14 paso 161.
+"""Typed entity extraction from free text -- F14 step 161.
 
-Pegas un artículo/dump y salen entidades tipadas para el grafo. Se hace con REGEX
-(determinista, sin alucinaciones de IA — importante para no meter falsos positivos),
-con un filtro anti-FP para dominios (no confundir nombres de archivo con dominios).
+Paste an article/dump and typed entities come out for the graph. Done with REGEX
+(deterministic, no AI hallucinations -- important to avoid injecting false
+positives), with an anti-FP filter for domains (don't mistake file names for domains).
 
-Módulo PURO."""
+PURE module."""
 from __future__ import annotations
 import re
 
-# extensiones comunes que NO son dominios (anti-falso-positivo)
+# common extensions that are NOT domains (anti false-positive)
 _NO_TLD = {'txt', 'jpg', 'jpeg', 'png', 'gif', 'pdf', 'html', 'htm', 'js', 'css',
           'py', 'exe', 'zip', 'doc', 'docx', 'xml', 'json', 'csv', 'md', 'php'}
 
@@ -22,8 +22,8 @@ _RX = [
 
 
 def extraer_entidades(texto: str) -> list:
-    """Devuelve [(tipo, valor), ...] sin duplicados. Los dominios que sean claramente
-    nombres de archivo (extensión conocida) se descartan."""
+    """Returns [(type, value), ...] without duplicates. Domains that are clearly
+    file names (known extension) are discarded."""
     texto = texto or ''
     out, vistos = [], set()
     for tipo, rx in _RX:
@@ -31,9 +31,9 @@ def extraer_entidades(texto: str) -> list:
             v = m.strip().rstrip('.,);:')
             if tipo == 'ip':
                 if any(int(o) > 255 for o in v.split('.')):
-                    continue                     # octeto inválido
+                    continue                     # invalid octet
             if tipo == 'dominio' and v.rsplit('.', 1)[-1].lower() in _NO_TLD:
-                continue                         # es un archivo, no un dominio
+                continue                         # it's a file, not a domain
             key = (tipo, v.lower())
             if v and key not in vistos:
                 vistos.add(key)
