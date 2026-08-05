@@ -1989,7 +1989,7 @@ def api_run():
 # ════════════════════════════════════════════════════════════════════════════
 
 @transform(entrada='dominio', salidas=('ip',), nombre='dns_a',
-           descripcion='Registros A del dominio (dig)')
+           descripcion='A records of the domain (dig)')
 def _t_dns_a(entidad, ctx):
     out = run_tool(['dig', entidad.valor, 'A', '+short'], timeout=10)
     for linea in out.splitlines():
@@ -1998,7 +1998,7 @@ def _t_dns_a(entidad, ctx):
             ctx.emitir('ip', linea, etiqueta='A')
 
 @transform(entrada='ip', salidas=('dominio',), nombre='ptr',
-           descripcion='PTR / DNS inverso (dig -x)')
+           descripcion='PTR / reverse DNS (dig -x)')
 def _t_ptr(entidad, ctx):
     out = run_tool(['dig', '-x', entidad.valor, '+short'], timeout=10)
     for linea in out.splitlines():
@@ -2007,7 +2007,7 @@ def _t_ptr(entidad, ctx):
             ctx.emitir('dominio', linea, etiqueta='PTR')
 
 @transform(entrada='url', salidas=('tech', 'persona', 'url'), nombre='metadata',
-           descripcion='Metadata EXIF como entidades pivotables: GPS, dispositivo, software, autor (F9)')
+           descripcion='EXIF metadata as pivotable entities: GPS, device, software, author (F9)')
 def _t_metadata(entidad, ctx):
     if not _which('exiftool'):
         return
@@ -2056,7 +2056,7 @@ def _t_metadata(entidad, ctx):
             pass
 
 @transform(entrada='dominio', salidas=(), nombre='dorks',
-           descripcion='Genera Google dorks útiles del dominio (archivos, paneles, índices, backups)')
+           descripcion='Generates useful Google dorks for the domain (files, panels, indexes, backups)')
 def _t_dorks(entidad, ctx):
     from urllib.parse import quote_plus
     d = entidad.valor
@@ -2073,7 +2073,7 @@ def _t_dorks(entidad, ctx):
         for q, query in plantillas]
 
 @transform(entrada='wallet', salidas=(), nombre='wallet_balance',
-           descripcion='Balance y actividad de una wallet BTC (blockchain.info, keyless)')
+           descripcion='Balance and activity of a BTC wallet (blockchain.info, keyless)')
 def _t_wallet_balance(entidad, ctx):
     if not re.fullmatch(r'[a-zA-Z0-9]{20,90}', entidad.valor):   # forma BTC, no basura en la URL
         return
@@ -2088,7 +2088,7 @@ def _t_wallet_balance(entidad, ctx):
         log.debug("wallet_balance no disponible: %s", _e)
 
 @transform(entrada='dominio', salidas=('hash',), nombre='favicon_hash',
-           descripcion='Hash mmh3 del favicon — nodo pivotable para Shodan/FOFA (F8)')
+           descripcion='mmh3 hash of the favicon -- pivotable node for Shodan/FOFA (F8)')
 def _t_favicon_hash(entidad, ctx):
     try:
         import mmh3
@@ -2137,7 +2137,7 @@ def _pivote_ips(campos):
     return ips
 
 @transform(entrada='hash', salidas=('ip',), nombre='favicon_pivote', requiere_key=True,
-           descripcion='Enumera IPs que sirven este favicon (FOFA/Shodan) — sin tocar al objetivo (F8)')
+           descripcion='Enumerates IPs serving this favicon (FOFA/Shodan) -- without touching the target (F8)')
 def _t_favicon_pivote(entidad, ctx):
     if entidad.propiedades.get('tipo_hash') != 'favicon':
         return
@@ -2145,7 +2145,7 @@ def _t_favicon_pivote(entidad, ctx):
         ctx.emitir('ip', ip, etiqueta='mismo-favicon')
 
 @transform(entrada='dominio', salidas=('subdominio',), nombre='wayback',
-           descripcion='Snapshot histórico + subdominios viejos del dominio (Wayback Machine)')
+           descripcion='Historical snapshot + old subdomains of the domain (Wayback Machine)')
 def _t_wayback(entidad, ctx):
     # 1. ¿hay snapshot? (endpoint 'available', confiable)
     try:
@@ -2172,7 +2172,7 @@ def _t_wayback(entidad, ctx):
         log.debug("wayback cdx: %s", _e)
 
 @transform(entrada='dominio', salidas=('subdominio', 'ip'), nombre='subdominios_ht',
-           descripcion='Subdominios (+ su IP) vía HackerTarget hostsearch (keyless)')
+           descripcion='Subdomains (+ their IP) via HackerTarget hostsearch (keyless)')
 def _t_subdominios_ht(entidad, ctx):
     try:
         texto = SESSION.get(f'https://api.hackertarget.com/hostsearch/?q={entidad.valor}', timeout=12).text
@@ -2193,7 +2193,7 @@ def _t_subdominios_ht(entidad, ctx):
         log.debug("subdominios_ht no disponible: %s", _e)
 
 @transform(entrada='dominio', salidas=('subdominio',), nombre='crtsh',
-           descripcion='Subdominios desde crt.sh (Certificate Transparency)')
+           descripcion='Subdomains from crt.sh (Certificate Transparency)')
 def _t_crtsh(entidad, ctx):
     try:
         r = SESSION.get(f'https://crt.sh/?q=%.{entidad.valor}&output=json', timeout=12)
@@ -2208,7 +2208,7 @@ def _t_crtsh(entidad, ctx):
         log.debug("crtsh no disponible: %s", _e)
 
 @transform(entrada='dominio', salidas=('subdominio',), nombre='ct_certspotter',
-           descripcion='Subdominios desde Certificate Transparency (certspotter, keyless)')
+           descripcion='Subdomains from Certificate Transparency (certspotter, keyless)')
 def _t_ct_certspotter(entidad, ctx):
     try:
         data = SESSION.get('https://api.certspotter.com/v1/issuances',
@@ -2227,7 +2227,7 @@ def _t_ct_certspotter(entidad, ctx):
         log.debug("certspotter no disponible: %s", _e)
 
 @transform(entrada='ip', salidas=('pais', 'org', 'asn'), nombre='geo_ip',
-           descripcion='Geolocalización e info de red de la IP (ip-api.com)')
+           descripcion='Geolocation and network info of the IP (ip-api.com)')
 def _t_geo_ip(entidad, ctx):
     try:
         r = SESSION.get(f'http://ip-api.com/json/{entidad.valor}'
@@ -2246,7 +2246,7 @@ def _t_geo_ip(entidad, ctx):
         log.debug("geo_ip no disponible: %s", _e)
 
 @transform(entrada='usuario', salidas=('plataforma',), nombre='sherlock',
-           descripcion='Cuentas del usuario en 400+ plataformas (Sherlock)')
+           descripcion='User accounts across 400+ platforms (Sherlock)')
 def _t_sherlock(entidad, ctx):
     if not _which('sherlock'):
         return
@@ -2257,7 +2257,7 @@ def _t_sherlock(entidad, ctx):
             ctx.emitir('plataforma', m.group(1).strip(), etiqueta='perfil', url=m.group(2).strip())
 
 @transform(entrada='usuario', salidas=('email', 'repo'), nombre='github_usuario',
-           descripcion='Email y repos públicos del usuario en GitHub')
+           descripcion='User email and public repos on GitHub')
 def _t_github(entidad, ctx):
     try:
         gh = SESSION.get(f'https://api.github.com/users/{entidad.valor}', timeout=8).json()
@@ -2276,7 +2276,7 @@ def _t_github(entidad, ctx):
         log.debug("github_usuario no disponible: %s", _e)
 
 @transform(entrada='ip', salidas=('puerto',), nombre='puertos',
-           descripcion='Puertos abiertos y servicios (nmap top-20)')
+           descripcion='Open ports and services (nmap top-20)')
 def _t_puertos(entidad, ctx):
     if not _which('nmap'):
         return
@@ -2293,7 +2293,7 @@ def _t_puertos(entidad, ctx):
         ctx.emitir('puerto', f'{entidad.valor}:{num}', etiqueta='abierto', servicio=servicio)
 
 @transform(entrada='dominio', salidas=('dominio',), nombre='dns_mx',
-           descripcion='Servidores de correo del dominio (MX)')
+           descripcion='Mail servers of the domain (MX)')
 def _t_dns_mx(entidad, ctx):
     out = run_tool(['dig', entidad.valor, 'MX', '+short'], timeout=10)
     for linea in out.splitlines():
@@ -2305,7 +2305,7 @@ def _t_dns_mx(entidad, ctx):
             ctx.emitir('dominio', host, etiqueta='MX')
 
 @transform(entrada='dominio', salidas=('dominio',), nombre='dns_ns',
-           descripcion='Name servers del dominio (NS)')
+           descripcion='Name servers of the domain (NS)')
 def _t_dns_ns(entidad, ctx):
     out = run_tool(['dig', entidad.valor, 'NS', '+short'], timeout=10)
     for linea in out.splitlines():
@@ -2314,7 +2314,7 @@ def _t_dns_ns(entidad, ctx):
             ctx.emitir('dominio', host, etiqueta='NS')
 
 @transform(entrada='email', salidas=('org',), nombre='email_breaches',
-           descripcion='Brechas donde apareció el email (HIBP; requiere HIBP_API_KEY real)')
+           descripcion='Breaches the email appeared in (HIBP; requires a real HIBP_API_KEY)')
 def _t_email_breaches(entidad, ctx):
     try:
         hibp_key = _key_rotativa('hibp') or os.environ.get('HIBP_API_KEY', '')
@@ -2351,17 +2351,17 @@ def _pastes_github(entidad):
         log.debug("pastes_github no disponible: %s", _e)
 
 @transform(entrada='dominio', salidas=(), nombre='pastes_github',
-           descripcion='Menciones + secretos del dominio en GitHub (token gratis en la bóveda)')
+           descripcion='Domain mentions + secrets on GitHub (free token in the vault)')
 def _t_pastes_github_dom(entidad, ctx):
     _pastes_github(entidad)
 
 @transform(entrada='email', salidas=(), nombre='pastes_github_email',
-           descripcion='Menciones del email en código público de GitHub (token gratis en la bóveda)')
+           descripcion='Email mentions in public GitHub code (free token in the vault)')
 def _t_pastes_github_email(entidad, ctx):
     _pastes_github(entidad)
 
 @transform(entrada='email', salidas=('org',), nombre='breaches_xon',
-           descripcion='Brechas donde apareció el email (XposedOrNot, keyless)')
+           descripcion='Breaches the email appeared in (XposedOrNot, keyless)')
 def _t_breaches_xon(entidad, ctx):
     try:
         r = SESSION.get(f'https://api.xposedornot.com/v1/check-email/{requests.utils.quote(entidad.valor)}',
@@ -2379,7 +2379,7 @@ def _t_breaches_xon(entidad, ctx):
         log.debug("xposedornot no disponible: %s", _e)
 
 @transform(entrada='email', salidas=(), nombre='stealer_hudsonrock',
-           descripcion='¿El email salió de una máquina con infostealer? (HudsonRock, keyless)')
+           descripcion='Did the email come from an infostealer-infected machine? (HudsonRock, keyless)')
 def _t_stealer(entidad, ctx):
     try:
         r = SESSION.get('https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email',
@@ -2392,7 +2392,7 @@ def _t_stealer(entidad, ctx):
         log.debug("hudsonrock no disponible: %s", _e)
 
 @transform(entrada='email', salidas=('org',), nombre='breaches',
-           descripcion='Agregador de brechas: XposedOrNot + LeakCheck (keyless) + HIBP (si hay key), unificados (F10 paso 135)')
+           descripcion='Breach aggregator: XposedOrNot + LeakCheck (keyless) + HIBP (if key), unified (F10 step 135)')
 def _t_breaches(entidad, ctx):
     email = entidad.valor
     fuentes = set()
@@ -2428,7 +2428,7 @@ def _t_breaches(entidad, ctx):
             ctx.emitir('org', f, etiqueta='brecha')
 
 @transform(entrada='email', salidas=('url',), nombre='intelx', requiere_key=True,
-           descripcion='Búsqueda histórica de filtraciones por selector (Intelligence X, key en bóveda) (F10 paso 134)')
+           descripcion='Historical leak search by selector (Intelligence X, key in vault) (F10 step 134)')
 def _t_intelx(entidad, ctx):
     key = _key_rotativa('intelx') or os.environ.get('INTELX_KEY', '')
     if not key:
@@ -2452,7 +2452,7 @@ def _t_intelx(entidad, ctx):
         log.debug("intelx no disponible: %s", _e)
 
 @transform(entrada='email', salidas=('url',), nombre='pastes',
-           descripcion='Monitoreo de pastes: psbdmp + dorks a Pastebin/Ghostbin/etc (keyless) (F10 paso 133)')
+           descripcion='Paste monitoring: psbdmp + dorks to Pastebin/Ghostbin/etc (keyless) (F10 step 133)')
 def _t_pastes(entidad, ctx):
     from urllib.parse import quote as _q
     q = entidad.valor
@@ -2469,7 +2469,7 @@ def _t_pastes(entidad, ctx):
                    etiqueta=f'paste-dork:{sitio}', sitio=sitio)
 
 @transform(entrada='dominio', salidas=(), nombre='stealer_dominio',
-           descripcion='Exposición del dominio en stealer logs (empleados/usuarios infectados, HudsonRock keyless) (F10 paso 132)')
+           descripcion='Domain exposure in stealer logs (infected employees/users, HudsonRock keyless) (F10 step 132)')
 def _t_stealer_dominio(entidad, ctx):
     try:
         d = SESSION.get('https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-domain',
@@ -2489,7 +2489,7 @@ def _t_stealer_dominio(entidad, ctx):
         log.debug("stealer_dominio no disponible: %s", _e)
 
 @transform(entrada='email', salidas=(), nombre='email_spoofable',
-           descripcion='Revisa el SPF del dominio del email (riesgo de spoofing)')
+           descripcion='Checks the SPF of the email domain (spoofing risk)')
 def _t_email_spoofable(entidad, ctx):
     dominio = entidad.valor.split('@')[-1]
     if not dominio:
@@ -2526,12 +2526,12 @@ def _screenshot(entidad):
         log.debug("screenshot falló: %s", _e)
 
 @transform(entrada='dominio', salidas=(), nombre='screenshot',
-           descripcion='Captura de pantalla de la web (navegador headless)')
+           descripcion='Screenshot of the site (headless browser)')
 def _t_screenshot_dom(entidad, ctx):
     _screenshot(entidad)
 
 @transform(entrada='subdominio', salidas=(), nombre='screenshot_sub',
-           descripcion='Captura de pantalla del subdominio (headless)')
+           descripcion='Screenshot of the subdomain (headless)')
 def _t_screenshot_sub(entidad, ctx):
     _screenshot(entidad)
 
@@ -2556,12 +2556,12 @@ def _nuclei(entidad):
         entidad.propiedades['nuclei'] = hallados[:20]
 
 @transform(entrada='dominio', salidas=(), nombre='nuclei',
-           descripcion='Escaneo de vulnerabilidades con plantillas (nuclei)')
+           descripcion='Template-based vulnerability scan (nuclei)')
 def _t_nuclei_dom(entidad, ctx):
     _nuclei(entidad)
 
 @transform(entrada='subdominio', salidas=(), nombre='nuclei_sub',
-           descripcion='Escaneo de vulns del subdominio (nuclei)')
+           descripcion='Subdomain vulnerability scan (nuclei)')
 def _t_nuclei_sub(entidad, ctx):
     _nuclei(entidad)
 
@@ -2621,19 +2621,19 @@ def _tech_detect(entidad):
     return {t for t in techs if t and len(t) < 40}
 
 @transform(entrada='dominio', salidas=('tech',), nombre='tech',
-           descripcion='Tecnologías que usa el sitio (fingerprint HTTP)')
+           descripcion='Technologies the site uses (HTTP fingerprint)')
 def _t_tech_dom(entidad, ctx):
     for t in _tech_detect(entidad):
         ctx.emitir('tech', t, etiqueta='usa')
 
 @transform(entrada='subdominio', salidas=('tech',), nombre='tech_sub',
-           descripcion='Tecnologías del subdominio (fingerprint HTTP)')
+           descripcion='Subdomain technologies (HTTP fingerprint)')
 def _t_tech_sub(entidad, ctx):
     for t in _tech_detect(entidad):
         ctx.emitir('tech', t, etiqueta='usa')
 
 @transform(entrada='tech', salidas=('cve',), nombre='cve_lookup',
-           descripcion='CVEs críticos asociados a la tecnología (NVD). SIN versión → verificar aplicabilidad')
+           descripcion='Critical CVEs associated with the technology (NVD). NO version -> verify applicability')
 def _t_cve_lookup(entidad, ctx):
     kw = entidad.valor
     try:
@@ -2657,17 +2657,17 @@ def _t_cve_lookup(entidad, ctx):
                 e.etiquetar('sin-verificar-version')
 
 @transform(entrada='dominio', salidas=(), nombre='http_probe',
-           descripcion='Sondeo HTTP: status, título, server, redirect (estilo httpx)')
+           descripcion='HTTP probe: status, title, server, redirect (httpx-style)')
 def _t_http_probe_dom(entidad, ctx):
     _http_probe(entidad)
 
 @transform(entrada='subdominio', salidas=(), nombre='http_probe_sub',
-           descripcion='Sondeo HTTP del subdominio (estilo httpx)')
+           descripcion='HTTP probe of the subdomain (httpx-style)')
 def _t_http_probe_sub(entidad, ctx):
     _http_probe(entidad)
 
 @transform(entrada='dominio', salidas=('dominio',), nombre='reverse_whois',
-           descripcion='Otros dominios del mismo registrante (ViewDNS, key gratis en la bóveda). Único de F5 sin opción keyless.')
+           descripcion='Other domains of the same registrant (ViewDNS, free key in the vault). The only F5 one without a keyless option.')
 def _t_reverse_whois(entidad, ctx):
     key = _key_rotativa('viewdns') or os.environ.get('VIEWDNS_KEY', '')
     if not key:
@@ -2683,7 +2683,7 @@ def _t_reverse_whois(entidad, ctx):
         log.debug("reverse_whois no disponible: %s", _e)
 
 @transform(entrada='dominio', salidas=('dominio', 'org'), nombre='rdap',
-           descripcion='WHOIS moderno (RDAP, sin key): registrar, name servers, fechas')
+           descripcion='Modern WHOIS (RDAP, no key): registrar, name servers, dates')
 def _t_rdap(entidad, ctx):
     try:
         r = SESSION.get(f'https://rdap.org/domain/{entidad.valor}', timeout=12,
@@ -2714,7 +2714,7 @@ def _t_rdap(entidad, ctx):
         log.debug("rdap no disponible: %s", _e)
 
 @transform(entrada='ip', salidas=(), nombre='reputacion_ip',
-           descripcion='Reputación de la IP: proxy/VPN, hosting/datacenter, móvil (ip-api, keyless)')
+           descripcion='IP reputation: proxy/VPN, hosting/datacenter, mobile (ip-api, keyless)')
 def _t_reputacion_ip(entidad, ctx):
     try:
         d = SESSION.get(f'http://ip-api.com/json/{entidad.valor}?fields=status,proxy,hosting,mobile',
@@ -2733,7 +2733,7 @@ def _t_reputacion_ip(entidad, ctx):
         log.debug("reputacion_ip no disponible: %s", _e)
 
 @transform(entrada='ip', salidas=(), nombre='abuseipdb',
-           descripcion='Score de abuso de la IP (AbuseIPDB, key gratis en la bóveda)')
+           descripcion='Abuse score of the IP (AbuseIPDB, free key in the vault)')
 def _t_abuseipdb(entidad, ctx):
     key = _key_rotativa('abuseipdb') or os.environ.get('ABUSEIPDB_KEY', '')
     if not key:
@@ -2753,7 +2753,7 @@ def _t_abuseipdb(entidad, ctx):
 
 @transform(entrada='ip', salidas=('puerto', 'org', 'tech'), nombre='shodan',
            requiere_key=True,
-           descripcion='Puertos/servicios/org de la IP (Shodan, key en la bóveda)')
+           descripcion='Ports/services/org of the IP (Shodan, key in the vault)')
 def _t_shodan(entidad, ctx):
     key = _key_rotativa('shodan') or os.environ.get('SHODAN_API_KEY', '')
     if not key:
@@ -2779,7 +2779,7 @@ def _t_shodan(entidad, ctx):
 
 @transform(entrada='ip', salidas=('puerto', 'org', 'tech', 'asn'), nombre='censys',
            requiere_key=True,
-           descripcion='Servicios de la IP (Censys, key "id:secret" en la bóveda)')
+           descripcion='Services of the IP (Censys, key "id:secret" in the vault)')
 def _t_censys(entidad, ctx):
     cred = _key_rotativa('censys') or os.environ.get('CENSYS_API', '')
     if not cred or ':' not in cred:
@@ -2809,7 +2809,7 @@ def _t_censys(entidad, ctx):
 
 @transform(entrada='ip', salidas=('puerto', 'tech'), nombre='zoomeye',
            requiere_key=True,
-           descripcion='Servicios de la IP en ZoomEye (motor CN, key en la bóveda)')
+           descripcion='Services of the IP in ZoomEye (CN engine, key in the vault)')
 def _t_zoomeye(entidad, ctx):
     key = _key_rotativa('zoomeye') or os.environ.get('ZOOMEYE_KEY', '')
     if not key:
@@ -2832,7 +2832,7 @@ def _t_zoomeye(entidad, ctx):
 
 @transform(entrada='ip', salidas=('puerto', 'dominio'), nombre='fofa',
            requiere_key=True,
-           descripcion='Hosts/dominios en FOFA (motor CN, key "email:key" en la bóveda)')
+           descripcion='Hosts/domains in FOFA (CN engine, key "email:key" in the vault)')
 def _t_fofa(entidad, ctx):
     cred = _key_rotativa('fofa') or os.environ.get('FOFA_KEY', '')
     if not cred or ':' not in cred:
@@ -2859,7 +2859,7 @@ def _t_fofa(entidad, ctx):
 
 @transform(entrada='ip', salidas=('puerto', 'tech'), nombre='quake',
            requiere_key=True,
-           descripcion='Servicios de la IP en Quake/360 (motor CN, key en la bóveda)')
+           descripcion='Services of the IP in Quake/360 (CN engine, key in the vault)')
 def _t_quake(entidad, ctx):
     key = _key_rotativa('quake') or os.environ.get('QUAKE_KEY', '')
     if not key:
@@ -2881,7 +2881,7 @@ def _t_quake(entidad, ctx):
 
 @transform(entrada='ip', salidas=('puerto', 'dominio'), nombre='hunter',
            requiere_key=True,
-           descripcion='Hosts/dominios en Hunter.how (motor CN, key en la bóveda)')
+           descripcion='Hosts/domains in Hunter.how (CN engine, key in the vault)')
 def _t_hunter(entidad, ctx):
     key = _key_rotativa('hunter') or os.environ.get('HUNTER_KEY', '')
     if not key:
@@ -2901,7 +2901,7 @@ def _t_hunter(entidad, ctx):
 
 @transform(entrada='ip', salidas=('puerto',), nombre='netlas',
            requiere_key=True,
-           descripcion='Respuestas de la IP en Netlas (key en la bóveda)')
+           descripcion='Responses of the IP in Netlas (key in the vault)')
 def _t_netlas(entidad, ctx):
     key = _key_rotativa('netlas') or os.environ.get('NETLAS_KEY', '')
     if not key:
@@ -2919,7 +2919,7 @@ def _t_netlas(entidad, ctx):
 
 @transform(entrada='ip', salidas=('puerto',), nombre='criminalip',
            requiere_key=True,
-           descripcion='Puertos/exposición de la IP (Criminal IP, key en la bóveda)')
+           descripcion='Ports/exposure of the IP (Criminal IP, key in the vault)')
 def _t_criminalip(entidad, ctx):
     key = _key_rotativa('criminalip') or os.environ.get('CRIMINALIP_KEY', '')
     if not key:
@@ -2937,7 +2937,7 @@ def _t_criminalip(entidad, ctx):
 
 @transform(entrada='ip', salidas=('puerto',), nombre='binaryedge',
            requiere_key=True,
-           descripcion='Puertos expuestos de la IP (BinaryEdge, key en la bóveda)')
+           descripcion='Exposed ports of the IP (BinaryEdge, key in the vault)')
 def _t_binaryedge(entidad, ctx):
     key = _key_rotativa('binaryedge') or os.environ.get('BINARYEDGE_KEY', '')
     if not key:
@@ -2953,19 +2953,19 @@ def _t_binaryedge(entidad, ctx):
         log.debug("binaryedge no disponible: %s", _e)
 
 @transform(entrada='url', salidas=('url',), nombre='reverse_image',
-           descripcion='Búsqueda inversa de la imagen en Yandex/Google/TinEye/Bing (F9, keyless)')
+           descripcion='Reverse image search in Yandex/Google/TinEye/Bing (F9, keyless)')
 def _t_reverse_image(entidad, ctx):
     for motor, enlace in enlaces_reverse(entidad.valor).items():
         ctx.emitir('url', enlace, etiqueta=f'reverse:{motor}', motor=motor)
 
 @transform(entrada='url', salidas=('url',), nombre='busqueda_facial',
-           descripcion='Reconocimiento facial: Yandex (por URL) + FaceCheck/PimEyes (subir a mano) (F9)')
+           descripcion='Facial recognition: Yandex (by URL) + FaceCheck/PimEyes (manual upload) (F9)')
 def _t_busqueda_facial(entidad, ctx):
     for motor, info in enlaces_facial(entidad.valor).items():
         ctx.emitir('url', info['url'], etiqueta=f'facial:{motor}', motor=motor, modo=info['modo'])
 
 @transform(entrada='telefono', salidas=('url', 'pais'), nombre='telefono_dorks',
-           descripcion='Dorks de búsqueda del teléfono (Truecaller/mensajería) + carrier si hay key (F2 paso 33)')
+           descripcion='Phone search dorks (Truecaller/messaging) + carrier if key (F2 step 33)')
 def _t_telefono_dorks(entidad, ctx):
     from urllib.parse import quote as _q
     num = entidad.valor
@@ -2993,7 +2993,7 @@ def _t_telefono_dorks(entidad, ctx):
             log.debug("numverify no disponible: %s", _e)
 
 @transform(entrada='dominio', salidas=('dominio',), nombre='typosquatting',
-           descripcion='Variantes typosquat del dominio que SÍ están registradas (F2 paso 34)')
+           descripcion='Typosquat variants of the domain that ARE registered (F2 step 34)')
 def _t_typosquatting(entidad, ctx):
     dom = entidad.valor
     nombre, ext = dom.rsplit('.', 1) if '.' in dom else (dom, 'com')
@@ -3030,7 +3030,7 @@ def _t_typosquatting(entidad, ctx):
             d.etiquetar('typosquat')
 
 @transform(entrada='org', salidas=('bucket',), nombre='buckets',
-           descripcion='Buckets S3/GCS/Azure públicos por nombre de la organización (F2 paso 34)')
+           descripcion='Public S3/GCS/Azure buckets by organization name (F2 step 34)')
 def _t_buckets(entidad, ctx):
     base = re.sub(r'[^a-z0-9-]', '', entidad.valor.lower().replace(' ', '-').replace('_', '-'))
     if not base:
@@ -3069,7 +3069,7 @@ _TAKEOVER_FP = {
 }
 
 @transform(entrada='dominio', salidas=('subdominio',), nombre='takeover',
-           descripcion='Subdominios huérfanos vulnerables a takeover (CNAME a servicio abandonado) (F2 paso 34)')
+           descripcion='Orphaned subdomains vulnerable to takeover (CNAME to abandoned service) (F2 step 34)')
 def _t_takeover(entidad, ctx):
     dom = entidad.valor
     try:
@@ -3107,7 +3107,7 @@ def _t_takeover(entidad, ctx):
             s.etiquetar('takeover')          # dispara la regla r_takeover (F4/55)
 
 @transform(entrada='dominio', salidas=('ip',), nombre='passivedns', requiere_key=True,
-           descripcion='Historial de IPs del dominio (Passive DNS via VirusTotal, key en la bóveda) (F2 paso 34)')
+           descripcion='IP history of the domain (Passive DNS via VirusTotal, key in the vault) (F2 step 34)')
 def _t_passivedns(entidad, ctx):
     key = _key_rotativa('virustotal') or os.environ.get('VT_API_KEY', '')
     if not key:
@@ -3136,7 +3136,7 @@ _SECRET_PATTERNS = [
 ]
 
 @transform(entrada='usuario', salidas=('credencial', 'repo'), nombre='github_sec',
-           descripcion='Secretos hardcodeados en commits de repos públicos del usuario (F4 paso 60)')
+           descripcion='Hardcoded secrets in commits of the user public repos (F4 step 60)')
 def _t_github_sec(entidad, ctx):
     user = entidad.valor
     tok = _key_rotativa('github') or os.environ.get('GITHUB_TOKEN', '')
@@ -3174,7 +3174,7 @@ def _t_github_sec(entidad, ctx):
         log.debug("github_sec no disponible: %s", _e)
 
 @transform(entrada='persona', salidas=('url',), nombre='persona',
-           descripcion='OSINT de una persona: resumen (DuckDuckGo) + dorks (LinkedIn/X/GitHub…) (keyless)')
+           descripcion='OSINT on a person: summary (DuckDuckGo) + dorks (LinkedIn/X/GitHub...) (keyless)')
 def _t_persona(entidad, ctx):
     from urllib.parse import quote as _q
     nombre = entidad.valor
@@ -3194,7 +3194,7 @@ def _t_persona(entidad, ctx):
         ctx.emitir('url', f'https://www.google.com/search?q={_q(q)}', etiqueta=f'dork:{k}', dork=k)
 
 @transform(entrada='persona', salidas=('url',), nombre='darkweb',
-           descripcion='Búsqueda en dark web (Ahmia, índice .onion clearnet, sin Tor) (keyless)')
+           descripcion='Dark web search (Ahmia, clearnet .onion index, no Tor) (keyless)')
 def _t_darkweb(entidad, ctx):
     from urllib.parse import quote as _q
     try:
@@ -3209,7 +3209,7 @@ def _t_darkweb(entidad, ctx):
         log.debug("darkweb ahmia: %s", _e)
 
 @transform(entrada='url', salidas=(), nombre='url_check',
-           descripcion='Reputación de la URL en URLhaus (abuse.ch, CC0, keyless)')
+           descripcion='URL reputation in URLhaus (abuse.ch, CC0, keyless)')
 def _t_url_check(entidad, ctx):
     try:
         d = SESSION.post('https://urlhaus-api.abuse.ch/v1/url/',
@@ -3221,7 +3221,7 @@ def _t_url_check(entidad, ctx):
         log.debug("url_check urlhaus: %s", _e)
 
 @transform(entrada='url', salidas=('email',), nombre='render_js',
-           descripcion='Renderiza la página con navegador headless (playwright): emails del DOM final')
+           descripcion='Renders the page with a headless browser (playwright): emails from the final DOM')
 def _t_render_js(entidad, ctx):
     url = entidad.valor
     if not url.startswith(('http://', 'https://')):
@@ -3247,7 +3247,7 @@ def _t_render_js(entidad, ctx):
         log.debug("render_js: %s", _e)
 
 @transform(entrada='archivo', salidas=(), nombre='yara_bulk',
-           descripcion='Escanea una carpeta con yara-rules (solo local)')
+           descripcion='Scans a folder with yara-rules (local only)')
 def _t_yara_bulk(entidad, ctx):
     carpeta = entidad.valor
     if not os.path.isdir(carpeta) or not _which('yara-rules'):
@@ -3277,7 +3277,7 @@ def _t_yara_bulk(entidad, ctx):
         entidad.etiquetar('yara-match')
 
 @transform(entrada='persona', salidas=(), nombre='wordlist',
-           descripcion='Diccionario de contraseñas probable por IA desde el caso (Ollama)')
+           descripcion='Likely password wordlist from the case via AI (Ollama)')
 def _t_wordlist(entidad, ctx):
     if not ia.disponible():
         return
@@ -3306,7 +3306,7 @@ def _t_wordlist(entidad, ctx):
         log.debug("wordlist guardar: %s", _e)
 
 @transform(entrada='url', salidas=('url',), nombre='cronolocalizacion',
-           descripcion='Cronolocalización por sombras: SunCalc/ShadowMap (técnica Bellingcat) (F9 paso 121)')
+           descripcion='Chronolocation by shadows: SunCalc/ShadowMap (Bellingcat technique) (F9 step 121)')
 def _t_cronolocalizacion(entidad, ctx):
     coords = parse_gps(entidad.propiedades.get('gps', ''))
     enlaces = enlaces_cronolocalizacion(*(coords if coords else (None, None)))
@@ -3314,7 +3314,7 @@ def _t_cronolocalizacion(entidad, ctx):
         ctx.emitir('url', url, etiqueta=f'sol:{herr}', herramienta=herr)
 
 @transform(entrada='url', salidas=('url',), nombre='satelital',
-           descripcion='Cruce satelital de la ubicación (Google Earth/Sentinel/Bing) — requiere GPS (F9 paso 122)')
+           descripcion='Satellite cross-check of the location (Google Earth/Sentinel/Bing) -- requires GPS (F9 step 122)')
 def _t_satelital(entidad, ctx):
     coords = parse_gps(entidad.propiedades.get('gps', ''))
     if not coords:
@@ -3323,13 +3323,13 @@ def _t_satelital(entidad, ctx):
         ctx.emitir('url', url, etiqueta=f'satelite:{herr}', herramienta=herr)
 
 @transform(entrada='url', salidas=('url',), nombre='landmarks',
-           descripcion='Matching de puntos de referencia por imagen (Google Lens/Mapillary/Wikimapia) (F9 paso 123)')
+           descripcion='Landmark matching by image (Google Lens/Mapillary/Wikimapia) (F9 step 123)')
 def _t_landmarks(entidad, ctx):
     for herr, url in enlaces_landmark(entidad.valor).items():
         ctx.emitir('url', url, etiqueta=f'landmark:{herr}', herramienta=herr)
 
 @transform(entrada='url', salidas=(), nombre='ocr',
-           descripcion='OCR cirílico/chino/latino de la imagen (tesseract, langs rus+chi_sim+eng) (F9 paso 125)')
+           descripcion='Cyrillic/Chinese/Latin OCR of the image (tesseract, langs rus+chi_sim+eng) (F9 step 125)')
 def _t_ocr(entidad, ctx):
     if not _which('tesseract'):
         return                                       # degrada: falta tesseract + langs
@@ -3373,7 +3373,7 @@ def _fetch_tor(url, timeout=25):
                        timeout=timeout, headers={'User-Agent': 'Mozilla/5.0'})
 
 @transform(entrada='url', salidas=('email', 'url'), nombre='onion_fetch',
-           descripcion='Abre un sitio .onion por Tor y extrae título, emails y enlaces .onion (F10 paso 128)')
+           descripcion='Opens a .onion site via Tor and extracts title, emails and .onion links (F10 step 128)')
 def _t_onion_fetch(entidad, ctx):
     url = entidad.valor
     if '.onion' not in url:
@@ -3432,7 +3432,7 @@ def _tg_mensajes(usuario, limite=30):
 
 @transform(entrada='usuario', salidas=('email', 'url'), nombre='telegram',
            requiere_key=True,
-           descripcion='Menciones/enlaces del usuario o canal en Telegram (Telethon) (F10 paso 130)')
+           descripcion='Mentions/links of the user or channel in Telegram (Telethon) (F10 step 130)')
 def _t_telegram(entidad, ctx):
     ok, res = _tg_mensajes(entidad.valor)
     if not ok:
@@ -3462,7 +3462,7 @@ def coincidencias_leak(textos, keywords=None):
 
 @transform(entrada='usuario', salidas=('dominio', 'email'), nombre='canal_leaks',
            requiere_key=True,
-           descripcion='Vigila un canal de Telegram por menciones de leaks/brechas/ransomware (F10 paso 131)')
+           descripcion='Watches a Telegram channel for mentions of leaks/breaches/ransomware (F10 step 131)')
 def _t_canal_leaks(entidad, ctx):
     ok, res = _tg_mensajes(entidad.valor, limite=100)
     if not ok:
@@ -3484,7 +3484,7 @@ def _t_canal_leaks(entidad, ctx):
 _HAYSTAK_ONION = ('http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion')
 
 @transform(entrada='persona', salidas=('url',), nombre='haystak',
-           descripcion='Búsqueda dark web en Haystak (por Tor) — enlaces .onion (F10 paso 129)')
+           descripcion='Dark web search in Haystak (via Tor) -- .onion links (F10 step 129)')
 def _t_haystak(entidad, ctx):
     if not _tor_disponible():
         entidad.propiedades['haystak'] = 'requiere Tor (arranca el servicio tor)'
@@ -3512,7 +3512,7 @@ def _descargar_imagen(url):
         return f.name
 
 @transform(entrada='url', salidas=(), nombre='ela', requiere_key=False,
-           descripcion='Detección de edición por Error Level Analysis (genera imagen ELA) (F9 paso 126)')
+           descripcion='Edit detection via Error Level Analysis (generates ELA image) (F9 step 126)')
 def _t_ela(entidad, ctx):
     fn = _descargar_imagen(entidad.valor)
     if not fn:
@@ -3535,7 +3535,7 @@ def _t_ela(entidad, ctx):
             pass
 
 @transform(entrada='url', salidas=('hash',), nombre='phash',
-           descripcion='Hash perceptual (dHash): agrupa la misma imagen reusada en varios perfiles (F9 paso 127)')
+           descripcion='Perceptual hash (dHash): groups the same image reused across profiles (F9 step 127)')
 def _t_phash(entidad, ctx):
     fn = _descargar_imagen(entidad.valor)
     if not fn:
@@ -3559,7 +3559,7 @@ _WALLET_RE = {
 _ES_BTC = re.compile(r'(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\Z')
 
 @transform(entrada='wallet', salidas=('wallet',), nombre='tx_grafo',
-           descripcion='Contrapartes de transacciones de una wallet BTC (blockchain.info, keyless) (F11 paso 138)')
+           descripcion='Transaction counterparties of a BTC wallet (blockchain.info, keyless) (F11 step 138)')
 def _t_tx_grafo(entidad, ctx):
     addr = entidad.valor
     if not _ES_BTC.match(addr):
@@ -3586,7 +3586,7 @@ def _t_tx_grafo(entidad, ctx):
 _ES_ETH = re.compile(r'0x[a-fA-F0-9]{40}\Z')
 
 @transform(entrada='wallet', salidas=(), nombre='eth_balance',
-           descripcion='Saldo de una wallet Ethereum (RPC público cloudflare-eth, keyless) (F11 paso 142)')
+           descripcion='Balance of an Ethereum wallet (public RPC cloudflare-eth, keyless) (F11 step 142)')
 def _t_eth_balance(entidad, ctx):
     if not _ES_ETH.match(entidad.valor):
         return                                       # solo direcciones ETH
@@ -3615,14 +3615,14 @@ def _ransom_addrs():
     return _RANSOM['addrs'] or set()
 
 @transform(entrada='wallet', salidas=(), nombre='riesgo_wallet',
-           descripcion='Riesgo de la dirección: ¿ligada a ransomware? (Ransomwhere, CC0, keyless) (F11 paso 141)')
+           descripcion='Address risk: linked to ransomware? (Ransomwhere, CC0, keyless) (F11 step 141)')
 def _t_riesgo_wallet(entidad, ctx):
     if entidad.valor in _ransom_addrs():
         entidad.etiquetar('ransomware')
         entidad.propiedades['riesgo'] = 'ligada a ransomware (Ransomwhere)'
 
 @transform(entrada='wallet', salidas=('url',), nombre='exchange_attrib',
-           descripcion='Atribución a exchanges: enlaces a Blockchair/WalletExplorer/Arkham/OXT (F11 paso 140)')
+           descripcion='Exchange attribution: links to Blockchair/WalletExplorer/Arkham/OXT (F11 step 140)')
 def _t_exchange_attrib(entidad, ctx):
     from urllib.parse import quote as _q
     a = _q(entidad.valor)
@@ -3634,7 +3634,7 @@ def _t_exchange_attrib(entidad, ctx):
         ctx.emitir('url', url, etiqueta=f'attrib:{herr}', herramienta=herr)
 
 @transform(entrada='wallet', salidas=('wallet',), nombre='cluster_wallets',
-           descripcion='Clustering por co-inputs: direcciones del mismo dueño (heurística, blockchain.info) (F11 paso 139)')
+           descripcion='Clustering by co-inputs: addresses of the same owner (heuristic, blockchain.info) (F11 step 139)')
 def _t_cluster_wallets(entidad, ctx):
     addr = entidad.valor
     if not _ES_BTC.match(addr):
@@ -3657,7 +3657,7 @@ def _t_cluster_wallets(entidad, ctx):
             w.etiquetar('mismo-dueño')
 
 @transform(entrada='url', salidas=('wallet',), nombre='extraer_wallets',
-           descripcion='Extrae direcciones BTC/ETH de una página (F11 paso 137)')
+           descripcion='Extracts BTC/ETH addresses from a page (F11 step 137)')
 def _t_extraer_wallets(entidad, ctx):
     try:
         r = _fetch_seguro(entidad.valor, timeout=10, stream=False)
@@ -3669,7 +3669,7 @@ def _t_extraer_wallets(entidad, ctx):
             ctx.emitir('wallet', addr, etiqueta=cadena, cadena=cadena)
 
 @transform(entrada='persona', salidas=('url',), nombre='dorks_idioma',
-           descripcion='Dorks adaptados al idioma del nombre (cirílico/chino/latino) (F15 paso 176)')
+           descripcion='Dorks adapted to the name language (Cyrillic/Chinese/Latin) (F15 step 176)')
 def _t_dorks_idioma(entidad, ctx):
     from urllib.parse import quote as _q
     idioma = _ml.detectar_idioma(entidad.valor)
@@ -3677,26 +3677,26 @@ def _t_dorks_idioma(entidad, ctx):
         ctx.emitir('url', f'https://www.google.com/search?q={_q(d)}', etiqueta=f'dork:{idioma}', idioma=idioma)
 
 @transform(entrada='persona', salidas=('url',), nombre='motores_locales',
-           descripcion='Búsqueda en motores locales: Yandex, Baidu, Sogou (indexan otra internet) (F15 paso 174)')
+           descripcion='Search in local engines: Yandex, Baidu, Sogou (they index another internet) (F15 step 174)')
 def _t_motores_locales(entidad, ctx):
     for motor, url in _ml.motores_locales(entidad.valor).items():
         ctx.emitir('url', url, etiqueta=f'motor:{motor}', motor=motor)
 
 @transform(entrada='org', salidas=('url',), nombre='registros_regionales',
-           descripcion='Registros de empresas por región: QCC (China), RusProfile (Rusia), OpenCorporates (F15 paso 173)')
+           descripcion='Company registries by region: QCC (China), RusProfile (Russia), OpenCorporates (F15 step 173)')
 def _t_registros_regionales(entidad, ctx):
     for reg, url in _ml.registros_regionales(entidad.valor).items():
         ctx.emitir('url', url, etiqueta=f'registro:{reg}', registro=reg)
 
 @transform(entrada='persona', salidas=('persona',), nombre='transliterar',
-           descripcion='Variantes del nombre en cirílico/latino para buscar en cada alfabeto (F15 paso 172)')
+           descripcion='Name variants in Cyrillic/Latin to search in each alphabet (F15 step 172)')
 def _t_transliterar(entidad, ctx):
     for alfabeto, variante in _ml.transliterar(entidad.valor).items():
         if variante and variante.lower() != entidad.valor.lower():
             ctx.emitir('persona', variante, etiqueta=f'translit:{alfabeto}')
 
 @transform(entrada='usuario', salidas=('url',), nombre='plataformas_regionales',
-           descripcion='Perfiles en plataformas regionales: VK, Weibo, Douyin, OK, Telegram (F15 paso 171)')
+           descripcion='Profiles on regional platforms: VK, Weibo, Douyin, OK, Telegram (F15 step 171)')
 def _t_plataformas_regionales(entidad, ctx):
     for plat, url in _ml.perfiles_regionales(entidad.valor).items():
         ctx.emitir('url', url, etiqueta=f'plataforma:{plat}', plataforma=plat)
@@ -3732,7 +3732,7 @@ def _cargar_blocklist():
     return nets
 
 @transform(entrada='ip', salidas=(), nombre='ip_blocklist',
-           descripcion='¿La IP está en feeds de amenaza CC0 de alta confianza? (abuse.ch, keyless)')
+           descripcion='Is the IP in high-confidence CC0 threat feeds? (abuse.ch, keyless)')
 def _t_ip_blocklist(entidad, ctx):
     try:
         ip = ipaddress.ip_address(entidad.valor)
@@ -3745,7 +3745,7 @@ def _t_ip_blocklist(entidad, ctx):
             return
 
 @transform(entrada='ip', salidas=('org',), nombre='greynoise',
-           descripcion='Threat intel de la IP (GreyNoise Community, keyless pero 25/día; 404=no observada)')
+           descripcion='Threat intel of the IP (GreyNoise Community, keyless but 25/day; 404=not observed)')
 def _t_greynoise(entidad, ctx):
     try:
         r = SESSION.get(f'https://api.greynoise.io/v3/community/{entidad.valor}', timeout=8)
@@ -3767,7 +3767,7 @@ def _t_greynoise(entidad, ctx):
         log.debug("greynoise no disponible: %s", _e)
 
 @transform(entrada='dominio', salidas=(), nombre='dns_txt',
-           descripcion='Registros TXT del dominio (SPF, verificaciones, etc.)')
+           descripcion='TXT records of the domain (SPF, verifications, etc.)')
 def _t_dns_txt(entidad, ctx):
     out = run_tool(['dig', entidad.valor, 'TXT', '+short'], timeout=10)
     txt = [l.strip().strip('"') for l in out.splitlines() if l.strip()]
@@ -3775,7 +3775,7 @@ def _t_dns_txt(entidad, ctx):
         entidad.propiedades['txt'] = txt[:10]
 
 @transform(entrada='dominio', salidas=('org',), nombre='ssl',
-           descripcion='Certificado TLS del dominio: emisor y vigencia')
+           descripcion='TLS certificate of the domain: issuer and validity')
 def _t_ssl(entidad, ctx):
     try:
         contexto = ssl.create_default_context()
@@ -3795,7 +3795,7 @@ def _t_ssl(entidad, ctx):
         log.debug("ssl no disponible: %s", _e)
 
 @transform(entrada='dominio', salidas=('ip',), nombre='cert_pivote', requiere_key=True,
-           descripcion='IPs con el mismo cert TLS (CN) cruzando FOFA/Shodan — misma infra (F8)')
+           descripcion='IPs with the same TLS cert (CN) across FOFA/Shodan -- same infra (F8)')
 def _t_cert_pivote(entidad, ctx):
     cn = entidad.propiedades.get('cert_cn')
     if not cn:                                            # si ssl no corrió, saca el CN ahora
