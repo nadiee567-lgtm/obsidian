@@ -3299,17 +3299,15 @@ def _t_onion_fetch(entidad, ctx):
 
 _TG_SESION = os.path.join(HOME, '.obsidian', 'telegram.session')
 
-@transform(entrada='usuario', salidas=('email', 'url'), nombre='telegram',
-           requiere_key=True,
-           descripcion='Menciones/enlaces del usuario o canal en Telegram (Telethon) (F10 paso 130)')
-def _t_telegram(entidad, ctx):
+def _tg_mensajes(usuario, limite=30):
+    """Trae los últimos mensajes de un usuario/canal de Telegram. Devuelve
+    (True, (id, [textos])) o (False, motivo_del_fallo). Compartido por los
+    transforms de Telegram (paso 130, 131)."""
     cred = _boveda.obtener('telegram') or os.environ.get('TELEGRAM_API', '')
     if not cred or ':' not in cred:
-        entidad.propiedades['telegram'] = 'falta api_id:api_hash (gratis en my.telegram.org) en la bóveda'
-        return
+        return False, 'falta api_id:api_hash (gratis en my.telegram.org) en la bóveda'
     if not os.path.exists(_TG_SESION):
-        entidad.propiedades['telegram'] = 'falta login una vez: python telegram_login.py'
-        return
+        return False, 'falta login una vez: python telegram_login.py'
     api_id, api_hash = cred.split(':', 1)
     try:
         import asyncio
@@ -3320,26 +3318,68 @@ def _t_telegram(entidad, ctx):
             await cli.connect()
             if not await cli.is_user_authorized():
                 return None
-            objetivo = await cli.get_entity(entidad.valor)
-            textos = []
-            async for m in cli.iter_messages(objetivo, limit=30):
-                if m.text:
-                    textos.append(m.text)
+            objetivo = await cli.get_entity(usuario)
+            textos = [m.text async for m in cli.iter_messages(objetivo, limit=limite) if m.text]
             await cli.disconnect()
-            return getattr(objetivo, 'id', None), '\n'.join(textos)
+            return getattr(objetivo, 'id', None), textos
 
         res = asyncio.run(_run())
         if not res:
-            entidad.propiedades['telegram'] = 'sesión no autorizada — re-login'
-            return
-        tid, texto = res
-        entidad.propiedades['telegram_id'] = tid
-        for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', texto)))[:15]:
-            ctx.emitir('email', em, etiqueta='en-telegram')
-        for u in list(set(re.findall(r'https?://[^\s"\'<>]+', texto)))[:15]:
-            ctx.emitir('url', u[:200], etiqueta='en-telegram')
-    except Exception as _e:
-        log.debug("telegram: %s", _e)
+            return False, 'sesión no autorizada — re-login'
+        return True, res
+    except Exception as e:
+        return False, f'error: {e}'
+
+@transform(entrada='usuario', salidas=('email', 'url'), nombre='telegram',
+           requiere_key=True,
+           descripcion='Menciones/enlaces del usuario o canal en Telegram (Telethon) (F10 paso 130)')
+def _t_telegram(entidad, ctx):
+    ok, res = _tg_mensajes(entidad.valor)
+    if not ok:
+        entidad.propiedades['telegram'] = res
+        return
+    tid, textos = res
+    entidad.propiedades['telegram_id'] = tid
+    texto = '\n'.join(textos)
+    for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', texto)))[:15]:
+        ctx.emitir('email', em, etiqueta='en-telegram')
+    for u in list(set(re.findall(r'https?://[^\s"\'<>]+', texto)))[:15]:
+        ctx.emitir('url', u[:200], etiqueta='en-telegram')
+
+_LEAK_KW = ['leak', 'breach', 'database', 'combolist', 'stealer', 'ransomware',
+            'dump', 'fullz', 'rdp access', 'initial access', 'base de datos', 'filtracion']
+
+def coincidencias_leak(textos, keywords=None):
+    """Mensajes que mencionan términos de leaks/brechas (paso 131). PURO/testeable."""
+    kws = keywords or _LEAK_KW
+    hits = []
+    for t in textos:
+        tl = t.lower()
+        kw = next((k for k in kws if k in tl), None)
+        if kw:
+            hits.append({'keyword': kw, 'texto': t[:200]})
+    return hits
+
+@transform(entrada='usuario', salidas=('dominio', 'email'), nombre='canal_leaks',
+           requiere_key=True,
+           descripcion='Vigila un canal de Telegram por menciones de leaks/brechas/ransomware (F10 paso 131)')
+def _t_canal_leaks(entidad, ctx):
+    ok, res = _tg_mensajes(entidad.valor, limite=100)
+    if not ok:
+        entidad.propiedades['canal_leaks'] = res
+        return
+    _tid, textos = res
+    hits = coincidencias_leak(textos)
+    if not hits:
+        return
+    entidad.etiquetar('canal-leaks')
+    entidad.propiedades['leaks_menciones'] = len(hits)
+    entidad.propiedades['leaks_muestra'] = [h['texto'] for h in hits[:5]]
+    unido = '\n'.join(h['texto'] for h in hits)
+    for dom in list(set(re.findall(r'\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b', unido.lower())))[:15]:
+        ctx.emitir('dominio', dom, etiqueta='mencionado-en-leaks')
+    for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', unido)))[:15]:
+        ctx.emitir('email', em, etiqueta='mencionado-en-leaks')
 
 _HAYSTAK_ONION = ('http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion')
 

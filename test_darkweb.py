@@ -68,3 +68,24 @@ def test_telegram_sin_sesion(monkeypatch):
     monkeypatch.setattr(ob.os.path, 'exists', lambda p: not str(p).endswith('telegram.session'))
     prod, e = _correr('telegram', 'usuario', 'durov')
     assert prod == [] and 'login' in e.propiedades.get('telegram', '')
+
+
+# ── 131: monitoreo de canales (lógica testeable; fetch degrada sin cuenta) ────
+def test_coincidencias_leak():
+    hits = ob.coincidencias_leak(['hola mundo', 'nueva DATABASE a la venta', 'ransomware group', 'nada'])
+    assert len(hits) == 2 and {h['keyword'] for h in hits} == {'database', 'ransomware'}
+
+
+def test_canal_leaks(monkeypatch):
+    textos = ['combolist fresca de acme.com', 'admin@acme.com filtrado en breach', 'gatitos']
+    monkeypatch.setattr(ob, '_tg_mensajes', lambda u, limite=100: (True, (123, textos)))
+    prod, e = _correr('canal_leaks', 'usuario', 'canal_ru')
+    assert 'canal-leaks' in e.tags and e.propiedades.get('leaks_menciones') == 2
+    assert 'acme.com' in {x.valor for x in prod if x.tipo == 'dominio'}
+    assert 'admin@acme.com' in {x.valor for x in prod if x.tipo == 'email'}
+
+
+def test_canal_leaks_sin_creds(monkeypatch):
+    monkeypatch.setattr(ob, '_tg_mensajes', lambda u, limite=100: (False, 'falta api_id:api_hash ...'))
+    prod, e = _correr('canal_leaks', 'usuario', 'x')
+    assert prod == [] and 'api_id' in e.propiedades.get('canal_leaks', '')
