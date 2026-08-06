@@ -679,7 +679,7 @@ def _recon_favicon(dominio):
         except Exception as e:
             datos['resultados']['error_shodan'] = str(e)
     else:
-        datos['resultados']['nota'] = f'Hash calculado: {hash_mmh3}. Agregar API key de Shodan (gratis en shodan.io) para buscar infraestructura relacionada, o pegar el hash manualmente en shodan.io/search?query=http.favicon.hash:{hash_mmh3}'
+        datos['resultados']['nota'] = f'Computed hash: {hash_mmh3}. Add a Shodan API key (free at shodan.io) to search related infrastructure, or paste the hash manually into shodan.io/search?query=http.favicon.hash:{hash_mmh3}'
     _guardar_dato(f'favicon_{dominio}', datos)
     return datos
 
@@ -687,24 +687,24 @@ def _recon_typosquatting(dominio):
     datos = {'tipo':'typosquatting','objetivo':dominio,'resultados':{}}
     nombre, ext = dominio.rsplit('.',1) if '.' in dominio else (dominio,'com')
     variantes = set()
-    # Sustituciones comunes
+    # Common substitutions
     subs = {'a':'4','e':'3','i':'1','o':'0','s':'5','l':'1'}
     for i, c in enumerate(nombre):
         if c in subs:
             v = nombre[:i]+subs[c]+nombre[i+1:]
             variantes.add(f'{v}.{ext}')
-    # Typos de teclado
+    # Keyboard typos
     teclado = {'q':'w','w':'e','e':'r','r':'t','t':'y','a':'s','s':'d','d':'f',
                'f':'g','g':'h','z':'x','x':'c','c':'v','v':'b'}
     for i, c in enumerate(nombre.lower()):
         if c in teclado:
             v = nombre[:i]+teclado[c]+nombre[i+1:]
             variantes.add(f'{v}.{ext}')
-    # Omisión/duplicación de letras
+    # Letter omission/duplication
     for i in range(len(nombre)):
         variantes.add(f'{nombre[:i]+nombre[i+1:]}.{ext}')
         variantes.add(f'{nombre[:i]+nombre[i]*2+nombre[i:]}.{ext}')
-    # Verificar cuáles existen
+    # Check which exist
     registrados = []
     def _check_domain(v):
         out = _cmd(f'dig {v} A +short 2>/dev/null', timeout=3)
@@ -760,7 +760,7 @@ def _recon_subdomain_takeover(dominio):
                 if s.endswith(dominio) and s != dominio: subs.add(s)
     except Exception:
         subs = set()
-    # Servicios vulnerables a takeover
+    # Services vulnerable to takeover
     FINGERPRINTS = {
         'github.io':          'There isn\'t a GitHub Pages site here',
         'herokuapp.com':      'No such app',
@@ -783,7 +783,7 @@ def _recon_subdomain_takeover(dominio):
                     if fp.lower() in r.text.lower():
                         vulnerables.append({'subdominio':sub,'cname':cname,'servicio':servicio,'status':'VULNERABLE'})
                 except Exception:
-                    vulnerables.append({'subdominio':sub,'cname':cname,'servicio':servicio,'status':'POSIBLE'})
+                    vulnerables.append({'subdominio':sub,'cname':cname,'servicio':servicio,'status':'POSSIBLE'})
     ths = [threading.Thread(target=_check_sub, args=(s,)) for s in list(subs)[:20]]
     for t in ths: t.start()
     for t in ths: t.join(timeout=20)
@@ -793,12 +793,12 @@ def _recon_subdomain_takeover(dominio):
     return datos
 
 def _recon_passivedns(dominio):
-    """Historial de IPs por las que pasó el dominio, vía VirusTotal (ya tenés la key de Analyze)."""
+    """History of IPs the domain has resolved to, via VirusTotal (reuses the Analyze key)."""
     datos = {'tipo':'passivedns','objetivo':dominio,'resultados':{}}
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
     vt_key = os.environ.get('VT_API_KEY','')
     if not vt_key:
-        datos['resultados']['nota'] = 'Agregar API key de VirusTotal (gratis, tab Analyze) para ver el historial de IPs'
+        datos['resultados']['nota'] = 'Add a VirusTotal API key (free, Analyze tab) to see the IP history'
         _guardar_dato(f'passivedns_{dominio}', datos)
         return datos
     try:
@@ -827,7 +827,7 @@ def _recon_metadata(url):
     try:
         r = _fetch_seguro(url, timeout=10, stream=True)
         content_type = r.headers.get('Content-Type','')
-        # Si es imagen, extraer EXIF
+        # If it is an image, extract EXIF
         if 'image' in content_type:
             import tempfile
             with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as f:
@@ -838,12 +838,12 @@ def _recon_metadata(url):
             if _which('exiftool'):
                 exif = _cmd(f'exiftool {fname} 2>/dev/null')
                 datos['resultados']['exif'] = exif[:2000]
-                # Buscar GPS
+                # Search for GPS
                 gps = re.findall(r'GPS.*?:\s*(.+)', exif)
                 if gps: datos['resultados']['gps'] = gps
             os.unlink(fname)
         else:
-            # HTML — extraer meta tags
+            # HTML -- extract meta tags
             from bs4 import BeautifulSoup
             soup = BeautifulSoup(r.text[:50000], 'html.parser')
             metas = {}
@@ -859,14 +859,14 @@ def _recon_metadata(url):
     return datos
 
 def _recon_render_js(url):
-    """Renderiza la página con navegador headless — ve lo que carga con JS, screenshot incluido."""
+    """Renders the page with a headless browser -- sees what loads via JS, screenshot included."""
     datos = {'tipo':'render_js','objetivo':url,'resultados':{}}
     if not url.startswith(('http://','https://')):
         url = 'https://' + url
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        datos['resultados']['error'] = 'Falta playwright — instalar con: pip install playwright && playwright install chromium'
+        datos['resultados']['error'] = 'Missing playwright -- install with: pip install playwright && playwright install chromium'
         _guardar_dato(f'render_{url[:50]}', datos)
         return datos
     shots_dir = os.path.join(STATIC_DIR, 'screenshots')
@@ -887,12 +887,12 @@ def _recon_render_js(url):
             r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', html_render)))[:15]
         datos['resultados']['tamano_html_render'] = len(html_render)
     except Exception as e:
-        datos['resultados']['error'] = f'Error al renderizar: {e}'
+        datos['resultados']['error'] = f'Render error: {e}'
     _guardar_dato(f'render_{url[:50]}', datos)
     return datos
 
 def _recon_yara_bulk(carpeta):
-    """Escanea todos los archivos de una carpeta con yara-rules — solo tiene sentido en PC."""
+    """Scans every file in a folder with yara-rules -- only makes sense on a full PC."""
     datos = {'tipo':'yara_bulk','objetivo':carpeta,'resultados':{}}
     if not os.path.isdir(carpeta):
         datos['resultados']['error'] = f'Not a valid folder: {carpeta}'
@@ -951,7 +951,7 @@ Generate 30-50 entries. One per line. Only the passwords, no explanation."""
     wordlist = [w.strip() for w in wordlist if w.strip() and len(w.strip()) >= 6]
     datos['resultados']['wordlist'] = wordlist
     datos['resultados']['total'] = len(wordlist)
-    # Guardar archivo
+    # Save file
     path = os.path.join(CASES_DIR, f'wordlist_{re.sub(r"[^a-z0-9]","_",objetivo.lower())}.txt')
     with open(path,'w') as f:
         f.write('\n'.join(wordlist))
@@ -1130,7 +1130,7 @@ BLACKARCH_TOOLS = {
 }
 
 def _distrobox_run(distro, tool_dict, tool_id, arg):
-    """Ejecuta herramienta en un contenedor distrobox"""
+    """Runs a tool inside a distrobox container"""
     tool = None
     for cat in tool_dict.values():
         for t in cat:
@@ -1146,7 +1146,7 @@ def _distrobox_run(distro, tool_dict, tool_id, arg):
     return {'tool': tool['nombre'], 'cmd': cmd, 'output': resultado}
 
 def _kali_run(tool_id, arg):
-    """Ejecuta una herramienta de Kali dentro del contenedor distrobox"""
+    """Runs a Kali tool inside the distrobox container"""
     tool = None
     for cat in KALI_TOOLS.values():
         for t in cat:
@@ -1171,48 +1171,48 @@ def _kali_run(tool_id, arg):
     }
 
 def _check_url(url):
-    """Analiza URL con VirusTotal (si hay key) o heurísticas locales"""
+    """Analyzes a URL with VirusTotal (if a key exists) or local heuristics"""
     datos = {'tipo': 'url_check', 'url': url, 'resultados': {}}
     score = 0
     flags = []
 
-    # Heurísticas de phishing
+    # Phishing heuristics
     u = url.lower()
     dominios_legitimos = ['paypal','amazon','google','facebook','microsoft','apple','netflix','bancomer','banamex','bbva','santander']
     for marca in dominios_legitimos:
         if marca in u and marca + '.com' not in u:
-            flags.append(f'Posible phishing de {marca} (marca en URL pero dominio diferente)')
+            flags.append(f'Possible phishing of {marca} (brand in URL but different domain)')
             score += 30
 
     sospechosos = ['login','secure','verify','account','update','confirm','signin','banking','wallet','password']
     for kw in sospechosos:
         if kw in u:
-            flags.append(f'Keyword sospechosa: {kw}')
+            flags.append(f'Suspicious keyword: {kw}')
             score += 10
 
     if u.count('.') > 4:
-        flags.append(f'Muchos subdominios ({u.count(".")} puntos)')
+        flags.append(f'Many subdomains ({u.count(".")} dots)')
         score += 15
 
     if any(x in u for x in ['-paypal','-amazon','-google','-apple','-microsoft']):
-        flags.append('Guion con marca conocida — phishing probable')
+        flags.append('Hyphen with a known brand -- probable phishing')
         score += 40
 
     if re.search(r'[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}', u):
-        flags.append('URL con IP directa (no dominio)')
+        flags.append('URL with a direct IP (not a domain)')
         score += 25
 
     if len(url) > 100:
-        flags.append(f'URL muy larga ({len(url)} caracteres)')
+        flags.append(f'Very long URL ({len(url)} characters)')
         score += 10
 
     tlds_raros = ['.xyz','.top','.gq','.ml','.cf','.tk','.pw','.cc']
     for tld in tlds_raros:
         if tld in u:
-            flags.append(f'TLD sospechoso: {tld}')
+            flags.append(f'Suspicious TLD: {tld}')
             score += 20
 
-    # VirusTotal si hay API key
+    # VirusTotal if an API key exists
     vt_key = os.environ.get('VT_API_KEY','')
     if vt_key:
         try:
@@ -1229,11 +1229,11 @@ def _check_url(url):
                     'limpio': stats.get('undetected', 0)
                 }
                 if malicious > 0:
-                    flags.append(f'VirusTotal: {malicious} motores lo marcan como MALICIOSO')
+                    flags.append(f'VirusTotal: {malicious} engines flag it as MALICIOUS')
                     score += 50
         except Exception as _e: log.debug("source unavailable: %s", _e)
 
-    # AbuseIPDB para la IP del dominio
+    # AbuseIPDB for the domain's IP
     try:
         dominio = re.sub(r'^https?://', '', url).split('/')[0].split(':')[0]
         ip_check = socket.gethostbyname(dominio)
@@ -1247,7 +1247,7 @@ def _check_url(url):
                 ab_score = d2.get('abuseConfidenceScore', 0)
                 datos['resultados']['abuseipdb'] = {'ip': ip_check, 'abuse_score': ab_score, 'reportes': d2.get('totalReports',0)}
                 if ab_score > 50:
-                    flags.append(f'AbuseIPDB: IP con {ab_score}% de confianza de abuso')
+                    flags.append(f'AbuseIPDB: IP with {ab_score}% abuse confidence')
                     score += 30
         else:
             datos['resultados']['ip_dominio'] = ip_check
