@@ -3618,7 +3618,7 @@ def _ransom_addrs():
 def _t_riesgo_wallet(entidad, ctx):
     if entidad.valor in _ransom_addrs():
         entidad.etiquetar('ransomware')
-        entidad.propiedades['riesgo'] = 'ligada a ransomware (Ransomwhere)'
+        entidad.propiedades['riesgo'] = 'linked to ransomware (Ransomwhere)'
 
 @transform(entrada='wallet', salidas=('url',), nombre='exchange_attrib',
            descripcion='Exchange attribution: links to Blockchair/WalletExplorer/Arkham/OXT (F11 step 140)')
@@ -3648,7 +3648,7 @@ def _t_cluster_wallets(entidad, ctx):
     for tx in d.get('txs', [])[:20]:
         inputs = [(i.get('prev_out') or {}).get('addr') for i in tx.get('inputs', [])]
         inputs = [a for a in inputs if a]
-        if addr in inputs:                           # el seed gastó junto con estas → mismo dueño
+        if addr in inputs:                           # the seed spent alongside these -> same owner
             mismo.update(a for a in inputs if a != addr)
     for a in list(mismo)[:30]:
         w = ctx.emitir('wallet', a, etiqueta='mismo-dueño', cadena='btc')
@@ -3700,14 +3700,14 @@ def _t_plataformas_regionales(entidad, ctx):
     for plat, url in _ml.perfiles_regionales(entidad.valor).items():
         ctx.emitir('url', url, etiqueta=f'plataforma:{plat}', plataforma=plat)
 
-_BLOCKLIST = {'nets': None, 'ts': 0}   # caché en memoria (refresca cada 6h)
+_BLOCKLIST = {'nets': None, 'ts': 0}   # in-memory cache (refreshes every 6h)
 
-# SOLO fuentes de licencia limpia (abuse.ch = CC0) y ALTA confianza (C2 curados).
-# NO usar agregadores ruidosos tipo FireHOL: licencias mixtas + falsos positivos
-# graves (bloquean países enteros, incluyen TOR que NO es malicioso). Un match
-# aquí es SEÑAL con fuente, no un veredicto "malicioso".
+# ONLY clean-license sources (abuse.ch = CC0) and HIGH confidence (curated C2).
+# Do NOT use noisy aggregators like FireHOL: mixed licenses + serious false
+# positives (they block whole countries, include TOR which is NOT malicious). A
+# match here is a SIGNAL with source, not a "malicious" verdict.
 _FEEDS_AMENAZA = [
-    ('Feodo Tracker (C2 de botnet)', 'https://feodotracker.abuse.ch/downloads/ipblocklist.txt'),
+    ('Feodo Tracker (botnet C2)', 'https://feodotracker.abuse.ch/downloads/ipblocklist.txt'),
 ]
 
 def _cargar_blocklist():
@@ -3739,7 +3739,7 @@ def _t_ip_blocklist(entidad, ctx):
         return
     for red, fuente in _cargar_blocklist():
         if ip in red:
-            entidad.etiquetar('listado-amenaza')   # señal, NO veredicto 'malicioso'
+            entidad.etiquetar('listado-amenaza')   # signal, NOT a 'malicious' verdict
             entidad.propiedades['amenaza_fuente'] = fuente
             return
 
@@ -3748,7 +3748,7 @@ def _t_ip_blocklist(entidad, ctx):
 def _t_greynoise(entidad, ctx):
     try:
         r = SESSION.get(f'https://api.greynoise.io/v3/community/{entidad.valor}', timeout=8)
-        if r.status_code != 200:   # 404 = IP no observada scanando -> sin enriquecer
+        if r.status_code != 200:   # 404 = IP not observed scanning -> no enrichment
             return
         d = r.json()
         if d.get('noise'):
@@ -3784,10 +3784,10 @@ def _t_ssl(entidad, ctx):
         issuer = dict(x[0] for x in cert.get('issuer', []))
         org = issuer.get('organizationName')
         if org:
-            ctx.emitir('org', org, etiqueta='emisor cert')
+            ctx.emitir('org', org, etiqueta='cert issuer')
         cn = dict(x[0] for x in cert.get('subject', [])).get('commonName')
         if cn:
-            entidad.propiedades['cert_cn'] = cn          # para pivotar (paso 115)
+            entidad.propiedades['cert_cn'] = cn          # to pivot (step 115)
         entidad.propiedades['cert_desde'] = cert.get('notBefore')
         entidad.propiedades['cert_expira'] = cert.get('notAfter')
     except Exception as _e:
@@ -3797,7 +3797,7 @@ def _t_ssl(entidad, ctx):
            descripcion='IPs with the same TLS cert (CN) across FOFA/Shodan -- same infra (F8)')
 def _t_cert_pivote(entidad, ctx):
     cn = entidad.propiedades.get('cert_cn')
-    if not cn:                                            # si ssl no corrió, saca el CN ahora
+    if not cn:                                            # if ssl did not run, get the CN now
         try:
             contexto = ssl.create_default_context()
             with socket.create_connection((entidad.valor, 443), timeout=8) as sock:
@@ -3814,43 +3814,43 @@ def _t_cert_pivote(entidad, ctx):
 
 @app.route('/api/v2/transforms/<tipo>')
 def api_v2_transforms(tipo):
-    """Transforms que aplican a un tipo de entidad (paso 35)."""
+    """Transforms that apply to an entity type (step 35)."""
     ts = [{'nombre': t.nombre, 'salidas': list(t.salidas),
            'requiere_key': t.requiere_key, 'descripcion': t.descripcion}
           for t in REGISTRO.aplicables(tipo)]
     return jsonify({'tipo': tipo, 'transforms': ts})
 
-# El almacén lo mutan el endpoint /run Y el hilo del monitor (paso 95): un lock
-# serializa esas escrituras y las lecturas de snapshot del monitor.
+# The store is mutated by the /run endpoint AND the monitor thread (step 95): a
+# lock serializes those writes and the monitor's snapshot reads.
 _almacen_lock = threading.RLock()
 
 def _correr_transform_interno(tipo, valor, nombre):
-    """Corre un transform y persiste (autosave). Compartido por /run y el monitor.
-    Lanza ValueError/KeyError; el llamador decide qué hacer con el error."""
+    """Runs a transform and persists (autosave). Shared by /run and the monitor.
+    Raises ValueError/KeyError; the caller decides what to do with the error."""
     if not tipo_valido(tipo):
         raise ValueError('invalid entity type')
-    semilla = Entidad(tipo, (valor or '').strip())          # puede lanzar ValueError
+    semilla = Entidad(tipo, (valor or '').strip())          # may raise ValueError
     if not semilla.valor_bien_formado():
         raise ValueError(f'malformed value for {tipo}')
     if _PROXIES['pool']:
-        _rotar_proxy()                                      # OPSEC: rota proxy por transform (154)
-    _higiene_request()                                      # OPSEC: randomiza UA (155)
-    _jitter()                                               # OPSEC: espaciado entre requests (156)
-    _registrar_huella(nombre, tipo, valor)                  # OPSEC: registra tu huella (160)
+        _rotar_proxy()                                      # OPSEC: rotate proxy per transform (154)
+    _higiene_request()                                      # OPSEC: randomize UA (155)
+    _jitter()                                               # OPSEC: spacing between requests (156)
+    _registrar_huella(nombre, tipo, valor)                  # OPSEC: log your footprint (160)
     with _almacen_lock:
         semilla = _almacen.agregar(semilla)
         producidas = ejecutar_por_nombre(nombre, semilla, _almacen)
-        if _ws_activo:                          # autosave (46) + auditoría (48)
+        if _ws_activo:                          # autosave (46) + audit (48)
             try:
                 _gestor.guardar(_ws_activo, _almacen)
                 _gestor.registrar(_ws_activo, nombre, valor, len(producidas))
             except Exception as _e:
-                log.warning("autosave falló: %s", _e)
+                log.warning("autosave failed: %s", _e)
     return producidas
 
 @app.route('/api/v2/run', methods=['POST'])
 def api_v2_run():
-    """Corre un transform sobre una entidad {tipo, valor} (paso 36)."""
+    """Runs a transform on an entity {tipo, valor} (step 36)."""
     d = request.json or {}
     try:
         producidas = _correr_transform_interno(
@@ -3861,7 +3861,7 @@ def api_v2_run():
                     'total_entidades': len(_almacen), 'workspace': _ws_activo})
 
 def _estado_datos():
-    """Recolecta la salud del sistema (toca disco/procesos)."""
+    """Collects system health (touches disk/processes)."""
     por_tipo = {}
     con_key = []
     total = 0
@@ -3904,14 +3904,14 @@ def _cargar_reglas_usuario():
         if os.path.exists(_REGLAS_FILE):
             with open(_REGLAS_FILE, encoding='utf-8') as f:
                 n = cargar_reglas_yaml(f.read())
-                log.info("reglas YAML del usuario cargadas: %d", n)
+                log.info("user YAML rules loaded: %d", n)
     except Exception as _e:
-        log.warning("no se pudieron cargar reglas YAML: %s", _e)
+        log.warning("could not load YAML rules: %s", _e)
 
 @app.route('/api/v2/reglas', methods=['GET', 'POST'])
 def api_v2_reglas():
-    """Reglas de correlación YAML del usuario (paso 63). POST {yaml} las carga y
-    persiste; GET devuelve las activas."""
+    """User YAML correlation rules (step 63). POST {yaml} loads and persists them;
+    GET returns the active ones."""
     if request.method == 'POST':
         texto = (request.json or {}).get('yaml', '')
         n = cargar_reglas_yaml(texto)
@@ -3920,14 +3920,14 @@ def api_v2_reglas():
             with open(_REGLAS_FILE, 'w', encoding='utf-8') as f:
                 f.write(texto)
         except Exception as _e:
-            log.warning("no se pudo guardar reglas.yaml: %s", _e)
+            log.warning("could not save reglas.yaml: %s", _e)
         return jsonify({'ok': True, 'cargadas': n})
     from core.correlacion import _REGLAS_YAML
     return jsonify({'reglas': _REGLAS_YAML})
 
 @app.route('/api/v2/buscar/traducir', methods=['POST'])
 def api_v2_buscar_traducir():
-    """Traduce una consulta unificada al dialecto de CADA motor (F8 paso 117).
+    """Translates a unified query to EACH engine's dialect (F8 step 117).
     Body: {campos:{ip,dominio,favicon,cert,puerto,...}, cn:true|false|null}."""
     d = request.json or {}
     campos = {k: v for k, v in (d.get('campos') or {}).items() if v}
@@ -3935,17 +3935,17 @@ def api_v2_buscar_traducir():
 
 @app.route('/api/v2/estado')
 def api_v2_estado():
-    """Salud del sistema en JSON (paso 105)."""
+    """System health in JSON (step 105)."""
     return jsonify(_estado_datos())
 
 @app.route('/v2/estado')
 def v2_estado():
-    """Página de estado del sistema (paso 105)."""
+    """System status page (step 105)."""
     return Response(render_estado(_estado_datos()), mimetype='text/html')
 
 @app.route('/api/v2/recon', methods=['POST'])
 def api_v2_recon():
-    """Corre en paralelo todos los transforms aplicables a la semilla (paso 102)."""
+    """Runs all transforms applicable to the seed in parallel (step 102)."""
     d = request.json or {}
     tipo = d.get('tipo', '')
     valor = (d.get('valor', '') or '').strip()
@@ -3962,15 +3962,15 @@ def api_v2_recon():
             try:
                 _gestor.guardar(_ws_activo, _almacen)
             except Exception as _e:
-                log.warning("autosave recon falló: %s", _e)
+                log.warning("autosave recon failed: %s", _e)
     return jsonify({'resultados': res, 'total_entidades': len(_almacen), 'workspace': _ws_activo})
 
 _tareas = GestorTareas()
 
 @app.route('/api/v2/recon_async', methods=['POST'])
 def api_v2_recon_async():
-    """Lanza el recon en background (paso 37) y devuelve un job_id. El progreso se
-    escucha en /api/v2/tarea/<id>/stream (SSE). No bloquea la request."""
+    """Launches the recon in the background (step 37) and returns a job_id. Progress
+    is listened to on /api/v2/tarea/<id>/stream (SSE). Does not block the request."""
     d = request.json or {}
     tipo = d.get('tipo', '')
     valor = (d.get('valor', '') or '').strip()
@@ -4017,8 +4017,8 @@ def api_v2_tarea_stream(tid):
 
 @app.route('/api/v2/entidad', methods=['POST'])
 def api_v2_entidad():
-    """Agrega una entidad semilla al grafo SIN correr transforms (estilo Maltego:
-    agregas el nodo, luego click derecho → transform). F6."""
+    """Adds a seed entity to the graph WITHOUT running transforms (Maltego-style:
+    you add the node, then right-click -> transform). F6."""
     d = request.json or {}
     tipo = d.get('tipo', '')
     valor = (d.get('valor', '') or '').strip()
@@ -4035,7 +4035,7 @@ def api_v2_entidad():
         try:
             _gestor.guardar(_ws_activo, _almacen)
         except Exception as _e:
-            log.warning("autosave falló: %s", _e)
+            log.warning("autosave failed: %s", _e)
     return jsonify({'ok': True, 'id': ent.id})
 
 def _autosave():
@@ -4043,11 +4043,11 @@ def _autosave():
         try:
             _gestor.guardar(_ws_activo, _almacen)
         except Exception as _e:
-            log.warning("autosave falló: %s", _e)
+            log.warning("autosave failed: %s", _e)
 
 @app.route('/api/v2/entidad/nota', methods=['POST'])
 def api_v2_nota():
-    """Nota del analista sobre una entidad (F6 paso 88)."""
+    """Analyst note on an entity (F6 step 88)."""
     d = request.json or {}
     e = _almacen.obtener(d.get('id', ''))
     if not e:
@@ -4058,7 +4058,7 @@ def api_v2_nota():
 
 @app.route('/api/v2/entidad/tag', methods=['POST'])
 def api_v2_tag():
-    """Toggle de una etiqueta del analista (interesante/descartado/falso-positivo)."""
+    """Toggle an analyst tag (interesante/descartado/falso-positivo)."""
     d = request.json or {}
     e = _almacen.obtener(d.get('id', ''))
     if not e:
@@ -4072,14 +4072,14 @@ def api_v2_tag():
 
 @app.route('/api/v2/grafo')
 def api_v2_grafo():
-    """Grafo tipado. ?migrar=1 convierte el case['datos'] viejo al modelo nuevo."""
+    """Typed graph. ?migrar=1 converts the old case['datos'] to the new model."""
     if request.args.get('migrar') == '1':
         return jsonify(migrar_caso(case).to_dict())
     return jsonify(_almacen.to_dict())
 
 @app.route('/api/v2/workspaces', methods=['GET', 'POST', 'DELETE'])
 def api_v2_workspaces():
-    """CRUD de workspaces (F3 paso 44). Cada uno es un caso aislado en SQLite."""
+    """Workspace CRUD (F3 step 44). Each one is an isolated SQLite case."""
     global _almacen, _ws_activo
     if request.method == 'GET':
         return jsonify({'workspaces': _gestor.listar(), 'activo': _ws_activo})
@@ -4099,7 +4099,7 @@ def api_v2_workspaces():
 
 @app.route('/api/v2/workspaces/abrir', methods=['POST'])
 def api_v2_workspace_abrir():
-    """Carga un workspace en memoria y lo hace el activo (F3 paso 45)."""
+    """Loads a workspace into memory and makes it the active one (F3 step 45)."""
     global _almacen, _ws_activo
     nombre = (request.json or {}).get('nombre', '')
     try:
@@ -4107,17 +4107,17 @@ def api_v2_workspace_abrir():
     except KeyError:
         return _error('workspace not found', 404)
     _ws_activo = _slug_caso(nombre)
-    _aplicar_perfil_opsec(_ws_activo)                # modo no-atribución (157)
+    _aplicar_perfil_opsec(_ws_activo)                # non-attribution mode (157)
     return jsonify({'ok': True, 'activo': _ws_activo, 'total_entidades': len(_almacen)})
 
 @app.route('/api/v2/workspaces/historial')
 def api_v2_ws_historial():
-    """Historial de transforms del workspace activo (F3 paso 48)."""
+    """Transform history of the active workspace (F3 step 48)."""
     return jsonify({'historial': _gestor.historial(_ws_activo) if _ws_activo else []})
 
 @app.route('/api/v2/workspaces/snapshot', methods=['GET', 'POST'])
 def api_v2_ws_snapshot():
-    """Crear (POST) o listar (GET) snapshots del workspace activo (F3 paso 49)."""
+    """Create (POST) or list (GET) snapshots of the active workspace (F3 step 49)."""
     if not _ws_activo:
         return _error('no active workspace', 400)
     if request.method == 'POST':
@@ -4128,7 +4128,7 @@ def api_v2_ws_snapshot():
         return jsonify({'ok': True, 'snapshot': sid})
     return jsonify({'snapshots': _gestor.listar_snapshots(_ws_activo)})
 
-# ── OPSEC: modo anónimo (todo el tráfico por Tor) — F13 paso 153 ─────────────
+# ── OPSEC: anonymous mode (all traffic over Tor) -- F13 step 153 ─────────────
 _OPSEC = {'anonimo': False}
 
 def _set_anonimo(on):
@@ -4138,8 +4138,8 @@ def _set_anonimo(on):
 _HUELLA = []
 
 def _registrar_huella(nombre, tipo, valor):
-    """Anota qué transform corriste sobre qué objetivo y si iba anonimizado —
-    tu huella/exposición al investigar (F13 paso 160)."""
+    """Records which transform you ran on which target and whether it was anonymized
+    -- your footprint/exposure while investigating (F13 step 160)."""
     _HUELLA.insert(0, {'ts': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                        'transform': nombre, 'objetivo': f'{tipo}:{valor}',
                        'anonimo': _OPSEC['anonimo'] or bool(_PROXIES['pool'])})
