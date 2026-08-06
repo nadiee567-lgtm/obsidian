@@ -4147,16 +4147,16 @@ def _registrar_huella(nombre, tipo, valor):
 
 @app.route('/api/v2/opsec/huella')
 def api_v2_opsec_huella():
-    """Tu huella: qué tocaste y cuánto fue sin anonimizar (exposición). Paso 160."""
+    """Your footprint: what you touched and how much was un-anonymized (exposure). Step 160."""
     expuestos = sum(1 for h in _HUELLA if not h['anonimo'])
     return jsonify({'total': len(_HUELLA), 'expuestos': expuestos, 'huella': _HUELLA[:100]})
 
 _KEY_ROT = {}
 
 def _key_rotativa(servicio):
-    """Key de un servicio, rotando entre varias cuentas si se guardó 'k1|k2|k3'
-    (reparte carga entre cuentas del mismo servicio). Paso 159. Retrocompatible:
-    una sola key se devuelve tal cual."""
+    """A service's key, rotating across several accounts if 'k1|k2|k3' was saved
+    (spreads load across accounts of the same service). Step 159. Backward-compatible:
+    a single key is returned as-is."""
     raw = _boveda.obtener(servicio)
     if not raw or '|' not in raw:
         return raw
@@ -4177,7 +4177,7 @@ _USER_AGENTS = [
 _OPSEC_HIGIENE = {'on': False}
 
 def _higiene_request():
-    """Randomiza el User-Agent para no parecer un bot (F13 paso 155)."""
+    """Randomizes the User-Agent so it does not look like a bot (F13 step 155)."""
     if _OPSEC_HIGIENE['on']:
         SESSION.headers['User-Agent'] = secrets.choice(_USER_AGENTS)
 
@@ -4188,22 +4188,22 @@ def api_v2_opsec_higiene():
     return jsonify({'higiene': _OPSEC_HIGIENE['on']})
 
 def _evaluar_fuga(anon, ip_session, ip_real):
-    """LEAK si el modo anónimo está on pero la IP vista por Obsidian == la IP real
-    (o sea, el tráfico NO sale por Tor/proxy). Puro/testeable. Paso 158."""
+    """LEAK if anonymous mode is on but the IP seen by Obsidian == the real IP
+    (i.e. traffic does NOT go out via Tor/proxy). Pure/testable. Step 158."""
     return bool(anon and ip_session and ip_real and ip_session == ip_real)
 
 @app.route('/api/v2/opsec/fuga')
 def api_v2_opsec_fuga():
-    """Detección de fuga de IP/DNS antes de un transform sensible (F13 paso 158).
-    (WebRTC solo aplica en navegador — aquí se cubre la fuga de IP del server.)"""
+    """IP/DNS leak detection before a sensitive transform (F13 step 158).
+    (WebRTC only applies in a browser -- here the server's IP leak is covered.)"""
     anon = _OPSEC['anonimo'] or bool(_PROXIES['pool'])
     ip_session = ip_real = None
     try:
-        ip_session = SESSION.get('https://api.ipify.org', timeout=8).text.strip()   # con proxy/Tor
+        ip_session = SESSION.get('https://api.ipify.org', timeout=8).text.strip()   # via proxy/Tor
     except Exception:
         pass
     try:
-        ip_real = requests.get('https://api.ipify.org', timeout=8).text.strip()     # directo, sin proxy
+        ip_real = requests.get('https://api.ipify.org', timeout=8).text.strip()     # direct, no proxy
     except Exception:
         pass
     fuga = _evaluar_fuga(anon, ip_session, ip_real)
@@ -4214,7 +4214,7 @@ def api_v2_opsec_fuga():
 _OPSEC_JITTER = {'min': 0.0, 'max': 0.0}
 
 def _jitter():
-    """Espera un tiempo aleatorio entre requests para parecer tráfico normal (F13 paso 156)."""
+    """Waits a random time between requests to look like normal traffic (F13 step 156)."""
     lo, hi = _OPSEC_JITTER['min'], _OPSEC_JITTER['max']
     if hi <= 0:
         return 0.0
@@ -4233,7 +4233,7 @@ def api_v2_opsec_jitter():
 _PROXIES = {'pool': [], 'i': 0}
 
 def _rotar_proxy():
-    """Pone en el SESSION el siguiente proxy del pool (round-robin). Paso 154."""
+    """Sets the next proxy from the pool on the SESSION (round-robin). Step 154."""
     pool = _PROXIES['pool']
     if not pool:
         return None
@@ -4244,7 +4244,7 @@ def _rotar_proxy():
 
 @app.route('/api/v2/opsec/proxies', methods=['GET', 'POST', 'DELETE'])
 def api_v2_opsec_proxies():
-    """Pool de proxies que rota por transform (F13 paso 154)."""
+    """Pool of proxies rotated per transform (F13 step 154)."""
     if request.method == 'POST':
         _PROXIES['pool'] = [p for p in ((request.json or {}).get('pool') or []) if p]
         _PROXIES['i'] = 0
@@ -4257,7 +4257,7 @@ def api_v2_opsec_proxies():
 
 @app.route('/api/v2/opsec/anonimo', methods=['GET', 'POST'])
 def api_v2_opsec_anonimo():
-    """Enruta TODO el tráfico de Obsidian por Tor para no exponer tu IP (F13 paso 153)."""
+    """Routes ALL of Obsidian's traffic over Tor so your IP is not exposed (F13 step 153)."""
     if request.method == 'POST':
         on = bool((request.json or {}).get('on'))
         if on and not _tor_disponible():
@@ -4265,7 +4265,7 @@ def api_v2_opsec_anonimo():
         _set_anonimo(on)
     return jsonify({'anonimo': _OPSEC['anonimo'], 'tor': _tor_disponible()})
 
-# ── Modo no-atribución: perfil OPSEC por workspace (F13 paso 157) ────────────
+# ── Non-attribution mode: per-workspace OPSEC profile (F13 step 157) ─────────
 _OPSEC_PROFILES = os.path.join(HOME, '.obsidian', 'opsec_profiles.json')
 
 def _leer_perfiles():
@@ -4276,8 +4276,8 @@ def _leer_perfiles():
         return {}
 
 def _aplicar_perfil_opsec(ws):
-    """Aísla el caso con su propia identidad de red: aplica el perfil OPSEC del
-    workspace (persona, proxies, anónimo, higiene, jitter)."""
+    """Isolates the case with its own network identity: applies the workspace's
+    OPSEC profile (persona, proxies, anonymous, hygiene, jitter)."""
     p = _leer_perfiles().get(ws, {})
     _OPSEC_HIGIENE['on'] = bool(p.get('higiene'))
     _OPSEC_JITTER['min'] = float(p.get('jitter_min', 0) or 0)
@@ -4290,7 +4290,7 @@ def _aplicar_perfil_opsec(ws):
 
 @app.route('/api/v2/opsec/perfil', methods=['GET', 'POST'])
 def api_v2_opsec_perfil():
-    """Perfil OPSEC (identidad de red) asociado a un workspace (F13 paso 157)."""
+    """OPSEC profile (network identity) associated with a workspace (F13 step 157)."""
     if request.method == 'POST':
         d = request.json or {}
         ws = _slug_caso(d.get('workspace', '') or '')
@@ -4315,7 +4315,7 @@ _personas = GestorPersonas(os.path.join(HOME, '.obsidian', 'personas.json'))
 
 @app.route('/api/v2/personas', methods=['GET', 'POST', 'DELETE'])
 def api_v2_personas():
-    """Bóveda de sock puppets: identidades de investigación no atribuibles (F13 paso 152)."""
+    """Sock-puppet vault: non-attributable investigation identities (F13 step 152)."""
     if request.method == 'GET':
         nombre = request.args.get('nombre')
         if nombre:
@@ -4333,8 +4333,8 @@ def api_v2_personas():
 
 @app.route('/api/v2/keys', methods=['GET', 'POST', 'DELETE'])
 def api_v2_keys():
-    """Bóveda de API keys cifrada (F3 paso 51). GET lista solo NOMBRES de
-    servicio (nunca valores). POST guarda; DELETE borra."""
+    """Encrypted API-key vault (F3 step 51). GET lists only service NAMES (never
+    values). POST saves; DELETE removes."""
     if request.method == 'GET':
         return jsonify({'servicios': _boveda.servicios()})
     d = request.json or {}
@@ -4350,7 +4350,7 @@ def api_v2_keys():
     _boveda.borrar(servicio)   # DELETE
     return jsonify({'ok': True, 'servicios': _boveda.servicios()})
 
-# Servicio -> (transform, tipo, valor de prueba conocido con datos)
+# Service -> (transform, type, known test value that has data)
 _TEST_SERVICIO = {
     'shodan': ('shodan', 'ip', '8.8.8.8'), 'censys': ('censys', 'ip', '8.8.8.8'),
     'zoomeye': ('zoomeye', 'ip', '8.8.8.8'), 'fofa': ('fofa', 'ip', '8.8.8.8'),
@@ -4366,8 +4366,8 @@ _TEST_SERVICIO = {
 
 @app.route('/api/v2/keys/probar', methods=['POST'])
 def api_v2_keys_probar():
-    """Verifica una key REAL: corre su transform sobre un objetivo conocido y dice
-    si el parser produjo datos (así se confirma cada buscador contra su API real)."""
+    """Verifies a REAL key: runs its transform on a known target and reports whether
+    the parser produced data (this confirms each engine against its real API)."""
     servicio = ((request.json or {}).get('servicio', '') or '').strip().lower()
     mapeo = _TEST_SERVICIO.get(servicio)
     if not mapeo:
@@ -4391,7 +4391,7 @@ _TIPOS_ACTIVO = ('dominio', 'subdominio', 'ip', 'puerto', 'tech', 'url', 'cve', 
 
 @app.route('/api/v2/inventario')
 def api_v2_inventario():
-    """Inventario de activos internet-facing del objetivo, en un solo lugar (F12 paso 144)."""
+    """Inventory of the target's internet-facing assets, in one place (F12 step 144)."""
     inv = {}
     for t in _TIPOS_ACTIVO:
         ents = _almacen.de_tipo(t)
@@ -4405,8 +4405,8 @@ def api_v2_inventario():
 
 @app.route('/api/v2/diff_historico')
 def api_v2_diff_historico():
-    """Cómo cambió la superficie del objetivo vs un snapshot anterior (F12 paso 151).
-    Sin ?snapshot devuelve la lista de snapshots disponibles."""
+    """How the target's surface changed vs an earlier snapshot (F12 step 151).
+    Without ?snapshot it returns the list of available snapshots."""
     if not _ws_activo:
         return _error('no active workspace', 400)
     sid = request.args.get('snapshot')
@@ -4425,7 +4425,7 @@ def api_v2_diff_historico():
 
 @app.route('/api/v2/exposicion')
 def api_v2_exposicion():
-    """Score de exposición del objetivo: tamaño de la superficie + riesgo (F12 paso 149)."""
+    """Target exposure score: surface size + risk (F12 step 149)."""
     conteos = {t: len(_almacen.de_tipo(t)) for t in _TIPOS_ACTIVO}
     h = correlacionar(_almacen)
     riesgo = score_riesgo(h)
@@ -4434,14 +4434,14 @@ def api_v2_exposicion():
 
 @app.route('/api/v2/hallazgos')
 def api_v2_hallazgos():
-    """Corre el motor de correlación sobre el caso activo (F4 pasos 62, 64)."""
+    """Runs the correlation engine on the active case (F4 steps 62, 64)."""
     h = correlacionar(_almacen)
     return jsonify({'hallazgos': [x.to_dict() for x in h], 'score': score_riesgo(h)})
 
 def _objetivo_del_almacen():
-    """Mejor candidato a 'objetivo' del caso para el encabezado del reporte.
-    Prefiere la SEMILLA (entidad sin procedencia = agregada a mano, no derivada
-    por un transform), así el reporte dice el objetivo real y no un dato hijo."""
+    """Best 'objetivo' candidate of the case for the report header. Prefers the SEED
+    (entity with no provenance = added by hand, not derived by a transform), so the
+    report shows the real target and not a child datum."""
     ents = _almacen.entidades
     if not ents:
         return None
@@ -4449,15 +4449,15 @@ def _objetivo_del_almacen():
     if obj:
         return sorted(obj, key=lambda e: e.valor)[0].valor
     orden = {'dominio': 0, 'ip': 1, 'email': 2, 'usuario': 3, 'url': 4, 'wallet': 5}
-    semillas = [e for e in ents if not e.procedencia]     # sin procedencia = semilla
+    semillas = [e for e in ents if not e.procedencia]     # no provenance = seed
     cand = [e for e in (semillas or ents) if e.tipo in orden] or (semillas or ents)
     return sorted(cand, key=lambda e: (orden.get(e.tipo, 9), e.valor))[0].valor
 
 @app.route('/api/v2/reporte')
 @app.route('/v2/reporte')
 def api_v2_reporte():
-    """Reporte HTML autocontenido del caso activo (F7 paso 93): resumen de riesgo,
-    hallazgos, inventario de entidades y grafo embebido. ?grafo=0 lo omite (más liviano)."""
+    """Self-contained HTML report of the active case (F7 step 93): risk summary,
+    findings, entity inventory and embedded graph. ?grafo=0 omits it (lighter)."""
     h = correlacionar(_almacen)
     vis_js = None
     if request.args.get('grafo', '1') != '0':
@@ -4477,7 +4477,7 @@ def _nombre_export():
 
 @app.route('/api/v2/export/json')
 def api_v2_export_json():
-    """Caso completo en JSON, re-importable (F7 paso 94)."""
+    """Full case in JSON, re-importable (F7 step 94)."""
     h = correlacionar(_almacen)
     data = exportar_json(_almacen, h, score_riesgo(h),
                          {'workspace': _ws_activo, 'objetivo': _objetivo_del_almacen()})
@@ -4486,12 +4486,12 @@ def api_v2_export_json():
 
 @app.route('/api/v2/export/csv')
 def api_v2_export_csv():
-    """Entidades en CSV plano, saneado contra inyección de fórmulas (F7 paso 94)."""
+    """Entities as flat CSV, sanitized against formula injection (F7 step 94)."""
     data = exportar_csv(_almacen)
     return Response(data, mimetype='text/csv',
                     headers={'Content-Disposition': f'attachment; filename="{_nombre_export()}.csv"'})
 
-# ── Monitoreo continuo (F7 paso 95) ──────────────────────────────────────────
+# ── Continuous monitoring (F7 step 95) ───────────────────────────────────────
 _monitor = None
 _monitor_tareas = []
 
@@ -4504,10 +4504,10 @@ def _monitor_refrescar():
         try:
             _correr_transform_interno(t['tipo'], t['valor'], t['transform'])
         except Exception as e:
-            log.debug("monitor: transform %s falló: %s", t.get('transform'), e)
+            log.debug("monitor: transform %s failed: %s", t.get('transform'), e)
 
 def _ntfy_topic():
-    """Topic de ntfy: env OBSIDIAN_NTFY o la bóveda (clave 'ntfy_topic')."""
+    """ntfy topic: env OBSIDIAN_NTFY or the vault (key 'ntfy_topic')."""
     t = os.environ.get('OBSIDIAN_NTFY')
     if t:
         return t
@@ -4517,15 +4517,15 @@ def _ntfy_topic():
         return None
 
 def _monitor_alerta(cambios):
-    """Hook de alerta del monitor (paso 95): avisa al celular por ntfy (paso 96)."""
+    """Monitor alert hook (step 95): notifies the phone via ntfy (step 96)."""
     log.info("MONITOR: %s", cambios.resumen())
     topic = _ntfy_topic()
     if topic:
-        enviar_ntfy(topic, cambios.resumen(), titulo='OBSIDIAN · cambio detectado',
+        enviar_ntfy(topic, cambios.resumen(), titulo='OBSIDIAN · change detected',
                     prioridad='high', tags='satellite,warning')
 
 def _tareas_monitor_default():
-    """Re-corre, sobre la semilla, los transforms que ya construyeron el grafo."""
+    """Re-runs, on the seed, the transforms that already built the graph."""
     seed_valor = _objetivo_del_almacen()
     if not seed_valor:
         return []
@@ -4541,7 +4541,7 @@ def _tareas_monitor_default():
 
 @app.route('/api/v2/monitor', methods=['GET'])
 def api_v2_monitor():
-    """Estado del monitor + historial de alertas."""
+    """Monitor status + alert history."""
     return jsonify({
         'activo': bool(_monitor and _monitor.activo),
         'intervalo': _monitor.intervalo if _monitor else None,
@@ -4552,7 +4552,7 @@ def api_v2_monitor():
 
 @app.route('/api/v2/monitor/ntfy', methods=['POST'])
 def api_v2_monitor_ntfy():
-    """Configura el topic de ntfy (bóveda) y manda una notificación de prueba."""
+    """Configures the ntfy topic (vault) and sends a test notification."""
     d = request.json or {}
     topic = (d.get('topic', '') or '').strip()
     if not topic:
@@ -4561,7 +4561,7 @@ def api_v2_monitor_ntfy():
         _boveda.guardar('ntfy_topic', topic)
     except Exception as e:
         return _error(f'could not save: {e}', 500)
-    ok = enviar_ntfy(topic, 'Notificaciones de OBSIDIAN activadas ✓',
+    ok = enviar_ntfy(topic, 'OBSIDIAN notifications enabled ✓',
                      titulo='OBSIDIAN', prioridad='default')
     return jsonify({'ok': True, 'prueba_enviada': ok})
 
@@ -4569,7 +4569,7 @@ def api_v2_monitor_ntfy():
 def api_v2_monitor_start():
     global _monitor, _monitor_tareas
     d = request.json or {}
-    intervalo = max(30, int(d.get('intervalo', 300)))     # mínimo 30s (no martillar)
+    intervalo = max(30, int(d.get('intervalo', 300)))     # minimum 30s (do not hammer)
     _monitor_tareas = d.get('tareas') or _tareas_monitor_default()
     if not _monitor_tareas:
         return _error('nothing to monitor: add a target and run transforms first', 400)
@@ -4619,24 +4619,24 @@ _FUENTE_POR_IDIOMA = {'ru': 'Yandex / VK', 'zh': 'Baidu / Weibo', 'ar': 'Google 
 
 @app.route('/api/v2/zona_horaria', methods=['POST'])
 def api_v2_zona_horaria():
-    """Zona horaria y hora local de un país, para la cronolocalización (F15 paso 178)."""
+    """Time zone and local time of a country, for chrono-location (F15 step 178)."""
     return jsonify(_ml.zona_horaria((request.json or {}).get('pais', '')))
 
 @app.route('/api/v2/normalizar_telefono', methods=['POST'])
 def api_v2_normalizar_telefono():
-    """Normaliza un teléfono a +E.164 según el país (F15 paso 177)."""
+    """Normalizes a phone to +E.164 based on the country (F15 step 177)."""
     d = request.json or {}
     return jsonify({'e164': _ml.normalizar_telefono(d.get('numero', ''), d.get('pais', 'US'))})
 
 @app.route('/api/v2/idioma', methods=['POST'])
 def api_v2_idioma():
-    """Detecta el idioma del texto y sugiere la fuente/motor correcto (F15 paso 175)."""
+    """Detects the text language and suggests the right source/engine (F15 step 175)."""
     idioma = _ml.detectar_idioma((request.json or {}).get('texto', ''))
     return jsonify({'idioma': idioma, 'fuente_sugerida': _FUENTE_POR_IDIOMA.get(idioma, 'Google')})
 
 @app.route('/api/v2/extraer_texto', methods=['POST'])
 def api_v2_extraer_texto():
-    """Pega texto → entidades tipadas al grafo (F14 paso 161, regex determinista)."""
+    """Paste text -> typed entities into the graph (F14 step 161, deterministic regex)."""
     texto = (request.json or {}).get('texto', '')
     agregadas = []
     with _almacen_lock:
@@ -4797,8 +4797,8 @@ def api_v2_verificar():
 
 @app.route('/v2')
 def v2_page():
-    """Página demo del motor v2: correr transforms y ver el grafo tipado.
-    Protegida por el guard de auth (no está en _PUBLIC_PATHS)."""
+    """v2 engine demo page: run transforms and view the typed graph.
+    Protected by the auth guard (not in _PUBLIC_PATHS)."""
     return _cargar_web('v2.html')
 
 
@@ -4812,7 +4812,7 @@ def api_reporte():
 def reporte_pdf():
     path = _generar_reporte_html()
     with open(path) as f: contenido = f.read()
-    # Inyectar CSS de impresión para PDF
+    # Inject print CSS for PDF
     contenido = contenido.replace('</head>',
         '<style>@media print{body{background:#fff!important;color:#000!important}.section{border:1px solid #ccc!important;background:#f9f9f9!important}pre{color:#333!important}h1,h2{color:#333!important}}</style></head>')
     return contenido
@@ -4820,7 +4820,7 @@ def reporte_pdf():
 @app.route('/api/darkweb', methods=['POST'])
 def api_darkweb():
     q = (request.json or {}).get('query','')
-    if not q: return jsonify({'error':'Sin query'}), 400
+    if not q: return jsonify({'error':'No query'}), 400
     return jsonify(_darkweb_search(q))
 
 @app.route('/api/shodan', methods=['POST'])
@@ -4831,13 +4831,13 @@ def api_shodan():
             return jsonify({'error': 'Invalid IP: disallowed characters'}), 400
         return jsonify(_shodan_ip(d['ip']))
     q = d.get('query','')
-    if not q: return jsonify({'error':'Sin query'}), 400
+    if not q: return jsonify({'error':'No query'}), 400
     return jsonify(_shodan_search(q))
 
 @app.route('/api/netlas', methods=['POST'])
 def api_netlas():
     q = (request.json or {}).get('query','')
-    if not q: return jsonify({'error':'Sin query'}), 400
+    if not q: return jsonify({'error':'No query'}), 400
     return jsonify(_netlas_search(q))
 
 @app.route('/api/kali', methods=['POST'])
@@ -4969,8 +4969,8 @@ WEB_HTML = _cargar_web('app.html')
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-# Rate limits por defecto: no más de N ejecuciones concurrentes de cada transform
-# que pega a una API de terceros (paso 40). Configurable con OBSIDIAN_LIMITE_API.
+# Default rate limits: no more than N concurrent runs of each transform that hits
+# a third-party API (step 40). Configurable with OBSIDIAN_LIMITE_API.
 from core.transforms import set_limite as _set_limite
 _LIMITE_API = int(os.environ.get('OBSIDIAN_LIMITE_API', '2'))
 for _rl_nombre in ('crtsh', 'ct_certspotter', 'shodan', 'censys', 'zoomeye', 'fofa',
