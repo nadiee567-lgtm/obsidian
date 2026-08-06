@@ -35,7 +35,7 @@ def test_onion_fetch(monkeypatch):
 def test_onion_fetch_tor_caido(monkeypatch):
     monkeypatch.setattr(ob, '_tor_disponible', lambda: False)
     prod, e = _correr('onion_fetch', 'url', 'http://xxxxabcdefgh2345.onion/')
-    assert prod == [] and 'Tor no disponible' in e.propiedades.get('tor', '')
+    assert prod == [] and 'Tor unavailable' in e.propiedades.get('tor', '')
 
 
 # ── 129: Ahmia + Haystak ─────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ def test_haystak(monkeypatch):
 def test_haystak_sin_tor(monkeypatch):
     monkeypatch.setattr(ob, '_tor_disponible', lambda: False)
     prod, e = _correr('haystak', 'persona', 'objetivo')
-    assert prod == [] and 'requiere Tor' in e.propiedades.get('haystak', '')
+    assert prod == [] and 'requires Tor' in e.propiedades.get('haystak', '')
 
 
 # ── 130: Telegram (Telethon) — caminos de degradado (el activo necesita cuenta) ─

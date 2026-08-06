@@ -3310,7 +3310,7 @@ def _t_cronolocalizacion(entidad, ctx):
     coords = parse_gps(entidad.propiedades.get('gps', ''))
     enlaces = enlaces_cronolocalizacion(*(coords if coords else (None, None)))
     for herr, url in enlaces.items():
-        ctx.emitir('url', url, etiqueta=f'sol:{herr}', herramienta=herr)
+        ctx.emitir('url', url, etiqueta=f'sun:{herr}', herramienta=herr)
 
 @transform(entrada='url', salidas=('url',), nombre='satelital',
            descripcion='Satellite cross-check of the location (Google Earth/Sentinel/Bing) -- requires GPS (F9 step 122)')
@@ -3319,7 +3319,7 @@ def _t_satelital(entidad, ctx):
     if not coords:
         return
     for herr, url in enlaces_satelital(*coords).items():
-        ctx.emitir('url', url, etiqueta=f'satelite:{herr}', herramienta=herr)
+        ctx.emitir('url', url, etiqueta=f'satellite:{herr}', herramienta=herr)
 
 @transform(entrada='url', salidas=('url',), nombre='landmarks',
            descripcion='Landmark matching by image (Google Lens/Mapillary/Wikimapia) (F9 step 123)')
@@ -3331,7 +3331,7 @@ def _t_landmarks(entidad, ctx):
            descripcion='Cyrillic/Chinese/Latin OCR of the image (tesseract, langs rus+chi_sim+eng) (F9 step 125)')
 def _t_ocr(entidad, ctx):
     if not _which('tesseract'):
-        return                                       # degrada: falta tesseract + langs
+        return                                       # degrades: tesseract + langs missing
     try:
         r = _fetch_seguro(entidad.valor, timeout=10, stream=True)
     except Exception:
@@ -3345,7 +3345,7 @@ def _t_ocr(entidad, ctx):
     try:
         out = run_tool(['tesseract', fn, 'stdout', '-l', 'rus+chi_sim+eng'], timeout=25)
         texto = (out or '').strip()
-        if not texto:                                # langs no instalados → intenta solo eng
+        if not texto:                                # langs not installed -> try eng only
             texto = (run_tool(['tesseract', fn, 'stdout'], timeout=25) or '').strip()
         if texto:
             entidad.propiedades['ocr'] = texto[:1000]
@@ -3356,7 +3356,7 @@ def _t_ocr(entidad, ctx):
         except OSError:
             pass
 
-# ── Ruteo .onion por Tor (F10 paso 128) — aprovecha el tor del sistema/QuimichNet ─
+# ── .onion routing over Tor (F10 step 128) -- uses the system tor ─────────────
 TOR_PROXY = os.environ.get('OBSIDIAN_TOR', 'socks5h://127.0.0.1:9050')
 
 def _tor_disponible():
@@ -3367,7 +3367,7 @@ def _tor_disponible():
         return False
 
 def _fetch_tor(url, timeout=25):
-    """GET a través de Tor (socks5h resuelve .onion por el propio Tor)."""
+    """GET over Tor (socks5h resolves .onion through Tor itself)."""
     return SESSION.get(url, proxies={'http': TOR_PROXY, 'https': TOR_PROXY},
                        timeout=timeout, headers={'User-Agent': 'Mozilla/5.0'})
 
@@ -3376,11 +3376,11 @@ def _fetch_tor(url, timeout=25):
 def _t_onion_fetch(entidad, ctx):
     url = entidad.valor
     if '.onion' not in url:
-        return                                       # SOLO .onion (no SSRF a IPs internas)
+        return                                       # .onion ONLY (no SSRF to internal IPs)
     if not url.startswith('http'):
         url = 'http://' + url
     if not _tor_disponible():
-        entidad.propiedades['tor'] = 'Tor no disponible (arranca el servicio tor / QuimichNet)'
+        entidad.propiedades['tor'] = 'Tor unavailable (start the tor service)'
         return
     try:
         r = _fetch_tor(url)
@@ -3391,7 +3391,7 @@ def _t_onion_fetch(entidad, ctx):
     if m:
         entidad.propiedades['onion_titulo'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
     for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', r.text)))[:15]:
-        ctx.emitir('email', em, etiqueta='en-onion')
+        ctx.emitir('email', em, etiqueta='in-onion')
     for on in list(set(re.findall(r'[a-z2-7]{16,56}\.onion', r.text)))[:15]:
         ctx.emitir('url', 'http://' + on, etiqueta='onion-link')
     entidad.etiquetar('onion-vivo')
@@ -3399,14 +3399,14 @@ def _t_onion_fetch(entidad, ctx):
 _TG_SESION = os.path.join(HOME, '.obsidian', 'telegram.session')
 
 def _tg_mensajes(usuario, limite=30):
-    """Trae los últimos mensajes de un usuario/canal de Telegram. Devuelve
-    (True, (id, [textos])) o (False, motivo_del_fallo). Compartido por los
-    transforms de Telegram (paso 130, 131)."""
+    """Fetches the latest messages from a Telegram user/channel. Returns
+    (True, (id, [texts])) or (False, failure_reason). Shared by the Telegram
+    transforms (steps 130, 131)."""
     cred = _boveda.obtener('telegram') or os.environ.get('TELEGRAM_API', '')
     if not cred or ':' not in cred:
         return False, 'missing api_id:api_hash (free at my.telegram.org) in the vault'
     if not os.path.exists(_TG_SESION):
-        return False, 'falta login una vez: python telegram_login.py'
+        return False, 'login once first: python telegram_login.py'
     api_id, api_hash = cred.split(':', 1)
     try:
         import asyncio
@@ -3441,15 +3441,15 @@ def _t_telegram(entidad, ctx):
     entidad.propiedades['telegram_id'] = tid
     texto = '\n'.join(textos)
     for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', texto)))[:15]:
-        ctx.emitir('email', em, etiqueta='en-telegram')
+        ctx.emitir('email', em, etiqueta='in-telegram')
     for u in list(set(re.findall(r'https?://[^\s"\'<>]+', texto)))[:15]:
-        ctx.emitir('url', u[:200], etiqueta='en-telegram')
+        ctx.emitir('url', u[:200], etiqueta='in-telegram')
 
 _LEAK_KW = ['leak', 'breach', 'database', 'combolist', 'stealer', 'ransomware',
             'dump', 'fullz', 'rdp access', 'initial access', 'base de datos', 'filtracion']
 
 def coincidencias_leak(textos, keywords=None):
-    """Mensajes que mencionan términos de leaks/brechas (paso 131). PURO/testeable."""
+    """Messages that mention leak/breach terms (step 131). PURE/testable."""
     kws = keywords or _LEAK_KW
     hits = []
     for t in textos:
@@ -3476,9 +3476,9 @@ def _t_canal_leaks(entidad, ctx):
     entidad.propiedades['leaks_muestra'] = [h['texto'] for h in hits[:5]]
     unido = '\n'.join(h['texto'] for h in hits)
     for dom in list(set(re.findall(r'\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b', unido.lower())))[:15]:
-        ctx.emitir('dominio', dom, etiqueta='mencionado-en-leaks')
+        ctx.emitir('dominio', dom, etiqueta='mentioned-in-leaks')
     for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', unido)))[:15]:
-        ctx.emitir('email', em, etiqueta='mencionado-en-leaks')
+        ctx.emitir('email', em, etiqueta='mentioned-in-leaks')
 
 _HAYSTAK_ONION = ('http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion')
 
@@ -3486,7 +3486,7 @@ _HAYSTAK_ONION = ('http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxf
            descripcion='Dark web search in Haystak (via Tor) -- .onion links (F10 step 129)')
 def _t_haystak(entidad, ctx):
     if not _tor_disponible():
-        entidad.propiedades['haystak'] = 'requiere Tor (arranca el servicio tor)'
+        entidad.propiedades['haystak'] = 'requires Tor (start the tor service)'
         return
     from urllib.parse import quote as _q
     try:
@@ -3498,7 +3498,7 @@ def _t_haystak(entidad, ctx):
         ctx.emitir('url', 'http://' + on, etiqueta='haystak')
 
 def _descargar_imagen(url):
-    """Baja una imagen a un archivo temporal (anti-SSRF). Devuelve la ruta o None."""
+    """Downloads an image to a temp file (anti-SSRF). Returns the path or None."""
     try:
         r = _fetch_seguro(url, timeout=10, stream=True)
     except Exception:
@@ -3525,7 +3525,7 @@ def _t_ela(entidad, ctx):
             entidad.propiedades['ela_img'] = f'/static/ela/{nombre_img}'
             entidad.propiedades['ela_max_diff'] = max_diff
             entidad.etiquetar('ela-generado')
-            if max_diff >= 50:                       # heurístico: revisar visualmente
+            if max_diff >= 50:                       # heuristic: review visually
                 entidad.etiquetar('revisar-edicion')
     finally:
         try:
@@ -3562,7 +3562,7 @@ _ES_BTC = re.compile(r'(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\Z'
 def _t_tx_grafo(entidad, ctx):
     addr = entidad.valor
     if not _ES_BTC.match(addr):
-        return                                       # solo BTC por ahora (keyless)
+        return                                       # BTC only for now (keyless)
     try:
         d = SESSION.get(f'https://blockchain.info/rawaddr/{addr}',
                         params={'limit': 5}, timeout=12).json() or {}
@@ -3588,7 +3588,7 @@ _ES_ETH = re.compile(r'0x[a-fA-F0-9]{40}\Z')
            descripcion='Balance of an Ethereum wallet (public RPC cloudflare-eth, keyless) (F11 step 142)')
 def _t_eth_balance(entidad, ctx):
     if not _ES_ETH.match(entidad.valor):
-        return                                       # solo direcciones ETH
+        return                                       # ETH addresses only
     try:
         d = SESSION.post('https://cloudflare-eth.com',
                          json={'jsonrpc': '2.0', 'method': 'eth_getBalance',
@@ -3602,7 +3602,7 @@ def _t_eth_balance(entidad, ctx):
 _RANSOM = {'addrs': None, 'ts': 0}
 
 def _ransom_addrs():
-    """Direcciones de ransomware conocidas (Ransomwhere, CC0). Caché 6h."""
+    """Known ransomware addresses (Ransomwhere, CC0). 6h cache."""
     if _RANSOM['addrs'] is not None and time.time() - _RANSOM['ts'] < 21600:
         return _RANSOM['addrs']
     try:
