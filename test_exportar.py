@@ -7,7 +7,7 @@ import io
 import json
 
 from core.modelo import Store
-from core.correlacion import Hallazgo
+from core.correlacion import Finding
 from core.exportar import exportar_json, exportar_csv
 
 
@@ -22,7 +22,7 @@ def _demo():
 
 def test_json_reimportable():
     alm, d, ip = _demo()
-    h = [Hallazgo('ip-listada', 'alto', 'x', [ip.id])]
+    h = [Finding('ip-listada', 'alto', 'x', [ip.id])]
     txt = exportar_json(alm, h, score=20, meta={'workspace': 'c1'})
     obj = json.loads(txt)
     assert obj['meta']['workspace'] == 'c1'

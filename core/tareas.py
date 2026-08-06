@@ -13,7 +13,7 @@ import threading
 import uuid
 
 
-class GestorTareas:
+class TaskManager:
     def __init__(self):
         self._tareas: dict = {}
         self._lock = threading.Lock()

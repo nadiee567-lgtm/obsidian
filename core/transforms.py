@@ -40,7 +40,7 @@ class Transform:
                 raise ValueError(f"unknown output type: {s!r}")
 
 
-class _Registro:
+class _Registry:
     """Central transform catalog (step 27). Indexed by input type to answer
     quickly 'which transforms apply to this entity?' (step 35)."""
     def __init__(self):
@@ -70,7 +70,7 @@ class _Registro:
 
 
 # Global registry (concrete transforms register themselves on import).
-REGISTRO = _Registro()
+REGISTRO = _Registry()
 
 
 def transform(entrada: str, salidas=(), nombre=None, requiere_key=False, descripcion=''):
@@ -89,7 +89,7 @@ def transform(entrada: str, salidas=(), nombre=None, requiere_key=False, descrip
     return deco
 
 
-class Contexto:
+class Context:
     """API the transform author receives. `emitir` creates an output entity, adds
     it to the store (dedup + events), relates it to the input and sets its
     provenance -- all automatic."""
@@ -143,7 +143,7 @@ def ejecutar(t: Transform, entidad: Entity, almacen: Store) -> list:
     (step 40)."""
     if entidad.tipo != t.entrada:
         raise ValueError(f"{t.nombre} expects '{t.entrada}', got '{entidad.tipo}'")
-    ctx = Contexto(almacen, entidad, t.nombre)
+    ctx = Context(almacen, entidad, t.nombre)
     sem = _SEMAFOROS.get(t.nombre)
     try:
         if sem is not None:
@@ -227,7 +227,7 @@ class Machine:
 
 
 # ── Step 41: Runner with cache (don't repeat the same expensive query) ───────
-class Corredor:
+class Runner:
     """Runs transforms/machines over a store, remembering which
     (transform, entity) pairs already ran to avoid repeating them in the same session."""
     def __init__(self, almacen: Store):

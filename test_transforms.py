@@ -123,7 +123,7 @@ def test_corredor_cachea():
 
     alm = Store()
     dom = alm.crear('dominio', 'example.com')
-    corr = tr.Corredor(alm)
+    corr = tr.Runner(alm)
     corr.ejecutar('dns', dom)
     corr.ejecutar('dns', dom)      # second time: cache, does not re-run
     assert len(corridas) == 1
@@ -142,7 +142,7 @@ def test_machine_cascada():
     alm = Store()
     dom = alm.crear('dominio', 'example.com')
     receta = tr.Machine(nombre='recon', pasos=('dns', 'ports'))
-    producidas = tr.Corredor(alm).ejecutar_machine(receta, dom)
+    producidas = tr.Runner(alm).ejecutar_machine(receta, dom)
 
     tipos = sorted(e.tipo for e in producidas)
     assert tipos == ['ip', 'puerto']              # cascade: domain→ip→port

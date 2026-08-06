@@ -12,7 +12,7 @@ import json
 import os
 
 
-class GestorPersonas:
+class PersonaManager:
     def __init__(self, ruta: str):
         self.ruta = ruta
 

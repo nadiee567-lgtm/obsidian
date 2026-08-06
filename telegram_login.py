@@ -16,9 +16,9 @@ import os
 
 from core.config import HOME
 try:
-    from core.boveda import Boveda
+    from core.boveda import Vault
 except Exception:
-    Boveda = None
+    Vault = None
 
 SESION = os.path.join(HOME, '.obsidian', 'telegram.session')
 
@@ -28,9 +28,9 @@ def _cred():
     api_hash = os.environ.get('OBSIDIAN_API_HASH', '')
     if api_id and api_hash:
         return api_id, api_hash
-    if Boveda is not None:
+    if Vault is not None:
         try:
-            cred = Boveda(os.path.join(HOME, '.obsidian')).obtener('telegram') or ''
+            cred = Vault(os.path.join(HOME, '.obsidian')).obtener('telegram') or ''
             if ':' in cred:
                 a, b = cred.split(':', 1)
                 return a, b

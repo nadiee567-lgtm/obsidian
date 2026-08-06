@@ -115,8 +115,8 @@ def test_shadow_it():
 
 # ── 151: historical surface diff ────────────────────────────────────────────
 def test_diff_historico(tmp_path):
-    from core.workspaces import Gestor
-    g = Gestor(str(tmp_path))
+    from core.workspaces import Manager
+    g = Manager(str(tmp_path))
     g.crear('caso')
     alm = Store()
     alm.crear('subdominio', 'a.x.com')

@@ -84,9 +84,9 @@ def test_auth_protege_v2():
 
 def test_workspaces_flujo(tmp_path):
     """Workspace CRUD + persistence via endpoints (F3), isolated in tmp."""
-    from core.workspaces import Gestor
+    from core.workspaces import Manager
     prev_g, prev_ws, prev_a = ob._gestor, ob._ws_activo, ob._almacen
-    ob._gestor = Gestor(str(tmp_path))
+    ob._gestor = Manager(str(tmp_path))
     ob._ws_activo = None
     ob._almacen = ob.Store()
     try:

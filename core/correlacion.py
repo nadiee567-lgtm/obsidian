@@ -16,7 +16,7 @@ _PESO = {'critico': 40, 'alto': 20, 'medio': 8, 'bajo': 3}
 
 
 @dataclass
-class Hallazgo:
+class Finding:
     """A detected risk pattern (step 54)."""
     regla: str
     severidad: str          # critico | alto | medio | bajo (severity value ids)
@@ -91,7 +91,7 @@ def _evaluar_yaml(almacen) -> list:
         for e in ents:
             if _coincide_yaml(e, cuando):
                 msg = str(spec.get('mensaje', spec['nombre'])).replace('{valor}', e.valor)
-                out.append(Hallazgo(spec['nombre'], spec.get('severidad', 'medio'), msg, [e.id]))
+                out.append(Finding(spec['nombre'], spec.get('severidad', 'medio'), msg, [e.id]))
     return out
 
 
@@ -149,7 +149,7 @@ def r_puerto_sensible(alm):
     for p in alm.de_tipo('puerto'):
         num = p.valor.split(':')[-1]
         if num in _PUERTOS_SENSIBLES:
-            yield Hallazgo('puerto-sensible', 'alto',
+            yield Finding('puerto-sensible', 'alto',
                            f'Port {num} ({_PUERTOS_SENSIBLES[num]}) exposed: {p.valor}', [p.id])
 
 @regla
@@ -165,7 +165,7 @@ def r_cert_vencido(alm):
         except ValueError:
             continue
         if fecha < ahora:
-            yield Hallazgo('cert-vencido', 'medio',
+            yield Finding('cert-vencido', 'medio',
                            f'Expired TLS certificate on {d.valor} ({exp})', [d.id])
 
 @regla
@@ -173,7 +173,7 @@ def r_ip_maliciosa(alm):
     """IP classified malicious by real threat intel (GreyNoise). Step 57."""
     for ip in alm.de_tipo('ip'):
         if 'malicioso' in ip.tags:
-            yield Hallazgo('ip-maliciosa', 'critico',
+            yield Finding('ip-maliciosa', 'critico',
                            f'IP {ip.valor} classified as malicious (GreyNoise)', [ip.id])
 
 @regla
@@ -183,7 +183,7 @@ def r_ip_listada(alm):
     for ip in alm.de_tipo('ip'):
         if 'listado-amenaza' in ip.tags:
             fuente = ip.propiedades.get('amenaza_fuente', 'threat feed')
-            yield Hallazgo('ip-listada', 'alto',
+            yield Finding('ip-listada', 'alto',
                            f'IP {ip.valor} listed in {fuente} -- verify (possible false positive)', [ip.id])
 
 @regla
@@ -191,7 +191,7 @@ def r_email_filtrado(alm):
     """Email that appeared in data breaches (part of 56)."""
     for e in alm.de_tipo('email'):
         if 'filtrado' in e.tags:
-            yield Hallazgo('email-filtrado', 'alto',
+            yield Finding('email-filtrado', 'alto',
                            f'{e.valor} appeared in data breaches', [e.id])
 
 @regla
@@ -199,7 +199,7 @@ def r_stealer(alm):
     """Email coming from an infostealer-infected machine = compromised credentials."""
     for e in alm.de_tipo('email'):
         if 'stealer-infectado' in e.tags:
-            yield Hallazgo('stealer-infectado', 'critico',
+            yield Finding('stealer-infectado', 'critico',
                            f'{e.valor} came from an infostealer machine: compromised credentials', [e.id])
 
 @regla
@@ -207,7 +207,7 @@ def r_email_spoofable(alm):
     """Email domain without SPF -> spoofing possible."""
     for e in alm.de_tipo('email'):
         if 'spoofable' in e.tags:
-            yield Hallazgo('email-spoofable', 'medio',
+            yield Finding('email-spoofable', 'medio',
                            f'The domain of {e.valor} has no SPF: spoofing possible', [e.id])
 
 @regla
@@ -215,7 +215,7 @@ def r_takeover(alm):
     """Subdomain marked as vulnerable to takeover (step 55)."""
     for s in alm.de_tipo('subdominio'):
         if 'takeover' in s.tags:
-            yield Hallazgo('subdominio-takeover', 'alto',
+            yield Finding('subdominio-takeover', 'alto',
                            f'Subdomain vulnerable to takeover: {s.valor}', [s.id])
 
 @regla
@@ -224,12 +224,12 @@ def r_shadow_it(alm):
     and broken subdomains (HTTP 5xx = forgotten/badly maintained)."""
     for b in alm.de_tipo('bucket'):
         if 'publico' in b.tags:
-            yield Hallazgo('shadow-it', 'alto',
+            yield Finding('shadow-it', 'alto',
                            f'Public bucket -- exposed storage: {b.valor}', [b.id])
     for s in alm.de_tipo('subdominio'):
         st = s.propiedades.get('http_status')
         if isinstance(st, int) and st >= 500:
-            yield Hallazgo('shadow-it', 'medio',
+            yield Finding('shadow-it', 'medio',
                            f'Broken/forgotten subdomain (HTTP {st}): {s.valor}', [s.id])
 
 @regla
@@ -246,7 +246,7 @@ def r_infra_compartida(alm):
                     grupos[str(v)].append(e)
         for v, ents in grupos.items():
             if len(ents) >= 2:
-                yield Hallazgo('infra-compartida', 'bajo',
+                yield Finding('infra-compartida', 'bajo',
                                f'{len(ents)} assets share {etiqueta} ({v[:40]}) -- same '
                                f'infrastructure: ' + ', '.join(e.valor for e in ents[:4]),
                                [e.id for e in ents])
@@ -256,7 +256,7 @@ def r_wallet_ransomware(alm):
     """Wallet linked to ransomware (step 141)."""
     for w in alm.de_tipo('wallet'):
         if 'ransomware' in w.tags:
-            yield Hallazgo('wallet-ransomware', 'critico',
+            yield Finding('wallet-ransomware', 'critico',
                            f'Wallet linked to ransomware: {w.valor}', [w.id])
 
 @regla
@@ -271,7 +271,7 @@ def r_leak_login(alm):
                for e in alm.de_tipo(tipo) if 'panel-login' in e.tags]
     for panel in paneles:
         for cred in filtrados[:3]:
-            yield Hallazgo('leak-login', 'critico',
+            yield Finding('leak-login', 'critico',
                            f'Leaked credential ({cred.valor}) + exposed panel ({panel.valor}) '
                            f'= possible account access', [cred.id, panel.id])
 
@@ -287,7 +287,7 @@ def r_pivote_plataformas(alm):
             conteo[r.origen] = conteo.get(r.origen, 0) + 1
     for uid, n in conteo.items():
         if n >= 5:
-            yield Hallazgo('pivote-plataformas', 'bajo',
+            yield Finding('pivote-plataformas', 'bajo',
                            f'{usuarios[uid].valor} present on {n} platforms -- strong pivot to cross identity',
                            [uid])
 
@@ -303,7 +303,7 @@ def r_login_expuesto(alm):
             if 'panel-login' in e.tags:
                 sev = 'critico' if hay_cred else 'alto'
                 extra = ' + there are leaked credentials in the case' if hay_cred else ''
-                yield Hallazgo('login-expuesto', sev,
+                yield Finding('login-expuesto', sev,
                                f'Login/admin panel exposed: {e.valor}{extra}', [e.id])
 
 @regla
@@ -313,7 +313,7 @@ def r_secreto_github(alm):
         if 'secreto-github' in c.tags:
             tipo = c.propiedades.get('tipo_secreto', 'secret')
             repo = c.propiedades.get('repo', '?')
-            yield Hallazgo('secreto-github', 'critico',
+            yield Finding('secreto-github', 'critico',
                            f'{tipo} exposed in a commit of {repo}', [c.id])
 
 @regla
@@ -323,5 +323,5 @@ def r_nuclei_vuln(alm):
         for e in alm.de_tipo(tipo):
             if 'vulnerable' in e.tags:
                 n = len(e.propiedades.get('nuclei', []))
-                yield Hallazgo('vuln-nuclei', 'alto',
+                yield Finding('vuln-nuclei', 'alto',
                                f'{e.valor}: {n} nuclei finding(s) (high+ severity)', [e.id])

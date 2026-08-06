@@ -228,8 +228,8 @@ def test_rate_limit_concurrencia():
 
 # ── 37: background queue + SSE ──────────────────────────────────────────────
 def test_gestor_tareas():
-    from core.tareas import GestorTareas
-    g = GestorTareas()
+    from core.tareas import TaskManager
+    g = TaskManager()
 
     def trabajo(emit):
         emit({'tipo': 'inicio', 'total': 2})
@@ -245,8 +245,8 @@ def test_gestor_tareas():
 
 
 def test_gestor_tareas_error_no_cuelga():
-    from core.tareas import GestorTareas
-    g = GestorTareas()
+    from core.tareas import TaskManager
+    g = TaskManager()
 
     def trabajo(emit):
         raise RuntimeError('boom')

@@ -12,7 +12,7 @@ import json
 from cryptography.fernet import Fernet
 
 
-class Boveda:
+class Vault:
     def __init__(self, directorio):
         self.dir = directorio
         os.makedirs(self.dir, exist_ok=True)

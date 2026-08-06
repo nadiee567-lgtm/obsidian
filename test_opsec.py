@@ -6,8 +6,8 @@ Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_opsec.py -q
 
 # ── 152: sock-puppet vault ──────────────────────────────────────────────────
 def test_gestor_personas(tmp_path):
-    from core.personas import GestorPersonas
-    g = GestorPersonas(str(tmp_path / 'p.json'))
+    from core.personas import PersonaManager
+    g = PersonaManager(str(tmp_path / 'p.json'))
     g.crear('juan_investigador', {'email': 'juan@proton.me', 'usuario': 'juanx'})
     assert 'juan_investigador' in g.listar()
     p = g.obtener('juan_investigador')

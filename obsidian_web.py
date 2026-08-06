@@ -13,8 +13,8 @@ from core.registro import get_logger
 from core.modelo import Store, Entity, tipo_valido, TIPOS
 from core.transforms import transform, REGISTRO, ejecutar_por_nombre, ejecutar_lote
 from core.migracion import migrar_caso
-from core.workspaces import Gestor
-from core.boveda import Boveda
+from core.workspaces import Manager
+from core.boveda import Vault
 from core.correlacion import correlacionar, score_riesgo, cargar_reglas_yaml, score_exposicion
 from core.reporte import generar_reporte
 from core.exportar import exportar_json, exportar_csv
@@ -22,8 +22,8 @@ from core.monitor import Monitor, snapshot as _snap_estado
 from core.notificar import enviar_ntfy, construir_ntfy
 from core.estado import render_estado
 from core.motores import traducir as _motor_query, traducir_todos, MOTORES
-from core.tareas import GestorTareas
-from core.personas import GestorPersonas
+from core.tareas import TaskManager
+from core.personas import PersonaManager
 from core.extraccion import extraer_entidades
 from core import multiidioma as _ml
 from core.imagen import (enlaces_reverse, enlaces_facial, parse_gps,
@@ -223,11 +223,11 @@ _almacen = Store()
 
 # F3: workspace manager (isolated SQLite cases). _ws_activo = None -> ephemeral
 # mode (not saved); if one is active, each transform autosaves.
-_gestor = Gestor(WORKSPACES_DIR)
+_gestor = Manager(WORKSPACES_DIR)
 _ws_activo = None
 
 # F3 step 51: encrypted API-key vault (Fernet).
-_boveda = Boveda(os.path.join(HOME, '.obsidian'))
+_boveda = Vault(os.path.join(HOME, '.obsidian'))
 
 SYSTEM = """You are OBSIDIAN AI, an OSINT intelligence analysis engine.
 ROLE: Expert analyst. Correlate data, find patterns, generate actionable conclusions.
@@ -3965,7 +3965,7 @@ def api_v2_recon():
                 log.warning("autosave recon failed: %s", _e)
     return jsonify({'resultados': res, 'total_entidades': len(_almacen), 'workspace': _ws_activo})
 
-_tareas = GestorTareas()
+_tareas = TaskManager()
 
 @app.route('/api/v2/recon_async', methods=['POST'])
 def api_v2_recon_async():
@@ -4311,7 +4311,7 @@ def api_v2_opsec_perfil():
                     'estado': {'anonimo': _OPSEC['anonimo'], 'higiene': _OPSEC_HIGIENE['on'],
                                'proxies': len(_PROXIES['pool']), 'persona': _OPSEC.get('persona')}})
 
-_personas = GestorPersonas(os.path.join(HOME, '.obsidian', 'personas.json'))
+_personas = PersonaManager(os.path.join(HOME, '.obsidian', 'personas.json'))
 
 @app.route('/api/v2/personas', methods=['GET', 'POST', 'DELETE'])
 def api_v2_personas():

@@ -16,7 +16,7 @@ from core.persistencia import guardar_almacen, cargar_almacen, registrar_evento,
 from core.validacion import _slug_caso
 
 
-class Gestor:
+class Manager:
     """Manages the workspaces inside a directory (one = one .db file)."""
 
     def __init__(self, directorio):

@@ -27,10 +27,10 @@ from core.transforms import REGISTRO, ejecutar_por_nombre, ejecutar_lote
 from core.correlacion import correlacionar, score_riesgo
 from core.reporte import generar_reporte
 from core.exportar import exportar_json, exportar_csv
-from core.workspaces import Gestor
+from core.workspaces import Manager
 from core.config import WORKSPACES_DIR, STATIC_DIR, VIS_FILE
 
-_gestor = Gestor(WORKSPACES_DIR)
+_gestor = Manager(WORKSPACES_DIR)
 
 
 def _almacen(ws):

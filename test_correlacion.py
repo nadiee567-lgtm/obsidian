@@ -3,7 +3,7 @@
 Run:  ../.venv/bin/python -m pytest test_correlacion.py -q
 """
 from core.modelo import Store
-from core.correlacion import correlacionar, score_riesgo, Hallazgo
+from core.correlacion import correlacionar, score_riesgo, Finding
 
 
 def test_puerto_sensible():
@@ -52,10 +52,10 @@ def test_orden_por_severidad():
 
 def test_score_riesgo():
     assert score_riesgo([]) == 0
-    h = [Hallazgo('a', 'critico', 'x'), Hallazgo('b', 'medio', 'y')]
+    h = [Finding('a', 'critico', 'x'), Finding('b', 'medio', 'y')]
     assert score_riesgo(h) == 48          # 40 + 8
     # caps at 100
-    muchos = [Hallazgo('r', 'critico', 'm') for _ in range(5)]
+    muchos = [Finding('r', 'critico', 'm') for _ in range(5)]
     assert score_riesgo(muchos) == 100
 
 

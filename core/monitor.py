@@ -32,7 +32,7 @@ def snapshot(almacen) -> dict:
 
 
 @dataclass
-class Cambios:
+class Changes:
     """What changed between two snapshots."""
     nuevas_entidades: list = field(default_factory=list)   # dicts {tipo,valor}  # noqa
     nuevas_relaciones: list = field(default_factory=list)  # ids
@@ -59,7 +59,7 @@ class Cambios:
                 'cambios_prop': self.cambios_prop}
 
 
-def diff(antes: dict, despues: dict) -> Cambios:
+def diff(antes: dict, despues: dict) -> Changes:
     """Compares two snapshots and returns the changes."""
     a, d = antes['ents'], despues['ents']
     nuevas = [{'tipo': d[i]['tipo'], 'valor': d[i]['valor']} for i in d if i not in a]
@@ -77,7 +77,7 @@ def diff(antes: dict, despues: dict) -> Cambios:
         for t in sorted(set(d[i]['tags']) - set(a[i]['tags'])):
             cambios.append({'entidad': d[i]['valor'], 'tipo': d[i]['tipo'],
                             'campo': 'tag', 'antes': None, 'ahora': t})
-    return Cambios(nuevas, nuevas_rel, cambios)
+    return Changes(nuevas, nuevas_rel, cambios)
 
 
 def _ahora() -> str:
@@ -103,7 +103,7 @@ class Monitor:
     def activo(self) -> bool:
         return self._hilo is not None and self._hilo.is_alive()
 
-    def ciclo(self) -> Cambios:
+    def ciclo(self) -> Changes:
         """One cycle: snapshot, refresh, snapshot, diff, alert. Never raises (isolates failures)."""
         antes = self.snapshot_fn()
         try:

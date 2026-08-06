@@ -48,7 +48,7 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
     """Returns the full report HTML.
 
     almacen   -- typed Store (source of entities/relations)
-    hallazgos -- list of Hallazgo from correlacion.correlacionar() (or None)
+    hallazgos -- list of Finding from correlacion.correlacionar() (or None)
     score     -- risk score 0-100 (correlacion.score_riesgo)
     meta      -- {'workspace','objetivo','generado'} optional
     vis_js    -- vis-network.min.js content to embed (or None: no graph)
