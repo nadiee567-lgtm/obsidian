@@ -4,7 +4,7 @@ Run:  ../.venv/bin/python -m pytest test_transforms.py -q
 """
 import pytest
 from core.modelo import Store, Entity
-from core.eventos import Bus, ENTIDAD_NUEVA
+from core.eventos import Bus, ENTITY_NEW
 import core.transforms as tr
 
 
@@ -101,7 +101,7 @@ def test_emitir_valor_basura_se_ignora():
 def test_transform_dispara_eventos_del_bus():
     nuevas = []
     bus = Bus()
-    bus.suscribir(ENTIDAD_NUEVA, lambda e: nuevas.append(e))
+    bus.subscribe(ENTITY_NEW, lambda e: nuevas.append(e))
 
     @tr.transform(input='domain', outputs=('ip',), name='dns')
     def _f(entidad, ctx):

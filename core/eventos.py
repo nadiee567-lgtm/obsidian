@@ -8,28 +8,28 @@ PURE module: no Flask, no network. A subscriber's failures are ISOLATED so a
 broken callback cannot take down the others or the publisher."""
 
 # Standard event names (constants so we don't scatter loose strings).
-ENTIDAD_NUEVA        = 'entidad_nueva'
-ENTIDAD_ACTUALIZADA  = 'entidad_actualizada'
-RELACION_NUEVA       = 'relacion_nueva'
+ENTITY_NEW        = 'entity_new'
+ENTITY_UPDATED  = 'entity_updated'
+RELATION_NEW       = 'relation_new'
 
 
 class Bus:
-    """Minimal pub/sub. suscribir(event, callback) / publish(event, *args)."""
+    """Minimal pub/sub. subscribe(event, callback) / publish(event, *args)."""
 
     def __init__(self):
         self._subs: dict[str, list] = {}
 
-    def suscribir(self, evento: str, callback) -> None:
+    def subscribe(self, evento: str, callback) -> None:
         self._subs.setdefault(evento, []).append(callback)
 
     def publish(self, evento: str, *args, **kwargs) -> list:
         """Calls each subscriber. Isolates failures: if a callback raises, it's
         caught and we continue with the rest. Returns the list of exceptions that
         occurred (empty if all fine) so the caller can log them."""
-        errores = []
+        errors = []
         for cb in list(self._subs.get(evento, ())):
             try:
                 cb(*args, **kwargs)
             except Exception as e:   # noqa: BLE001 -- isolate by design
-                errores.append(e)
-        return errores
+                errors.append(e)
+        return errors

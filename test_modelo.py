@@ -4,7 +4,7 @@ Run:  ../.venv/bin/python -m pytest test_modelo.py -q
 """
 import pytest
 from core.modelo import Entity, Relation, Store, normalize, TIPOS, valid_type
-from core.eventos import Bus, ENTIDAD_NUEVA, ENTIDAD_ACTUALIZADA, RELACION_NUEVA
+from core.eventos import Bus, ENTITY_NEW, ENTITY_UPDATED, RELATION_NEW
 
 
 # ── deterministic id + normalization (steps 14, 22) ─────────────────────────
@@ -141,8 +141,8 @@ def test_procedencia():
 def test_bus_publica_entidad_nueva_y_actualizada():
     bus = Bus()
     nuevas, actualizadas = [], []
-    bus.suscribir(ENTIDAD_NUEVA, lambda e: nuevas.append(e))
-    bus.suscribir(ENTIDAD_ACTUALIZADA, lambda e: actualizadas.append(e))
+    bus.subscribe(ENTITY_NEW, lambda e: nuevas.append(e))
+    bus.subscribe(ENTITY_UPDATED, lambda e: actualizadas.append(e))
     alm = Store(bus=bus)
     alm.create('domain', 'example.com')            # new
     alm.create('domain', 'www.example.com')        # same id -> updated
@@ -152,7 +152,7 @@ def test_bus_publica_entidad_nueva_y_actualizada():
 def test_bus_publishes_new_relation():
     bus = Bus()
     rels = []
-    bus.suscribir(RELACION_NUEVA, lambda r: rels.append(r))
+    bus.subscribe(RELATION_NEW, lambda r: rels.append(r))
     alm = Store(bus=bus)
     d = alm.create('domain', 'example.com')
     i = alm.create('ip', '93.184.216.34')
@@ -163,8 +163,8 @@ def test_bus_publishes_new_relation():
 def test_bus_aisla_fallos_de_suscriptor():
     bus = Bus()
     ok = []
-    bus.suscribir(ENTIDAD_NUEVA, lambda e: (_ for _ in ()).throw(RuntimeError("boom")))
-    bus.suscribir(ENTIDAD_NUEVA, lambda e: ok.append(e))
-    errores = bus.publish(ENTIDAD_NUEVA, Entity('ip', '8.8.8.8'))
+    bus.subscribe(ENTITY_NEW, lambda e: (_ for _ in ()).throw(RuntimeError("boom")))
+    bus.subscribe(ENTITY_NEW, lambda e: ok.append(e))
+    errores = bus.publish(ENTITY_NEW, Entity('ip', '8.8.8.8'))
     assert len(ok) == 1, "the second subscriber runs even if the first fails"
     assert len(errores) == 1

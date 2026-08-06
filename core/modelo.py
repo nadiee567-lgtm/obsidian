@@ -202,9 +202,9 @@ class Store:
     a Bus, publishes events on create/merge/relate (step 19)."""
 
     def __init__(self, bus=None):
-        self._entidades: dict[str, Entity] = {}
-        self._relaciones: dict[str, Relation] = {}
-        self._por_tipo: dict[str, set] = {}     # type -> {id, ...}
+        self._entities: dict[str, Entity] = {}
+        self._relations: dict[str, Relation] = {}
+        self._by_type: dict[str, set] = {}     # type -> {id, ...}
         self._bus = bus
 
     def _publish(self, evento, *args):
@@ -214,14 +214,14 @@ class Store:
     # -- entities --
     def add(self, ent: Entity) -> Entity:
         """Adds or merges. Returns the live entity in the store (step 17)."""
-        existente = self._entidades.get(ent.id)
+        existente = self._entities.get(ent.id)
         if existente:
             existente.merge(ent)
-            self._publish('entidad_actualizada', existente)
+            self._publish('entity_updated', existente)
             return existente
-        self._entidades[ent.id] = ent
-        self._por_tipo.setdefault(ent.type, set()).add(ent.id)
-        self._publish('entidad_nueva', ent)
+        self._entities[ent.id] = ent
+        self._by_type.setdefault(ent.type, set()).add(ent.id)
+        self._publish('entity_new', ent)
         return ent
 
     def create(self, type, value, **kw) -> Entity:
@@ -229,15 +229,15 @@ class Store:
         return self.add(Entity(type=type, value=value, **kw))
 
     def get(self, id_: str) -> Entity | None:
-        return self._entidades.get(id_)
+        return self._entities.get(id_)
 
     def find(self, type, value) -> Entity | None:
         """Looks up by (type, value) without adding -- respects normalization."""
         eid = hashlib.sha1(f"{type}:{normalize(type, value)}".encode()).hexdigest()[:16]
-        return self._entidades.get(eid)
+        return self._entities.get(eid)
 
     def of_type(self, type) -> list:
-        return [self._entidades[i] for i in self._por_tipo.get(type, ())]
+        return [self._entities[i] for i in self._by_type.get(type, ())]
 
     # -- relations --
     def relate(self, source, target, label='') -> Relation:
@@ -245,28 +245,28 @@ class Store:
         oid = source.id if isinstance(source, Entity) else source
         did = target.id if isinstance(target, Entity) else target
         rel = Relation(source=oid, target=did, label=label)
-        if rel.id not in self._relaciones:
-            self._relaciones[rel.id] = rel
-            self._publish('relacion_nueva', rel)
-        return self._relaciones[rel.id]
+        if rel.id not in self._relations:
+            self._relations[rel.id] = rel
+            self._publish('relation_new', rel)
+        return self._relations[rel.id]
 
     # -- views --
     @property
     def entities(self) -> list:
-        return list(self._entidades.values())
+        return list(self._entities.values())
 
     @property
     def relations(self) -> list:
-        return list(self._relaciones.values())
+        return list(self._relations.values())
 
     def __len__(self) -> int:
-        return len(self._entidades)
+        return len(self._entities)
 
     # ── Step 21: full-case serialization ──
     def to_dict(self) -> dict:
         return {
-            'entities': [e.to_dict() for e in self._entidades.values()],
-            'relations': [r.to_dict() for r in self._relaciones.values()],
+            'entities': [e.to_dict() for e in self._entities.values()],
+            'relations': [r.to_dict() for r in self._relations.values()],
         }
 
     @classmethod
@@ -276,5 +276,5 @@ class Store:
             alm.add(Entity.from_dict(ed))
         for rd in d.get('relations', []):
             r = Relation.from_dict(rd)
-            alm._relaciones[r.id] = r
+            alm._relations[r.id] = r
         return alm
