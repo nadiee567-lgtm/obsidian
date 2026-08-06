@@ -1,21 +1,21 @@
-"""Capa unificada de buscadores de internet — F8 pasos 106 y 117.
+"""Unified internet-search-engine layer -- F8 steps 106 and 117.
 
-Occidente usa casi solo Shodan; los motores chinos (FOFA, ZoomEye, Quake) ven
-infraestructura que Shodan no. Aquí una MISMA consulta de OBSIDIAN se traduce al
-dialecto de cada motor y se puede lanzar a todos a la vez.
+The West uses almost only Shodan; the Chinese engines (FOFA, ZoomEye, Quake) see
+infrastructure Shodan does not. Here the SAME OBSIDIAN query is translated to each
+engine's dialect and can be launched to all of them at once.
 
-Este módulo es PURO (registro + traductor). Las llamadas reales con key y el
-parseo de cada respuesta se conectan por motor en los pasos 107-113.
+This module is PURE (registry + translator). The real calls with a key and the
+parsing of each response are wired per engine in steps 107-113.
 
-Campos unificados que entiende OBSIDIAN:
+Unified fields OBSIDIAN understands:
     ip, dominio, favicon (mmh3 hash), cert (CN/subject), puerto,
-    producto (software), org, pais (código ISO), titulo, asn
-Cada motor soporta un subconjunto; `traducir` ignora los campos que no aplican.
+    producto (software), org, pais (ISO code), titulo, asn
+Each engine supports a subset; `traducir` ignores the fields that don't apply.
 """
 from __future__ import annotations
 
-# Metadatos por motor + plantilla de cada campo en su dialecto propio.
-# 'join' = operador AND del motor. 'cn' marca los motores chinos.
+# Per-engine metadata + template for each field in its own dialect.
+# 'join' = the engine's AND operator. 'cn' marks the Chinese engines.
 MOTORES = {
     'shodan': {
         'etiqueta': 'Shodan', 'requiere_key': True, 'cn': False, 'join': ' ',
@@ -81,18 +81,18 @@ CAMPOS = ('ip', 'dominio', 'favicon', 'cert', 'puerto', 'producto', 'org', 'pais
 
 
 def motores_disponibles(cn=None) -> list:
-    """Nombres de motores. cn=True solo chinos, cn=False solo occidentales, None todos."""
+    """Engine names. cn=True only Chinese, cn=False only Western, None all."""
     return [m for m, info in MOTORES.items() if cn is None or info['cn'] == cn]
 
 
 def traducir(motor: str, campos: dict) -> str:
-    """Traduce una consulta unificada al dialecto de `motor` (paso 117).
+    """Translates a unified query to `motor`'s dialect (step 117).
 
-    campos: {campo: valor} con campos de CAMPOS. Se ignoran los que el motor no
-    soporta y los vacíos. Devuelve '' si no queda nada que consultar.
+    campos: {field: value} with fields from CAMPOS. Fields the engine does not
+    support and empty ones are ignored. Returns '' if nothing is left to query.
     """
     if motor not in MOTORES:
-        raise KeyError(f'motor desconocido: {motor}')
+        raise KeyError(f'unknown engine: {motor}')
     info = MOTORES[motor]
     partes = []
     for campo in CAMPOS:
@@ -104,7 +104,7 @@ def traducir(motor: str, campos: dict) -> str:
 
 
 def traducir_todos(campos: dict, cn=None) -> dict:
-    """La misma consulta traducida a CADA motor. {motor: query} (solo no vacíos)."""
+    """The same query translated to EACH engine. {engine: query} (non-empty only)."""
     out = {}
     for motor in motores_disponibles(cn):
         q = traducir(motor, campos)

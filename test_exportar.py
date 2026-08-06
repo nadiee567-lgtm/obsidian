@@ -38,7 +38,7 @@ def test_json_reimportable():
 def test_csv_tiene_cabecera_y_filas():
     alm, _, _ = _demo()
     filas = list(csv.reader(io.StringIO(exportar_csv(alm))))
-    assert filas[0] == ['tipo', 'valor', 'tags', 'fuentes', 'confianza', 'propiedades']
+    assert filas[0] == ['type', 'value', 'tags', 'sources', 'confidence', 'properties']
     assert len(filas) == 1 + 2                       # cabecera + 2 entidades
     valores = {f[1] for f in filas[1:]}
     assert valores == {'objetivo.com', '93.184.216.34'}

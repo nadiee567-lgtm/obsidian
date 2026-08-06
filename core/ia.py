@@ -1,36 +1,36 @@
-"""Capa de IA ÚNICA de OBSIDIAN — una sola "cabeza" que todos los features usan.
+"""OBSIDIAN's SINGLE AI layer -- one "head" that every feature uses.
 
-En vez de regar llamadas a Ollama por el código (resumen, verificador, futura
-extracción de entidades, traducción, chat...), TODO pasa por aquí. Una sola
-puerta: cambiar de modelo o apuntar a NEXO (router) se hace en UN solo lugar.
+Instead of scattering Ollama calls across the code (summary, verifier, future
+entity extraction, translation, chat...), EVERYTHING goes through here. One door:
+switching model or pointing to NEXO (router) is done in a SINGLE place.
 
-Es UN modelo local (Ollama), no varios. Local = sin costo por token (corre en
-la GPU del usuario); el único costo es tiempo de cómputo.
+It is ONE local model (Ollama), not several. Local = no per-token cost (runs on
+the user's GPU); the only cost is compute time.
 
-Módulo PURO: su propio cliente HTTP, no depende de Flask."""
+PURE module: its own HTTP client, does not depend on Flask."""
 import os
 import re
 import requests
 
 OLLAMA = os.environ.get('OBSIDIAN_OLLAMA', 'http://localhost:11434')
 MODELO = os.environ.get('OBSIDIAN_MODELO_IA', 'qwen2.5:3b')
-NEXO = os.environ.get('OBSIDIAN_NEXO', '')       # '1' activa el ruteo estilo NEXO
+NEXO = os.environ.get('OBSIDIAN_NEXO', '')       # '1' enables NEXO-style routing
 
 _S = requests.Session()
 
-# Ruteo estilo NEXO (paso 168): clasifica la tarea por keywords → modelo local.
+# NEXO-style routing (step 168): classifies the task by keywords -> local model.
 _RUTEO = {
-    'seguridad': (['exploit', 'vuln', 'cve', 'ataque', 'attack', 'malware', 'ransomware',
+    'seguridad': (['exploit', 'vuln', 'cve', 'attack', 'malware', 'ransomware',
                    'payload', 'pentest', 'shell', 'takeover'], 'dolphin-llama3'),
-    'osint': (['osint', 'dominio', 'subdominio', 'whois', 'dns', 'recon', 'wallet',
-               'breach', 'leak', 'filtrac'], 'qwen2.5:3b'),
-    'codigo': (['código', 'codigo', 'python', 'function', 'regex', 'script', 'bug'], 'qwen2.5:3b'),
+    'osint': (['osint', 'domain', 'subdomain', 'whois', 'dns', 'recon', 'wallet',
+               'breach', 'leak'], 'qwen2.5:3b'),
+    'codigo': (['code', 'python', 'function', 'regex', 'script', 'bug'], 'qwen2.5:3b'),
 }
 
 
 def elegir_modelo(texto):
-    """Elige el modelo local según la tarea (router estilo NEXO). Una IP explícita
-    pesa hacia seguridad; sin señales, un modelo rápido por defecto."""
+    """Picks the local model based on the task (NEXO-style router). An explicit IP
+    leans toward security; with no signals, a fast model by default."""
     t = (texto or '').lower()
     puntajes = {cat: sum(t.count(k) for k in kws) for cat, (kws, _) in _RUTEO.items()}
     if re.search(r'\b\d{1,3}(?:\.\d{1,3}){3}\b', t):
@@ -40,7 +40,7 @@ def elegir_modelo(texto):
 
 
 def disponible():
-    """¿Está corriendo Ollama? (para degradar con gracia si no)."""
+    """Is Ollama running? (to degrade gracefully if not)."""
     try:
         return _S.get(f'{OLLAMA}/api/tags', timeout=3).ok
     except Exception:
@@ -48,11 +48,11 @@ def disponible():
 
 
 def consultar(prompt, sistema=None, max_tokens=300, temp=0.4, modelo=None):
-    """La ÚNICA función que habla con la IA. Devuelve texto (o lanza si Ollama
-    no responde — el llamador decide cómo degradar).
+    """The ONLY function that talks to the AI. Returns text (or raises if Ollama
+    does not respond -- the caller decides how to degrade).
 
-    Si OBSIDIAN_NEXO está activo (y no se fuerza `modelo`), enruta al mejor modelo
-    local según la tarea (paso 168), sin tocar a los que la llaman."""
+    If OBSIDIAN_NEXO is active (and `modelo` is not forced), it routes to the best
+    local model for the task (step 168), without touching the callers."""
     m = modelo or (elegir_modelo(f'{sistema or ""} {prompt}') if NEXO else MODELO)
     mensajes = ([{'role': 'system', 'content': sistema}] if sistema else [])
     mensajes.append({'role': 'user', 'content': prompt})

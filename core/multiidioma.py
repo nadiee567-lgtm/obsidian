@@ -1,8 +1,8 @@
-"""Multi-idioma y fuentes regionales — F15.
+"""Multilingual and regional sources -- F15.
 
-Un dato clave puede estar solo en chino o ruso. Estas utilidades PURAS ayudan a
-buscarlo donde está: plataformas regionales, transliteración de nombres, detección
-de idioma por alfabeto, motores locales y dorks por idioma."""
+A key datum may exist only in Chinese or Russian. These PURE utilities help find
+it where it lives: regional platforms, name transliteration, language detection by
+alphabet, local engines and per-language dorks."""
 from __future__ import annotations
 import re
 from urllib.parse import quote
@@ -12,7 +12,7 @@ _PAIS_PREFIJO = {'MX': '52', 'US': '1', 'RU': '7', 'CN': '86', 'ES': '34',
 
 
 def normalizar_telefono(numero: str, pais: str = 'US') -> str:
-    """Normaliza un teléfono a formato +E.164 según el país (paso 177)."""
+    """Normalizes a phone to +E.164 format based on the country (step 177)."""
     d = re.sub(r'\D', '', numero or '')
     if not d:
         return ''
@@ -32,7 +32,7 @@ _PAIS_TZ = {
 
 
 def zona_horaria(pais: str) -> dict:
-    """Zona horaria y hora local del país, para la cronolocalización (paso 178)."""
+    """Country time zone and local time, for chrono-location (step 178)."""
     import datetime
     tz = _PAIS_TZ.get((pais or '').upper(), 'UTC')
     hora = None
@@ -45,7 +45,7 @@ def zona_horaria(pais: str) -> dict:
 
 
 def perfiles_regionales(usuario: str) -> dict:
-    """Perfiles/búsquedas del usuario en plataformas regionales (paso 171)."""
+    """User profiles/searches on regional platforms (step 171)."""
     u = quote(usuario)
     return {
         'vk': f'https://vk.com/{usuario}',
@@ -56,7 +56,7 @@ def perfiles_regionales(usuario: str) -> dict:
     }
 
 
-# ── Transliteración cirílico ↔ latino (paso 172) ─────────────────────────────
+# ── Cyrillic <-> Latin transliteration (step 172) ────────────────────────────
 _CIR_LAT = {
     'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e', 'ж': 'zh',
     'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
@@ -91,11 +91,11 @@ def latino_a_cirilico(texto: str) -> str:
 
 
 def transliterar(nombre: str) -> dict:
-    """Variantes del nombre en cada alfabeto para buscar a la misma persona (paso 172)."""
+    """Name variants in each alphabet to find the same person (step 172)."""
     return {'latino': cirilico_a_latino(nombre), 'cirilico': latino_a_cirilico(nombre)}
 
 
-# ── Detección de idioma por alfabeto (paso 175) ──────────────────────────────
+# ── Language detection by alphabet (step 175) ────────────────────────────────
 _DORK_TERMS = {
     'ru': {'contacto': 'контакты', 'email': 'почта', 'telefono': 'телефон', 'sites': ['vk.com', 'ok.ru']},
     'zh': {'contacto': '联系', 'email': '邮箱', 'telefono': '电话', 'sites': ['weibo.com', 'zhihu.com']},
@@ -104,7 +104,7 @@ _DORK_TERMS = {
 
 
 def dorks_por_idioma(objetivo: str, idioma: str = 'es_en') -> list:
-    """Dorks adaptados al idioma/región (paso 176)."""
+    """Dorks adapted to the language/region (step 176)."""
     t = _DORK_TERMS.get(idioma, _DORK_TERMS['es_en'])
     dorks = [f'"{objetivo}" {t["contacto"]}', f'"{objetivo}" {t["email"]}', f'"{objetivo}" {t["telefono"]}']
     dorks += [f'"{objetivo}" site:{s}' for s in t['sites']]
@@ -112,7 +112,7 @@ def dorks_por_idioma(objetivo: str, idioma: str = 'es_en') -> list:
 
 
 def registros_regionales(org: str) -> dict:
-    """Registros de empresas/personas por región (paso 173)."""
+    """Company/person registries by region (step 173)."""
     q = quote(org)
     return {
         'china_qcc': f'https://www.qcc.com/web/search?key={q}',
@@ -122,7 +122,7 @@ def registros_regionales(org: str) -> dict:
 
 
 def motores_locales(consulta: str) -> dict:
-    """Motores de búsqueda locales (paso 174): ven otra internet que Google."""
+    """Local search engines (step 174): they see a different internet than Google."""
     q = quote(consulta)
     return {'yandex': f'https://yandex.com/search/?text={q}',
             'baidu': f'https://www.baidu.com/s?wd={q}',
@@ -130,7 +130,7 @@ def motores_locales(consulta: str) -> dict:
 
 
 def detectar_idioma(texto: str) -> str:
-    """Idioma probable por el rango Unicode dominante. Keyless, sin librerías."""
+    """Likely language by the dominant Unicode range. Keyless, no libraries."""
     conteo = {'ru': 0, 'zh': 0, 'ar': 0, 'ja': 0, 'ko': 0, 'es_en': 0}
     for c in texto or '':
         o = ord(c)

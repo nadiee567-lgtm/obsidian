@@ -1,26 +1,26 @@
-"""Exportadores de datos de OBSIDIAN — F7 paso 94.
+"""OBSIDIAN data exporters -- F7 step 94.
 
-Deja el caso en formatos estructurados para importar en otras herramientas:
-  - JSON: el caso completo (entidades + relaciones + hallazgos + meta), máquina.
-  - CSV:  una fila por entidad, para hojas de cálculo / otras tools.
+Leaves the case in structured formats to import into other tools:
+  - JSON: the full case (entities + relations + findings + meta), machine-readable.
+  - CSV:  one row per entity, for spreadsheets / other tools.
 
-Módulo PURO: no toca Flask ni red.
+PURE module: does not touch Flask or the network.
 
-Seguridad: el CSV neutraliza INYECCIÓN DE FÓRMULAS (CSV injection). Un valor de
-OSINT crudo que empiece con = + - @ (o tab/CR) se interpreta como fórmula al
-abrir el archivo en Excel/Sheets → se le antepone un apóstrofo. Es el análogo del
-escape anti-XSS del reporte: los datos del objetivo no son de confianza."""
+Security: the CSV neutralizes FORMULA INJECTION (CSV injection). A raw OSINT value
+starting with = + - @ (or tab/CR) is interpreted as a formula when the file is
+opened in Excel/Sheets -> an apostrophe is prepended. It is the analogue of the
+report's anti-XSS escaping: the target's data is untrusted."""
 from __future__ import annotations
 import csv
 import io
 import json
 import datetime
 
-_PELIGRO = ('=', '+', '-', '@')   # inicios que Excel/Sheets tratan como fórmula
+_PELIGRO = ('=', '+', '-', '@')   # starts Excel/Sheets treat as a formula
 
 
 def _celda(v) -> str:
-    """Neutraliza inyección de fórmulas en una celda CSV."""
+    """Neutralizes formula injection in a CSV cell."""
     s = '' if v is None else str(v)
     if s and (s[0] in _PELIGRO or s[0] in ('\t', '\r')):
         s = "'" + s
@@ -28,7 +28,7 @@ def _celda(v) -> str:
 
 
 def exportar_json(almacen, hallazgos=None, score=0, meta=None) -> str:
-    """Caso completo en JSON, re-importable con Almacen.from_dict()."""
+    """Full case in JSON, re-importable with Almacen.from_dict()."""
     meta = dict(meta or {})
     meta.setdefault('generado', datetime.datetime.now().isoformat(timespec='seconds'))
     d = almacen.to_dict()
@@ -39,10 +39,10 @@ def exportar_json(almacen, hallazgos=None, score=0, meta=None) -> str:
 
 
 def exportar_csv(almacen) -> str:
-    """Una fila por entidad. Celdas saneadas contra inyección de fórmulas."""
+    """One row per entity. Cells sanitized against formula injection."""
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(['tipo', 'valor', 'tags', 'fuentes', 'confianza', 'propiedades'])
+    w.writerow(['type', 'value', 'tags', 'sources', 'confidence', 'properties'])
     for e in sorted(almacen.entidades, key=lambda x: (x.tipo, x.valor)):
         props = '; '.join(f'{k}={v}' for k, v in (e.propiedades or {}).items())
         w.writerow([_celda(e.tipo), _celda(e.valor), _celda(' '.join(sorted(e.tags))),
