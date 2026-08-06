@@ -44,29 +44,29 @@ class _Registry:
     """Central transform catalog (step 27). Indexed by input type to answer
     quickly 'which transforms apply to this entity?' (step 35)."""
     def __init__(self):
-        self._por_entrada: dict[str, list] = {}
-        self._por_nombre: dict[str, Transform] = {}
+        self._by_input: dict[str, list] = {}
+        self._by_name: dict[str, Transform] = {}
 
     def registrar(self, t: Transform) -> Transform:
-        if t.nombre in self._por_nombre:
+        if t.nombre in self._by_name:
             raise ValueError(f"duplicate transform: {t.nombre}")
-        self._por_nombre[t.nombre] = t
-        self._por_entrada.setdefault(t.entrada, []).append(t)
+        self._by_name[t.nombre] = t
+        self._by_input.setdefault(t.entrada, []).append(t)
         return t
 
-    def aplicables(self, tipo: str) -> list:
+    def applicable(self, tipo: str) -> list:
         """Transforms that run on an entity of this type (step 35)."""
-        return list(self._por_entrada.get(tipo, ()))
+        return list(self._by_input.get(tipo, ()))
 
-    def por_nombre(self, nombre: str) -> Transform | None:
-        return self._por_nombre.get(nombre)
+    def by_name(self, nombre: str) -> Transform | None:
+        return self._by_name.get(nombre)
 
-    def todos(self) -> list:
-        return list(self._por_nombre.values())
+    def all_transforms(self) -> list:
+        return list(self._by_name.values())
 
-    def limpiar(self):
-        self._por_entrada.clear()
-        self._por_nombre.clear()
+    def clear(self):
+        self._by_input.clear()
+        self._by_name.clear()
 
 
 # Global registry (concrete transforms register themselves on import).
@@ -157,7 +157,7 @@ def ejecutar(t: Transform, entidad: Entity, almacen: Store) -> list:
 
 
 def run_by_name(nombre: str, entidad: Entity, almacen: Store) -> list:
-    t = REGISTRO.por_nombre(nombre)
+    t = REGISTRO.by_name(nombre)
     if t is None:
         raise KeyError(f"transform not registered: {nombre}")
     return ejecutar(t, entidad, almacen)
@@ -247,7 +247,7 @@ class Runner:
         pool = {semilla.id: semilla}
         producidas = []
         for paso in machine.pasos:
-            t = REGISTRO.por_nombre(paso)
+            t = REGISTRO.by_name(paso)
             if t is None:
                 continue
             objetivos = [e for e in list(pool.values()) if e.tipo == t.entrada]

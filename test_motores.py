@@ -38,7 +38,7 @@ def test_ignora_vacios():
 
 def test_traducir_todos():
     d = traducir_todos({'favicon': '123'})
-    # todos los motores que soportan favicon deben aparecer; criminalip/binaryedge no
+    # all engines that support favicon must appear; criminalip/binaryedge do not
     assert 'shodan' in d and 'fofa' in d and 'zoomeye' in d
     assert 'criminalip' not in d
     assert d['fofa'] == 'icon_hash="123"'

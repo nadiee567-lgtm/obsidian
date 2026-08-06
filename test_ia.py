@@ -30,7 +30,7 @@ def test_extraer_wallets_de_texto():
 def test_traducir(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
-    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'Hello world')
+    monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'Hello world')
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
@@ -53,7 +53,7 @@ def test_resumen_modo_ia(monkeypatch):
     import obsidian_web as ob
     assert 'resumen' in ob._PROMPTS_IA
     monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
-    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'The target has 3 exposed subdomains.')
+    monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'The target has 3 exposed subdomains.')
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
@@ -71,7 +71,7 @@ def test_modos_ia_extra():
 def test_consulta_nl(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
-    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: '1. dns_a on the domain\n2. crtsh')
+    monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: '1. dns_a on the domain\n2. crtsh')
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
@@ -93,7 +93,7 @@ def test_elegir_modelo_nexo():
 def test_deteccion_ia(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
-    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'Very uniform text, possibly AI.')
+    monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'Very uniform text, possibly AI.')
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
@@ -105,7 +105,7 @@ def test_deteccion_ia(monkeypatch):
 def test_chat_caso(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
-    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'IP 1.2.3.4 hosts the domain.')
+    monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'IP 1.2.3.4 hosts the domain.')
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True

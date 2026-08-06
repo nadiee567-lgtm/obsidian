@@ -13,12 +13,12 @@ def _registro_aislado():
     """Each test starts with an empty registry, but RESTORES whatever was there
     before when done -- so it does not wipe the real transforms the app registers
     (independent of test order)."""
-    prev_entrada = {k: list(v) for k, v in tr.REGISTRO._por_entrada.items()}
-    prev_nombre = dict(tr.REGISTRO._por_nombre)
-    tr.REGISTRO.limpiar()
+    prev_entrada = {k: list(v) for k, v in tr.REGISTRO._by_input.items()}
+    prev_nombre = dict(tr.REGISTRO._by_name)
+    tr.REGISTRO.clear()
     yield
-    tr.REGISTRO._por_entrada = prev_entrada
-    tr.REGISTRO._por_nombre = prev_nombre
+    tr.REGISTRO._by_input = prev_entrada
+    tr.REGISTRO._by_name = prev_nombre
 
 
 # ── contract + registry + decorator (steps 26, 27) ──────────────────────────
@@ -26,8 +26,8 @@ def test_decorator_registra():
     @tr.transform(entrada='dominio', salidas=('ip',), nombre='dns')
     def _f(entidad, ctx):
         pass
-    assert tr.REGISTRO.por_nombre('dns') is not None
-    assert tr.REGISTRO.aplicables('dominio')[0].nombre == 'dns'
+    assert tr.REGISTRO.by_name('dns') is not None
+    assert tr.REGISTRO.applicable('dominio')[0].nombre == 'dns'
 
 def test_tipo_entrada_o_salida_invalido_falla():
     with pytest.raises(ValueError):
@@ -160,4 +160,4 @@ def test_cargar_plugins(tmp_path):
     )
     cargados = tr.load_plugins(str(tmp_path))
     assert 'mi_transform' in cargados
-    assert tr.REGISTRO.por_nombre('plugin_dns') is not None
+    assert tr.REGISTRO.by_name('plugin_dns') is not None

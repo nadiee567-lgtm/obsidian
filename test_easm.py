@@ -124,7 +124,7 @@ def test_diff_historico(tmp_path):
     sid = g.snapshot('caso')                     # historical snapshot: 1 asset
     alm.create('subdominio', 'b.x.com')           # a new asset appeared
     g.guardar('caso', alm)
-    viejo = g.cargar_snapshot('caso', sid)
+    viejo = g.load_snapshot('caso', sid)
     assert len(viejo) == 1
     nuevos = {e.id for e in g.cargar('caso').entidades} - {e.id for e in viejo.entidades}
     assert len(nuevos) == 1                       # b.x.com appeared since the snapshot

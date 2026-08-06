@@ -47,7 +47,7 @@ def disponible():
         return False
 
 
-def consultar(prompt, sistema=None, max_tokens=300, temp=0.4, modelo=None):
+def ask(prompt, sistema=None, max_tokens=300, temp=0.4, modelo=None):
     """The ONLY function that talks to the AI. Returns text (or raises if Ollama
     does not respond -- the caller decides how to degrade).
 

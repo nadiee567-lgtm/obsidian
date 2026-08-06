@@ -213,6 +213,6 @@ def test_todos_los_motores_registrados():
     """The 9 engines in core.motores each have a registered transform."""
     from core.transforms import REGISTRO
     from core.motores import MOTORES
-    nombres = {t.nombre for t in REGISTRO.aplicables('ip')}
+    nombres = {t.nombre for t in REGISTRO.applicable('ip')}
     faltan = set(MOTORES) - nombres
     assert not faltan, f'engines without a transform: {faltan}'

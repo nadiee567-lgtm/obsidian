@@ -8,10 +8,10 @@ from core.workspaces import Manager
 
 def test_crear_y_listar(tmp_path):
     g = Manager(str(tmp_path))
-    assert g.listar() == []
+    assert g.list_ws() == []
     g.create('caso1')
     g.create('target-com')
-    assert g.listar() == ['caso1', 'target-com']
+    assert g.list_ws() == ['caso1', 'target-com']
     assert g.existe('caso1') and not g.existe('inexistente')
 
 
@@ -58,10 +58,10 @@ def test_sobrevive_recarga(tmp_path):
 def test_borrar_y_renombrar(tmp_path):
     g = Manager(str(tmp_path))
     g.create('viejo')
-    g.renombrar('viejo', 'nuevo')
-    assert g.listar() == ['nuevo']
+    g.rename('viejo', 'nuevo')
+    assert g.list_ws() == ['nuevo']
     assert g.borrar('nuevo') is True
-    assert g.listar() == []
+    assert g.list_ws() == []
 
 
 def test_nombres_maliciosos_rechazados(tmp_path):
@@ -70,7 +70,7 @@ def test_nombres_maliciosos_rechazados(tmp_path):
         with pytest.raises(ValueError):
             g.create(malo)
     # and nothing was created outside the directory
-    assert g.listar() == []
+    assert g.list_ws() == []
 
 
 def test_historial(tmp_path):
@@ -89,12 +89,12 @@ def test_snapshots(tmp_path):
     a.create('ip', '8.8.8.8')
     g.guardar('caso', a)
     sid = g.snapshot('caso')
-    assert sid in g.listar_snapshots('caso')
+    assert sid in g.list_snapshots('caso')
 
     # change the case, then restore the snapshot -> the old state returns
     a2 = g.cargar('caso')
     a2.create('ip', '1.1.1.1')
     g.guardar('caso', a2)
     assert len(g.cargar('caso')) == 2
-    g.restaurar('caso', sid)
+    g.restore('caso', sid)
     assert len(g.cargar('caso')) == 1   # reverted to the snapshot (only 8.8.8.8)

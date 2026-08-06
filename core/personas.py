@@ -35,7 +35,7 @@ class PersonaManager:
         self._escribir(d)
         return nombre
 
-    def listar(self) -> list:
+    def list_ws(self) -> list:
         return sorted(self._leer().keys())
 
     def obtener(self, nombre: str):

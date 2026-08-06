@@ -52,7 +52,7 @@ def _err(msg):
 
 
 def cmd_transforms(a):
-    ts = REGISTRO.aplicables(a.tipo)
+    ts = REGISTRO.applicable(a.tipo)
     if not ts:
         print(f"(no transforms for type '{a.tipo}')")
         return 0
@@ -85,7 +85,7 @@ def cmd_recon(a):
         return _err(f"invalid type: {a.tipo}")
     alm = _almacen(a.workspace)
     alm.create(a.tipo, a.valor)
-    ts = [t for t in REGISTRO.aplicables(a.tipo) if a.with_keys or not t.requiere_key]
+    ts = [t for t in REGISTRO.applicable(a.tipo) if a.with_keys or not t.requiere_key]
     tareas = [(a.tipo, a.valor, t.nombre) for t in ts]
     print(f"recon on {a.tipo} {a.valor} -- {len(tareas)} transform(s) in parallel")
     t0 = time.time()
@@ -142,7 +142,7 @@ def cmd_export(a):
 
 
 def cmd_workspaces(a):
-    ws = _gestor.listar()
+    ws = _gestor.list_ws()
     if not ws:
         print("(no workspaces)")
     for w in ws:

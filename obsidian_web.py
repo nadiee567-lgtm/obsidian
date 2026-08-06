@@ -3286,7 +3286,7 @@ def _t_wordlist(entidad, ctx):
               f'name+123), leet speak. 30-50 entries, one per line, passwords only.\n\n'
               f'Data:\n{contexto}')
     try:
-        resp = ia.consultar(prompt, max_tokens=600, temp=0.6) or ''
+        resp = ia.ask(prompt, max_tokens=600, temp=0.6) or ''
     except Exception as _e:
         log.debug("wordlist ia: %s", _e)
         return
@@ -3817,7 +3817,7 @@ def api_v2_transforms(tipo):
     """Transforms that apply to an entity type (step 35)."""
     ts = [{'nombre': t.nombre, 'salidas': list(t.salidas),
            'requiere_key': t.requiere_key, 'descripcion': t.descripcion}
-          for t in REGISTRO.aplicables(tipo)]
+          for t in REGISTRO.applicable(tipo)]
     return jsonify({'tipo': tipo, 'transforms': ts})
 
 # The store is mutated by the /run endpoint AND the monitor thread (step 95): a
@@ -3866,7 +3866,7 @@ def _estado_datos():
     con_key = []
     total = 0
     for tp in TIPOS:
-        ts = REGISTRO.aplicables(tp)
+        ts = REGISTRO.applicable(tp)
         if ts:
             por_tipo[tp] = len(ts)
             total += len(ts)
@@ -3892,7 +3892,7 @@ def _estado_datos():
         'herramientas': herramientas,
         'keys': keys,
         'ia': {'disponible': ia.disponible(), 'modelo': ia.MODELO},
-        'workspaces': len(_gestor.listar()),
+        'workspaces': len(_gestor.list_ws()),
         'monitor': bool(_monitor and _monitor.activo),
         'ntfy': bool(_ntfy_topic()),
     }
@@ -3954,7 +3954,7 @@ def api_v2_recon():
     con_keys = bool(d.get('con_keys'))
     with _almacen_lock:
         _almacen.create(tipo, valor)
-    ts = [t for t in REGISTRO.aplicables(tipo) if con_keys or not t.requiere_key]
+    ts = [t for t in REGISTRO.applicable(tipo) if con_keys or not t.requiere_key]
     tareas = [(tipo, valor, t.nombre) for t in ts]
     res = run_batch(tareas, _almacen, lock=_almacen_lock)
     if _ws_activo:
@@ -3981,7 +3981,7 @@ def api_v2_recon_async():
     def trabajo(emit):
         with _almacen_lock:
             _almacen.create(tipo, valor)
-        ts = [t for t in REGISTRO.aplicables(tipo) if con_keys or not t.requiere_key]
+        ts = [t for t in REGISTRO.applicable(tipo) if con_keys or not t.requiere_key]
         tareas = [(tipo, valor, t.nombre) for t in ts]
         emit({'tipo': 'inicio', 'total': len(tareas)})
 
@@ -4082,7 +4082,7 @@ def api_v2_workspaces():
     """Workspace CRUD (F3 step 44). Each one is an isolated SQLite case."""
     global _almacen, _ws_activo
     if request.method == 'GET':
-        return jsonify({'workspaces': _gestor.listar(), 'activo': _ws_activo})
+        return jsonify({'workspaces': _gestor.list_ws(), 'activo': _ws_activo})
     nombre = (request.json or {}).get('nombre', '')
     if request.method == 'POST':
         try:
@@ -4126,7 +4126,7 @@ def api_v2_ws_snapshot():
         except KeyError:
             return _error('workspace not found', 404)
         return jsonify({'ok': True, 'snapshot': sid})
-    return jsonify({'snapshots': _gestor.listar_snapshots(_ws_activo)})
+    return jsonify({'snapshots': _gestor.list_snapshots(_ws_activo)})
 
 # ── OPSEC: anonymous mode (all traffic over Tor) -- F13 step 153 ─────────────
 _OPSEC = {'anonimo': False}
@@ -4320,16 +4320,16 @@ def api_v2_personas():
         nombre = request.args.get('nombre')
         if nombre:
             return jsonify({'persona': _personas.obtener(nombre)})
-        return jsonify({'personas': _personas.listar()})
+        return jsonify({'personas': _personas.list_ws()})
     d = request.json or {}
     nombre = (d.get('nombre', '') or '').strip()
     if not nombre:
         return _error('missing persona name', 400)
     if request.method == 'POST':
         _personas.create(nombre, d.get('datos', {}))
-        return jsonify({'ok': True, 'personas': _personas.listar()})
+        return jsonify({'ok': True, 'personas': _personas.list_ws()})
     _personas.borrar(nombre)   # DELETE
-    return jsonify({'ok': True, 'personas': _personas.listar()})
+    return jsonify({'ok': True, 'personas': _personas.list_ws()})
 
 @app.route('/api/v2/keys', methods=['GET', 'POST', 'DELETE'])
 def api_v2_keys():
@@ -4411,9 +4411,9 @@ def api_v2_diff_historico():
         return _error('no active workspace', 400)
     sid = request.args.get('snapshot')
     if not sid:
-        return jsonify({'snapshots': _gestor.listar_snapshots(_ws_activo)})
+        return jsonify({'snapshots': _gestor.list_snapshots(_ws_activo)})
     try:
-        viejo = _gestor.cargar_snapshot(_ws_activo, sid)
+        viejo = _gestor.load_snapshot(_ws_activo, sid)
     except KeyError:
         return _error('snapshot not found', 404)
     ids_v = {e.id: e for e in viejo.entidades}
@@ -4535,9 +4535,9 @@ def _tareas_monitor_default():
     usados = set()
     for e in _almacen.entidades:
         usados |= set(e.origenes)
-    aplicables = {t.nombre for t in REGISTRO.aplicables(seed.tipo)}
+    applicable = {t.nombre for t in REGISTRO.applicable(seed.tipo)}
     return [{'tipo': seed.tipo, 'valor': seed.valor, 'transform': n}
-            for n in sorted(usados & aplicables)]
+            for n in sorted(usados & applicable)]
 
 @app.route('/api/v2/monitor', methods=['GET'])
 def api_v2_monitor():
@@ -4666,7 +4666,7 @@ def api_v2_chat():
               f'data; if the answer is not in it, say so clearly.\n\nData:\n{contexto}\n\n'
               f'Question: {pregunta}')
     try:
-        resp = ia.consultar(prompt, max_tokens=500, temp=0.3)
+        resp = ia.ask(prompt, max_tokens=500, temp=0.3)
     except Exception as e:
         return _error(f'AI failed: {e}', 500)
     return jsonify({'pregunta': pregunta, 'respuesta': resp})
@@ -4681,7 +4681,7 @@ def api_v2_deteccion_ia():
     if not texto.strip():
         return _error('empty text', 400)
     try:
-        resp = ia.consultar('Does this text look AI-generated? Give concrete SIGNALS (uniformity, '
+        resp = ia.ask('Does this text look AI-generated? Give concrete SIGNALS (uniformity, '
                             'generic phrasing, lack of specific detail) and a tentative verdict. '
                             f'Do not invent certainty.\n\n{texto}', max_tokens=400, temp=0.3)
     except Exception as e:
@@ -4698,12 +4698,12 @@ def api_v2_consulta():
     pregunta = ((request.json or {}).get('pregunta', '') or '').strip()
     if not pregunta:
         return _error('empty question', 400)
-    disponibles = sorted({t.nombre for tp in TIPOS for t in REGISTRO.aplicables(tp)})
+    disponibles = sorted({t.nombre for tp in TIPOS for t in REGISTRO.applicable(tp)})
     prompt = (f'You are OBSIDIAN, an OSINT engine. Available transforms: {", ".join(disponibles)}.\n'
               f'The user asks: "{pregunta}". Return a concrete PLAN: which transforms to run, '
               f'on which entity and in what order. Be specific.')
     try:
-        resp = ia.consultar(prompt, max_tokens=600, temp=0.3)
+        resp = ia.ask(prompt, max_tokens=600, temp=0.3)
     except Exception as e:
         return _error(f'AI failed: {e}', 500)
     return jsonify({'pregunta': pregunta, 'plan': resp})
@@ -4717,7 +4717,7 @@ def api_v2_traducir():
     if not texto.strip():
         return _error('empty text', 400)
     try:
-        resp = ia.consultar(f'Translate to English. Return ONLY the translation, no notes '
+        resp = ia.ask(f'Translate to English. Return ONLY the translation, no notes '
                             f'or quotes:\n\n{texto}', max_tokens=800, temp=0.2)
     except Exception as e:
         return _error(f'AI failed: {e}', 500)
@@ -4733,7 +4733,7 @@ def api_v2_ia_modo(modo):
     contexto = json.dumps(_almacen.to_dict(), default=str)[:3500]
     prompt = _PROMPTS_IA[modo].format(objetivo=_objetivo_del_almacen() or 'el objetivo', datos=contexto)
     try:
-        resp = ia.consultar(prompt, max_tokens=700, temp=0.4)
+        resp = ia.ask(prompt, max_tokens=700, temp=0.4)
     except Exception as e:
         return _error(f'AI failed: {e}', 500)
     return jsonify({'modo': modo, 'resultado': resp})
@@ -4757,7 +4757,7 @@ def api_v2_hallazgos_ia():
         f"In 3-4 sentences: summarize the main risk and suggest the next concrete "
         f"investigation step. Direct, no filler.")
     try:
-        texto = ia.consultar(prompt, max_tokens=300)
+        texto = ia.ask(prompt, max_tokens=300)
         return jsonify({'resumen': texto or 'The AI returned no text.'})
     except Exception as e:
         log.warning("AI correlation failed: %s", e)
@@ -4788,7 +4788,7 @@ def api_v2_verificar():
             "In 2-3 sentences: real risk or likely false positive? WHY (based on the "
             "evidence)? What should the user verify?")
         try:
-            razon = ia.consultar(prompt, max_tokens=220, temp=0.3)
+            razon = ia.ask(prompt, max_tokens=220, temp=0.3)
         except Exception as e:
             log.warning("verify AI failed: %s", e)
             razon = 'AI unavailable (is Ollama on :11434?)'

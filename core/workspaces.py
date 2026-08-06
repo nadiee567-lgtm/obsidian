@@ -33,7 +33,7 @@ class Manager:
             return None
         return ruta
 
-    def listar(self):
+    def list_ws(self):
         return sorted(os.path.splitext(os.path.basename(p))[0]
                       for p in glob.glob(os.path.join(self.dir, '*.db')))
 
@@ -71,7 +71,7 @@ class Manager:
             return True
         return False
 
-    def renombrar(self, viejo, nuevo):
+    def rename(self, viejo, nuevo):
         rv, rn = self._ruta(viejo), self._ruta(nuevo)
         if not rv or not os.path.exists(rv):
             raise KeyError('workspace not found')
@@ -109,14 +109,14 @@ class Manager:
         shutil.copy2(r, os.path.join(d, snap_id + '.db'))
         return snap_id
 
-    def listar_snapshots(self, nombre):
+    def list_snapshots(self, nombre):
         d = self._dir_snaps(nombre)
         if not d:
             return []
         return sorted((os.path.splitext(os.path.basename(p))[0]
                        for p in glob.glob(os.path.join(d, '*.db'))), reverse=True)
 
-    def cargar_snapshot(self, nombre, snap_id):
+    def load_snapshot(self, nombre, snap_id):
         """Loads a snapshot's Store WITHOUT restoring it (for historical diff, step 151)."""
         d = self._dir_snaps(nombre)
         sid = _slug_caso(snap_id)
@@ -125,7 +125,7 @@ class Manager:
             raise KeyError('snapshot not found')
         return load_store(ruta)
 
-    def restaurar(self, nombre, snap_id):
+    def restore(self, nombre, snap_id):
         """Reverts the case to an earlier snapshot (snapshots the current one first)."""
         r = self._ruta(nombre)
         d = self._dir_snaps(nombre)
