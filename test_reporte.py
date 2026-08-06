@@ -18,7 +18,7 @@ def _almacen_demo():
 
 def test_reporte_tiene_secciones():
     alm, d, ip = _almacen_demo()
-    h = [Finding('ip-listada', 'alto', 'IP en feed de amenazas', [ip.id])]
+    h = [Finding('ip-listada', 'high', 'IP en feed de amenazas', [ip.id])]
     html = generar_reporte(alm, hallazgos=h, score=20,
                            meta={'workspace': 'caso-1', 'objetivo': 'objetivo.com'})
     for txt in ('Risk summary', 'Findings', 'Entity inventory',
@@ -43,7 +43,7 @@ def test_reporte_escapa_xss():
     alm = Store()
     alm.create('dominio', 'malo.com',
               propiedades={'nota': '<script>alert(1)</script>'})
-    h = [Finding('r', 'critico', 'injection <img src=x onerror=alert(1)>', [])]
+    h = [Finding('r', 'critical', 'injection <img src=x onerror=alert(1)>', [])]
     html = generar_reporte(alm, hallazgos=h, score=40)
     assert '<script>alert(1)</script>' not in html          # raw NO
     assert '&lt;script&gt;' in html                          # escaped YES

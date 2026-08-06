@@ -14,8 +14,8 @@ import datetime
 
 from core.modelo import TIPOS
 
-_SEV_COLOR = {'critico': '#f38ba8', 'alto': '#fab387', 'medio': '#f9e2af', 'bajo': '#89b4fa'}  # Catppuccin Mocha
-_SEV_ORDEN = {'critico': 4, 'alto': 3, 'medio': 2, 'bajo': 1}
+_SEV_COLOR = {'critical': '#f38ba8', 'high': '#fab387', 'medium': '#f9e2af', 'low': '#89b4fa'}  # Catppuccin Mocha
+_SEV_ORDEN = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
 
 
 def _e(v) -> str:
@@ -24,7 +24,7 @@ def _e(v) -> str:
 
 
 def _resumen_severidad(hallazgos) -> dict:
-    conteo = {'critico': 0, 'alto': 0, 'medio': 0, 'bajo': 0}
+    conteo = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
     for h in hallazgos:
         sev = getattr(h, 'severidad', None)
         if sev in conteo:
@@ -62,16 +62,16 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
     conteo = _resumen_severidad(hallazgos)
 
     # ── score bar colored by level ──
-    if score >= 70:   score_col = _SEV_COLOR['critico']
-    elif score >= 40: score_col = _SEV_COLOR['alto']
-    elif score >= 15: score_col = _SEV_COLOR['medio']
-    else:             score_col = _SEV_COLOR['bajo']
+    if score >= 70:   score_col = _SEV_COLOR['critical']
+    elif score >= 40: score_col = _SEV_COLOR['high']
+    elif score >= 15: score_col = _SEV_COLOR['medium']
+    else:             score_col = _SEV_COLOR['low']
 
     # ── findings ──
     if hallazgos:
         filas = []
         for h in hallazgos:
-            sev = getattr(h, 'severidad', 'bajo')
+            sev = getattr(h, 'severidad', 'low')
             col = _SEV_COLOR.get(sev, '#8b8b98')
             n_ent = len(getattr(h, 'entidades', []) or [])
             filas.append(
@@ -132,7 +132,7 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
     chips = ''.join(
         f'<span class="chip" style="border-color:{_SEV_COLOR[s]}">'
         f'<b style="color:{_SEV_COLOR[s]}">{conteo[s]}</b> {s}</span>'
-        for s in ('critico', 'alto', 'medio', 'bajo'))
+        for s in ('critical', 'high', 'medium', 'low'))
 
     return f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8">

@@ -22,7 +22,7 @@ def _demo():
 
 def test_json_reimportable():
     alm, d, ip = _demo()
-    h = [Finding('ip-listada', 'alto', 'x', [ip.id])]
+    h = [Finding('ip-listada', 'high', 'x', [ip.id])]
     txt = exportar_json(alm, h, score=20, meta={'workspace': 'c1'})
     obj = json.loads(txt)
     assert obj['meta']['workspace'] == 'c1'

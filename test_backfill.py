@@ -93,7 +93,7 @@ def test_github_sec_y_regla(monkeypatch):
     creds = [p for p in prod if p.tipo == 'credencial']
     assert creds and 'secreto-github' in creds[0].tags
     h = correlate(alm)
-    assert any(x.regla == 'secreto-github' and x.severidad == 'critico' for x in h)
+    assert any(x.regla == 'secreto-github' and x.severidad == 'critical' for x in h)
 
 
 # ── 56: exposed login/panel + credential ────────────────────────────────────
@@ -102,10 +102,10 @@ def test_login_expuesto_regla():
     alm = Store()
     alm.create('dominio', 'admin.x.com').tag('panel-login')
     r = [x for x in correlate(alm) if x.regla == 'login-expuesto']
-    assert r and r[0].severidad == 'alto'
+    assert r and r[0].severidad == 'high'
     alm.create('email', 'a@x.com').tag('filtrado')     # login + credential
     r2 = [x for x in correlate(alm) if x.regla == 'login-expuesto']
-    assert r2 and r2[0].severidad == 'critico'
+    assert r2 and r2[0].severidad == 'critical'
 
 
 def test_http_probe_detecta_panel_login(monkeypatch):
@@ -126,7 +126,7 @@ def test_leak_login():
     e = alm.create('email', 'admin@acme.com'); e.tag('filtrado')
     p = alm.create('subdominio', 'panel.acme.com'); p.tag('panel-login')
     r = [x for x in correlate(alm) if x.regla == 'leak-login']
-    assert r and r[0].severidad == 'critico'
+    assert r and r[0].severidad == 'critical'
     assert e.id in r[0].entidades and p.id in r[0].entidades   # names both
 
 
@@ -163,7 +163,7 @@ def test_reglas_yaml():
     from core.correlacion import load_yaml_rules, correlate
     yaml_txt = """
 - nombre: puerto-ftp
-  severidad: alto
+  severidad: high
   mensaje: "FTP en {valor}"
   cuando:
     tipo: puerto
@@ -175,7 +175,7 @@ def test_reglas_yaml():
         alm.create('puerto', '1.2.3.4:21')
         alm.create('puerto', '1.2.3.4:443')              # does not match
         r = [x for x in correlate(alm) if x.regla == 'puerto-ftp']
-        assert len(r) == 1 and r[0].severidad == 'alto' and r[0].mensaje == 'FTP en 1.2.3.4:21'
+        assert len(r) == 1 and r[0].severidad == 'high' and r[0].mensaje == 'FTP en 1.2.3.4:21'
     finally:
         load_yaml_rules('')                          # clears the global
 
@@ -184,7 +184,7 @@ def test_reglas_yaml_severidad_invalida_se_normaliza():
     from core.correlacion import load_yaml_rules, _REGLAS_YAML
     try:
         load_yaml_rules("- nombre: x\n  severidad: URGENTISIMO\n  cuando: {tag: y}\n")
-        assert _REGLAS_YAML[0]['severidad'] == 'medio'  # invalid severity → medio
+        assert _REGLAS_YAML[0]['severidad'] == 'medium'  # invalid severity → medio
     finally:
         load_yaml_rules('')
 

@@ -29,7 +29,7 @@ def test_ip_maliciosa_es_critica():
     ip = alm.create('ip', '45.9.9.9')
     ip.tag('malicioso')
     h = correlate(alm)
-    assert h[0].regla == 'ip-maliciosa' and h[0].severidad == 'critico'   # comes first
+    assert h[0].regla == 'ip-maliciosa' and h[0].severidad == 'critical'   # comes first
 
 
 def test_email_filtrado_y_spoofable():
@@ -46,16 +46,16 @@ def test_orden_por_severidad():
     alm.create('ip', '45.0.0.1').tag('malicioso')     # critical
     alm.create('puerto', '1.1.1.1:3306')                    # high
     sev = [x.severidad for x in correlate(alm)]
-    assert sev == sorted(sev, key=lambda s: -{'critico':4,'alto':3,'medio':2,'bajo':1}[s])
-    assert sev[0] == 'critico'
+    assert sev == sorted(sev, key=lambda s: -{'critical':4,'high':3,'medium':2,'low':1}[s])
+    assert sev[0] == 'critical'
 
 
 def test_score_riesgo():
     assert risk_score([]) == 0
-    h = [Finding('a', 'critico', 'x'), Finding('b', 'medio', 'y')]
+    h = [Finding('a', 'critical', 'x'), Finding('b', 'medium', 'y')]
     assert risk_score(h) == 48          # 40 + 8
     # caps at 100
-    muchos = [Finding('r', 'critico', 'm') for _ in range(5)]
+    muchos = [Finding('r', 'critical', 'm') for _ in range(5)]
     assert risk_score(muchos) == 100
 
 

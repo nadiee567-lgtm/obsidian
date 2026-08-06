@@ -110,7 +110,7 @@ def test_shadow_it():
     alm.create('subdominio', 'vivo.acme.com', propiedades={'http_status': 200})   # healthy
     r = [x for x in correlate(alm) if x.regla == 'shadow-it']
     sev = {x.severidad for x in r}
-    assert len(r) == 2 and sev == {'alto', 'medio'}                    # bucket + broken subdom
+    assert len(r) == 2 and sev == {'high', 'medium'}                    # bucket + broken subdom
 
 
 # ── 151: historical surface diff ────────────────────────────────────────────
