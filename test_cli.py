@@ -1,6 +1,6 @@
-"""Tests del CLI (F7 paso 98). No tocan la red.
+"""Tests for the CLI (F7 step 98). They don't touch the network.
 
-Correr:  ../.venv/bin/python -m pytest test_cli.py -q
+Run:  ../.venv/bin/python -m pytest test_cli.py -q
 """
 import obsidian_cli as cli
 

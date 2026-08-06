@@ -1,6 +1,6 @@
-"""Tests del ejecutor de transforms en paralelo (F7 paso 102).
+"""Tests for the parallel transform executor (F7 step 102).
 
-Correr:  ../.venv/bin/python -m pytest test_lote.py -q
+Run:  ../.venv/bin/python -m pytest test_lote.py -q
 """
 import threading
 
@@ -24,10 +24,10 @@ def test_lote_fusiona_resultados():
     res = ejecutar_lote([('dominio', 'ejemplo.com', '_test_lote_a'),
                          ('dominio', 'ejemplo.com', '_test_lote_b')], alm)
     assert dict(res) == {'_test_lote_a': 2, '_test_lote_b': 1}
-    # semilla compartida (dedup) + 2 ip + 1 subdominio = 4
+    # shared seed (dedup) + 2 ip + 1 subdomain = 4
     assert len(alm) == 4
     assert {e.tipo for e in alm.entidades} == {'dominio', 'ip', 'subdominio'}
-    # las relaciones semilla→salida también se fusionaron
+    # the seed→output relations were merged too
     assert len(alm.relaciones) == 3
 
 
@@ -45,14 +45,14 @@ def test_lote_transform_inexistente_no_rompe():
     alm = Almacen()
     res = ejecutar_lote([('dominio', 'a.com', 'no_existe_zzz')], alm)
     assert res == [('no_existe_zzz', 0)]
-    assert len(alm) == 1          # solo la semilla
+    assert len(alm) == 1          # only the seed
 
 
 def test_lote_no_pierde_datos_en_paralelo():
-    """Muchas tareas concurrentes: ninguna salida se pierde en la fusión."""
+    """Many concurrent tasks: no output is lost in the merge."""
     alm = Almacen()
     tareas = [('dominio', f'sitio{i}.com', '_test_lote_a') for i in range(20)]
     ejecutar_lote(tareas, alm, max_workers=8)
-    # 20 semillas distintas + 2 ips compartidas (10.0.0.1/2) = 22
+    # 20 distinct seeds + 2 shared ips (10.0.0.1/2) = 22
     assert len(alm.de_tipo('dominio')) == 20
     assert len(alm.de_tipo('ip')) == 2
