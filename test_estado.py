@@ -1,6 +1,6 @@
-"""Tests de la página de estado (F7 paso 105).
+"""Tests for the status page (F7 step 105).
 
-Correr:  ../.venv/bin/python -m pytest test_estado.py -q
+Run:  ../.venv/bin/python -m pytest test_estado.py -q
 """
 from core.estado import render_estado
 
@@ -21,7 +21,7 @@ def _datos():
 def test_render_muestra_datos():
     html = render_estado(_datos())
     for txt in ('system status', '39', 'dominio', 'qwen2.5:3b', 'github', 'abuseipdb', 'dig'):
-        assert txt in html, f'falta: {txt}'
+        assert txt in html, f'missing: {txt}'
 
 
 def test_render_sin_keys():
@@ -41,4 +41,4 @@ def test_render_escapa_xss():
 def test_render_ia_no_disponible():
     d = _datos(); d['ia'] = {'disponible': False, 'modelo': '?'}
     html = render_estado(d)
-    assert 'system status' in html      # no revienta con ia caída
+    assert 'system status' in html      # does not blow up with AI down
