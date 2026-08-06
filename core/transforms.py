@@ -1,18 +1,19 @@
-"""Motor de transforms de OBSIDIAN — F2, pasos 26-28.
+"""OBSIDIAN transform engine -- F2, steps 26-28.
 
-Diseño copiado de contratos REALES y probados, no inventado:
-  - Maltego: "un transform toma UNA entidad de entrada y produce CERO O MÁS
-    entidades de salida", declarado con un decorator con tipo de entrada/salida.
-  - SpiderFoot: cada módulo declara watchedEvents (consume) / producedEvents
-    (produce) / handleEvent (lógica).
+Design copied from REAL, proven contracts, not invented:
+  - Maltego: "a transform takes ONE input entity and produces ZERO OR MORE
+    output entities", declared with a decorator with input/output type.
+  - SpiderFoot: each module declares watchedEvents (consumes) / producedEvents
+    (produces) / handleEvent (logic).
 
-Aquí: @transform(entrada=<tipo>, salidas=(<tipos>)) registra una función
-fn(entidad, ctx). El Contexto (ctx) es la API ergonómica para el autor: emitir
-entidades de salida que se agregan al almacén, se relacionan con la entrada y
-registran procedencia — automático.
+Here: @transform(entrada=<type>, salidas=(<types>)) registers a function
+fn(entidad, ctx). The Context (ctx) is the ergonomic API for the author: emit
+output entities that are added to the store, related to the input and get
+their provenance recorded -- automatic.
 
-Módulo PURO: sin Flask, sin red. Los transforms concretos (con red/APIs) se
-registran encima; el motor solo los orquesta y AÍSLA sus fallos (paso 38)."""
+PURE module: no Flask, no network. Concrete transforms (with network/APIs) are
+registered on top; the engine only orchestrates them and ISOLATES their
+failures (step 38)."""
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
@@ -22,8 +23,8 @@ from core.modelo import Almacen, Entidad, tipo_valido
 
 @dataclass
 class Transform:
-    """Contrato de un transform (paso 26). entrada = tipo de entidad sobre el que
-    corre; salidas = tipos que puede producir; requiere_key = necesita API key."""
+    """A transform's contract (step 26). entrada = entity type it runs on;
+    salidas = types it can produce; requiere_key = needs an API key."""
     nombre: str
     entrada: str
     salidas: tuple = ()
@@ -33,28 +34,28 @@ class Transform:
 
     def __post_init__(self):
         if not tipo_valido(self.entrada):
-            raise ValueError(f"tipo de entrada desconocido: {self.entrada!r}")
+            raise ValueError(f"unknown input type: {self.entrada!r}")
         for s in self.salidas:
             if not tipo_valido(s):
-                raise ValueError(f"tipo de salida desconocido: {s!r}")
+                raise ValueError(f"unknown output type: {s!r}")
 
 
 class _Registro:
-    """Catálogo central de transforms (paso 27). Indexado por tipo de entrada
-    para responder rápido '¿qué transforms aplican a esta entidad?' (paso 35)."""
+    """Central transform catalog (step 27). Indexed by input type to answer
+    quickly 'which transforms apply to this entity?' (step 35)."""
     def __init__(self):
         self._por_entrada: dict[str, list] = {}
         self._por_nombre: dict[str, Transform] = {}
 
     def registrar(self, t: Transform) -> Transform:
         if t.nombre in self._por_nombre:
-            raise ValueError(f"transform duplicado: {t.nombre}")
+            raise ValueError(f"duplicate transform: {t.nombre}")
         self._por_nombre[t.nombre] = t
         self._por_entrada.setdefault(t.entrada, []).append(t)
         return t
 
     def aplicables(self, tipo: str) -> list:
-        """Transforms que corren sobre una entidad de este tipo (paso 35)."""
+        """Transforms that run on an entity of this type (step 35)."""
         return list(self._por_entrada.get(tipo, ()))
 
     def por_nombre(self, nombre: str) -> Transform | None:
@@ -68,12 +69,12 @@ class _Registro:
         self._por_nombre.clear()
 
 
-# Registro global (los transforms concretos se registran al importarse).
+# Global registry (concrete transforms register themselves on import).
 REGISTRO = _Registro()
 
 
 def transform(entrada: str, salidas=(), nombre=None, requiere_key=False, descripcion=''):
-    """Decorator que registra una función como transform.
+    """Decorator that registers a function as a transform.
 
     @transform(entrada='dominio', salidas=('ip','subdominio'))
     def resolver(entidad, ctx):
@@ -89,9 +90,9 @@ def transform(entrada: str, salidas=(), nombre=None, requiere_key=False, descrip
 
 
 class Contexto:
-    """API que recibe el autor del transform. `emitir` crea una entidad de salida,
-    la agrega al almacén (dedup + eventos), la relaciona con la entrada y le pone
-    la procedencia — todo automático."""
+    """API the transform author receives. `emitir` creates an output entity, adds
+    it to the store (dedup + events), relates it to the input and sets its
+    provenance -- all automatic."""
     def __init__(self, almacen: Almacen, entrada: Entidad, nombre_transform: str):
         self.almacen = almacen
         self.entrada = entrada
@@ -102,7 +103,7 @@ class Contexto:
         try:
             ent = Entidad(tipo=tipo, valor=valor, propiedades=propiedades)
         except ValueError:
-            return None   # valor basura: se ignora, no rompe el transform
+            return None   # garbage value: ignored, does not break the transform
         viva = self.almacen.agregar(ent)
         viva.anotar_procedencia(self._nombre, input_id=self.entrada.id)
         self.almacen.relacionar(self.entrada, viva, etiqueta)
@@ -110,9 +111,9 @@ class Contexto:
         return viva
 
 
-# ── Rate limiting por transform (paso 40) ────────────────────────────────────
-# Un semáforo por transform limita cuántas ejecuciones concurrentes tocan su API,
-# para no reventar a los terceros. Sin límite configurado = sin tope.
+# ── Per-transform rate limiting (step 40) ────────────────────────────────────
+# A semaphore per transform limits how many concurrent runs touch its API, so as
+# not to hammer third parties. No configured limit = no cap.
 import threading as _threading
 
 _SEMAFOROS: dict = {}
@@ -121,7 +122,7 @@ _lock_lim = _threading.Lock()
 
 
 def set_limite(nombre: str, max_concurrentes: int) -> None:
-    """Configura la concurrencia máxima de un transform. <=0 quita el límite."""
+    """Configures a transform's max concurrency. <=0 removes the limit."""
     with _lock_lim:
         if max_concurrentes and max_concurrentes > 0:
             _LIMITES[nombre] = max_concurrentes
@@ -136,43 +137,44 @@ def limites() -> dict:
 
 
 def ejecutar(t: Transform, entidad: Entidad, almacen: Almacen) -> list:
-    """Corre un transform sobre una entidad (paso 28). Devuelve las entidades
-    producidas. AÍSLA fallos (paso 38): si el transform revienta, no propaga —
-    devuelve lo que alcanzó a emitir. Respeta el rate limit del transform (paso 40)."""
+    """Runs a transform on an entity (step 28). Returns the produced entities.
+    ISOLATES failures (step 38): if the transform crashes, it does not propagate
+    -- it returns whatever it managed to emit. Honors the transform's rate limit
+    (step 40)."""
     if entidad.tipo != t.entrada:
-        raise ValueError(f"{t.nombre} espera '{t.entrada}', recibió '{entidad.tipo}'")
+        raise ValueError(f"{t.nombre} expects '{t.entrada}', got '{entidad.tipo}'")
     ctx = Contexto(almacen, entidad, t.nombre)
     sem = _SEMAFOROS.get(t.nombre)
     try:
         if sem is not None:
-            with sem:                       # no más de N concurrentes de este transform
+            with sem:                       # no more than N concurrent of this transform
                 t.fn(entidad, ctx)
         else:
             t.fn(entidad, ctx)
     except Exception:
-        pass   # el fallo de un transform no tumba el caso
+        pass   # a transform failure does not take down the case
     return ctx.emitidas
 
 
 def ejecutar_por_nombre(nombre: str, entidad: Entidad, almacen: Almacen) -> list:
     t = REGISTRO.por_nombre(nombre)
     if t is None:
-        raise KeyError(f"transform no registrado: {nombre}")
+        raise KeyError(f"transform not registered: {nombre}")
     return ejecutar(t, entidad, almacen)
 
 
 def ejecutar_lote(tareas, almacen: Almacen, max_workers: int = 8, lock=None,
                   on_progreso=None) -> list:
-    """Corre varios transforms EN PARALELO (paso 102). Los transforms son I/O-bound
-    (red), así que se lanzan concurrentemente — cada uno en un Almacen AISLADO, sin
-    estado compartido durante el fetch. Al terminar, se fusionan los resultados en
-    `almacen` (dedup por id determinista). Si se pasa `lock`, la fusión va bajo él.
+    """Runs several transforms IN PARALLEL (step 102). Transforms are I/O-bound
+    (network), so they are launched concurrently -- each in an ISOLATED Store, no
+    shared state during the fetch. When done, results are merged into `almacen`
+    (dedup by deterministic id). If `lock` is passed, the merge runs under it.
 
-    on_progreso(nombre, n, hechas, total): callback opcional que se llama a medida
-    que CADA transform termina (paso 37, para el streaming de progreso).
+    on_progreso(nombre, n, hechas, total): optional callback called as EACH
+    transform finishes (step 37, for progress streaming).
 
-    tareas: iterable de (tipo, valor, nombre_transform).
-    Devuelve [(nombre, nº_producidas), ...]."""
+    tareas: iterable of (type, value, transform_name).
+    Returns [(name, n_produced), ...]."""
     import contextlib
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -205,7 +207,7 @@ def ejecutar_lote(tareas, almacen: Almacen, max_workers: int = 8, lock=None,
                     pass
 
     ctx = lock if lock is not None else contextlib.nullcontext()
-    with ctx:                                    # fusión serializada (dedup consistente)
+    with ctx:                                    # serialized merge (consistent dedup)
         for local in locales:
             for e in local.entidades:
                 almacen.agregar(e)
@@ -214,34 +216,34 @@ def ejecutar_lote(tareas, almacen: Almacen, max_workers: int = 8, lock=None,
     return resultados
 
 
-# ── Paso 39: Machines (recetas = cadenas de transforms, estilo Maltego) ──────
+# ── Step 39: Machines (recipes = chains of transforms, Maltego-style) ────────
 @dataclass
 class Machine:
-    """Una receta: transforms en orden que cascada de un tipo al siguiente.
-    Ej: ['dns_resolver','port_scan'] → dominio→ips, luego ips→puertos."""
+    """A recipe: transforms in order that cascade from one type to the next.
+    E.g. ['dns_resolver','port_scan'] -> domain->ips, then ips->ports."""
     nombre: str
     pasos: tuple = ()
     descripcion: str = ''
 
 
-# ── Paso 41: Corredor con caché (no repetir la misma consulta cara) ──────────
+# ── Step 41: Runner with cache (don't repeat the same expensive query) ───────
 class Corredor:
-    """Ejecuta transforms/machines sobre un almacén, recordando qué
-    (transform, entidad) ya corrió para no repetirlo en la misma sesión."""
+    """Runs transforms/machines over a store, remembering which
+    (transform, entity) pairs already ran to avoid repeating them in the same session."""
     def __init__(self, almacen: Almacen):
         self.almacen = almacen
-        self._hechos: set = set()   # {(nombre_transform, entidad_id)}
+        self._hechos: set = set()   # {(transform_name, entity_id)}
 
     def ejecutar(self, nombre: str, entidad: Entidad) -> list:
         clave = (nombre, entidad.id)
         if clave in self._hechos:
-            return []               # caché: ya se corrió sobre esta entidad
+            return []               # cache: already ran on this entity
         self._hechos.add(clave)
         return ejecutar_por_nombre(nombre, entidad, self.almacen)
 
     def ejecutar_machine(self, machine: Machine, semilla: Entidad) -> list:
-        """Corre la receta: cada paso corre sobre las entidades del tipo que
-        espera (semilla + lo producido antes). El caché evita re-ejecutar."""
+        """Runs the recipe: each step runs on the entities of the type it
+        expects (seed + what was produced before). The cache avoids re-running."""
         pool = {semilla.id: semilla}
         producidas = []
         for paso in machine.pasos:
@@ -256,10 +258,10 @@ class Corredor:
         return producidas
 
 
-# ── Paso 42: cargar transforms desde plugins (sin tocar el core) ─────────────
+# ── Step 42: load transforms from plugins (without touching the core) ────────
 def cargar_plugins(directorio: str) -> list:
-    """Importa cada .py de `directorio` (que se auto-registra con @transform).
-    Extensible como el Transform Hub de Maltego. Devuelve los nombres cargados."""
+    """Imports each .py in `directorio` (which self-registers via @transform).
+    Extensible like Maltego's Transform Hub. Returns the loaded names."""
     import importlib.util
     import os
     import glob

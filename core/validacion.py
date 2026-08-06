@@ -1,18 +1,18 @@
-"""Validadores y sanitizadores de seguridad de OBSIDIAN — paso 8 (core/).
+"""OBSIDIAN security validators and sanitizers -- step 8 (core/).
 
-Funciones PURAS: no tocan `case`, `SESSION` ni Flask. Su única dependencia es
-CASES_DIR (para contener las rutas de caso). Cierran command injection,
-argument injection, path traversal y SSRF. Testeadas en test_seguridad.py.
+PURE functions: they don't touch `case`, `SESSION` or Flask. Their only
+dependency is CASES_DIR (to contain case paths). They close command injection,
+argument injection, path traversal and SSRF. Tested in test_seguridad.py.
 """
 import os, re, socket, ipaddress
 from urllib.parse import urlparse
 
 from core.config import CASES_DIR
 
-# Metacaracteres de shell — usados por el check genérico _objetivo_seguro.
+# Shell metacharacters -- used by the generic _objetivo_seguro check.
 _SHELL_PELIGROSOS = set(' \t\n\r;&|`$<>(){}[]!*?~"\'\\')
 
-# Un módulo → qué tipo de objetivo espera (para validar con el patrón correcto).
+# A module -> which target type it expects (to validate with the right pattern).
 _MODULO_TIPO = {
     'usuario': 'usuario', 'dominio': 'dominio', 'ip': 'ip', 'email': 'email',
     'ssl': 'dominio', 'typosquatting': 'dominio', 'takeover': 'dominio',
@@ -32,8 +32,8 @@ def _es_ip(v):
 
 
 def _validar(arg, tipo):
-    """True solo si `arg` encaja EXACTAMENTE en la forma esperada de `tipo`.
-    Allowlist: cierra command injection Y argument injection de una vez."""
+    """True only if `arg` matches EXACTLY the expected shape of `tipo`.
+    Allowlist: closes command injection AND argument injection at once."""
     arg = (arg or '').strip()
     if not arg or len(arg) > 253:
         return False
@@ -41,13 +41,13 @@ def _validar(arg, tipo):
     if tipo == 'ip':       return _es_ip(arg)
     if tipo == 'usuario':  return bool(_RE_USUARIO.match(arg))
     if tipo == 'email':    return bool(_RE_EMAIL.match(arg))
-    # tipo desconocido → check genérico
+    # unknown type -> generic check
     return _objetivo_seguro(arg)
 
 
 def _objetivo_seguro(arg):
-    """Check genérico para objetivos sin tipo fijo (distrobox, shodan).
-    Rechaza vacío, '-' inicial (argument injection) y metacaracteres de shell."""
+    """Generic check for targets with no fixed type (distrobox, shodan).
+    Rejects empty, leading '-' (argument injection) and shell metacharacters."""
     arg = (arg or '').strip()
     if not arg or arg.startswith('-'):
         return False
@@ -55,22 +55,22 @@ def _objetivo_seguro(arg):
 
 
 def _slug_caso(nombre):
-    """Nombre de caso saneado para usar como archivo. Solo deja [A-Za-z0-9 _.-],
-    sin separadores de ruta ni '..'. Devuelve '' si queda inválido — así un
-    nombre como '../../.bashrc' no escribe/lee fuera de CASES_DIR."""
+    """Case name sanitized for use as a filename. Keeps only [A-Za-z0-9 _.-],
+    no path separators or '..'. Returns '' if it ends up invalid -- so a name
+    like '../../.bashrc' does not write/read outside CASES_DIR."""
     nombre = (nombre or '').strip()
-    # Rechazar de plano cualquier cosa con pinta de ruta, no "arreglarla".
+    # Flatly reject anything that looks like a path, do not "fix" it.
     if '/' in nombre or '\\' in nombre or '..' in nombre:
         return ''
     limpio = re.sub(r'[^A-Za-z0-9 _.-]', '', nombre).strip()[:80]
-    if not limpio or set(limpio) <= {'.'}:   # vacío, '.', '...'
+    if not limpio or set(limpio) <= {'.'}:   # empty, '.', '...'
         return ''
     return limpio
 
 
 def _ruta_caso_segura(nombre, sufijo='.json'):
-    """Ruta dentro de CASES_DIR para un caso saneado, o None si es inválido o
-    intentara escaparse del directorio (defensa en profundidad con realpath)."""
+    """Path inside CASES_DIR for a sanitized case, or None if invalid or it would
+    try to escape the directory (defense in depth with realpath)."""
     slug = _slug_caso(nombre)
     if not slug:
         return None
@@ -81,9 +81,9 @@ def _ruta_caso_segura(nombre, sufijo='.json'):
 
 
 def _url_publica(url):
-    """True solo si `url` es http/https hacia un host que resuelve a IP(s)
-    PÚBLICAS. Bloquea SSRF: localhost, LAN (10/172.16/192.168), link-local
-    (169.254.x, incluida la metadata de la nube), reservadas y multicast."""
+    """True only if `url` is http/https to a host that resolves to PUBLIC IP(s).
+    Blocks SSRF: localhost, LAN (10/172.16/192.168), link-local (169.254.x,
+    including cloud metadata), reserved and multicast."""
     try:
         p = urlparse(url)
     except Exception:
