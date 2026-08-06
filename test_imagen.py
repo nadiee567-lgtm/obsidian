@@ -42,7 +42,7 @@ def test_enlaces_facial():
 def test_busqueda_facial_transform():
     alm = Store()
     e = alm.create('url', 'https://x.com/cara.jpg')
-    prod = run_by_name('busqueda_facial', e, alm)
+    prod = run_by_name('facial_search', e, alm)
     motores = {p.properties.get('engine'): p.properties.get('mode') for p in prod}
     assert motores == {'yandex': 'url', 'facecheck': 'upload', 'pimeyes': 'upload'}
 
@@ -86,7 +86,7 @@ def test_cronolocalizacion(monkeypatch):
     from core.transforms import run_by_name
     alm = Store()
     u = alm.create('url', 'https://x.com/f.jpg', properties={'gps': "40 deg 26' N, 79 deg 58' W"})
-    prod = run_by_name('cronolocalizacion', u, alm)
+    prod = run_by_name('chronolocation', u, alm)
     assert {p.properties.get('tool') for p in prod} == {'suncalc', 'shadowmap'}
     assert any('40' in p.value for p in prod)         # coords en el link
 

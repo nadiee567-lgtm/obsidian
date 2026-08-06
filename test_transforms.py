@@ -64,12 +64,12 @@ def test_ejecutar_emite_relaciona_y_anota_procedencia():
     assert len(alm.relations) == 2
 
 def test_ejecutar_valida_tipo_de_entrada():
-    @tr.transform(input='domain', name='solo_dominio')
+    @tr.transform(input='domain', name='domain_only')
     def _f(entidad, ctx): pass
     alm = Store()
     ip = alm.create('ip', '8.8.8.8')
     with pytest.raises(ValueError):
-        tr.run_by_name('solo_dominio', ip, alm)
+        tr.run_by_name('domain_only', ip, alm)
 
 
 # ── failure isolation (step 38) ─────────────────────────────────────────────

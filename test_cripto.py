@@ -35,7 +35,7 @@ def test_extraer_wallets(monkeypatch):
 _GENESIS = '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
 
 
-def test_tx_grafo(monkeypatch):
+def test_tx_graph(monkeypatch):
     tx_json = {'txs': [{'inputs': [{'prev_out': {'addr': 'inp111'}}],
                         'out': [{'addr': 'out222'}, {'addr': _GENESIS}]}]}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=tx_json))
@@ -44,7 +44,7 @@ def test_tx_grafo(monkeypatch):
     assert ws == {'inp111', 'out222'}                # counterparties, without itself
 
 
-def test_tx_grafo_ignora_no_btc():
+def test_tx_graph_ignores_non_btc():
     prod, _, _ = _run_one('tx_grafo', 'wallet', '0x' + 'a' * 40)   # ETH -> not applicable yet
     assert prod == []
 

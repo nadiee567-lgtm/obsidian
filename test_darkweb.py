@@ -99,18 +99,18 @@ class _RjD:
         return self._d
 
 
-def test_stealer_dominio(monkeypatch):
+def test_stealer_domain(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _RjD({'data': {'employees': 12, 'users': 340}}))
-    _, e = _run_one('stealer_dominio', 'domain', 'acme.com')
+    _, e = _run_one('stealer_domain', 'domain', 'acme.com')
     assert 'stealer-exposed' in e.tags
     assert e.properties.get('stealer_empleados') == 12 and e.properties.get('stealer_usuarios') == 340
 
 
-def test_stealer_dominio_limpio(monkeypatch):
+def test_stealer_domain_clean(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _RjD({'data': {'employees': 0, 'users': 0}}))
-    _, e = _run_one('stealer_dominio', 'domain', 'acme.com')
+    _, e = _run_one('stealer_domain', 'domain', 'acme.com')
     assert 'stealer-exposed' not in e.tags
 
 

@@ -5,7 +5,7 @@ Run:  ../.venv/bin/python -m pytest test_notificar.py -q
 from core.notificar import build_ntfy, send_ntfy
 
 
-def test_construir_url_y_headers():
+def test_build_url_and_headers():
     url, headers, cuerpo = build_ntfy('my-topic', 'São Paulo alert',
                                           titulo='OBSIDIAN', prioridad='high', tags='warning')
     assert url == 'https://ntfy.sh/my-topic'
@@ -15,7 +15,7 @@ def test_construir_url_y_headers():
     assert cuerpo == 'São Paulo alert'.encode('utf-8')   # utf-8 body
 
 
-def test_construir_respeta_server_propio():
+def test_build_respects_own_server():
     url, _, _ = build_ntfy('t', 'x', server='https://ntfy.mydomain.com/')
     assert url == 'https://ntfy.mydomain.com/t'
 

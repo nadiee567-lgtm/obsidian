@@ -18,9 +18,9 @@ def _client():
 
 def test_transforms_reales_registrados():
     nombres = {t.name for t in REGISTRO.all_transforms()}
-    assert {'dns_a', 'ptr', 'crtsh', 'geo_ip', 'github_usuario', 'puertos', 'dns_mx',
+    assert {'dns_a', 'ptr', 'crtsh', 'geo_ip', 'github_user', 'puertos', 'dns_mx',
             'dns_ns', 'email_breaches', 'email_spoofable', 'rdap', 'greynoise',
-            'dns_txt', 'ssl', 'subdominios_ht', 'http_probe', 'http_probe_sub',
+            'dns_txt', 'ssl', 'subdomains_ht', 'http_probe', 'http_probe_sub',
             'screenshot', 'nuclei', 'breaches_xon', 'stealer_hudsonrock',
             'reputacion_ip', 'abuseipdb', 'wallet_balance', 'ip_blocklist', 'ct_certspotter', 'tech', 'cve_lookup', 'dorks', 'pastes_github', 'sherlock', 'metadata', 'wayback', 'reverse_whois', 'favicon_hash'} <= nombres
 
@@ -31,7 +31,7 @@ def test_transforms_aplicables_por_tipo():
     dominio = {t.name for t in REGISTRO.applicable('domain')}
     assert {'dns_a', 'crtsh', 'dns_mx', 'dns_ns'} <= dominio
     usuario = {t.name for t in REGISTRO.applicable('user')}
-    assert 'github_usuario' in usuario
+    assert 'github_user' in usuario
 
 
 def test_endpoints_viejos_intactos():
@@ -68,7 +68,7 @@ def test_v2_run_transform_inexistente():
     assert r.status_code == 400
 
 
-def test_v2_grafo_migrar_vacio():
+def test_v2_graph_migrate_empty():
     c = _client()
     r = c.get('/api/v2/grafo?migrar=1')
     assert r.status_code == 200

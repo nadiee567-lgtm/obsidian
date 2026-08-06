@@ -16,7 +16,7 @@ def _almacen_demo():
     return alm, d, ip
 
 
-def test_reporte_tiene_secciones():
+def test_report_has_sections():
     alm, d, ip = _almacen_demo()
     h = [Finding('ip-listed', 'high', 'IP en feed de amenazas', [ip.id])]
     html = generate_report(alm, hallazgos=h, score=20,
@@ -26,19 +26,19 @@ def test_reporte_tiene_secciones():
         assert txt in html, f'missing from the report: {txt}'
 
 
-def test_reporte_sin_hallazgos():
+def test_report_no_findings():
     alm, _, _ = _almacen_demo()
     html = generate_report(alm, hallazgos=[], score=0)
     assert 'No risks detected' in html
     assert '0/100' in html
 
 
-def test_reporte_almacen_vacio():
+def test_report_empty_store():
     html = generate_report(Store(), hallazgos=[], score=0)
     assert 'No entities' in html
 
 
-def test_reporte_escapa_xss():
+def test_report_escapes_xss():
     """Raw target data with a payload → must come out escaped, never executable."""
     alm = Store()
     alm.create('domain', 'malo.com',
@@ -51,7 +51,7 @@ def test_reporte_escapa_xss():
     assert '&lt;img src=x' in html
 
 
-def test_reporte_grafo_embebido():
+def test_report_embedded_graph():
     alm, d, ip = _almacen_demo()
     # fake vis_js: we only check it gets embedded and builds the datasets
     html = generate_report(alm, hallazgos=[], score=0, vis_js='/*VISLIB*/')

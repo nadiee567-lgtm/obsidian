@@ -227,7 +227,7 @@ def test_rate_limit_concurrencia():
 
 
 # ── 37: background queue + SSE ──────────────────────────────────────────────
-def test_gestor_tareas():
+def test_task_manager():
     from core.tareas import TaskManager
     g = TaskManager()
 
@@ -244,7 +244,7 @@ def test_gestor_tareas():
     assert g.estado(tid)['resultado'] == {'ok': True}
 
 
-def test_gestor_tareas_error_no_cuelga():
+def test_task_manager_error_no_hang():
     from core.tareas import TaskManager
     g = TaskManager()
 
@@ -268,7 +268,7 @@ def test_ejecutar_lote_progreso():
 
 
 # ── Migration of the rest of the old Obsidian (minus distroboxes) ────────────
-def test_persona(monkeypatch):
+def test_person(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _Rj({'AbstractText': 'Person bio.'}))
     prod, e, _ = _run_one('person', 'person', 'Juan Perez')

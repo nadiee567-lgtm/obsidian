@@ -2170,9 +2170,9 @@ def _t_wayback(entidad, ctx):
     except Exception as _e:
         log.debug("wayback cdx: %s", _e)
 
-@transform(input='domain', outputs=('subdomain', 'ip'), name='subdominios_ht',
+@transform(input='domain', outputs=('subdomain', 'ip'), name='subdomains_ht',
            description='Subdomains (+ their IP) via HackerTarget hostsearch (keyless)')
-def _t_subdominios_ht(entidad, ctx):
+def _t_subdomains_ht(entidad, ctx):
     try:
         texto = SESSION.get(f'https://api.hackertarget.com/hostsearch/?q={entidad.value}', timeout=12).text
         if 'API count exceeded' in texto or 'error' in texto.lower():
@@ -2185,8 +2185,8 @@ def _t_subdominios_ht(entidad, ctx):
                 continue
             sub_ent = ctx.emit('subdomain', sub, label='subdomain')
             if sub_ent and re.fullmatch(r'\d+\.\d+\.\d+\.\d+', ip):
-                ip_ent = ctx.almacen.create('ip', ip, sources={'subdominios_ht'})
-                ip_ent.note_provenance('subdominios_ht', input_id=sub_ent.id)
+                ip_ent = ctx.almacen.create('ip', ip, sources={'subdomains_ht'})
+                ip_ent.note_provenance('subdomains_ht', input_id=sub_ent.id)
                 ctx.almacen.relate(sub_ent, ip_ent, 'A')
     except Exception as _e:
         log.debug("subdominios_ht unavailable: %s", _e)
@@ -2255,7 +2255,7 @@ def _t_sherlock(entidad, ctx):
         if m:
             ctx.emit('platform', m.group(1).strip(), label='profile', url=m.group(2).strip())
 
-@transform(input='user', outputs=('email', 'repo'), name='github_usuario',
+@transform(input='user', outputs=('email', 'repo'), name='github_user',
            description='User email and public repos on GitHub')
 def _t_github(entidad, ctx):
     try:
@@ -2467,9 +2467,9 @@ def _t_pastes(entidad, ctx):
         ctx.emit('url', f'https://www.google.com/search?q={_q(f"{q} site:{sitio}")}',
                    label=f'paste-dork:{sitio}', sitio=sitio)
 
-@transform(input='domain', outputs=(), name='stealer_dominio',
+@transform(input='domain', outputs=(), name='stealer_domain',
            description='Domain exposure in stealer logs (infected employees/users, HudsonRock keyless) (F10 step 132)')
-def _t_stealer_dominio(entidad, ctx):
+def _t_stealer_domain(entidad, ctx):
     try:
         d = SESSION.get('https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-domain',
                         params={'domain': entidad.value}, timeout=10).json() or {}
@@ -2957,7 +2957,7 @@ def _t_reverse_image(entidad, ctx):
     for motor, enlace in enlaces_reverse(entidad.value).items():
         ctx.emit('url', enlace, label=f'reverse:{motor}', engine=motor)
 
-@transform(input='url', outputs=('url',), name='busqueda_facial',
+@transform(input='url', outputs=('url',), name='facial_search',
            description='Facial recognition: Yandex (by URL) + FaceCheck/PimEyes (manual upload) (F9)')
 def _t_busqueda_facial(entidad, ctx):
     for motor, info in enlaces_facial(entidad.value).items():
@@ -3174,7 +3174,7 @@ def _t_github_sec(entidad, ctx):
 
 @transform(input='person', outputs=('url',), name='person',
            description='OSINT on a person: summary (DuckDuckGo) + dorks (LinkedIn/X/GitHub...) (keyless)')
-def _t_persona(entidad, ctx):
+def _t_person(entidad, ctx):
     from urllib.parse import quote as _q
     name = entidad.value
     try:
@@ -3304,7 +3304,7 @@ def _t_wordlist(entidad, ctx):
     except Exception as _e:
         log.debug("wordlist save: %s", _e)
 
-@transform(input='url', outputs=('url',), name='cronolocalizacion',
+@transform(input='url', outputs=('url',), name='chronolocation',
            description='Chronolocation by shadows: SunCalc/ShadowMap (Bellingcat technique) (F9 step 121)')
 def _t_cronolocalizacion(entidad, ctx):
     coords = parse_gps(entidad.properties.get('gps', ''))
@@ -3559,7 +3559,7 @@ _ES_BTC = re.compile(r'(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\Z'
 
 @transform(input='wallet', outputs=('wallet',), name='tx_grafo',
            description='Transaction counterparties of a BTC wallet (blockchain.info, keyless) (F11 step 138)')
-def _t_tx_grafo(entidad, ctx):
+def _t_tx_graph(entidad, ctx):
     addr = entidad.value
     if not _ES_BTC.match(addr):
         return                                       # BTC only for now (keyless)
@@ -3667,7 +3667,7 @@ def _t_extraer_wallets(entidad, ctx):
         for addr in list(set(rx.findall(texto)))[:30]:
             ctx.emit('wallet', addr, label=cadena, cadena=cadena)
 
-@transform(input='person', outputs=('url',), name='dorks_idioma',
+@transform(input='person', outputs=('url',), name='language_dorks',
            description='Dorks adapted to the name language (Cyrillic/Chinese/Latin) (F15 step 176)')
 def _t_dorks_idioma(entidad, ctx):
     from urllib.parse import quote as _q
@@ -3675,13 +3675,13 @@ def _t_dorks_idioma(entidad, ctx):
     for d in _ml.dorks_por_idioma(entidad.value, idioma):
         ctx.emit('url', f'https://www.google.com/search?q={_q(d)}', label=f'dork:{idioma}', language=idioma)
 
-@transform(input='person', outputs=('url',), name='motores_locales',
+@transform(input='person', outputs=('url',), name='local_engines',
            description='Search in local engines: Yandex, Baidu, Sogou (they index another internet) (F15 step 174)')
 def _t_motores_locales(entidad, ctx):
     for motor, url in _ml.motores_locales(entidad.value).items():
         ctx.emit('url', url, label=f'motor:{motor}', engine=motor)
 
-@transform(input='org', outputs=('url',), name='registros_regionales',
+@transform(input='org', outputs=('url',), name='regional_registries',
            description='Company registries by region: QCC (China), RusProfile (Russia), OpenCorporates (F15 step 173)')
 def _t_registros_regionales(entidad, ctx):
     for reg, url in _ml.registros_regionales(entidad.value).items():
@@ -3694,7 +3694,7 @@ def _t_transliterar(entidad, ctx):
         if variante and variante.lower() != entidad.value.lower():
             ctx.emit('person', variante, label=f'translit:{alfabeto}')
 
-@transform(input='user', outputs=('url',), name='plataformas_regionales',
+@transform(input='user', outputs=('url',), name='regional_platforms',
            description='Profiles on regional platforms: VK, Weibo, Douyin, OK, Telegram (F15 step 171)')
 def _t_plataformas_regionales(entidad, ctx):
     for plat, url in _ml.perfiles_regionales(entidad.value).items():
@@ -4359,7 +4359,7 @@ _TEST_SERVICIO = {
     'binaryedge': ('binaryedge', 'ip', '8.8.8.8'),
     'virustotal': ('passivedns', 'domain', 'google.com'),
     'abuseipdb': ('abuseipdb', 'ip', '8.8.8.8'),
-    'github': ('github_usuario', 'user', 'torvalds'),
+    'github': ('github_user', 'user', 'torvalds'),
     'viewdns': ('reverse_whois', 'domain', 'google.com'),
     'hibp': ('email_breaches', 'email', 'test@example.com'),
 }

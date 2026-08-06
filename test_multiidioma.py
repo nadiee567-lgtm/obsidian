@@ -15,7 +15,7 @@ def _run_one(name, type, value):
 
 # ── 171: regional social platforms ──────────────────────────────────────────
 def test_plataformas_regionales():
-    prod, _ = _run_one('plataformas_regionales', 'user', 'nadiee')
+    prod, _ = _run_one('regional_platforms', 'user', 'nadiee')
     plats = {p.properties.get('platform') for p in prod if p.type == 'url'}
     assert {'vk', 'ok', 'weibo', 'douyin', 'telegram'} == plats
 
@@ -35,14 +35,14 @@ def test_transliterar_transform():
 
 # ── 173: regional registries ────────────────────────────────────────────────
 def test_registros_regionales():
-    prod, _ = _run_one('registros_regionales', 'org', 'ACME Corp')
+    prod, _ = _run_one('regional_registries', 'org', 'ACME Corp')
     regs = {p.properties.get('registry') for p in prod if p.type == 'url'}
     assert {'china_qcc', 'rusia_rusprofile', 'opencorporates'} == regs
 
 
 # ── 174: local engines ──────────────────────────────────────────────────────
 def test_motores_locales():
-    prod, _ = _run_one('motores_locales', 'person', 'Ivan Petrov')
+    prod, _ = _run_one('local_engines', 'person', 'Ivan Petrov')
     motores = {p.properties.get('engine') for p in prod if p.type == 'url'}
     assert {'yandex', 'baidu', 'sogou'} == motores
 
@@ -71,7 +71,7 @@ def test_dorks_por_idioma():
 
 
 def test_dorks_idioma_transform():
-    prod, _ = _run_one('dorks_idioma', 'person', 'Иван Петров')   # cyrillic -> ru
+    prod, _ = _run_one('language_dorks', 'person', 'Иван Петров')   # cyrillic -> ru
     idiomas = {p.properties.get('language') for p in prod if p.type == 'url'}
     assert idiomas == {'ru'}
 
