@@ -111,7 +111,7 @@ def test_key_rotativa(monkeypatch):
 
 
 # ── 160: logging your own footprint ─────────────────────────────────────────
-def test_registrar_huella():
+def test_record_footprint():
     import obsidian_web as ob
     ob._HUELLA.clear()
     ob._OPSEC['anonimo'] = False

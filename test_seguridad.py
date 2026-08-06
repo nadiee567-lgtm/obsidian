@@ -78,7 +78,7 @@ def test_path_traversal_bloqueado():
                  'a/b', 'x\\y', '....//....//x']:
         assert ob._ruta_caso_segura(malo) is None, malo
 
-def test_nombres_caso_validos_ok():
+def test_valid_case_names_ok():
     for bueno in ['caso1', 'target.com', 'Investigacion 2026', 'mi_caso-01']:
         path = ob._ruta_caso_segura(bueno)
         assert path is not None

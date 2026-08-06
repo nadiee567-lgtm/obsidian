@@ -5,14 +5,14 @@ Run:  ../.venv/bin/python -m pytest test_boveda.py -q
 from core.boveda import Vault
 
 
-def test_guardar_y_obtener(tmp_path):
+def test_save_and_get(tmp_path):
     b = Vault(str(tmp_path))
     b.save('shodan', 'SECRETO-123')
     assert b.get('shodan') == 'SECRETO-123'
     assert b.get('inexistente') is None
 
 
-def test_solo_nombres_no_valores(tmp_path):
+def test_only_names_no_values(tmp_path):
     b = Vault(str(tmp_path))
     b.save('shodan', 'k1')
     b.save('hibp', 'k2')

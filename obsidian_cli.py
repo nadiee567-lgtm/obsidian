@@ -33,13 +33,13 @@ from core.config import WORKSPACES_DIR, STATIC_DIR, VIS_FILE
 _gestor = Manager(WORKSPACES_DIR)
 
 
-def _almacen(ws):
+def _store(ws):
     if ws and _gestor.exists(ws):
         return _gestor.load(ws)
     return Store()
 
 
-def _guardar(ws, alm):
+def _save(ws, alm):
     if ws:
         if not _gestor.exists(ws):
             _gestor.create(ws)
@@ -65,13 +65,13 @@ def cmd_transforms(a):
 def cmd_run(a):
     if not valid_type(a.type):
         return _err(f"invalid type: {a.type}")
-    alm = _almacen(a.workspace)
+    alm = _store(a.workspace)
     try:
         semilla = alm.create(a.type, a.value)
         producidas = run_by_name(a.transform, semilla, alm)
     except (KeyError, ValueError) as e:
         return _err(str(e))
-    _guardar(a.workspace, alm)
+    _save(a.workspace, alm)
     print(f"✓ {a.transform} → +{len(producidas)} entity(ies) (total {len(alm)})")
     for e in producidas:
         print(f"    {e.type:12} {e.value}")
@@ -83,7 +83,7 @@ def cmd_recon(a):
     import time
     if not valid_type(a.type):
         return _err(f"invalid type: {a.type}")
-    alm = _almacen(a.workspace)
+    alm = _store(a.workspace)
     alm.create(a.type, a.value)
     ts = [t for t in REGISTRO.applicable(a.type) if a.with_keys or not t.requires_key]
     tareas = [(a.type, a.value, t.name) for t in ts]
@@ -91,7 +91,7 @@ def cmd_recon(a):
     t0 = time.time()
     for name, n in sorted(run_batch(tareas, alm)):
         print(f"  {name:22} +{n}")
-    _guardar(a.workspace, alm)
+    _save(a.workspace, alm)
     h = correlate(alm)
     print(f"total: {len(alm)} entities · {len(h)} finding(s) · "
           f"risk {risk_score(h)}/100 · {time.time() - t0:.1f}s")
@@ -107,7 +107,7 @@ def _vis_js():
 
 
 def cmd_report(a):
-    alm = _almacen(a.workspace)
+    alm = _store(a.workspace)
     if not len(alm):
         return _err("empty or nonexistent workspace")
     h = correlate(alm)
@@ -124,7 +124,7 @@ def cmd_report(a):
 
 
 def cmd_export(a):
-    alm = _almacen(a.workspace)
+    alm = _store(a.workspace)
     if not len(alm):
         return _err("empty or nonexistent workspace")
     if a.formato == 'json':

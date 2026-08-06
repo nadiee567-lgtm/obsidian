@@ -7,7 +7,7 @@ from core.correlacion import Finding
 from core.reporte import generate_report
 
 
-def _almacen_demo():
+def _store_demo():
     alm = Store()
     d = alm.create('domain', 'target.com', properties={'org': 'ACME'})
     ip = alm.create('ip', '93.184.216.34', properties={'country': 'US'})
@@ -17,7 +17,7 @@ def _almacen_demo():
 
 
 def test_report_has_sections():
-    alm, d, ip = _almacen_demo()
+    alm, d, ip = _store_demo()
     h = [Finding('ip-listed', 'high', 'IP en feed de amenazas', [ip.id])]
     html = generate_report(alm, hallazgos=h, score=20,
                            meta={'workspace': 'caso-1', 'target': 'target.com'})
@@ -27,7 +27,7 @@ def test_report_has_sections():
 
 
 def test_report_no_findings():
-    alm, _, _ = _almacen_demo()
+    alm, _, _ = _store_demo()
     html = generate_report(alm, hallazgos=[], score=0)
     assert 'No risks detected' in html
     assert '0/100' in html
@@ -52,7 +52,7 @@ def test_report_escapes_xss():
 
 
 def test_report_embedded_graph():
-    alm, d, ip = _almacen_demo()
+    alm, d, ip = _store_demo()
     # fake vis_js: we only check it gets embedded and builds the datasets
     html = generate_report(alm, hallazgos=[], score=0, vis_js='/*VISLIB*/')
     assert 'Relationship graph' in html

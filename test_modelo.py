@@ -54,7 +54,7 @@ def test_fusionar_distinto_id_falla():
 
 
 # ── store: automatic dedup (steps 16, 17) ───────────────────────────────────
-def test_almacen_deduplica():
+def test_store_dedup():
     alm = Store()
     alm.create('domain', 'example.com', sources={'whois'})
     alm.create('domain', 'WWW.example.com', sources={'crtsh'})   # same domain
@@ -62,7 +62,7 @@ def test_almacen_deduplica():
     ent = alm.find('domain', 'example.com')
     assert ent.sources == {'whois', 'crtsh'}, "merged sources"
 
-def test_almacen_de_tipo_y_buscar():
+def test_store_of_type_and_find():
     alm = Store()
     alm.create('ip', '8.8.8.8')
     alm.create('ip', '1.1.1.1')
@@ -82,7 +82,7 @@ def test_relaciones_dedup():
 
 
 # ── round-trip serialization (step 21) ──────────────────────────────────────
-def test_roundtrip_almacen():
+def test_store_roundtrip():
     alm = Store()
     d = alm.create('domain', 'example.com', sources={'whois'}, properties={'reg': 'GoDaddy'})
     i = alm.create('ip', '93.184.216.34', sources={'dns'})

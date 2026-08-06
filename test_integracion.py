@@ -85,10 +85,10 @@ def test_auth_protege_v2():
 def test_workspaces_flujo(tmp_path):
     """Workspace CRUD + persistence via endpoints (F3), isolated in tmp."""
     from core.workspaces import Manager
-    prev_g, prev_ws, prev_a = ob._gestor, ob._ws_activo, ob._almacen
+    prev_g, prev_ws, prev_a = ob._gestor, ob._ws_activo, ob._store
     ob._gestor = Manager(str(tmp_path))
     ob._ws_activo = None
-    ob._almacen = ob.Store()
+    ob._store = ob.Store()
     try:
         c = _client()
         # create -> becomes active
@@ -98,9 +98,9 @@ def test_workspaces_flujo(tmp_path):
         j = c.get('/api/v2/workspaces').get_json()
         assert 'caso demo' in j['workspaces'] and j['activo'] == 'caso demo'
         # simulate saved data and open fresh
-        ob._almacen.create('ip', '8.8.8.8')
-        ob._gestor.save('caso demo', ob._almacen)
-        ob._almacen = ob.Store()
+        ob._store.create('ip', '8.8.8.8')
+        ob._gestor.save('caso demo', ob._store)
+        ob._store = ob.Store()
         r = c.post('/api/v2/workspaces/open', json={'name': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['total_entities'] == 1
         # delete -> no active
@@ -108,7 +108,7 @@ def test_workspaces_flujo(tmp_path):
         assert r.status_code == 200 and r.get_json()['activo'] is None
         assert c.get('/api/v2/workspaces').get_json()['workspaces'] == []
     finally:
-        ob._gestor, ob._ws_activo, ob._almacen = prev_g, prev_ws, prev_a
+        ob._gestor, ob._ws_activo, ob._store = prev_g, prev_ws, prev_a
 
 
 def test_guard_recuerda_destino():

@@ -219,7 +219,7 @@ case_lock = threading.Lock()
 
 # Typed session model (F2, transform-engine integration).
 # Coexists with `case` during migration; the /api/v2/* endpoints use this.
-_almacen = Store()
+_store = Store()
 
 # F3: workspace manager (isolated SQLite cases). _ws_activo = None -> ephemeral
 # mode (not saved); if one is active, each transform autosaves.
@@ -3838,11 +3838,11 @@ def _run_transform_internal(type, value, name):
     _jitter()                                               # OPSEC: spacing between requests (156)
     _record_footprint(name, type, value)                  # OPSEC: log your footprint (160)
     with _almacen_lock:
-        semilla = _almacen.add(semilla)
-        producidas = run_by_name(name, semilla, _almacen)
+        semilla = _store.add(semilla)
+        producidas = run_by_name(name, semilla, _store)
         if _ws_activo:                          # autosave (46) + audit (48)
             try:
-                _gestor.save(_ws_activo, _almacen)
+                _gestor.save(_ws_activo, _store)
                 _gestor.record(_ws_activo, name, value, len(producidas))
             except Exception as _e:
                 log.warning("autosave failed: %s", _e)
@@ -3858,9 +3858,9 @@ def api_v2_run():
     except (KeyError, ValueError) as e:
         return _error(str(e), 400)
     return jsonify({'producidas': [e.to_dict() for e in producidas],
-                    'total_entities': len(_almacen), 'workspace': _ws_activo})
+                    'total_entities': len(_store), 'workspace': _ws_activo})
 
-def _estado_datos():
+def _status_data():
     """Collects system health (touches disk/processes)."""
     por_tipo = {}
     con_key = []
@@ -3936,12 +3936,12 @@ def api_v2_find_translate():
 @app.route('/api/v2/status')
 def api_v2_estado():
     """System health in JSON (step 105)."""
-    return jsonify(_estado_datos())
+    return jsonify(_status_data())
 
 @app.route('/v2/status')
 def v2_estado():
     """System status page (step 105)."""
-    return Response(render_estado(_estado_datos()), mimetype='text/html')
+    return Response(render_estado(_status_data()), mimetype='text/html')
 
 @app.route('/api/v2/recon', methods=['POST'])
 def api_v2_recon():
@@ -3953,17 +3953,17 @@ def api_v2_recon():
         return _error('invalid entity type', 400)
     con_keys = bool(d.get('con_keys'))
     with _almacen_lock:
-        _almacen.create(type, value)
+        _store.create(type, value)
     ts = [t for t in REGISTRO.applicable(type) if con_keys or not t.requires_key]
     tareas = [(type, value, t.name) for t in ts]
-    res = run_batch(tareas, _almacen, lock=_almacen_lock)
+    res = run_batch(tareas, _store, lock=_almacen_lock)
     if _ws_activo:
         with _almacen_lock:
             try:
-                _gestor.save(_ws_activo, _almacen)
+                _gestor.save(_ws_activo, _store)
             except Exception as _e:
                 log.warning("autosave recon failed: %s", _e)
-    return jsonify({'results': res, 'total_entities': len(_almacen), 'workspace': _ws_activo})
+    return jsonify({'results': res, 'total_entities': len(_store), 'workspace': _ws_activo})
 
 _tareas = TaskManager()
 
@@ -3980,22 +3980,22 @@ def api_v2_recon_async():
 
     def trabajo(emit):
         with _almacen_lock:
-            _almacen.create(type, value)
+            _store.create(type, value)
         ts = [t for t in REGISTRO.applicable(type) if con_keys or not t.requires_key]
         tareas = [(type, value, t.name) for t in ts]
         emit({'type': 'inicio', 'total': len(tareas)})
 
         def prog(name, n, hechas, total):
             emit({'type': 'progreso', 'transform': name, 'nuevas': n,
-                  'hechas': hechas, 'total': total, 'entities': len(_almacen)})
-        res = run_batch(tareas, _almacen, lock=_almacen_lock, on_progreso=prog)
+                  'hechas': hechas, 'total': total, 'entities': len(_store)})
+        res = run_batch(tareas, _store, lock=_almacen_lock, on_progreso=prog)
         if _ws_activo:
             with _almacen_lock:
                 try:
-                    _gestor.save(_ws_activo, _almacen)
+                    _gestor.save(_ws_activo, _store)
                 except Exception as _e:
                     log.warning("autosave recon_async: %s", _e)
-        return {'results': res, 'total_entities': len(_almacen)}
+        return {'results': res, 'total_entities': len(_store)}
 
     return jsonify({'job_id': _tareas.create(trabajo)})
 
@@ -4030,10 +4030,10 @@ def api_v2_entidad():
         return _error(str(e), 400)
     if not ent.well_formed():
         return _error(f'malformed value for {type}', 400)
-    ent = _almacen.add(ent)
+    ent = _store.add(ent)
     if _ws_activo:
         try:
-            _gestor.save(_ws_activo, _almacen)
+            _gestor.save(_ws_activo, _store)
         except Exception as _e:
             log.warning("autosave failed: %s", _e)
     return jsonify({'ok': True, 'id': ent.id})
@@ -4041,7 +4041,7 @@ def api_v2_entidad():
 def _autosave():
     if _ws_activo:
         try:
-            _gestor.save(_ws_activo, _almacen)
+            _gestor.save(_ws_activo, _store)
         except Exception as _e:
             log.warning("autosave failed: %s", _e)
 
@@ -4049,7 +4049,7 @@ def _autosave():
 def api_v2_note():
     """Analyst note on an entity (F6 step 88)."""
     d = request.json or {}
-    e = _almacen.get(d.get('id', ''))
+    e = _store.get(d.get('id', ''))
     if not e:
         return _error('entity not found', 404)
     e.properties['nota'] = (d.get('nota', '') or '')[:1000]
@@ -4060,7 +4060,7 @@ def api_v2_note():
 def api_v2_tag():
     """Toggle an analyst tag (interesante/descartado/falso-positivo)."""
     d = request.json or {}
-    e = _almacen.get(d.get('id', ''))
+    e = _store.get(d.get('id', ''))
     if not e:
         return _error('entity not found', 404)
     tag = (d.get('tag', '') or '').strip()[:30]
@@ -4075,18 +4075,18 @@ def api_v2_graph():
     """Typed graph. ?migrar=1 converts the old case['data'] to the new model."""
     if request.args.get('migrar') == '1':
         return jsonify(migrate_case(case).to_dict())
-    return jsonify(_almacen.to_dict())
+    return jsonify(_store.to_dict())
 
 @app.route('/api/v2/workspaces', methods=['GET', 'POST', 'DELETE'])
 def api_v2_workspaces():
     """Workspace CRUD (F3 step 44). Each one is an isolated SQLite case."""
-    global _almacen, _ws_activo
+    global _store, _ws_activo
     if request.method == 'GET':
         return jsonify({'workspaces': _gestor.list_ws(), 'activo': _ws_activo})
     name = (request.json or {}).get('name', '')
     if request.method == 'POST':
         try:
-            _almacen = _gestor.create(name)
+            _store = _gestor.create(name)
         except ValueError as e:
             return _error(str(e), 400)
         _ws_activo = _slug_caso(name)
@@ -4094,21 +4094,21 @@ def api_v2_workspaces():
     if request.method == 'DELETE':
         _gestor.delete(name)
         if _ws_activo == _slug_caso(name):
-            _almacen, _ws_activo = Store(), None
+            _store, _ws_activo = Store(), None
         return jsonify({'ok': True, 'activo': _ws_activo})
 
 @app.route('/api/v2/workspaces/open', methods=['POST'])
 def api_v2_workspace_abrir():
     """Loads a workspace into memory and makes it the active one (F3 step 45)."""
-    global _almacen, _ws_activo
+    global _store, _ws_activo
     name = (request.json or {}).get('name', '')
     try:
-        _almacen = _gestor.load(name)
+        _store = _gestor.load(name)
     except KeyError:
         return _error('workspace not found', 404)
     _ws_activo = _slug_caso(name)
     _aplicar_perfil_opsec(_ws_activo)                # non-attribution mode (157)
-    return jsonify({'ok': True, 'activo': _ws_activo, 'total_entities': len(_almacen)})
+    return jsonify({'ok': True, 'activo': _ws_activo, 'total_entities': len(_store)})
 
 @app.route('/api/v2/workspaces/history')
 def api_v2_ws_historial():
@@ -4394,12 +4394,12 @@ def api_v2_inventario():
     """Inventory of the target's internet-facing assets, in one place (F12 step 144)."""
     inv = {}
     for t in _TIPOS_ACTIVO:
-        ents = _almacen.of_type(t)
+        ents = _store.of_type(t)
         if ents:
             inv[t] = [{'value': e.value, 'tags': sorted(e.tags),
                        'props': {k: e.properties[k] for k in list(e.properties)[:4]}}
                       for e in sorted(ents, key=lambda x: x.value)]
-    return jsonify({'target': _objetivo_del_almacen(),
+    return jsonify({'target': _target_of_store(),
                     'total_activos': sum(len(v) for v in inv.values()),
                     'inventario': inv})
 
@@ -4417,17 +4417,17 @@ def api_v2_diff_historico():
     except KeyError:
         return _error('snapshot not found', 404)
     ids_v = {e.id: e for e in viejo.entities}
-    ids_n = {e.id: e for e in _almacen.entities}
+    ids_n = {e.id: e for e in _store.entities}
     agregados = [{'type': e.type, 'value': e.value} for i, e in ids_n.items() if i not in ids_v]
     removidos = [{'type': e.type, 'value': e.value} for i, e in ids_v.items() if i not in ids_n]
     return jsonify({'snapshot': sid, 'agregados': agregados, 'removidos': removidos,
-                    'total_antes': len(viejo), 'total_ahora': len(_almacen)})
+                    'total_antes': len(viejo), 'total_ahora': len(_store)})
 
 @app.route('/api/v2/exposure')
 def api_v2_exposicion():
     """Target exposure score: surface size + risk (F12 step 149)."""
-    conteos = {t: len(_almacen.of_type(t)) for t in _TIPOS_ACTIVO}
-    h = correlate(_almacen)
+    conteos = {t: len(_store.of_type(t)) for t in _TIPOS_ACTIVO}
+    h = correlate(_store)
     riesgo = risk_score(h)
     return jsonify({'exposicion': exposure_score(conteos, riesgo), 'riesgo': riesgo,
                     'superficie': conteos, 'hallazgos': len(h)})
@@ -4435,17 +4435,17 @@ def api_v2_exposicion():
 @app.route('/api/v2/findings')
 def api_v2_findings():
     """Runs the correlation engine on the active case (F4 steps 62, 64)."""
-    h = correlate(_almacen)
+    h = correlate(_store)
     return jsonify({'hallazgos': [x.to_dict() for x in h], 'score': risk_score(h)})
 
-def _objetivo_del_almacen():
+def _target_of_store():
     """Best 'target' candidate of the case for the report header. Prefers the SEED
     (entity with no provenance = added by hand, not derived by a transform), so the
     report shows the real target and not a child datum."""
-    ents = _almacen.entities
+    ents = _store.entities
     if not ents:
         return None
-    obj = _almacen.of_type('target')
+    obj = _store.of_type('target')
     if obj:
         return sorted(obj, key=lambda e: e.value)[0].value
     orden = {'domain': 0, 'ip': 1, 'email': 2, 'user': 3, 'url': 4, 'wallet': 5}
@@ -4458,7 +4458,7 @@ def _objetivo_del_almacen():
 def api_v2_report():
     """Self-contained HTML report of the active case (F7 step 93): risk summary,
     findings, entity inventory and embedded graph. ?grafo=0 omits it (lighter)."""
-    h = correlate(_almacen)
+    h = correlate(_store)
     vis_js = None
     if request.args.get('grafo', '1') != '0':
         ruta_vis = os.path.join(STATIC_DIR, _VIS)
@@ -4466,30 +4466,30 @@ def api_v2_report():
             with open(ruta_vis, encoding='utf-8') as f:
                 vis_js = f.read()
     html_doc = generate_report(
-        _almacen, hallazgos=h, score=risk_score(h),
-        meta={'workspace': _ws_activo, 'target': _objetivo_del_almacen()},
+        _store, hallazgos=h, score=risk_score(h),
+        meta={'workspace': _ws_activo, 'target': _target_of_store()},
         vis_js=vis_js)
     return Response(html_doc, mimetype='text/html')
 
-def _nombre_export():
+def _export_name():
     base = _slug_caso(_ws_activo) if _ws_activo else 'caso'
     return f'obsidian-{base}-{datetime.datetime.now():%Y%m%d}'
 
 @app.route('/api/v2/export/json')
 def api_v2_export_json():
     """Full case in JSON, re-importable (F7 step 94)."""
-    h = correlate(_almacen)
-    data = exportar_json(_almacen, h, risk_score(h),
-                         {'workspace': _ws_activo, 'target': _objetivo_del_almacen()})
+    h = correlate(_store)
+    data = exportar_json(_store, h, risk_score(h),
+                         {'workspace': _ws_activo, 'target': _target_of_store()})
     return Response(data, mimetype='application/json',
-                    headers={'Content-Disposition': f'attachment; filename="{_nombre_export()}.json"'})
+                    headers={'Content-Disposition': f'attachment; filename="{_export_name()}.json"'})
 
 @app.route('/api/v2/export/csv')
 def api_v2_export_csv():
     """Entities as flat CSV, sanitized against formula injection (F7 step 94)."""
-    data = exportar_csv(_almacen)
+    data = exportar_csv(_store)
     return Response(data, mimetype='text/csv',
-                    headers={'Content-Disposition': f'attachment; filename="{_nombre_export()}.csv"'})
+                    headers={'Content-Disposition': f'attachment; filename="{_export_name()}.csv"'})
 
 # ── Continuous monitoring (F7 step 95) ───────────────────────────────────────
 _monitor = None
@@ -4497,7 +4497,7 @@ _monitor_tareas = []
 
 def _monitor_snapshot():
     with _almacen_lock:
-        return _snap_estado(_almacen)
+        return _snap_estado(_store)
 
 def _monitor_refrescar():
     for t in _monitor_tareas:
@@ -4526,14 +4526,14 @@ def _monitor_alerta(cambios):
 
 def _tareas_monitor_default():
     """Re-runs, on the seed, the transforms that already built the graph."""
-    seed_valor = _objetivo_del_almacen()
+    seed_valor = _target_of_store()
     if not seed_valor:
         return []
-    seed = next((e for e in _almacen.entities if e.value == seed_valor), None)
+    seed = next((e for e in _store.entities if e.value == seed_valor), None)
     if not seed:
         return []
     usados = set()
-    for e in _almacen.entities:
+    for e in _store.entities:
         usados |= set(e.sources)
     applicable = {t.name for t in REGISTRO.applicable(seed.type)}
     return [{'type': seed.type, 'value': seed.value, 'transform': n}
@@ -4642,13 +4642,13 @@ def api_v2_extraer_texto():
     with _almacen_lock:
         for type, value in extract_entities(texto):
             try:
-                e = _almacen.create(type, value)
+                e = _store.create(type, value)
                 agregadas.append({'type': e.type, 'value': e.value})
             except Exception:
                 pass
         if _ws_activo:
             try:
-                _gestor.save(_ws_activo, _almacen)
+                _gestor.save(_ws_activo, _store)
             except Exception as _e:
                 log.warning("autosave extraer_texto: %s", _e)
     return jsonify({'agregadas': agregadas, 'total': len(agregadas)})
@@ -4661,7 +4661,7 @@ def api_v2_chat():
     pregunta = ((request.json or {}).get('pregunta', '') or '').strip()
     if not pregunta:
         return _error('empty question', 400)
-    contexto = json.dumps(_almacen.to_dict(), default=str)[:3500]
+    contexto = json.dumps(_store.to_dict(), default=str)[:3500]
     prompt = (f'You are an analyst with access to this OSINT case. Answer the question using ONLY this '
               f'data; if the answer is not in it, say so clearly.\n\nData:\n{contexto}\n\n'
               f'Question: {pregunta}')
@@ -4730,8 +4730,8 @@ def api_v2_ia_modo(modo):
         return _error('invalid mode', 404)
     if not ia.available():
         return _error('AI (Ollama) unavailable', 503)
-    contexto = json.dumps(_almacen.to_dict(), default=str)[:3500]
-    prompt = _PROMPTS_IA[modo].format(target=_objetivo_del_almacen() or 'el target', data=contexto)
+    contexto = json.dumps(_store.to_dict(), default=str)[:3500]
+    prompt = _PROMPTS_IA[modo].format(target=_target_of_store() or 'el target', data=contexto)
     try:
         resp = ia.ask(prompt, max_tokens=700, temp=0.4)
     except Exception as e:
@@ -4742,11 +4742,11 @@ def api_v2_ia_modo(modo):
 def api_v2_findings_ai():
     """AI-assisted correlation (F4 step 65): Ollama summarizes the risk and
     suggests the next step from the case findings."""
-    h = correlate(_almacen)
+    h = correlate(_store)
     if not h:
         return jsonify({'resumen': 'No findings to analyze yet. Run more transforms.'})
     conteo = {}
-    for e in _almacen.entities:
+    for e in _store.entities:
         conteo[e.type] = conteo.get(e.type, 0) + 1
     ents = ', '.join(f'{n} {t}' for t, n in conteo.items())
     lista = '\n'.join(f'- [{x.severity}] {x.message}' for x in h)
@@ -4768,10 +4768,10 @@ def api_v2_verificar():
     """SECOND SHIELD: the AI reviews each finding with the real EVIDENCE, explains
     why it is (or is not) dangerous and flags likely false positives. It SUGGESTS,
     it does not delete -- the human confirms (LLM-as-verifier)."""
-    h = correlate(_almacen)
+    h = correlate(_store)
     if not h:
         return jsonify({'revisiones': []})
-    idmap = {e.id: e for e in _almacen.entities}
+    idmap = {e.id: e for e in _store.entities}
     revisiones = []
     for hall in h[:6]:   # cap so it does not run forever
         ev = []
@@ -4809,7 +4809,7 @@ def api_report():
     return jsonify({'ok':True, 'path':path})
 
 @app.route('/report_pdf')
-def reporte_pdf():
+def report_pdf():
     path = _generate_html_report()
     with open(path) as f: contenido = f.read()
     # Inject print CSS for PDF
@@ -4959,7 +4959,7 @@ def api_graph():
     return jsonify(_build_graph())
 
 @app.route('/api/data')
-def api_datos():
+def api_data():
     with case_lock:
         return jsonify({'data': case['data'], 'history': case['history'][-20:]})
 

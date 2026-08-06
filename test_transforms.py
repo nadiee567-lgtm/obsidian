@@ -29,13 +29,13 @@ def test_decorator_registra():
     assert tr.REGISTRO.by_name('dns') is not None
     assert tr.REGISTRO.applicable('domain')[0].name == 'dns'
 
-def test_tipo_entrada_o_salida_invalido_falla():
+def test_invalid_input_or_output_type_fails():
     with pytest.raises(ValueError):
         tr.Transform(name='x', input='inventado')
     with pytest.raises(ValueError):
         tr.Transform(name='y', input='domain', outputs=('inventado',))
 
-def test_no_duplicar_nombre():
+def test_no_duplicate_name():
     tr.Transform  # noqa
     @tr.transform(input='ip', name='dup')
     def _a(entidad, ctx): pass
@@ -45,7 +45,7 @@ def test_no_duplicar_nombre():
 
 
 # ── execution: input → outputs, related and with provenance (step 28) ──────
-def test_ejecutar_emite_relaciona_y_anota_procedencia():
+def test_run_emits_relates_notes_provenance():
     @tr.transform(input='domain', outputs=('ip', 'subdomain'), name='dns')
     def _dns(entidad, ctx):
         ctx.emit('ip', '93.184.216.34', label='A')
@@ -63,7 +63,7 @@ def test_ejecutar_emite_relaciona_y_anota_procedencia():
     # relation created domain -> ip
     assert len(alm.relations) == 2
 
-def test_ejecutar_valida_tipo_de_entrada():
+def test_run_validates_input_type():
     @tr.transform(input='domain', name='domain_only')
     def _f(entidad, ctx): pass
     alm = Store()
@@ -150,7 +150,7 @@ def test_machine_cascada():
 
 
 # ── plugins: load transforms from a directory -- step 42 ────────────────────
-def test_cargar_plugins(tmp_path):
+def test_load_plugins(tmp_path):
     plugin = tmp_path / "mi_transform.py"
     plugin.write_text(
         "import core.transforms as tr\n"

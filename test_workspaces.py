@@ -64,7 +64,7 @@ def test_borrar_y_renombrar(tmp_path):
     assert g.list_ws() == []
 
 
-def test_nombres_maliciosos_rechazados(tmp_path):
+def test_malicious_names_rejected(tmp_path):
     g = Manager(str(tmp_path))
     for malo in ['../../etc/passwd', '..', 'a/b', 'x\\y', '']:
         with pytest.raises(ValueError):

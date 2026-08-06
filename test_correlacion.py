@@ -59,7 +59,7 @@ def test_score_riesgo():
     assert risk_score(muchos) == 100
 
 
-def test_sin_datos_sin_hallazgos():
+def test_no_data_no_findings():
     assert correlate(Store()) == []
 
 

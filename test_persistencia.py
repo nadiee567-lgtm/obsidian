@@ -6,7 +6,7 @@ from core.modelo import Store
 from core.persistencia import save_store, load_store
 
 
-def _almacen_ejemplo():
+def _store_example():
     alm = Store()
     d = alm.create('domain', 'example.com', sources={'whois'},
                   properties={'registrar': 'GoDaddy'})
@@ -17,9 +17,9 @@ def _almacen_ejemplo():
     return alm
 
 
-def test_guardar_y_cargar_roundtrip(tmp_path):
+def test_save_load_roundtrip(tmp_path):
     db = str(tmp_path / 'caso.db')
-    original = _almacen_ejemplo()
+    original = _store_example()
     save_store(original, db)
 
     cargado = load_store(db)
@@ -35,9 +35,9 @@ def test_guardar_y_cargar_roundtrip(tmp_path):
     assert {'transform': 'transform_dns', 'input': d.id} in i.provenance
 
 
-def test_guardar_es_idempotente(tmp_path):
+def test_save_is_idempotent(tmp_path):
     db = str(tmp_path / 'caso.db')
-    alm = _almacen_ejemplo()
+    alm = _store_example()
     save_store(alm, db)
     save_store(alm, db)   # segunda vez: upsert, no duplica
     cargado = load_store(db)
@@ -47,7 +47,7 @@ def test_guardar_es_idempotente(tmp_path):
 
 def test_ids_estables_tras_recarga(tmp_path):
     db = str(tmp_path / 'caso.db')
-    alm = _almacen_ejemplo()
+    alm = _store_example()
     ids_antes = {e.id for e in alm.entities}
     save_store(alm, db)
     cargado = load_store(db)

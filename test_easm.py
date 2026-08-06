@@ -15,7 +15,7 @@ class _R:
 
 
 def _cliente_con(alm, monkeypatch):
-    monkeypatch.setattr(ob, '_almacen', alm)
+    monkeypatch.setattr(ob, '_store', alm)
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True

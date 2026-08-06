@@ -48,7 +48,7 @@ def test_lote_transform_inexistente_no_rompe():
     assert len(alm) == 1          # only the seed
 
 
-def test_lote_no_pierde_datos_en_paralelo():
+def test_batch_no_data_loss_parallel():
     """Many concurrent tasks: no output is lost in the merge."""
     alm = Store()
     tareas = [('domain', f'sitio{i}.com', '_test_lote_a') for i in range(20)]
