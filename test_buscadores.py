@@ -18,10 +18,10 @@ class FakeResp:
         return self._data
 
 
-def _correr(nombre, type, value):
+def _correr(name, type, value):
     alm = Store()
     e = alm.create(type, value)
-    return run_by_name(nombre, e, alm)
+    return run_by_name(name, e, alm)
 
 
 def _con_key(monkeypatch, resp, key='fakekey'):
@@ -213,6 +213,6 @@ def test_todos_los_motores_registrados():
     """The 9 engines in core.motores each have a registered transform."""
     from core.transforms import REGISTRO
     from core.motores import MOTORES
-    nombres = {t.nombre for t in REGISTRO.applicable('ip')}
+    nombres = {t.name for t in REGISTRO.applicable('ip')}
     faltan = set(MOTORES) - nombres
     assert not faltan, f'engines without a transform: {faltan}'

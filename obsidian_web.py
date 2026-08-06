@@ -61,7 +61,7 @@ def _manejar_error(e):
 def _db_init():
     con = sqlite3.connect(CASES_DB)
     con.execute("""CREATE TABLE IF NOT EXISTS casos (
-        nombre TEXT PRIMARY KEY, objetivo TEXT, iniciado TEXT,
+        name TEXT PRIMARY KEY, objetivo TEXT, iniciado TEXT,
         actualizado TEXT, datos_json TEXT
     )""")
     con.commit()
@@ -74,9 +74,9 @@ def _db_guardar_caso(caso_dict):
     try:
         con = sqlite3.connect(CASES_DB)
         con.execute(
-            "INSERT INTO casos (nombre, objetivo, iniciado, actualizado, datos_json) VALUES (?,?,?,?,?) "
-            "ON CONFLICT(nombre) DO UPDATE SET objetivo=excluded.objetivo, actualizado=excluded.actualizado, datos_json=excluded.datos_json",
-            (caso_dict.get('nombre'), caso_dict.get('target'), caso_dict.get('iniciado'),
+            "INSERT INTO casos (name, objetivo, iniciado, actualizado, datos_json) VALUES (?,?,?,?,?) "
+            "ON CONFLICT(name) DO UPDATE SET objetivo=excluded.objetivo, actualizado=excluded.actualizado, datos_json=excluded.datos_json",
+            (caso_dict.get('name'), caso_dict.get('target'), caso_dict.get('iniciado'),
              datetime.datetime.now().isoformat(), json.dumps(caso_dict.get('datos', {}), default=str))
         )
         con.commit()
@@ -89,7 +89,7 @@ def _db_buscar(termino):
     con = sqlite3.connect(CASES_DB)
     con.row_factory = sqlite3.Row
     filas = con.execute(
-        "SELECT nombre, objetivo, actualizado, datos_json FROM casos WHERE datos_json LIKE ? OR objetivo LIKE ?",
+        "SELECT name, objetivo, actualizado, datos_json FROM casos WHERE datos_json LIKE ? OR objetivo LIKE ?",
         (f'%{termino}%', f'%{termino}%')
     ).fetchall()
     con.close()
@@ -102,18 +102,18 @@ def _db_buscar(termino):
         modulos_con_match = [clave for clave, value in datos.items()
                               if termino.lower() in json.dumps(value, default=str).lower()]
         resultados.append({
-            'caso': fila['nombre'], 'target': fila['target'],
+            'caso': fila['name'], 'target': fila['target'],
             'actualizado': fila['actualizado'], 'modulos_con_match': modulos_con_match
         })
     return resultados
 # If vis.js (graph) is missing from the user static dir, copy the one shipped with the program
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _WEB_DIR = os.path.join(_HERE, 'web')
-def _cargar_web(nombre):
+def _cargar_web(name):
     """Loads a UI file (HTML/JS/CSS) from web/. The front-end lives in files, not
     embedded in the .py. It is read as text: the usual .replace()/.format() still
     apply (no Jinja, which would clash with the CSS braces and the ${} of JS)."""
-    with open(os.path.join(_WEB_DIR, nombre), encoding='utf-8') as _f:
+    with open(os.path.join(_WEB_DIR, name), encoding='utf-8') as _f:
         return _f.read()
 
 if not os.path.exists(os.path.join(STATIC_DIR, _VIS)) and os.path.exists(os.path.join(_HERE, _VIS)):
@@ -214,7 +214,7 @@ SESSION = requests.Session()
 SESSION.headers.update({'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0'})
 
 # Global investigation state
-case = {'nombre': None, 'target': None, 'datos': {}, 'history': [], 'iniciado': None}
+case = {'name': None, 'target': None, 'datos': {}, 'history': [], 'iniciado': None}
 case_lock = threading.Lock()
 
 # Typed session model (F2, transform-engine integration).
@@ -334,11 +334,11 @@ def _tailscale_ip():
 
 # ── OSINT modules ─────────────────────────────────────────────────────────────
 
-def _osint_persona(nombre):
-    datos = {'type':'person','target':nombre,'resultados':{}}
+def _osint_persona(name):
+    datos = {'type':'person','target':name,'resultados':{}}
     # DuckDuckGo
     try:
-        r = SESSION.get(f"https://api.duckduckgo.com/?q={requests.utils.quote(nombre)}&format=json&no_html=1", timeout=8)
+        r = SESSION.get(f"https://api.duckduckgo.com/?q={requests.utils.quote(name)}&format=json&no_html=1", timeout=8)
         d = r.json()
         if d.get('AbstractText'):
             datos['resultados']['resumen'] = d['AbstractText'][:400]
@@ -347,21 +347,21 @@ def _osint_persona(nombre):
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # Dorks
     datos['resultados']['dorks'] = [
-        f'"{nombre}" site:linkedin.com',
-        f'"{nombre}" site:twitter.com OR site:x.com',
-        f'"{nombre}" email OR phone OR address',
-        f'"{nombre}" filetype:pdf',
-        f'"{nombre}" site:github.com',
-        f'"{nombre}" "date of birth" OR "birthday"',
-        f'"{nombre}" site:facebook.com',
+        f'"{name}" site:linkedin.com',
+        f'"{name}" site:twitter.com OR site:x.com',
+        f'"{name}" email OR phone OR address',
+        f'"{name}" filetype:pdf',
+        f'"{name}" site:github.com',
+        f'"{name}" "date of birth" OR "birthday"',
+        f'"{name}" site:facebook.com',
     ]
     # HIBP check
     try:
-        r = SESSION.get(f"https://haveibeenpwned.com/unifiedsearch/{requests.utils.quote(nombre)}",
+        r = SESSION.get(f"https://haveibeenpwned.com/unifiedsearch/{requests.utils.quote(name)}",
                        timeout=6, headers={'User-Agent':'OSINT-Research'})
         datos['resultados']['hibp'] = 'Possible presence in HIBP' if r.status_code==200 else 'Not found in HIBP'
     except Exception as _e: log.debug("source unavailable: %s", _e)
-    _guardar_dato(f'persona_{nombre}', datos)
+    _guardar_dato(f'persona_{name}', datos)
     return datos
 
 def _osint_usuario(username):
@@ -394,7 +394,7 @@ def _osint_usuario(username):
         gh = SESSION.get(f'https://api.github.com/users/{username}', timeout=8).json()
         if gh.get('login'):
             datos['resultados']['github'] = {
-                'nombre': gh.get('name','?'), 'bio': gh.get('bio','?'),
+                'name': gh.get('name','?'), 'bio': gh.get('bio','?'),
                 'repos': gh.get('public_repos',0), 'seguidores': gh.get('followers',0),
                 'ubicacion': gh.get('location','?'), 'email': gh.get('email','hidden'),
                 'web': gh.get('blog','?'), 'creado': gh.get('created_at','?')
@@ -402,7 +402,7 @@ def _osint_usuario(username):
             # Public repos
             repos_r = SESSION.get(f'https://api.github.com/users/{username}/repos?per_page=10&sort=updated', timeout=8)
             if repos_r.status_code == 200:
-                repos = [{'nombre':r['name'],'url':r['html_url'],'stars':r['stargazers_count'],
+                repos = [{'name':r['name'],'url':r['html_url'],'stars':r['stargazers_count'],
                           'lenguaje':r.get('language','?')} for r in repos_r.json()]
                 datos['resultados']['github_repos'] = repos
     except Exception as _e: log.debug("source unavailable: %s", _e)
@@ -685,25 +685,25 @@ def _recon_favicon(dominio):
 
 def _recon_typosquatting(dominio):
     datos = {'type':'typosquatting','target':dominio,'resultados':{}}
-    nombre, ext = dominio.rsplit('.',1) if '.' in dominio else (dominio,'com')
+    name, ext = dominio.rsplit('.',1) if '.' in dominio else (dominio,'com')
     variantes = set()
     # Common substitutions
     subs = {'a':'4','e':'3','i':'1','o':'0','s':'5','l':'1'}
-    for i, c in enumerate(nombre):
+    for i, c in enumerate(name):
         if c in subs:
-            v = nombre[:i]+subs[c]+nombre[i+1:]
+            v = name[:i]+subs[c]+name[i+1:]
             variantes.add(f'{v}.{ext}')
     # Keyboard typos
     teclado = {'q':'w','w':'e','e':'r','r':'t','t':'y','a':'s','s':'d','d':'f',
                'f':'g','g':'h','z':'x','x':'c','c':'v','v':'b'}
-    for i, c in enumerate(nombre.lower()):
+    for i, c in enumerate(name.lower()):
         if c in teclado:
-            v = nombre[:i]+teclado[c]+nombre[i+1:]
+            v = name[:i]+teclado[c]+name[i+1:]
             variantes.add(f'{v}.{ext}')
     # Letter omission/duplication
-    for i in range(len(nombre)):
-        variantes.add(f'{nombre[:i]+nombre[i+1:]}.{ext}')
-        variantes.add(f'{nombre[:i]+nombre[i]*2+nombre[i:]}.{ext}')
+    for i in range(len(name)):
+        variantes.add(f'{name[:i]+name[i+1:]}.{ext}')
+        variantes.add(f'{name[:i]+name[i]*2+name[i:]}.{ext}')
     # Check which exist
     registrados = []
     def _check_domain(v):
@@ -720,10 +720,10 @@ def _recon_typosquatting(dominio):
 
 def _recon_buckets(empresa):
     datos = {'type':'buckets','target':empresa,'resultados':{}}
-    nombre = empresa.lower().replace(' ','-').replace('_','-')
-    variantes = [nombre, f'{nombre}-backup', f'{nombre}-dev', f'{nombre}-prod',
-                 f'{nombre}-staging', f'{nombre}-assets', f'{nombre}-media',
-                 f'backup-{nombre}', f'dev-{nombre}', f'assets-{nombre}']
+    name = empresa.lower().replace(' ','-').replace('_','-')
+    variantes = [name, f'{name}-backup', f'{name}-dev', f'{name}-prod',
+                 f'{name}-staging', f'{name}-assets', f'{name}-media',
+                 f'backup-{name}', f'dev-{name}', f'assets-{name}']
     encontrados = []
     def _check(bucket):
         urls = [
@@ -989,143 +989,143 @@ Data: {datos_osint}"""
 
 KALI_TOOLS = {
     'recon': [
-        {'id':'nmap',         'nombre':'nmap',         'desc':'Scan ports and services',               'cmd':'nmap -sT -sV --open {arg}',               'placeholder':'IP or domain'},
-        {'id':'nmap_full',    'nombre':'nmap full',    'desc':'Full scan with versions and scripts',   'cmd':'nmap -sT -sV -sC {arg}',                  'placeholder':'IP or domain'},
-        {'id':'harvester',    'nombre':'theHarvester', 'desc':'Emails and subdomains from OSINT',      'cmd':'theHarvester -d {arg} -b google,bing,duckduckgo', 'placeholder':'domain.com'},
-        {'id':'whatweb',      'nombre':'whatweb',      'desc':'Detect website technologies',           'cmd':'whatweb {arg}',                            'placeholder':'http://target.com'},
-        {'id':'wafw00f',      'nombre':'wafw00f',      'desc':'Detect WAF firewall',                   'cmd':'wafw00f {arg}',                            'placeholder':'http://target.com'},
-        {'id':'dmitry',       'nombre':'dmitry',       'desc':'Full domain reconnaissance',            'cmd':'dmitry -winsepfb {arg}',                   'placeholder':'domain.com'},
-        {'id':'whois_kali',   'nombre':'whois',        'desc':'Domain registration info',              'cmd':'whois {arg}',                              'placeholder':'domain.com'},
-        {'id':'dig_kali',     'nombre':'dig',          'desc':'Full DNS queries',                      'cmd':'dig {arg} ANY',                            'placeholder':'domain.com'},
+        {'id':'nmap',         'name':'nmap',         'desc':'Scan ports and services',               'cmd':'nmap -sT -sV --open {arg}',               'placeholder':'IP or domain'},
+        {'id':'nmap_full',    'name':'nmap full',    'desc':'Full scan with versions and scripts',   'cmd':'nmap -sT -sV -sC {arg}',                  'placeholder':'IP or domain'},
+        {'id':'harvester',    'name':'theHarvester', 'desc':'Emails and subdomains from OSINT',      'cmd':'theHarvester -d {arg} -b google,bing,duckduckgo', 'placeholder':'domain.com'},
+        {'id':'whatweb',      'name':'whatweb',      'desc':'Detect website technologies',           'cmd':'whatweb {arg}',                            'placeholder':'http://target.com'},
+        {'id':'wafw00f',      'name':'wafw00f',      'desc':'Detect WAF firewall',                   'cmd':'wafw00f {arg}',                            'placeholder':'http://target.com'},
+        {'id':'dmitry',       'name':'dmitry',       'desc':'Full domain reconnaissance',            'cmd':'dmitry -winsepfb {arg}',                   'placeholder':'domain.com'},
+        {'id':'whois_kali',   'name':'whois',        'desc':'Domain registration info',              'cmd':'whois {arg}',                              'placeholder':'domain.com'},
+        {'id':'dig_kali',     'name':'dig',          'desc':'Full DNS queries',                      'cmd':'dig {arg} ANY',                            'placeholder':'domain.com'},
     ],
     'web': [
-        {'id':'nikto',        'nombre':'nikto',        'desc':'Scan web vulnerabilities',              'cmd':'nikto -h {arg}',                           'placeholder':'http://target.com'},
-        {'id':'gobuster',     'nombre':'gobuster',     'desc':'Directory brute force',                 'cmd':'gobuster dir -u {arg} -w /usr/share/wordlists/dirb/common.txt -q', 'placeholder':'http://target.com'},
-        {'id':'dirb',         'nombre':'dirb',         'desc':'Find hidden directories',               'cmd':'dirb {arg}',                               'placeholder':'http://target.com'},
-        {'id':'sqlmap',       'nombre':'sqlmap',       'desc':'Detect SQL injection',                  'cmd':'sqlmap -u {arg} --batch --dbs',            'placeholder':'http://target.com/page?id=1'},
-        {'id':'wfuzz',        'nombre':'wfuzz',        'desc':'Advanced web fuzzing',                  'cmd':'wfuzz -c -w /usr/share/wordlists/dirb/common.txt {arg}/FUZZ', 'placeholder':'http://target.com'},
+        {'id':'nikto',        'name':'nikto',        'desc':'Scan web vulnerabilities',              'cmd':'nikto -h {arg}',                           'placeholder':'http://target.com'},
+        {'id':'gobuster',     'name':'gobuster',     'desc':'Directory brute force',                 'cmd':'gobuster dir -u {arg} -w /usr/share/wordlists/dirb/common.txt -q', 'placeholder':'http://target.com'},
+        {'id':'dirb',         'name':'dirb',         'desc':'Find hidden directories',               'cmd':'dirb {arg}',                               'placeholder':'http://target.com'},
+        {'id':'sqlmap',       'name':'sqlmap',       'desc':'Detect SQL injection',                  'cmd':'sqlmap -u {arg} --batch --dbs',            'placeholder':'http://target.com/page?id=1'},
+        {'id':'wfuzz',        'name':'wfuzz',        'desc':'Advanced web fuzzing',                  'cmd':'wfuzz -c -w /usr/share/wordlists/dirb/common.txt {arg}/FUZZ', 'placeholder':'http://target.com'},
     ],
     'passwords': [
-        {'id':'hashid',       'nombre':'hashid',       'desc':'Identify hash type',                    'cmd':'hashid {arg}',                             'placeholder':'paste hash here'},
-        {'id':'john',         'nombre':'john',         'desc':'Crack hash with rockyou',               'cmd':'echo {arg} > /tmp/hash.txt && john /tmp/hash.txt --wordlist=/usr/share/wordlists/rockyou.txt', 'placeholder':'paste hash here'},
-        {'id':'hashcat_md5',  'nombre':'hashcat MD5',  'desc':'Crack MD5 hash',                        'cmd':'hashcat -m 0 -a 0 {arg} /usr/share/wordlists/rockyou.txt --force', 'placeholder':'MD5 hash'},
-        {'id':'hashcat_sha1', 'nombre':'hashcat SHA1', 'desc':'Crack SHA1 hash',                       'cmd':'hashcat -m 100 -a 0 {arg} /usr/share/wordlists/rockyou.txt --force', 'placeholder':'SHA1 hash'},
-        {'id':'crunch',       'nombre':'crunch',       'desc':'Generate custom wordlist',              'cmd':'crunch {arg} | head -50',                  'placeholder':'6 8 abc123'},
-        {'id':'cewl',         'nombre':'cewl',         'desc':'Wordlist from website',                 'cmd':'cewl {arg} -d 2 -m 5',                     'placeholder':'http://target.com'},
+        {'id':'hashid',       'name':'hashid',       'desc':'Identify hash type',                    'cmd':'hashid {arg}',                             'placeholder':'paste hash here'},
+        {'id':'john',         'name':'john',         'desc':'Crack hash with rockyou',               'cmd':'echo {arg} > /tmp/hash.txt && john /tmp/hash.txt --wordlist=/usr/share/wordlists/rockyou.txt', 'placeholder':'paste hash here'},
+        {'id':'hashcat_md5',  'name':'hashcat MD5',  'desc':'Crack MD5 hash',                        'cmd':'hashcat -m 0 -a 0 {arg} /usr/share/wordlists/rockyou.txt --force', 'placeholder':'MD5 hash'},
+        {'id':'hashcat_sha1', 'name':'hashcat SHA1', 'desc':'Crack SHA1 hash',                       'cmd':'hashcat -m 100 -a 0 {arg} /usr/share/wordlists/rockyou.txt --force', 'placeholder':'SHA1 hash'},
+        {'id':'crunch',       'name':'crunch',       'desc':'Generate custom wordlist',              'cmd':'crunch {arg} | head -50',                  'placeholder':'6 8 abc123'},
+        {'id':'cewl',         'name':'cewl',         'desc':'Wordlist from website',                 'cmd':'cewl {arg} -d 2 -m 5',                     'placeholder':'http://target.com'},
     ],
     'forensics': [
-        {'id':'binwalk',      'nombre':'binwalk',      'desc':'Analyze firmware/binaries',             'cmd':'binwalk {arg}',                            'placeholder':'/path/to/file'},
-        {'id':'exiftool_k',   'nombre':'exiftool',     'desc':'File metadata extractor',               'cmd':'exiftool {arg}',                           'placeholder':'/path/to/image.jpg'},
-        {'id':'strings_cmd',  'nombre':'strings',      'desc':'Extract strings from binaries',         'cmd':'strings {arg} | head -100',                'placeholder':'/path/to/binary'},
-        {'id':'file_cmd',     'nombre':'file',         'desc':'Identify file type',                    'cmd':'file {arg}',                               'placeholder':'/path/to/file'},
-        {'id':'steghide_ext', 'nombre':'steghide',     'desc':'Extract hidden data from image',        'cmd':'steghide extract -sf {arg} -p ""',         'placeholder':'/path/to/image.jpg'},
+        {'id':'binwalk',      'name':'binwalk',      'desc':'Analyze firmware/binaries',             'cmd':'binwalk {arg}',                            'placeholder':'/path/to/file'},
+        {'id':'exiftool_k',   'name':'exiftool',     'desc':'File metadata extractor',               'cmd':'exiftool {arg}',                           'placeholder':'/path/to/image.jpg'},
+        {'id':'strings_cmd',  'name':'strings',      'desc':'Extract strings from binaries',         'cmd':'strings {arg} | head -100',                'placeholder':'/path/to/binary'},
+        {'id':'file_cmd',     'name':'file',         'desc':'Identify file type',                    'cmd':'file {arg}',                               'placeholder':'/path/to/file'},
+        {'id':'steghide_ext', 'name':'steghide',     'desc':'Extract hidden data from image',        'cmd':'steghide extract -sf {arg} -p ""',         'placeholder':'/path/to/image.jpg'},
     ],
     'exploits': [
-        {'id':'searchsploit', 'nombre':'searchsploit', 'desc':'Search exploits in ExploitDB',          'cmd':'searchsploit {arg}',                       'placeholder':'apache 2.4 or wordpress 5.0'},
-        {'id':'msfvenom_lin', 'nombre':'msfvenom Linux','desc':'Generate Linux reverse shell payload', 'cmd':'msfvenom -p linux/x86/shell_reverse_tcp LHOST=127.0.0.1 LPORT=4444 -f elf 2>&1 | head -5', 'placeholder':'(no argument needed)'},
+        {'id':'searchsploit', 'name':'searchsploit', 'desc':'Search exploits in ExploitDB',          'cmd':'searchsploit {arg}',                       'placeholder':'apache 2.4 or wordpress 5.0'},
+        {'id':'msfvenom_lin', 'name':'msfvenom Linux','desc':'Generate Linux reverse shell payload', 'cmd':'msfvenom -p linux/x86/shell_reverse_tcp LHOST=127.0.0.1 LPORT=4444 -f elf 2>&1 | head -5', 'placeholder':'(no argument needed)'},
     ],
     'network': [
-        {'id':'netstat_k',    'nombre':'netstat',      'desc':'Active network connections',            'cmd':'ss -tulnp',                                'placeholder':'(no argument needed)'},
-        {'id':'arp_scan',     'nombre':'arp-scan',     'desc':'Discover hosts on local network',       'cmd':'arp-scan {arg}',                           'placeholder':'192.168.1.0/24'},
-        {'id':'nc_banner',    'nombre':'netcat banner','desc':'Grab service banner',                   'cmd':'nc -w3 {arg}',                             'placeholder':'IP port (e.g. 192.168.1.1 80)'},
+        {'id':'netstat_k',    'name':'netstat',      'desc':'Active network connections',            'cmd':'ss -tulnp',                                'placeholder':'(no argument needed)'},
+        {'id':'arp_scan',     'name':'arp-scan',     'desc':'Discover hosts on local network',       'cmd':'arp-scan {arg}',                           'placeholder':'192.168.1.0/24'},
+        {'id':'nc_banner',    'name':'netcat banner','desc':'Grab service banner',                   'cmd':'nc -w3 {arg}',                             'placeholder':'IP port (e.g. 192.168.1.1 80)'},
     ],
 }
 
 PARROT_TOOLS = {
     'anonymity': [
-        {'id':'anonsurf_start', 'nombre':'anonsurf start', 'desc':'Route ALL traffic through Tor',    'cmd':'anonsurf start',                           'placeholder':'(no argument needed)'},
-        {'id':'anonsurf_stop',  'nombre':'anonsurf stop',  'desc':'Disable Tor anonymity',            'cmd':'anonsurf stop',                            'placeholder':'(no argument needed)'},
-        {'id':'anonsurf_ip',    'nombre':'my anon IP',     'desc':'Show current public IP via Tor',   'cmd':'anonsurf myip',                            'placeholder':'(no argument needed)'},
+        {'id':'anonsurf_start', 'name':'anonsurf start', 'desc':'Route ALL traffic through Tor',    'cmd':'anonsurf start',                           'placeholder':'(no argument needed)'},
+        {'id':'anonsurf_stop',  'name':'anonsurf stop',  'desc':'Disable Tor anonymity',            'cmd':'anonsurf stop',                            'placeholder':'(no argument needed)'},
+        {'id':'anonsurf_ip',    'name':'my anon IP',     'desc':'Show current public IP via Tor',   'cmd':'anonsurf myip',                            'placeholder':'(no argument needed)'},
     ],
     'osint': [
-        {'id':'spiderfoot',     'nombre':'spiderfoot',     'desc':'Full automated OSINT',             'cmd':'spiderfoot -s {arg} -m all -q 2>&1 | head -80', 'placeholder':'domain.com or IP'},
-        {'id':'masscan',        'nombre':'masscan',        'desc':'Ultra-fast port scanner',          'cmd':'masscan {arg} -p1-1024 --rate=500 2>&1',   'placeholder':'192.168.1.0/24'},
-        {'id':'amass',          'nombre':'amass',          'desc':'Advanced subdomain enumeration',   'cmd':'amass enum -passive -d {arg} 2>&1 | head -50', 'placeholder':'domain.com'},
+        {'id':'spiderfoot',     'name':'spiderfoot',     'desc':'Full automated OSINT',             'cmd':'spiderfoot -s {arg} -m all -q 2>&1 | head -80', 'placeholder':'domain.com or IP'},
+        {'id':'masscan',        'name':'masscan',        'desc':'Ultra-fast port scanner',          'cmd':'masscan {arg} -p1-1024 --rate=500 2>&1',   'placeholder':'192.168.1.0/24'},
+        {'id':'amass',          'name':'amass',          'desc':'Advanced subdomain enumeration',   'cmd':'amass enum -passive -d {arg} 2>&1 | head -50', 'placeholder':'domain.com'},
     ],
     'wifi': [
-        {'id':'wifite',         'nombre':'wifite',         'desc':'Automated WiFi auditing',          'cmd':'wifite --kill --all 2>&1 | head -40',      'placeholder':'(no argument needed)'},
-        {'id':'wifiphisher',    'nombre':'wifiphisher',    'desc':'Advanced evil twin attack',        'cmd':'wifiphisher --essid {arg} 2>&1 | head -30', 'placeholder':'WiFi network name'},
+        {'id':'wifite',         'name':'wifite',         'desc':'Automated WiFi auditing',          'cmd':'wifite --kill --all 2>&1 | head -40',      'placeholder':'(no argument needed)'},
+        {'id':'wifiphisher',    'name':'wifiphisher',    'desc':'Advanced evil twin attack',        'cmd':'wifiphisher --essid {arg} 2>&1 | head -30', 'placeholder':'WiFi network name'},
     ],
     'passwords': [
-        {'id':'crunch_p',       'nombre':'crunch',         'desc':'Generate custom wordlist',         'cmd':'crunch {arg} | head -100',                 'placeholder':'6 8 abc123'},
-        {'id':'cewl_p',         'nombre':'cewl',           'desc':'Wordlist from website',            'cmd':'cewl {arg} -d 2 -m 5',                     'placeholder':'http://target.com'},
-        {'id':'medusa',         'nombre':'medusa',         'desc':'Network service brute force',      'cmd':'medusa -h {arg} -M ssh 2>&1 | head -30',   'placeholder':'IP user'},
+        {'id':'crunch_p',       'name':'crunch',         'desc':'Generate custom wordlist',         'cmd':'crunch {arg} | head -100',                 'placeholder':'6 8 abc123'},
+        {'id':'cewl_p',         'name':'cewl',           'desc':'Wordlist from website',            'cmd':'cewl {arg} -d 2 -m 5',                     'placeholder':'http://target.com'},
+        {'id':'medusa',         'name':'medusa',         'desc':'Network service brute force',      'cmd':'medusa -h {arg} -M ssh 2>&1 | head -30',   'placeholder':'IP user'},
     ],
     'forensics': [
-        {'id':'faraday_p',      'nombre':'faraday',        'desc':'Vulnerability management dashboard','cmd':'faraday-server --port 5985 &',             'placeholder':'(no argument needed)'},
-        {'id':'autopsy_p',      'nombre':'autopsy',        'desc':'Full forensic suite with GUI',     'cmd':'autopsy',                                  'placeholder':'(no argument needed)'},
+        {'id':'faraday_p',      'name':'faraday',        'desc':'Vulnerability management dashboard','cmd':'faraday-server --port 5985 &',             'placeholder':'(no argument needed)'},
+        {'id':'autopsy_p',      'name':'autopsy',        'desc':'Full forensic suite with GUI',     'cmd':'autopsy',                                  'placeholder':'(no argument needed)'},
     ],
 }
 
 REMNUX_TOOLS = {
     'malware': [
-        {'id':'capa',           'nombre':'capa',           'desc':'Detect malware capabilities',      'cmd':'capa {arg}',                               'placeholder':'/path/to/malware.exe'},
-        {'id':'manalyze',       'nombre':'manalyze',       'desc':'Analyze PE binary for malware',    'cmd':'manalyze {arg}',                           'placeholder':'/path/to/malware.exe'},
-        {'id':'peframe',        'nombre':'peframe',        'desc':'PE file internal structure',       'cmd':'peframe {arg}',                            'placeholder':'/path/to/malware.exe'},
-        {'id':'speakeasy',      'nombre':'speakeasy',      'desc':'Emulate malware without running',  'cmd':'speakeasy -t {arg} -o /tmp/speakeasy_out.json && cat /tmp/speakeasy_out.json', 'placeholder':'/path/to/malware.exe'},
-        {'id':'flarestrings',   'nombre':'flarestrings',   'desc':'Smart string extraction from malware','cmd':'flarestrings {arg}',                    'placeholder':'/path/to/malware.exe'},
+        {'id':'capa',           'name':'capa',           'desc':'Detect malware capabilities',      'cmd':'capa {arg}',                               'placeholder':'/path/to/malware.exe'},
+        {'id':'manalyze',       'name':'manalyze',       'desc':'Analyze PE binary for malware',    'cmd':'manalyze {arg}',                           'placeholder':'/path/to/malware.exe'},
+        {'id':'peframe',        'name':'peframe',        'desc':'PE file internal structure',       'cmd':'peframe {arg}',                            'placeholder':'/path/to/malware.exe'},
+        {'id':'speakeasy',      'name':'speakeasy',      'desc':'Emulate malware without running',  'cmd':'speakeasy -t {arg} -o /tmp/speakeasy_out.json && cat /tmp/speakeasy_out.json', 'placeholder':'/path/to/malware.exe'},
+        {'id':'flarestrings',   'name':'flarestrings',   'desc':'Smart string extraction from malware','cmd':'flarestrings {arg}',                    'placeholder':'/path/to/malware.exe'},
     ],
     'documents': [
-        {'id':'olevba',         'nombre':'olevba',         'desc':'Extract VBA macros from Office docs','cmd':'olevba {arg}',                           'placeholder':'/path/to/document.doc'},
-        {'id':'oledump',        'nombre':'oledump',        'desc':'Analyze internal OLE structure',   'cmd':'oledump.py {arg}',                         'placeholder':'/path/to/document.doc'},
-        {'id':'mraptor',        'nombre':'mraptor',        'desc':'Detect malicious macros',          'cmd':'mraptor {arg}',                            'placeholder':'/path/to/document.doc'},
-        {'id':'vmonkey',        'nombre':'vmonkey',        'desc':'Emulate VBA macros safely',        'cmd':'vmonkey {arg}',                            'placeholder':'/path/to/document.doc'},
-        {'id':'pdfid',          'nombre':'pdfid',          'desc':'Detect dangerous elements in PDF', 'cmd':'pdfid.py {arg}',                           'placeholder':'/path/to/document.pdf'},
-        {'id':'pdfparser',      'nombre':'pdf-parser',     'desc':'Full PDF structure analysis',      'cmd':'pdf-parser.py {arg}',                      'placeholder':'/path/to/document.pdf'},
-        {'id':'peepdf',         'nombre':'peepdf',         'desc':'Deep analysis of malicious PDFs',  'cmd':'peepdf -f {arg}',                          'placeholder':'/path/to/document.pdf'},
+        {'id':'olevba',         'name':'olevba',         'desc':'Extract VBA macros from Office docs','cmd':'olevba {arg}',                           'placeholder':'/path/to/document.doc'},
+        {'id':'oledump',        'name':'oledump',        'desc':'Analyze internal OLE structure',   'cmd':'oledump.py {arg}',                         'placeholder':'/path/to/document.doc'},
+        {'id':'mraptor',        'name':'mraptor',        'desc':'Detect malicious macros',          'cmd':'mraptor {arg}',                            'placeholder':'/path/to/document.doc'},
+        {'id':'vmonkey',        'name':'vmonkey',        'desc':'Emulate VBA macros safely',        'cmd':'vmonkey {arg}',                            'placeholder':'/path/to/document.doc'},
+        {'id':'pdfid',          'name':'pdfid',          'desc':'Detect dangerous elements in PDF', 'cmd':'pdfid.py {arg}',                           'placeholder':'/path/to/document.pdf'},
+        {'id':'pdfparser',      'name':'pdf-parser',     'desc':'Full PDF structure analysis',      'cmd':'pdf-parser.py {arg}',                      'placeholder':'/path/to/document.pdf'},
+        {'id':'peepdf',         'name':'peepdf',         'desc':'Deep analysis of malicious PDFs',  'cmd':'peepdf -f {arg}',                          'placeholder':'/path/to/document.pdf'},
     ],
     'analysis': [
-        {'id':'vol3',           'nombre':'volatility3',    'desc':'RAM memory dump analysis',         'cmd':'vol3 -f {arg} windows.pslist 2>&1 | head -50', 'placeholder':'/path/to/memory.raw'},
-        {'id':'binwalk_r',      'nombre':'binwalk',        'desc':'Analyze and extract firmware',     'cmd':'binwalk {arg}',                            'placeholder':'/path/to/file.bin'},
-        {'id':'yara',           'nombre':'yara-rules',     'desc':'Detect malware families with YARA','cmd':'yara-rules /etc/yara/ {arg} 2>&1 | head -30', 'placeholder':'/path/to/malware.exe'},
-        {'id':'strings_r',      'nombre':'strings',        'desc':'Extract text from any binary',     'cmd':'strings {arg} | grep -E "http|cmd|pass|key|token" | head -50', 'placeholder':'/path/to/file'},
-        {'id':'exiftool_r',     'nombre':'exiftool',       'desc':'Full metadata from any file',      'cmd':'exiftool {arg}',                           'placeholder':'/path/to/file'},
+        {'id':'vol3',           'name':'volatility3',    'desc':'RAM memory dump analysis',         'cmd':'vol3 -f {arg} windows.pslist 2>&1 | head -50', 'placeholder':'/path/to/memory.raw'},
+        {'id':'binwalk_r',      'name':'binwalk',        'desc':'Analyze and extract firmware',     'cmd':'binwalk {arg}',                            'placeholder':'/path/to/file.bin'},
+        {'id':'yara',           'name':'yara-rules',     'desc':'Detect malware families with YARA','cmd':'yara-rules /etc/yara/ {arg} 2>&1 | head -30', 'placeholder':'/path/to/malware.exe'},
+        {'id':'strings_r',      'name':'strings',        'desc':'Extract text from any binary',     'cmd':'strings {arg} | grep -E "http|cmd|pass|key|token" | head -50', 'placeholder':'/path/to/file'},
+        {'id':'exiftool_r',     'name':'exiftool',       'desc':'Full metadata from any file',      'cmd':'exiftool {arg}',                           'placeholder':'/path/to/file'},
     ],
     'crypto': [
-        {'id':'xortool',        'nombre':'xortool',        'desc':'Analyze and decrypt XOR data',     'cmd':'xortool {arg}',                            'placeholder':'/path/to/file.bin'},
-        {'id':'chepy',          'nombre':'chepy',          'desc':'Crypto ops: base64, hex, etc.',    'cmd':'chepy {arg} b64_decode str_to_hex',        'placeholder':'text or file'},
-        {'id':'trid',           'nombre':'trid',           'desc':'Identify real file type',          'cmd':'trid {arg}',                               'placeholder':'/path/to/file'},
+        {'id':'xortool',        'name':'xortool',        'desc':'Analyze and decrypt XOR data',     'cmd':'xortool {arg}',                            'placeholder':'/path/to/file.bin'},
+        {'id':'chepy',          'name':'chepy',          'desc':'Crypto ops: base64, hex, etc.',    'cmd':'chepy {arg} b64_decode str_to_hex',        'placeholder':'text or file'},
+        {'id':'trid',           'name':'trid',           'desc':'Identify real file type',          'cmd':'trid {arg}',                               'placeholder':'/path/to/file'},
     ],
 }
 
 BLACKARCH_TOOLS = {
     'recon': [
-        {'id':'nmap',        'nombre':'nmap',        'desc':'Port and service scanner',                    'cmd':'nmap -sT -sV --open {arg}',                       'placeholder':'IP or domain'},
-        {'id':'rustscan',    'nombre':'rustscan',    'desc':'Ultrafast scanner, passes results to nmap',   'cmd':'rustscan -a {arg} -- -sV -sC',                    'placeholder':'IP or range'},
-        {'id':'masscan',     'nombre':'masscan',     'desc':'Mass scan millions of IPs per second',        'cmd':'masscan {arg} -p1-65535 --rate=1000',             'placeholder':'IP or CIDR'},
-        {'id':'amass',       'nombre':'amass',       'desc':'Subdomain enumeration and ASN mapping',       'cmd':'amass enum -d {arg}',                             'placeholder':'domain.com'},
-        {'id':'subfinder',   'nombre':'subfinder',   'desc':'Passive subdomain discovery',                 'cmd':'subfinder -d {arg}',                              'placeholder':'domain.com'},
-        {'id':'dnsx',        'nombre':'dnsx',        'desc':'Mass DNS resolution with response filtering', 'cmd':'echo {arg} | dnsx -a -resp',                      'placeholder':'domain.com'},
-        {'id':'httpx',       'nombre':'httpx',       'desc':'HTTP probing with tech detection',            'cmd':'echo {arg} | httpx-pd -title -tech-detect -sc',   'placeholder':'domain.com'},
+        {'id':'nmap',        'name':'nmap',        'desc':'Port and service scanner',                    'cmd':'nmap -sT -sV --open {arg}',                       'placeholder':'IP or domain'},
+        {'id':'rustscan',    'name':'rustscan',    'desc':'Ultrafast scanner, passes results to nmap',   'cmd':'rustscan -a {arg} -- -sV -sC',                    'placeholder':'IP or range'},
+        {'id':'masscan',     'name':'masscan',     'desc':'Mass scan millions of IPs per second',        'cmd':'masscan {arg} -p1-65535 --rate=1000',             'placeholder':'IP or CIDR'},
+        {'id':'amass',       'name':'amass',       'desc':'Subdomain enumeration and ASN mapping',       'cmd':'amass enum -d {arg}',                             'placeholder':'domain.com'},
+        {'id':'subfinder',   'name':'subfinder',   'desc':'Passive subdomain discovery',                 'cmd':'subfinder -d {arg}',                              'placeholder':'domain.com'},
+        {'id':'dnsx',        'name':'dnsx',        'desc':'Mass DNS resolution with response filtering', 'cmd':'echo {arg} | dnsx -a -resp',                      'placeholder':'domain.com'},
+        {'id':'httpx',       'name':'httpx',       'desc':'HTTP probing with tech detection',            'cmd':'echo {arg} | httpx-pd -title -tech-detect -sc',   'placeholder':'domain.com'},
     ],
     'web': [
-        {'id':'gobuster',    'nombre':'gobuster',    'desc':'Directory and file brute force',              'cmd':'gobuster dir -u {arg} -w /usr/share/wordlists/dirb/common.txt', 'placeholder':'https://target.com'},
-        {'id':'ffuf',        'nombre':'ffuf',        'desc':'Fast web fuzzer with filters',                'cmd':'ffuf -u {arg}/FUZZ -w /usr/share/wordlists/dirb/common.txt -mc 200,301,302', 'placeholder':'https://target.com'},
-        {'id':'feroxbuster', 'nombre':'feroxbuster', 'desc':'Recursive auto fuzzer (Rust)',                'cmd':'feroxbuster -u {arg} -w /usr/share/wordlists/dirb/common.txt', 'placeholder':'https://target.com'},
-        {'id':'nuclei',      'nombre':'nuclei',      'desc':'Vulnerability scanner using templates',       'cmd':'nuclei -u {arg} -severity medium,high,critical',  'placeholder':'https://target.com'},
-        {'id':'sqlmap',      'nombre':'sqlmap',      'desc':'Automated SQL injection detection',           'cmd':'sqlmap -u {arg} --dbs --batch --level=2',          'placeholder':'https://target.com/page?id=1'},
+        {'id':'gobuster',    'name':'gobuster',    'desc':'Directory and file brute force',              'cmd':'gobuster dir -u {arg} -w /usr/share/wordlists/dirb/common.txt', 'placeholder':'https://target.com'},
+        {'id':'ffuf',        'name':'ffuf',        'desc':'Fast web fuzzer with filters',                'cmd':'ffuf -u {arg}/FUZZ -w /usr/share/wordlists/dirb/common.txt -mc 200,301,302', 'placeholder':'https://target.com'},
+        {'id':'feroxbuster', 'name':'feroxbuster', 'desc':'Recursive auto fuzzer (Rust)',                'cmd':'feroxbuster -u {arg} -w /usr/share/wordlists/dirb/common.txt', 'placeholder':'https://target.com'},
+        {'id':'nuclei',      'name':'nuclei',      'desc':'Vulnerability scanner using templates',       'cmd':'nuclei -u {arg} -severity medium,high,critical',  'placeholder':'https://target.com'},
+        {'id':'sqlmap',      'name':'sqlmap',      'desc':'Automated SQL injection detection',           'cmd':'sqlmap -u {arg} --dbs --batch --level=2',          'placeholder':'https://target.com/page?id=1'},
     ],
     'passwords': [
-        {'id':'hashcat',     'nombre':'hashcat',     'desc':'GPU/CPU hash cracker — all modes',            'cmd':'hashcat -m 0 {arg} /opt/wordlists/rockyou.txt',   'placeholder':'hash.txt or hash value'},
-        {'id':'john',        'nombre':'john',        'desc':'John the Ripper — hashes and files',          'cmd':'john --wordlist=/opt/wordlists/rockyou.txt {arg}', 'placeholder':'hash.txt'},
+        {'id':'hashcat',     'name':'hashcat',     'desc':'GPU/CPU hash cracker — all modes',            'cmd':'hashcat -m 0 {arg} /opt/wordlists/rockyou.txt',   'placeholder':'hash.txt or hash value'},
+        {'id':'john',        'name':'john',        'desc':'John the Ripper — hashes and files',          'cmd':'john --wordlist=/opt/wordlists/rockyou.txt {arg}', 'placeholder':'hash.txt'},
     ],
     'windows': [
-        {'id':'cme_smb',     'nombre':'crackmapexec smb',   'desc':'SMB recon and attack on AD',          'cmd':'cme smb {arg} --shares',                          'placeholder':'IP or 192.168.1.0/24'},
-        {'id':'cme_ldap',    'nombre':'crackmapexec ldap',  'desc':'LDAP enumeration on Active Directory','cmd':'cme ldap {arg} -u "" -p "" --users',              'placeholder':'domain-controller-IP'},
-        {'id':'evil_winrm',  'nombre':'evil-winrm',         'desc':'WinRM shell for Windows targets',     'cmd':'evil-winrm -i {arg} -u Administrator',            'placeholder':'target-IP'},
-        {'id':'responder',   'nombre':'responder',          'desc':'LLMNR/NBT-NS poisoning — capture hashes','cmd':'sudo responder -I eth0 -wv',                  'placeholder':'(run on local network)'},
-        {'id':'psexec',      'nombre':'impacket-psexec',    'desc':'Remote exec via SMB with credentials','cmd':'impacket-psexec {arg}',                           'placeholder':'domain/user:pass@IP'},
-        {'id':'secretsdump', 'nombre':'secretsdump',        'desc':'Dump SAM, LSA, NTDS.dit remotely',   'cmd':'impacket-secretsdump {arg}',                      'placeholder':'domain/user:pass@IP'},
+        {'id':'cme_smb',     'name':'crackmapexec smb',   'desc':'SMB recon and attack on AD',          'cmd':'cme smb {arg} --shares',                          'placeholder':'IP or 192.168.1.0/24'},
+        {'id':'cme_ldap',    'name':'crackmapexec ldap',  'desc':'LDAP enumeration on Active Directory','cmd':'cme ldap {arg} -u "" -p "" --users',              'placeholder':'domain-controller-IP'},
+        {'id':'evil_winrm',  'name':'evil-winrm',         'desc':'WinRM shell for Windows targets',     'cmd':'evil-winrm -i {arg} -u Administrator',            'placeholder':'target-IP'},
+        {'id':'responder',   'name':'responder',          'desc':'LLMNR/NBT-NS poisoning — capture hashes','cmd':'sudo responder -I eth0 -wv',                  'placeholder':'(run on local network)'},
+        {'id':'psexec',      'name':'impacket-psexec',    'desc':'Remote exec via SMB with credentials','cmd':'impacket-psexec {arg}',                           'placeholder':'domain/user:pass@IP'},
+        {'id':'secretsdump', 'name':'secretsdump',        'desc':'Dump SAM, LSA, NTDS.dit remotely',   'cmd':'impacket-secretsdump {arg}',                      'placeholder':'domain/user:pass@IP'},
     ],
     'wireless': [
-        {'id':'airmon',      'nombre':'airmon-ng',   'desc':'Enable monitor mode on WiFi adapter',        'cmd':'sudo airmon-ng start {arg}',                      'placeholder':'wlan0'},
-        {'id':'airodump',    'nombre':'airodump-ng', 'desc':'Capture WiFi packets and handshakes',        'cmd':'sudo airodump-ng {arg}',                          'placeholder':'wlan0mon'},
-        {'id':'aircrack',    'nombre':'aircrack-ng', 'desc':'Crack WPA/WEP captured handshakes',          'cmd':'aircrack-ng -w /opt/wordlists/rockyou.txt {arg}', 'placeholder':'capture.cap'},
+        {'id':'airmon',      'name':'airmon-ng',   'desc':'Enable monitor mode on WiFi adapter',        'cmd':'sudo airmon-ng start {arg}',                      'placeholder':'wlan0'},
+        {'id':'airodump',    'name':'airodump-ng', 'desc':'Capture WiFi packets and handshakes',        'cmd':'sudo airodump-ng {arg}',                          'placeholder':'wlan0mon'},
+        {'id':'aircrack',    'name':'aircrack-ng', 'desc':'Crack WPA/WEP captured handshakes',          'cmd':'aircrack-ng -w /opt/wordlists/rockyou.txt {arg}', 'placeholder':'capture.cap'},
     ],
     'forensics': [
-        {'id':'volatility',  'nombre':'volatility3', 'desc':'RAM memory forensics analysis',              'cmd':'vol -f {arg} windows.pslist',                     'placeholder':'/path/to/memory.dmp'},
-        {'id':'vol_netscan', 'nombre':'vol netscan', 'desc':'Network connections from memory dump',       'cmd':'vol -f {arg} windows.netscan',                    'placeholder':'/path/to/memory.dmp'},
-        {'id':'vol_cmdline', 'nombre':'vol cmdline', 'desc':'Command lines executed from memory',         'cmd':'vol -f {arg} windows.cmdline',                    'placeholder':'/path/to/memory.dmp'},
+        {'id':'volatility',  'name':'volatility3', 'desc':'RAM memory forensics analysis',              'cmd':'vol -f {arg} windows.pslist',                     'placeholder':'/path/to/memory.dmp'},
+        {'id':'vol_netscan', 'name':'vol netscan', 'desc':'Network connections from memory dump',       'cmd':'vol -f {arg} windows.netscan',                    'placeholder':'/path/to/memory.dmp'},
+        {'id':'vol_cmdline', 'name':'vol cmdline', 'desc':'Command lines executed from memory',         'cmd':'vol -f {arg} windows.cmdline',                    'placeholder':'/path/to/memory.dmp'},
     ],
 }
 
@@ -1143,7 +1143,7 @@ def _distrobox_run(distro, tool_dict, tool_id, arg):
         return {'error': 'Invalid argument: contains disallowed characters'}
     cmd = tool['cmd'].replace('{arg}', arg.strip())
     resultado = _cmd(f'distrobox enter {distro} -- bash -c "{cmd}"', timeout=90)
-    return {'tool': tool['nombre'], 'cmd': cmd, 'output': resultado}
+    return {'tool': tool['name'], 'cmd': cmd, 'output': resultado}
 
 def _kali_run(tool_id, arg):
     """Runs a Kali tool inside the distrobox container"""
@@ -1165,7 +1165,7 @@ def _kali_run(tool_id, arg):
     full_cmd = f'distrobox enter kali -- bash -c "{cmd}"'
     resultado = _cmd(full_cmd, timeout=60)
     return {
-        'tool': tool['nombre'],
+        'tool': tool['name'],
         'cmd': cmd,
         'output': resultado
     }
@@ -1495,8 +1495,8 @@ def _build_grafo():
                 add_node(eid3, gh['email'], 'email', f"GitHub email: {gh['email']}")
                 add_edge(uid, eid3, 'email')
             for repo in res.get('github_repos',[])[:5]:
-                rid = nid('repo_'+repo['nombre'])
-                add_node(rid, repo['nombre'][:20], 'repo', f"⭐{repo['stars']} {repo['lenguaje']}")
+                rid = nid('repo_'+repo['name'])
+                add_node(rid, repo['name'][:20], 'repo', f"⭐{repo['stars']} {repo['lenguaje']}")
                 add_edge(uid, rid, 'repo')
 
         # ── EMAIL ─────────────────────────────────────────────────
@@ -1571,7 +1571,7 @@ def _darkweb_search(query):
         for match in re.finditer(r'<h4[^>]*><a href="([^"]+)"[^>]*>([^<]+)</a></h4>.*?<p[^>]*>([^<]*)</p>',
                                   r.text, re.DOTALL):
             resultados.append({'url': match.group(1), 'titulo': match.group(2).strip(),
-                               'descripcion': match.group(3).strip()[:200]})
+                               'description': match.group(3).strip()[:200]})
         datos['resultados']['ahmia'] = resultados[:15]
     except Exception as e:
         datos['resultados']['ahmia_error'] = str(e)
@@ -1733,7 +1733,7 @@ def _build_timeline():
                     eventos.append({
                         'fecha': fecha_fmt[:10], 'timestamp': dt.timestamp(),
                         'modulo': type, 'target': objetivo,
-                        'descripcion': f'{type}: {objetivo or clave}'
+                        'description': f'{type}: {objetivo or clave}'
                     })
                 except Exception as _e: log.debug("source unavailable: %s", _e)
     # Add the history of executed modules
@@ -1742,12 +1742,12 @@ def _build_timeline():
         eventos.append({
             'fecha': datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M'),
             'timestamp': ts, 'modulo': 'ejecucion',
-            'target': h.get('clave',''), 'descripcion': f"Module run: {h.get('clave','')}"
+            'target': h.get('clave',''), 'description': f"Module run: {h.get('clave','')}"
         })
     vistos = set()
     unicos = []
     for e in eventos:
-        k = e['fecha'] + e['descripcion']
+        k = e['fecha'] + e['description']
         if k not in vistos:
             vistos.add(k)
             unicos.append(e)
@@ -1791,8 +1791,8 @@ def _monitor_stop():
     monitor_state['activo'] = False
 
 def _generar_reporte_html():
-    nombre = case['nombre'] or f'reporte_{int(time.time())}'
-    path = _ruta_caso_segura(nombre, '_reporte.html') or os.path.join(CASES_DIR, f'reporte_{int(time.time())}_reporte.html')
+    name = case['name'] or f'reporte_{int(time.time())}'
+    path = _ruta_caso_segura(name, '_reporte.html') or os.path.join(CASES_DIR, f'reporte_{int(time.time())}_reporte.html')
     ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
     secciones = ''
     for clave, value in case['datos'].items():
@@ -1807,7 +1807,7 @@ h2{{color:#89b4fa;font-size:.9rem;margin:20px 0 6px}}.meta{{color:#6c7086;margin
 pre{{color:#a6e3a1;font-size:.78rem;white-space:pre-wrap;word-break:break-all}}
 .badge{{background:#f38ba822;color:#f38ba8;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700}}</style>
 </head><body><h1>⬛ OBSIDIAN REPORT <span class="badge">CONFIDENTIAL</span></h1>
-<div class="meta"><b>Target:</b> {html.escape(str(case.get('target','?')))} | <b>Case:</b> {html.escape(nombre)} | <b>Generated:</b> {ts}</div>
+<div class="meta"><b>Target:</b> {html.escape(str(case.get('target','?')))} | <b>Case:</b> {html.escape(name)} | <b>Generated:</b> {ts}</div>
 {secciones}</body></html>"""
     with open(path,'w') as f: f.write(contenido)
     return path
@@ -1876,32 +1876,32 @@ def index():
 @app.route('/api/status')
 def api_status():
     with case_lock:
-        return jsonify({'caso': case['nombre'], 'target': case['target'],
+        return jsonify({'caso': case['name'], 'target': case['target'],
                        'modulos': len(case['datos']), 'ok': True})
 
 @app.route('/api/case', methods=['GET','POST','DELETE'])
 def api_caso():
     if request.method == 'GET':
         archivos = [f[:-5] for f in os.listdir(CASES_DIR) if f.endswith('.json')]
-        return jsonify({'casos': archivos, 'actual': case['nombre']})
+        return jsonify({'casos': archivos, 'actual': case['name']})
     d = request.json or {}
     if request.method == 'POST':
-        slug = _slug_caso(d.get('nombre','caso1'))
+        slug = _slug_caso(d.get('name','caso1'))
         if not slug:
             return jsonify({'error':'Invalid case name'}), 400
         with case_lock:
-            case.update({'nombre':slug, 'target':d.get('target',''),
+            case.update({'name':slug, 'target':d.get('target',''),
                          'datos':{}, 'history':[], 'iniciado':datetime.datetime.now().isoformat()})
         return jsonify({'ok':True})
     if request.method == 'DELETE':
         with case_lock:
-            case.update({'nombre':None,'target':None,'datos':{},'history':[]})
+            case.update({'name':None,'target':None,'datos':{},'history':[]})
         return jsonify({'ok':True})
 
 @app.route('/api/case/save', methods=['POST'])
 def api_guardar():
-    if not case['nombre']: return jsonify({'error':'No active case'}), 400
-    path = _ruta_caso_segura(case['nombre'])
+    if not case['name']: return jsonify({'error':'No active case'}), 400
+    path = _ruta_caso_segura(case['name'])
     if not path: return jsonify({'error':'Invalid case name'}), 400
     with open(path,'w') as f: json.dump(case, f, ensure_ascii=False, indent=2, default=str)
     _db_guardar_caso(case)
@@ -1915,8 +1915,8 @@ def api_buscar():
 
 @app.route('/api/case/load', methods=['POST'])
 def api_cargar():
-    nombre = (request.json or {}).get('nombre','')
-    path = _ruta_caso_segura(nombre)
+    name = (request.json or {}).get('name','')
+    path = _ruta_caso_segura(name)
     if not path: return jsonify({'error':'Invalid case name'}), 400
     if not os.path.exists(path): return jsonify({'error':'Not found'}), 404
     with open(path) as f: data = json.load(f)
@@ -1987,8 +1987,8 @@ def api_run():
 # F2 -- Integrated transform engine (endpoints /api/v2/*, additive)
 # ════════════════════════════════════════════════════════════════════════════
 
-@transform(entrada='domain', salidas=('ip',), nombre='dns_a',
-           descripcion='A records of the domain (dig)')
+@transform(input='domain', outputs=('ip',), name='dns_a',
+           description='A records of the domain (dig)')
 def _t_dns_a(entidad, ctx):
     out = run_tool(['dig', entidad.value, 'A', '+short'], timeout=10)
     for linea in out.splitlines():
@@ -1996,8 +1996,8 @@ def _t_dns_a(entidad, ctx):
         if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', linea):
             ctx.emit('ip', linea, label='A')
 
-@transform(entrada='ip', salidas=('domain',), nombre='ptr',
-           descripcion='PTR / reverse DNS (dig -x)')
+@transform(input='ip', outputs=('domain',), name='ptr',
+           description='PTR / reverse DNS (dig -x)')
 def _t_ptr(entidad, ctx):
     out = run_tool(['dig', '-x', entidad.value, '+short'], timeout=10)
     for linea in out.splitlines():
@@ -2005,8 +2005,8 @@ def _t_ptr(entidad, ctx):
         if linea and not linea.startswith(';'):
             ctx.emit('domain', linea, label='PTR')
 
-@transform(entrada='url', salidas=('tech', 'person', 'url'), nombre='metadata',
-           descripcion='EXIF metadata as pivotable entities: GPS, device, software, author (F9)')
+@transform(input='url', outputs=('tech', 'person', 'url'), name='metadata',
+           description='EXIF metadata as pivotable entities: GPS, device, software, author (F9)')
 def _t_metadata(entidad, ctx):
     if not _which('exiftool'):
         return
@@ -2054,8 +2054,8 @@ def _t_metadata(entidad, ctx):
         except OSError:
             pass
 
-@transform(entrada='domain', salidas=(), nombre='dorks',
-           descripcion='Generates useful Google dorks for the domain (files, panels, indexes, backups)')
+@transform(input='domain', outputs=(), name='dorks',
+           description='Generates useful Google dorks for the domain (files, panels, indexes, backups)')
 def _t_dorks(entidad, ctx):
     from urllib.parse import quote_plus
     d = entidad.value
@@ -2071,8 +2071,8 @@ def _t_dorks(entidad, ctx):
         {'que': q, 'url': f'https://www.google.com/search?q={quote_plus(query)}'}
         for q, query in plantillas]
 
-@transform(entrada='wallet', salidas=(), nombre='wallet_balance',
-           descripcion='Balance and activity of a BTC wallet (blockchain.info, keyless)')
+@transform(input='wallet', outputs=(), name='wallet_balance',
+           description='Balance and activity of a BTC wallet (blockchain.info, keyless)')
 def _t_wallet_balance(entidad, ctx):
     if not re.fullmatch(r'[a-zA-Z0-9]{20,90}', entidad.value):   # BTC shape, no junk in the URL
         return
@@ -2086,8 +2086,8 @@ def _t_wallet_balance(entidad, ctx):
     except Exception as _e:
         log.debug("wallet_balance unavailable: %s", _e)
 
-@transform(entrada='domain', salidas=('hash',), nombre='favicon_hash',
-           descripcion='mmh3 hash of the favicon -- pivotable node for Shodan/FOFA (F8)')
+@transform(input='domain', outputs=('hash',), name='favicon_hash',
+           description='mmh3 hash of the favicon -- pivotable node for Shodan/FOFA (F8)')
 def _t_favicon_hash(entidad, ctx):
     try:
         import mmh3
@@ -2135,16 +2135,16 @@ def _pivote_ips(campos):
             log.debug("pivote shodan: %s", _e)
     return ips
 
-@transform(entrada='hash', salidas=('ip',), nombre='favicon_pivote', requiere_key=True,
-           descripcion='Enumerates IPs serving this favicon (FOFA/Shodan) -- without touching the target (F8)')
+@transform(input='hash', outputs=('ip',), name='favicon_pivote', requires_key=True,
+           description='Enumerates IPs serving this favicon (FOFA/Shodan) -- without touching the target (F8)')
 def _t_favicon_pivote(entidad, ctx):
     if entidad.properties.get('tipo_hash') != 'favicon':
         return
     for ip in _pivote_ips({'favicon': entidad.value}):
         ctx.emit('ip', ip, label='same-favicon')
 
-@transform(entrada='domain', salidas=('subdomain',), nombre='wayback',
-           descripcion='Historical snapshot + old subdomains of the domain (Wayback Machine)')
+@transform(input='domain', outputs=('subdomain',), name='wayback',
+           description='Historical snapshot + old subdomains of the domain (Wayback Machine)')
 def _t_wayback(entidad, ctx):
     # 1. is there a snapshot? ('available' endpoint, reliable)
     try:
@@ -2170,8 +2170,8 @@ def _t_wayback(entidad, ctx):
     except Exception as _e:
         log.debug("wayback cdx: %s", _e)
 
-@transform(entrada='domain', salidas=('subdomain', 'ip'), nombre='subdominios_ht',
-           descripcion='Subdomains (+ their IP) via HackerTarget hostsearch (keyless)')
+@transform(input='domain', outputs=('subdomain', 'ip'), name='subdominios_ht',
+           description='Subdomains (+ their IP) via HackerTarget hostsearch (keyless)')
 def _t_subdominios_ht(entidad, ctx):
     try:
         texto = SESSION.get(f'https://api.hackertarget.com/hostsearch/?q={entidad.value}', timeout=12).text
@@ -2191,8 +2191,8 @@ def _t_subdominios_ht(entidad, ctx):
     except Exception as _e:
         log.debug("subdominios_ht unavailable: %s", _e)
 
-@transform(entrada='domain', salidas=('subdomain',), nombre='crtsh',
-           descripcion='Subdomains from crt.sh (Certificate Transparency)')
+@transform(input='domain', outputs=('subdomain',), name='crtsh',
+           description='Subdomains from crt.sh (Certificate Transparency)')
 def _t_crtsh(entidad, ctx):
     try:
         r = SESSION.get(f'https://crt.sh/?q=%.{entidad.value}&output=json', timeout=12)
@@ -2206,8 +2206,8 @@ def _t_crtsh(entidad, ctx):
     except Exception as _e:
         log.debug("crtsh unavailable: %s", _e)
 
-@transform(entrada='domain', salidas=('subdomain',), nombre='ct_certspotter',
-           descripcion='Subdomains from Certificate Transparency (certspotter, keyless)')
+@transform(input='domain', outputs=('subdomain',), name='ct_certspotter',
+           description='Subdomains from Certificate Transparency (certspotter, keyless)')
 def _t_ct_certspotter(entidad, ctx):
     try:
         data = SESSION.get('https://api.certspotter.com/v1/issuances',
@@ -2217,16 +2217,16 @@ def _t_ct_certspotter(entidad, ctx):
             return
         vistos = set()
         for cert in data:
-            for nombre in cert.get('dns_names', []):
-                nombre = nombre.lstrip('*.')
-                if nombre.endswith(entidad.value) and nombre != entidad.value and nombre not in vistos:
-                    vistos.add(nombre)
-                    ctx.emit('subdomain', nombre, label='subdomain')
+            for name in cert.get('dns_names', []):
+                name = name.lstrip('*.')
+                if name.endswith(entidad.value) and name != entidad.value and name not in vistos:
+                    vistos.add(name)
+                    ctx.emit('subdomain', name, label='subdomain')
     except Exception as _e:
         log.debug("certspotter unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('country', 'org', 'asn'), nombre='geo_ip',
-           descripcion='Geolocation and network info of the IP (ip-api.com)')
+@transform(input='ip', outputs=('country', 'org', 'asn'), name='geo_ip',
+           description='Geolocation and network info of the IP (ip-api.com)')
 def _t_geo_ip(entidad, ctx):
     try:
         r = SESSION.get(f'http://ip-api.com/json/{entidad.value}'
@@ -2244,8 +2244,8 @@ def _t_geo_ip(entidad, ctx):
     except Exception as _e:
         log.debug("geo_ip unavailable: %s", _e)
 
-@transform(entrada='user', salidas=('platform',), nombre='sherlock',
-           descripcion='User accounts across 400+ platforms (Sherlock)')
+@transform(input='user', outputs=('platform',), name='sherlock',
+           description='User accounts across 400+ platforms (Sherlock)')
 def _t_sherlock(entidad, ctx):
     if not _which('sherlock'):
         return
@@ -2255,8 +2255,8 @@ def _t_sherlock(entidad, ctx):
         if m:
             ctx.emit('platform', m.group(1).strip(), label='profile', url=m.group(2).strip())
 
-@transform(entrada='user', salidas=('email', 'repo'), nombre='github_usuario',
-           descripcion='User email and public repos on GitHub')
+@transform(input='user', outputs=('email', 'repo'), name='github_usuario',
+           description='User email and public repos on GitHub')
 def _t_github(entidad, ctx):
     try:
         gh = SESSION.get(f'https://api.github.com/users/{entidad.value}', timeout=8).json()
@@ -2274,8 +2274,8 @@ def _t_github(entidad, ctx):
     except Exception as _e:
         log.debug("github_usuario unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('port',), nombre='puertos',
-           descripcion='Open ports and services (nmap top-20)')
+@transform(input='ip', outputs=('port',), name='puertos',
+           description='Open ports and services (nmap top-20)')
 def _t_puertos(entidad, ctx):
     if not _which('nmap'):
         return
@@ -2291,8 +2291,8 @@ def _t_puertos(entidad, ctx):
         # the value carries the IP: port 80 of two hosts != the same node
         ctx.emit('port', f'{entidad.value}:{num}', label='open', servicio=servicio)
 
-@transform(entrada='domain', salidas=('domain',), nombre='dns_mx',
-           descripcion='Mail servers of the domain (MX)')
+@transform(input='domain', outputs=('domain',), name='dns_mx',
+           description='Mail servers of the domain (MX)')
 def _t_dns_mx(entidad, ctx):
     out = run_tool(['dig', entidad.value, 'MX', '+short'], timeout=10)
     for linea in out.splitlines():
@@ -2303,8 +2303,8 @@ def _t_dns_mx(entidad, ctx):
         if host:
             ctx.emit('domain', host, label='MX')
 
-@transform(entrada='domain', salidas=('domain',), nombre='dns_ns',
-           descripcion='Name servers of the domain (NS)')
+@transform(input='domain', outputs=('domain',), name='dns_ns',
+           description='Name servers of the domain (NS)')
 def _t_dns_ns(entidad, ctx):
     out = run_tool(['dig', entidad.value, 'NS', '+short'], timeout=10)
     for linea in out.splitlines():
@@ -2312,8 +2312,8 @@ def _t_dns_ns(entidad, ctx):
         if host:
             ctx.emit('domain', host, label='NS')
 
-@transform(entrada='email', salidas=('org',), nombre='email_breaches',
-           descripcion='Breaches the email appeared in (HIBP; requires a real HIBP_API_KEY)')
+@transform(input='email', outputs=('org',), name='email_breaches',
+           description='Breaches the email appeared in (HIBP; requires a real HIBP_API_KEY)')
 def _t_email_breaches(entidad, ctx):
     try:
         hibp_key = _key_rotativa('hibp') or os.environ.get('HIBP_API_KEY', '')
@@ -2323,9 +2323,9 @@ def _t_email_breaches(entidad, ctx):
             headers={'hibp-api-key': hibp_key, 'User-Agent': 'OBSIDIAN-OSINT'})
         if r.status_code == 200:
             for b in r.json():
-                nombre = b.get('Name')
-                if nombre:
-                    ctx.emit('org', nombre, label='leaked in')
+                name = b.get('Name')
+                if name:
+                    ctx.emit('org', name, label='leaked in')
             entidad.tag('leaked')
     except Exception as _e:
         log.debug("hibp unavailable: %s", _e)
@@ -2349,18 +2349,18 @@ def _pastes_github(entidad):
     except Exception as _e:
         log.debug("pastes_github unavailable: %s", _e)
 
-@transform(entrada='domain', salidas=(), nombre='pastes_github',
-           descripcion='Domain mentions + secrets on GitHub (free token in the vault)')
+@transform(input='domain', outputs=(), name='pastes_github',
+           description='Domain mentions + secrets on GitHub (free token in the vault)')
 def _t_pastes_github_dom(entidad, ctx):
     _pastes_github(entidad)
 
-@transform(entrada='email', salidas=(), nombre='pastes_github_email',
-           descripcion='Email mentions in public GitHub code (free token in the vault)')
+@transform(input='email', outputs=(), name='pastes_github_email',
+           description='Email mentions in public GitHub code (free token in the vault)')
 def _t_pastes_github_email(entidad, ctx):
     _pastes_github(entidad)
 
-@transform(entrada='email', salidas=('org',), nombre='breaches_xon',
-           descripcion='Breaches the email appeared in (XposedOrNot, keyless)')
+@transform(input='email', outputs=('org',), name='breaches_xon',
+           description='Breaches the email appeared in (XposedOrNot, keyless)')
 def _t_breaches_xon(entidad, ctx):
     try:
         r = SESSION.get(f'https://api.xposedornot.com/v1/check-email/{requests.utils.quote(entidad.value)}',
@@ -2369,16 +2369,16 @@ def _t_breaches_xon(entidad, ctx):
             return
         breaches = r.json().get('breaches') or []
         lista = breaches[0] if breaches and isinstance(breaches[0], list) else breaches
-        for nombre in (lista or [])[:30]:
-            if nombre:
-                ctx.emit('org', str(nombre), label='leaked in')
+        for name in (lista or [])[:30]:
+            if name:
+                ctx.emit('org', str(name), label='leaked in')
         if lista:
             entidad.tag('leaked')
     except Exception as _e:
         log.debug("xposedornot unavailable: %s", _e)
 
-@transform(entrada='email', salidas=(), nombre='stealer_hudsonrock',
-           descripcion='Did the email come from an infostealer-infected machine? (HudsonRock, keyless)')
+@transform(input='email', outputs=(), name='stealer_hudsonrock',
+           description='Did the email come from an infostealer-infected machine? (HudsonRock, keyless)')
 def _t_stealer(entidad, ctx):
     try:
         r = SESSION.get('https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email',
@@ -2390,8 +2390,8 @@ def _t_stealer(entidad, ctx):
     except Exception as _e:
         log.debug("hudsonrock unavailable: %s", _e)
 
-@transform(entrada='email', salidas=('org',), nombre='breaches',
-           descripcion='Breach aggregator: XposedOrNot + LeakCheck (keyless) + HIBP (if key), unified (F10 step 135)')
+@transform(input='email', outputs=('org',), name='breaches',
+           description='Breach aggregator: XposedOrNot + LeakCheck (keyless) + HIBP (if key), unified (F10 step 135)')
 def _t_breaches(entidad, ctx):
     email = entidad.value
     fuentes = set()
@@ -2406,9 +2406,9 @@ def _t_breaches(entidad, ctx):
         d = SESSION.get('https://leakcheck.io/api/public', params={'check': email}, timeout=10).json() or {}
         if d.get('success'):
             for s in d.get('sources', []):
-                nombre = s.get('name') if isinstance(s, dict) else s
-                if nombre:
-                    fuentes.add(nombre)
+                name = s.get('name') if isinstance(s, dict) else s
+                if name:
+                    fuentes.add(name)
     except Exception as _e:
         log.debug("breaches leakcheck: %s", _e)
     hibp = _key_rotativa('hibp') or os.environ.get('HIBP_API_KEY', '')
@@ -2426,8 +2426,8 @@ def _t_breaches(entidad, ctx):
         for f in sorted(fuentes)[:30]:
             ctx.emit('org', f, label='breach')
 
-@transform(entrada='email', salidas=('url',), nombre='intelx', requiere_key=True,
-           descripcion='Historical leak search by selector (Intelligence X, key in vault) (F10 step 134)')
+@transform(input='email', outputs=('url',), name='intelx', requires_key=True,
+           description='Historical leak search by selector (Intelligence X, key in vault) (F10 step 134)')
 def _t_intelx(entidad, ctx):
     key = _key_rotativa('intelx') or os.environ.get('INTELX_KEY', '')
     if not key:
@@ -2446,12 +2446,12 @@ def _t_intelx(entidad, ctx):
             sysid = rec.get('systemid')
             if sysid:
                 ctx.emit('url', f'https://intelx.io/?did={sysid}', label='intelx',
-                           nombre=(rec.get('name') or '')[:120], bucket=rec.get('bucket', ''))
+                           name=(rec.get('name') or '')[:120], bucket=rec.get('bucket', ''))
     except Exception as _e:
         log.debug("intelx unavailable: %s", _e)
 
-@transform(entrada='email', salidas=('url',), nombre='pastes',
-           descripcion='Paste monitoring: psbdmp + dorks to Pastebin/Ghostbin/etc (keyless) (F10 step 133)')
+@transform(input='email', outputs=('url',), name='pastes',
+           description='Paste monitoring: psbdmp + dorks to Pastebin/Ghostbin/etc (keyless) (F10 step 133)')
 def _t_pastes(entidad, ctx):
     from urllib.parse import quote as _q
     q = entidad.value
@@ -2467,8 +2467,8 @@ def _t_pastes(entidad, ctx):
         ctx.emit('url', f'https://www.google.com/search?q={_q(f"{q} site:{sitio}")}',
                    label=f'paste-dork:{sitio}', sitio=sitio)
 
-@transform(entrada='domain', salidas=(), nombre='stealer_dominio',
-           descripcion='Domain exposure in stealer logs (infected employees/users, HudsonRock keyless) (F10 step 132)')
+@transform(input='domain', outputs=(), name='stealer_dominio',
+           description='Domain exposure in stealer logs (infected employees/users, HudsonRock keyless) (F10 step 132)')
 def _t_stealer_dominio(entidad, ctx):
     try:
         d = SESSION.get('https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-domain',
@@ -2487,8 +2487,8 @@ def _t_stealer_dominio(entidad, ctx):
     except Exception as _e:
         log.debug("stealer_dominio unavailable: %s", _e)
 
-@transform(entrada='email', salidas=(), nombre='email_spoofable',
-           descripcion='Checks the SPF of the email domain (spoofing risk)')
+@transform(input='email', outputs=(), name='email_spoofable',
+           description='Checks the SPF of the email domain (spoofing risk)')
 def _t_email_spoofable(entidad, ctx):
     dominio = entidad.value.split('@')[-1]
     if not dominio:
@@ -2524,13 +2524,13 @@ def _screenshot(entidad):
     except Exception as _e:
         log.debug("screenshot failed: %s", _e)
 
-@transform(entrada='domain', salidas=(), nombre='screenshot',
-           descripcion='Screenshot of the site (headless browser)')
+@transform(input='domain', outputs=(), name='screenshot',
+           description='Screenshot of the site (headless browser)')
 def _t_screenshot_dom(entidad, ctx):
     _screenshot(entidad)
 
-@transform(entrada='subdomain', salidas=(), nombre='screenshot_sub',
-           descripcion='Screenshot of the subdomain (headless)')
+@transform(input='subdomain', outputs=(), name='screenshot_sub',
+           description='Screenshot of the subdomain (headless)')
 def _t_screenshot_sub(entidad, ctx):
     _screenshot(entidad)
 
@@ -2548,19 +2548,19 @@ def _nuclei(entidad):
         except Exception:
             continue
         info = j.get('info', {}) or {}
-        hallados.append({'id': j.get('template-id'), 'sev': info.get('severity'), 'nombre': info.get('name')})
+        hallados.append({'id': j.get('template-id'), 'sev': info.get('severity'), 'name': info.get('name')})
         if info.get('severity') in ('high', 'critical'):
             entidad.tag('vulnerable')
     if hallados:
         entidad.properties['nuclei'] = hallados[:20]
 
-@transform(entrada='domain', salidas=(), nombre='nuclei',
-           descripcion='Template-based vulnerability scan (nuclei)')
+@transform(input='domain', outputs=(), name='nuclei',
+           description='Template-based vulnerability scan (nuclei)')
 def _t_nuclei_dom(entidad, ctx):
     _nuclei(entidad)
 
-@transform(entrada='subdomain', salidas=(), nombre='nuclei_sub',
-           descripcion='Subdomain vulnerability scan (nuclei)')
+@transform(input='subdomain', outputs=(), name='nuclei_sub',
+           description='Subdomain vulnerability scan (nuclei)')
 def _t_nuclei_sub(entidad, ctx):
     _nuclei(entidad)
 
@@ -2613,26 +2613,26 @@ def _tech_detect(entidad):
     except Exception:
         pass
     cuerpo = r.text[:20000].lower()
-    for pista, nombre in [('wp-content', 'WordPress'), ('/_next/', 'Next.js'), ('drupal', 'Drupal'),
+    for pista, name in [('wp-content', 'WordPress'), ('/_next/', 'Next.js'), ('drupal', 'Drupal'),
                           ('joomla', 'Joomla'), ('cf-ray', 'Cloudflare'), ('x-shopify', 'Shopify')]:
         if pista in cuerpo:
-            techs.add(nombre)
+            techs.add(name)
     return {t for t in techs if t and len(t) < 40}
 
-@transform(entrada='domain', salidas=('tech',), nombre='tech',
-           descripcion='Technologies the site uses (HTTP fingerprint)')
+@transform(input='domain', outputs=('tech',), name='tech',
+           description='Technologies the site uses (HTTP fingerprint)')
 def _t_tech_dom(entidad, ctx):
     for t in _tech_detect(entidad):
         ctx.emit('tech', t, label='uses')
 
-@transform(entrada='subdomain', salidas=('tech',), nombre='tech_sub',
-           descripcion='Subdomain technologies (HTTP fingerprint)')
+@transform(input='subdomain', outputs=('tech',), name='tech_sub',
+           description='Subdomain technologies (HTTP fingerprint)')
 def _t_tech_sub(entidad, ctx):
     for t in _tech_detect(entidad):
         ctx.emit('tech', t, label='uses')
 
-@transform(entrada='tech', salidas=('cve',), nombre='cve_lookup',
-           descripcion='Critical CVEs associated with the technology (NVD). NO version -> verify applicability')
+@transform(input='tech', outputs=('cve',), name='cve_lookup',
+           description='Critical CVEs associated with the technology (NVD). NO version -> verify applicability')
 def _t_cve_lookup(entidad, ctx):
     kw = entidad.value
     try:
@@ -2655,18 +2655,18 @@ def _t_cve_lookup(entidad, ctx):
             if e:
                 e.tag('version-unverified')
 
-@transform(entrada='domain', salidas=(), nombre='http_probe',
-           descripcion='HTTP probe: status, title, server, redirect (httpx-style)')
+@transform(input='domain', outputs=(), name='http_probe',
+           description='HTTP probe: status, title, server, redirect (httpx-style)')
 def _t_http_probe_dom(entidad, ctx):
     _http_probe(entidad)
 
-@transform(entrada='subdomain', salidas=(), nombre='http_probe_sub',
-           descripcion='HTTP probe of the subdomain (httpx-style)')
+@transform(input='subdomain', outputs=(), name='http_probe_sub',
+           description='HTTP probe of the subdomain (httpx-style)')
 def _t_http_probe_sub(entidad, ctx):
     _http_probe(entidad)
 
-@transform(entrada='domain', salidas=('domain',), nombre='reverse_whois',
-           descripcion='Other domains of the same registrant (ViewDNS, free key in the vault). The only F5 one without a keyless option.')
+@transform(input='domain', outputs=('domain',), name='reverse_whois',
+           description='Other domains of the same registrant (ViewDNS, free key in the vault). The only F5 one without a keyless option.')
 def _t_reverse_whois(entidad, ctx):
     key = _key_rotativa('viewdns') or os.environ.get('VIEWDNS_KEY', '')
     if not key:
@@ -2681,8 +2681,8 @@ def _t_reverse_whois(entidad, ctx):
     except Exception as _e:
         log.debug("reverse_whois unavailable: %s", _e)
 
-@transform(entrada='domain', salidas=('domain', 'org'), nombre='rdap',
-           descripcion='Modern WHOIS (RDAP, no key): registrar, name servers, dates')
+@transform(input='domain', outputs=('domain', 'org'), name='rdap',
+           description='Modern WHOIS (RDAP, no key): registrar, name servers, dates')
 def _t_rdap(entidad, ctx):
     try:
         r = SESSION.get(f'https://rdap.org/domain/{entidad.value}', timeout=12,
@@ -2692,13 +2692,13 @@ def _t_rdap(entidad, ctx):
         d = r.json()
         for ent in d.get('entities', []):
             if 'registrar' in (ent.get('roles') or []):
-                nombre, vc = None, ent.get('vcardArray')
+                name, vc = None, ent.get('vcardArray')
                 if vc and len(vc) > 1:
                     for campo in vc[1]:
                         if campo and campo[0] == 'fn':
-                            nombre = campo[3]
-                if nombre:
-                    ctx.emit('org', nombre, label='registrar')
+                            name = campo[3]
+                if name:
+                    ctx.emit('org', name, label='registrar')
         for ns in d.get('nameservers', []):
             if ns.get('ldhName'):
                 ctx.emit('domain', ns['ldhName'], label='NS')
@@ -2712,8 +2712,8 @@ def _t_rdap(entidad, ctx):
     except Exception as _e:
         log.debug("rdap unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=(), nombre='reputacion_ip',
-           descripcion='IP reputation: proxy/VPN, hosting/datacenter, mobile (ip-api, keyless)')
+@transform(input='ip', outputs=(), name='reputacion_ip',
+           description='IP reputation: proxy/VPN, hosting/datacenter, mobile (ip-api, keyless)')
 def _t_reputacion_ip(entidad, ctx):
     try:
         d = SESSION.get(f'http://ip-api.com/json/{entidad.value}?fields=status,proxy,hosting,mobile',
@@ -2731,8 +2731,8 @@ def _t_reputacion_ip(entidad, ctx):
     except Exception as _e:
         log.debug("reputacion_ip unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=(), nombre='abuseipdb',
-           descripcion='Abuse score of the IP (AbuseIPDB, free key in the vault)')
+@transform(input='ip', outputs=(), name='abuseipdb',
+           description='Abuse score of the IP (AbuseIPDB, free key in the vault)')
 def _t_abuseipdb(entidad, ctx):
     key = _key_rotativa('abuseipdb') or os.environ.get('ABUSEIPDB_KEY', '')
     if not key:
@@ -2750,9 +2750,9 @@ def _t_abuseipdb(entidad, ctx):
     except Exception as _e:
         log.debug("abuseipdb unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('port', 'org', 'tech'), nombre='shodan',
-           requiere_key=True,
-           descripcion='Ports/services/org of the IP (Shodan, key in the vault)')
+@transform(input='ip', outputs=('port', 'org', 'tech'), name='shodan',
+           requires_key=True,
+           description='Ports/services/org of the IP (Shodan, key in the vault)')
 def _t_shodan(entidad, ctx):
     key = _key_rotativa('shodan') or os.environ.get('SHODAN_API_KEY', '')
     if not key:
@@ -2776,9 +2776,9 @@ def _t_shodan(entidad, ctx):
     except Exception as _e:
         log.debug("shodan unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('port', 'org', 'tech', 'asn'), nombre='censys',
-           requiere_key=True,
-           descripcion='Services of the IP (Censys, key "id:secret" in the vault)')
+@transform(input='ip', outputs=('port', 'org', 'tech', 'asn'), name='censys',
+           requires_key=True,
+           description='Services of the IP (Censys, key "id:secret" in the vault)')
 def _t_censys(entidad, ctx):
     cred = _key_rotativa('censys') or os.environ.get('CENSYS_API', '')
     if not cred or ':' not in cred:
@@ -2806,9 +2806,9 @@ def _t_censys(entidad, ctx):
     except Exception as _e:
         log.debug("censys unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('port', 'tech'), nombre='zoomeye',
-           requiere_key=True,
-           descripcion='Services of the IP in ZoomEye (CN engine, key in the vault)')
+@transform(input='ip', outputs=('port', 'tech'), name='zoomeye',
+           requires_key=True,
+           description='Services of the IP in ZoomEye (CN engine, key in the vault)')
 def _t_zoomeye(entidad, ctx):
     key = _key_rotativa('zoomeye') or os.environ.get('ZOOMEYE_KEY', '')
     if not key:
@@ -2829,9 +2829,9 @@ def _t_zoomeye(entidad, ctx):
     except Exception as _e:
         log.debug("zoomeye unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('port', 'domain'), nombre='fofa',
-           requiere_key=True,
-           descripcion='Hosts/domains in FOFA (CN engine, key "email:key" in the vault)')
+@transform(input='ip', outputs=('port', 'domain'), name='fofa',
+           requires_key=True,
+           description='Hosts/domains in FOFA (CN engine, key "email:key" in the vault)')
 def _t_fofa(entidad, ctx):
     cred = _key_rotativa('fofa') or os.environ.get('FOFA_KEY', '')
     if not cred or ':' not in cred:
@@ -2856,9 +2856,9 @@ def _t_fofa(entidad, ctx):
     except Exception as _e:
         log.debug("fofa unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('port', 'tech'), nombre='quake',
-           requiere_key=True,
-           descripcion='Services of the IP in Quake/360 (CN engine, key in the vault)')
+@transform(input='ip', outputs=('port', 'tech'), name='quake',
+           requires_key=True,
+           description='Services of the IP in Quake/360 (CN engine, key in the vault)')
 def _t_quake(entidad, ctx):
     key = _key_rotativa('quake') or os.environ.get('QUAKE_KEY', '')
     if not key:
@@ -2870,17 +2870,17 @@ def _t_quake(entidad, ctx):
                          timeout=12)
         for m in (r.json() or {}).get('data', []):
             p = m.get('port')
-            nombre = (m.get('service', {}) or {}).get('name')
+            name = (m.get('service', {}) or {}).get('name')
             if p:
-                ctx.emit('port', f"{entidad.value}:{p}", label='quake', servicio=nombre or '')
-            if nombre:
-                ctx.emit('tech', nombre, label='quake')
+                ctx.emit('port', f"{entidad.value}:{p}", label='quake', servicio=name or '')
+            if name:
+                ctx.emit('tech', name, label='quake')
     except Exception as _e:
         log.debug("quake unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('port', 'domain'), nombre='hunter',
-           requiere_key=True,
-           descripcion='Hosts/domains in Hunter.how (CN engine, key in the vault)')
+@transform(input='ip', outputs=('port', 'domain'), name='hunter',
+           requires_key=True,
+           description='Hosts/domains in Hunter.how (CN engine, key in the vault)')
 def _t_hunter(entidad, ctx):
     key = _key_rotativa('hunter') or os.environ.get('HUNTER_KEY', '')
     if not key:
@@ -2898,9 +2898,9 @@ def _t_hunter(entidad, ctx):
     except Exception as _e:
         log.debug("hunter unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('port',), nombre='netlas',
-           requiere_key=True,
-           descripcion='Responses of the IP in Netlas (key in the vault)')
+@transform(input='ip', outputs=('port',), name='netlas',
+           requires_key=True,
+           description='Responses of the IP in Netlas (key in the vault)')
 def _t_netlas(entidad, ctx):
     key = _key_rotativa('netlas') or os.environ.get('NETLAS_KEY', '')
     if not key:
@@ -2916,9 +2916,9 @@ def _t_netlas(entidad, ctx):
     except Exception as _e:
         log.debug("netlas unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('port',), nombre='criminalip',
-           requiere_key=True,
-           descripcion='Ports/exposure of the IP (Criminal IP, key in the vault)')
+@transform(input='ip', outputs=('port',), name='criminalip',
+           requires_key=True,
+           description='Ports/exposure of the IP (Criminal IP, key in the vault)')
 def _t_criminalip(entidad, ctx):
     key = _key_rotativa('criminalip') or os.environ.get('CRIMINALIP_KEY', '')
     if not key:
@@ -2934,9 +2934,9 @@ def _t_criminalip(entidad, ctx):
     except Exception as _e:
         log.debug("criminalip unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('port',), nombre='binaryedge',
-           requiere_key=True,
-           descripcion='Exposed ports of the IP (BinaryEdge, key in the vault)')
+@transform(input='ip', outputs=('port',), name='binaryedge',
+           requires_key=True,
+           description='Exposed ports of the IP (BinaryEdge, key in the vault)')
 def _t_binaryedge(entidad, ctx):
     key = _key_rotativa('binaryedge') or os.environ.get('BINARYEDGE_KEY', '')
     if not key:
@@ -2951,20 +2951,20 @@ def _t_binaryedge(entidad, ctx):
     except Exception as _e:
         log.debug("binaryedge unavailable: %s", _e)
 
-@transform(entrada='url', salidas=('url',), nombre='reverse_image',
-           descripcion='Reverse image search in Yandex/Google/TinEye/Bing (F9, keyless)')
+@transform(input='url', outputs=('url',), name='reverse_image',
+           description='Reverse image search in Yandex/Google/TinEye/Bing (F9, keyless)')
 def _t_reverse_image(entidad, ctx):
     for motor, enlace in enlaces_reverse(entidad.value).items():
         ctx.emit('url', enlace, label=f'reverse:{motor}', motor=motor)
 
-@transform(entrada='url', salidas=('url',), nombre='busqueda_facial',
-           descripcion='Facial recognition: Yandex (by URL) + FaceCheck/PimEyes (manual upload) (F9)')
+@transform(input='url', outputs=('url',), name='busqueda_facial',
+           description='Facial recognition: Yandex (by URL) + FaceCheck/PimEyes (manual upload) (F9)')
 def _t_busqueda_facial(entidad, ctx):
     for motor, info in enlaces_facial(entidad.value).items():
         ctx.emit('url', info['url'], label=f'facial:{motor}', motor=motor, modo=info['modo'])
 
-@transform(entrada='phone', salidas=('url', 'country'), nombre='telefono_dorks',
-           descripcion='Phone search dorks (Truecaller/messaging) + carrier if key (F2 step 33)')
+@transform(input='phone', outputs=('url', 'country'), name='telefono_dorks',
+           description='Phone search dorks (Truecaller/messaging) + carrier if key (F2 step 33)')
 def _t_telefono_dorks(entidad, ctx):
     from urllib.parse import quote as _q
     num = entidad.value
@@ -2975,8 +2975,8 @@ def _t_telefono_dorks(entidad, ctx):
         'messaging': f'{num} whatsapp OR telegram',
         'general': limpio,
     }
-    for nombre, q in dorks.items():
-        ctx.emit('url', f'https://www.google.com/search?q={_q(q)}', label=f'dork:{nombre}', dork=nombre)
+    for name, q in dorks.items():
+        ctx.emit('url', f'https://www.google.com/search?q={_q(q)}', label=f'dork:{name}', dork=name)
     key = _key_rotativa('numverify') or os.environ.get('NUMVERIFY_KEY', '')
     if key:
         try:
@@ -2991,24 +2991,24 @@ def _t_telefono_dorks(entidad, ctx):
         except Exception as _e:
             log.debug("numverify unavailable: %s", _e)
 
-@transform(entrada='domain', salidas=('domain',), nombre='typosquatting',
-           descripcion='Typosquat variants of the domain that ARE registered (F2 step 34)')
+@transform(input='domain', outputs=('domain',), name='typosquatting',
+           description='Typosquat variants of the domain that ARE registered (F2 step 34)')
 def _t_typosquatting(entidad, ctx):
     dom = entidad.value
-    nombre, ext = dom.rsplit('.', 1) if '.' in dom else (dom, 'com')
+    name, ext = dom.rsplit('.', 1) if '.' in dom else (dom, 'com')
     variantes = set()
     subs = {'a': '4', 'e': '3', 'i': '1', 'o': '0', 's': '5', 'l': '1'}
-    for i, c in enumerate(nombre):
+    for i, c in enumerate(name):
         if c in subs:
-            variantes.add(f'{nombre[:i] + subs[c] + nombre[i+1:]}.{ext}')
+            variantes.add(f'{name[:i] + subs[c] + name[i+1:]}.{ext}')
     teclado = {'q': 'w', 'w': 'e', 'e': 'r', 'r': 't', 't': 'y', 'a': 's', 's': 'd',
                'd': 'f', 'f': 'g', 'g': 'h', 'z': 'x', 'x': 'c', 'c': 'v', 'v': 'b'}
-    for i, c in enumerate(nombre.lower()):
+    for i, c in enumerate(name.lower()):
         if c in teclado:
-            variantes.add(f'{nombre[:i] + teclado[c] + nombre[i+1:]}.{ext}')
-    for i in range(len(nombre)):
-        variantes.add(f'{nombre[:i] + nombre[i+1:]}.{ext}')
-        variantes.add(f'{nombre[:i] + nombre[i]*2 + nombre[i:]}.{ext}')
+            variantes.add(f'{name[:i] + teclado[c] + name[i+1:]}.{ext}')
+    for i in range(len(name)):
+        variantes.add(f'{name[:i] + name[i+1:]}.{ext}')
+        variantes.add(f'{name[:i] + name[i]*2 + name[i:]}.{ext}')
     variantes.discard(dom)
     registrados, lock = {}, threading.Lock()
     def _chk(v):
@@ -3028,8 +3028,8 @@ def _t_typosquatting(entidad, ctx):
         if d:
             d.tag('typosquat')
 
-@transform(entrada='org', salidas=('bucket',), nombre='buckets',
-           descripcion='Public S3/GCS/Azure buckets by organization name (F2 step 34)')
+@transform(input='org', outputs=('bucket',), name='buckets',
+           description='Public S3/GCS/Azure buckets by organization name (F2 step 34)')
 def _t_buckets(entidad, ctx):
     base = re.sub(r'[^a-z0-9-]', '', entidad.value.lower().replace(' ', '-').replace('_', '-'))
     if not base:
@@ -3067,8 +3067,8 @@ _TAKEOVER_FP = {
     'shopify.com': 'Sorry, this shop is currently unavailable',
 }
 
-@transform(entrada='domain', salidas=('subdomain',), nombre='takeover',
-           descripcion='Orphaned subdomains vulnerable to takeover (CNAME to abandoned service) (F2 step 34)')
+@transform(input='domain', outputs=('subdomain',), name='takeover',
+           description='Orphaned subdomains vulnerable to takeover (CNAME to abandoned service) (F2 step 34)')
 def _t_takeover(entidad, ctx):
     dom = entidad.value
     try:
@@ -3105,8 +3105,8 @@ def _t_takeover(entidad, ctx):
         if s:
             s.tag('takeover')          # triggers the r_takeover rule (F4/55)
 
-@transform(entrada='domain', salidas=('ip',), nombre='passivedns', requiere_key=True,
-           descripcion='IP history of the domain (Passive DNS via VirusTotal, key in the vault) (F2 step 34)')
+@transform(input='domain', outputs=('ip',), name='passivedns', requires_key=True,
+           description='IP history of the domain (Passive DNS via VirusTotal, key in the vault) (F2 step 34)')
 def _t_passivedns(entidad, ctx):
     key = _key_rotativa('virustotal') or os.environ.get('VT_API_KEY', '')
     if not key:
@@ -3134,8 +3134,8 @@ _SECRET_PATTERNS = [
     ('Private Key', r'-----BEGIN (?:RSA|EC|OPENSSH) PRIVATE KEY-----'),
 ]
 
-@transform(entrada='user', salidas=('credential', 'repo'), nombre='github_sec',
-           descripcion='Hardcoded secrets in commits of the user public repos (F4 step 60)')
+@transform(input='user', outputs=('credential', 'repo'), name='github_sec',
+           description='Hardcoded secrets in commits of the user public repos (F4 step 60)')
 def _t_github_sec(entidad, ctx):
     user = entidad.value
     tok = _key_rotativa('github') or os.environ.get('GITHUB_TOKEN', '')
@@ -3172,28 +3172,28 @@ def _t_github_sec(entidad, ctx):
     except Exception as _e:
         log.debug("github_sec unavailable: %s", _e)
 
-@transform(entrada='person', salidas=('url',), nombre='person',
-           descripcion='OSINT on a person: summary (DuckDuckGo) + dorks (LinkedIn/X/GitHub...) (keyless)')
+@transform(input='person', outputs=('url',), name='person',
+           description='OSINT on a person: summary (DuckDuckGo) + dorks (LinkedIn/X/GitHub...) (keyless)')
 def _t_persona(entidad, ctx):
     from urllib.parse import quote as _q
-    nombre = entidad.value
+    name = entidad.value
     try:
-        d = SESSION.get(f'https://api.duckduckgo.com/?q={_q(nombre)}&format=json&no_html=1', timeout=8).json()
+        d = SESSION.get(f'https://api.duckduckgo.com/?q={_q(name)}&format=json&no_html=1', timeout=8).json()
         if d.get('AbstractText'):
             entidad.properties['resumen'] = d['AbstractText'][:400]
     except Exception as _e:
         log.debug("persona ddg: %s", _e)
-    dorks = {'linkedin': f'"{nombre}" site:linkedin.com',
-             'x': f'"{nombre}" site:twitter.com OR site:x.com',
-             'contact': f'"{nombre}" email OR phone OR address',
-             'pdf': f'"{nombre}" filetype:pdf',
-             'github': f'"{nombre}" site:github.com',
-             'facebook': f'"{nombre}" site:facebook.com'}
+    dorks = {'linkedin': f'"{name}" site:linkedin.com',
+             'x': f'"{name}" site:twitter.com OR site:x.com',
+             'contact': f'"{name}" email OR phone OR address',
+             'pdf': f'"{name}" filetype:pdf',
+             'github': f'"{name}" site:github.com',
+             'facebook': f'"{name}" site:facebook.com'}
     for k, q in dorks.items():
         ctx.emit('url', f'https://www.google.com/search?q={_q(q)}', label=f'dork:{k}', dork=k)
 
-@transform(entrada='person', salidas=('url',), nombre='darkweb',
-           descripcion='Dark web search (Ahmia, clearnet .onion index, no Tor) (keyless)')
+@transform(input='person', outputs=('url',), name='darkweb',
+           description='Dark web search (Ahmia, clearnet .onion index, no Tor) (keyless)')
 def _t_darkweb(entidad, ctx):
     from urllib.parse import quote as _q
     try:
@@ -3207,8 +3207,8 @@ def _t_darkweb(entidad, ctx):
     except Exception as _e:
         log.debug("darkweb ahmia: %s", _e)
 
-@transform(entrada='url', salidas=(), nombre='url_check',
-           descripcion='URL reputation in URLhaus (abuse.ch, CC0, keyless)')
+@transform(input='url', outputs=(), name='url_check',
+           description='URL reputation in URLhaus (abuse.ch, CC0, keyless)')
 def _t_url_check(entidad, ctx):
     try:
         d = SESSION.post('https://urlhaus-api.abuse.ch/v1/url/',
@@ -3219,8 +3219,8 @@ def _t_url_check(entidad, ctx):
     except Exception as _e:
         log.debug("url_check urlhaus: %s", _e)
 
-@transform(entrada='url', salidas=('email',), nombre='render_js',
-           descripcion='Renders the page with a headless browser (playwright): emails from the final DOM')
+@transform(input='url', outputs=('email',), name='render_js',
+           description='Renders the page with a headless browser (playwright): emails from the final DOM')
 def _t_render_js(entidad, ctx):
     url = entidad.value
     if not url.startswith(('http://', 'https://')):
@@ -3245,8 +3245,8 @@ def _t_render_js(entidad, ctx):
     except Exception as _e:
         log.debug("render_js: %s", _e)
 
-@transform(entrada='file', salidas=(), nombre='yara_bulk',
-           descripcion='Scans a folder with yara-rules (local only)')
+@transform(input='file', outputs=(), name='yara_bulk',
+           description='Scans a folder with yara-rules (local only)')
 def _t_yara_bulk(entidad, ctx):
     carpeta = entidad.value
     if not os.path.isdir(carpeta) or not _which('yara-rules'):
@@ -3275,8 +3275,8 @@ def _t_yara_bulk(entidad, ctx):
         entidad.properties['yara_hallazgos'] = hallazgos[:20]
         entidad.tag('yara-match')
 
-@transform(entrada='person', salidas=(), nombre='wordlist',
-           descripcion='Likely password wordlist from the case via AI (Ollama)')
+@transform(input='person', outputs=(), name='wordlist',
+           description='Likely password wordlist from the case via AI (Ollama)')
 def _t_wordlist(entidad, ctx):
     if not ia.available():
         return
@@ -3304,16 +3304,16 @@ def _t_wordlist(entidad, ctx):
     except Exception as _e:
         log.debug("wordlist save: %s", _e)
 
-@transform(entrada='url', salidas=('url',), nombre='cronolocalizacion',
-           descripcion='Chronolocation by shadows: SunCalc/ShadowMap (Bellingcat technique) (F9 step 121)')
+@transform(input='url', outputs=('url',), name='cronolocalizacion',
+           description='Chronolocation by shadows: SunCalc/ShadowMap (Bellingcat technique) (F9 step 121)')
 def _t_cronolocalizacion(entidad, ctx):
     coords = parse_gps(entidad.properties.get('gps', ''))
     enlaces = enlaces_cronolocalizacion(*(coords if coords else (None, None)))
     for herr, url in enlaces.items():
         ctx.emit('url', url, label=f'sun:{herr}', herramienta=herr)
 
-@transform(entrada='url', salidas=('url',), nombre='satelital',
-           descripcion='Satellite cross-check of the location (Google Earth/Sentinel/Bing) -- requires GPS (F9 step 122)')
+@transform(input='url', outputs=('url',), name='satelital',
+           description='Satellite cross-check of the location (Google Earth/Sentinel/Bing) -- requires GPS (F9 step 122)')
 def _t_satelital(entidad, ctx):
     coords = parse_gps(entidad.properties.get('gps', ''))
     if not coords:
@@ -3321,14 +3321,14 @@ def _t_satelital(entidad, ctx):
     for herr, url in enlaces_satelital(*coords).items():
         ctx.emit('url', url, label=f'satellite:{herr}', herramienta=herr)
 
-@transform(entrada='url', salidas=('url',), nombre='landmarks',
-           descripcion='Landmark matching by image (Google Lens/Mapillary/Wikimapia) (F9 step 123)')
+@transform(input='url', outputs=('url',), name='landmarks',
+           description='Landmark matching by image (Google Lens/Mapillary/Wikimapia) (F9 step 123)')
 def _t_landmarks(entidad, ctx):
     for herr, url in enlaces_landmark(entidad.value).items():
         ctx.emit('url', url, label=f'landmark:{herr}', herramienta=herr)
 
-@transform(entrada='url', salidas=(), nombre='ocr',
-           descripcion='Cyrillic/Chinese/Latin OCR of the image (tesseract, langs rus+chi_sim+eng) (F9 step 125)')
+@transform(input='url', outputs=(), name='ocr',
+           description='Cyrillic/Chinese/Latin OCR of the image (tesseract, langs rus+chi_sim+eng) (F9 step 125)')
 def _t_ocr(entidad, ctx):
     if not _which('tesseract'):
         return                                       # degrades: tesseract + langs missing
@@ -3371,8 +3371,8 @@ def _fetch_tor(url, timeout=25):
     return SESSION.get(url, proxies={'http': TOR_PROXY, 'https': TOR_PROXY},
                        timeout=timeout, headers={'User-Agent': 'Mozilla/5.0'})
 
-@transform(entrada='url', salidas=('email', 'url'), nombre='onion_fetch',
-           descripcion='Opens a .onion site via Tor and extracts title, emails and .onion links (F10 step 128)')
+@transform(input='url', outputs=('email', 'url'), name='onion_fetch',
+           description='Opens a .onion site via Tor and extracts title, emails and .onion links (F10 step 128)')
 def _t_onion_fetch(entidad, ctx):
     url = entidad.value
     if '.onion' not in url:
@@ -3429,9 +3429,9 @@ def _tg_mensajes(usuario, limite=30):
     except Exception as e:
         return False, f'error: {e}'
 
-@transform(entrada='user', salidas=('email', 'url'), nombre='telegram',
-           requiere_key=True,
-           descripcion='Mentions/links of the user or channel in Telegram (Telethon) (F10 step 130)')
+@transform(input='user', outputs=('email', 'url'), name='telegram',
+           requires_key=True,
+           description='Mentions/links of the user or channel in Telegram (Telethon) (F10 step 130)')
 def _t_telegram(entidad, ctx):
     ok, res = _tg_mensajes(entidad.value)
     if not ok:
@@ -3459,9 +3459,9 @@ def coincidencias_leak(textos, keywords=None):
             hits.append({'keyword': kw, 'texto': t[:200]})
     return hits
 
-@transform(entrada='user', salidas=('domain', 'email'), nombre='canal_leaks',
-           requiere_key=True,
-           descripcion='Watches a Telegram channel for mentions of leaks/breaches/ransomware (F10 step 131)')
+@transform(input='user', outputs=('domain', 'email'), name='canal_leaks',
+           requires_key=True,
+           description='Watches a Telegram channel for mentions of leaks/breaches/ransomware (F10 step 131)')
 def _t_canal_leaks(entidad, ctx):
     ok, res = _tg_mensajes(entidad.value, limite=100)
     if not ok:
@@ -3482,8 +3482,8 @@ def _t_canal_leaks(entidad, ctx):
 
 _HAYSTAK_ONION = ('http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion')
 
-@transform(entrada='person', salidas=('url',), nombre='haystak',
-           descripcion='Dark web search in Haystak (via Tor) -- .onion links (F10 step 129)')
+@transform(input='person', outputs=('url',), name='haystak',
+           description='Dark web search in Haystak (via Tor) -- .onion links (F10 step 129)')
 def _t_haystak(entidad, ctx):
     if not _tor_disponible():
         entidad.properties['haystak'] = 'requires Tor (start the tor service)'
@@ -3510,8 +3510,8 @@ def _descargar_imagen(url):
                 break
         return f.name
 
-@transform(entrada='url', salidas=(), nombre='ela', requiere_key=False,
-           descripcion='Edit detection via Error Level Analysis (generates ELA image) (F9 step 126)')
+@transform(input='url', outputs=(), name='ela', requires_key=False,
+           description='Edit detection via Error Level Analysis (generates ELA image) (F9 step 126)')
 def _t_ela(entidad, ctx):
     fn = _descargar_imagen(entidad.value)
     if not fn:
@@ -3533,8 +3533,8 @@ def _t_ela(entidad, ctx):
         except OSError:
             pass
 
-@transform(entrada='url', salidas=('hash',), nombre='phash',
-           descripcion='Perceptual hash (dHash): groups the same image reused across profiles (F9 step 127)')
+@transform(input='url', outputs=('hash',), name='phash',
+           description='Perceptual hash (dHash): groups the same image reused across profiles (F9 step 127)')
 def _t_phash(entidad, ctx):
     fn = _descargar_imagen(entidad.value)
     if not fn:
@@ -3557,8 +3557,8 @@ _WALLET_RE = {
 
 _ES_BTC = re.compile(r'(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\Z')
 
-@transform(entrada='wallet', salidas=('wallet',), nombre='tx_grafo',
-           descripcion='Transaction counterparties of a BTC wallet (blockchain.info, keyless) (F11 step 138)')
+@transform(input='wallet', outputs=('wallet',), name='tx_grafo',
+           description='Transaction counterparties of a BTC wallet (blockchain.info, keyless) (F11 step 138)')
 def _t_tx_grafo(entidad, ctx):
     addr = entidad.value
     if not _ES_BTC.match(addr):
@@ -3584,8 +3584,8 @@ def _t_tx_grafo(entidad, ctx):
 
 _ES_ETH = re.compile(r'0x[a-fA-F0-9]{40}\Z')
 
-@transform(entrada='wallet', salidas=(), nombre='eth_balance',
-           descripcion='Balance of an Ethereum wallet (public RPC cloudflare-eth, keyless) (F11 step 142)')
+@transform(input='wallet', outputs=(), name='eth_balance',
+           description='Balance of an Ethereum wallet (public RPC cloudflare-eth, keyless) (F11 step 142)')
 def _t_eth_balance(entidad, ctx):
     if not _ES_ETH.match(entidad.value):
         return                                       # ETH addresses only
@@ -3613,15 +3613,15 @@ def _ransom_addrs():
         log.debug("ransomwhere unavailable: %s", _e)
     return _RANSOM['addrs'] or set()
 
-@transform(entrada='wallet', salidas=(), nombre='riesgo_wallet',
-           descripcion='Address risk: linked to ransomware? (Ransomwhere, CC0, keyless) (F11 step 141)')
+@transform(input='wallet', outputs=(), name='riesgo_wallet',
+           description='Address risk: linked to ransomware? (Ransomwhere, CC0, keyless) (F11 step 141)')
 def _t_riesgo_wallet(entidad, ctx):
     if entidad.value in _ransom_addrs():
         entidad.tag('ransomware')
         entidad.properties['riesgo'] = 'linked to ransomware (Ransomwhere)'
 
-@transform(entrada='wallet', salidas=('url',), nombre='exchange_attrib',
-           descripcion='Exchange attribution: links to Blockchair/WalletExplorer/Arkham/OXT (F11 step 140)')
+@transform(input='wallet', outputs=('url',), name='exchange_attrib',
+           description='Exchange attribution: links to Blockchair/WalletExplorer/Arkham/OXT (F11 step 140)')
 def _t_exchange_attrib(entidad, ctx):
     from urllib.parse import quote as _q
     a = _q(entidad.value)
@@ -3632,8 +3632,8 @@ def _t_exchange_attrib(entidad, ctx):
     for herr, url in enlaces.items():
         ctx.emit('url', url, label=f'attrib:{herr}', herramienta=herr)
 
-@transform(entrada='wallet', salidas=('wallet',), nombre='cluster_wallets',
-           descripcion='Clustering by co-inputs: addresses of the same owner (heuristic, blockchain.info) (F11 step 139)')
+@transform(input='wallet', outputs=('wallet',), name='cluster_wallets',
+           description='Clustering by co-inputs: addresses of the same owner (heuristic, blockchain.info) (F11 step 139)')
 def _t_cluster_wallets(entidad, ctx):
     addr = entidad.value
     if not _ES_BTC.match(addr):
@@ -3655,8 +3655,8 @@ def _t_cluster_wallets(entidad, ctx):
         if w:
             w.tag('same-owner')
 
-@transform(entrada='url', salidas=('wallet',), nombre='extraer_wallets',
-           descripcion='Extracts BTC/ETH addresses from a page (F11 step 137)')
+@transform(input='url', outputs=('wallet',), name='extraer_wallets',
+           description='Extracts BTC/ETH addresses from a page (F11 step 137)')
 def _t_extraer_wallets(entidad, ctx):
     try:
         r = _fetch_seguro(entidad.value, timeout=10, stream=False)
@@ -3667,35 +3667,35 @@ def _t_extraer_wallets(entidad, ctx):
         for addr in list(set(rx.findall(texto)))[:30]:
             ctx.emit('wallet', addr, label=cadena, cadena=cadena)
 
-@transform(entrada='person', salidas=('url',), nombre='dorks_idioma',
-           descripcion='Dorks adapted to the name language (Cyrillic/Chinese/Latin) (F15 step 176)')
+@transform(input='person', outputs=('url',), name='dorks_idioma',
+           description='Dorks adapted to the name language (Cyrillic/Chinese/Latin) (F15 step 176)')
 def _t_dorks_idioma(entidad, ctx):
     from urllib.parse import quote as _q
     idioma = _ml.detectar_idioma(entidad.value)
     for d in _ml.dorks_por_idioma(entidad.value, idioma):
         ctx.emit('url', f'https://www.google.com/search?q={_q(d)}', label=f'dork:{idioma}', idioma=idioma)
 
-@transform(entrada='person', salidas=('url',), nombre='motores_locales',
-           descripcion='Search in local engines: Yandex, Baidu, Sogou (they index another internet) (F15 step 174)')
+@transform(input='person', outputs=('url',), name='motores_locales',
+           description='Search in local engines: Yandex, Baidu, Sogou (they index another internet) (F15 step 174)')
 def _t_motores_locales(entidad, ctx):
     for motor, url in _ml.motores_locales(entidad.value).items():
         ctx.emit('url', url, label=f'motor:{motor}', motor=motor)
 
-@transform(entrada='org', salidas=('url',), nombre='registros_regionales',
-           descripcion='Company registries by region: QCC (China), RusProfile (Russia), OpenCorporates (F15 step 173)')
+@transform(input='org', outputs=('url',), name='registros_regionales',
+           description='Company registries by region: QCC (China), RusProfile (Russia), OpenCorporates (F15 step 173)')
 def _t_registros_regionales(entidad, ctx):
     for reg, url in _ml.registros_regionales(entidad.value).items():
         ctx.emit('url', url, label=f'registro:{reg}', registro=reg)
 
-@transform(entrada='person', salidas=('person',), nombre='transliterar',
-           descripcion='Name variants in Cyrillic/Latin to search in each alphabet (F15 step 172)')
+@transform(input='person', outputs=('person',), name='transliterar',
+           description='Name variants in Cyrillic/Latin to search in each alphabet (F15 step 172)')
 def _t_transliterar(entidad, ctx):
     for alfabeto, variante in _ml.transliterar(entidad.value).items():
         if variante and variante.lower() != entidad.value.lower():
             ctx.emit('person', variante, label=f'translit:{alfabeto}')
 
-@transform(entrada='user', salidas=('url',), nombre='plataformas_regionales',
-           descripcion='Profiles on regional platforms: VK, Weibo, Douyin, OK, Telegram (F15 step 171)')
+@transform(input='user', outputs=('url',), name='plataformas_regionales',
+           description='Profiles on regional platforms: VK, Weibo, Douyin, OK, Telegram (F15 step 171)')
 def _t_plataformas_regionales(entidad, ctx):
     for plat, url in _ml.perfiles_regionales(entidad.value).items():
         ctx.emit('url', url, label=f'plataforma:{plat}', platform=plat)
@@ -3730,8 +3730,8 @@ def _cargar_blocklist():
     _BLOCKLIST['ts'] = time.time()
     return nets
 
-@transform(entrada='ip', salidas=(), nombre='ip_blocklist',
-           descripcion='Is the IP in high-confidence CC0 threat feeds? (abuse.ch, keyless)')
+@transform(input='ip', outputs=(), name='ip_blocklist',
+           description='Is the IP in high-confidence CC0 threat feeds? (abuse.ch, keyless)')
 def _t_ip_blocklist(entidad, ctx):
     try:
         ip = ipaddress.ip_address(entidad.value)
@@ -3743,8 +3743,8 @@ def _t_ip_blocklist(entidad, ctx):
             entidad.properties['amenaza_fuente'] = fuente
             return
 
-@transform(entrada='ip', salidas=('org',), nombre='greynoise',
-           descripcion='Threat intel of the IP (GreyNoise Community, keyless but 25/day; 404=not observed)')
+@transform(input='ip', outputs=('org',), name='greynoise',
+           description='Threat intel of the IP (GreyNoise Community, keyless but 25/day; 404=not observed)')
 def _t_greynoise(entidad, ctx):
     try:
         r = SESSION.get(f'https://api.greynoise.io/v3/community/{entidad.value}', timeout=8)
@@ -3765,16 +3765,16 @@ def _t_greynoise(entidad, ctx):
     except Exception as _e:
         log.debug("greynoise unavailable: %s", _e)
 
-@transform(entrada='domain', salidas=(), nombre='dns_txt',
-           descripcion='TXT records of the domain (SPF, verifications, etc.)')
+@transform(input='domain', outputs=(), name='dns_txt',
+           description='TXT records of the domain (SPF, verifications, etc.)')
 def _t_dns_txt(entidad, ctx):
     out = run_tool(['dig', entidad.value, 'TXT', '+short'], timeout=10)
     txt = [l.strip().strip('"') for l in out.splitlines() if l.strip()]
     if txt:
         entidad.properties['txt'] = txt[:10]
 
-@transform(entrada='domain', salidas=('org',), nombre='ssl',
-           descripcion='TLS certificate of the domain: issuer and validity')
+@transform(input='domain', outputs=('org',), name='ssl',
+           description='TLS certificate of the domain: issuer and validity')
 def _t_ssl(entidad, ctx):
     try:
         contexto = ssl.create_default_context()
@@ -3793,8 +3793,8 @@ def _t_ssl(entidad, ctx):
     except Exception as _e:
         log.debug("ssl unavailable: %s", _e)
 
-@transform(entrada='domain', salidas=('ip',), nombre='cert_pivote', requiere_key=True,
-           descripcion='IPs with the same TLS cert (CN) across FOFA/Shodan -- same infra (F8)')
+@transform(input='domain', outputs=('ip',), name='cert_pivote', requires_key=True,
+           description='IPs with the same TLS cert (CN) across FOFA/Shodan -- same infra (F8)')
 def _t_cert_pivote(entidad, ctx):
     cn = entidad.properties.get('cert_cn')
     if not cn:                                            # if ssl did not run, get the CN now
@@ -3815,8 +3815,8 @@ def _t_cert_pivote(entidad, ctx):
 @app.route('/api/v2/transforms/<type>')
 def api_v2_transforms(type):
     """Transforms that apply to an entity type (step 35)."""
-    ts = [{'nombre': t.nombre, 'salidas': list(t.salidas),
-           'requiere_key': t.requiere_key, 'descripcion': t.descripcion}
+    ts = [{'name': t.name, 'outputs': list(t.outputs),
+           'requires_key': t.requires_key, 'description': t.description}
           for t in REGISTRO.applicable(type)]
     return jsonify({'type': type, 'transforms': ts})
 
@@ -3824,7 +3824,7 @@ def api_v2_transforms(type):
 # lock serializes those writes and the monitor's snapshot reads.
 _almacen_lock = threading.RLock()
 
-def _correr_transform_interno(type, value, nombre):
+def _correr_transform_interno(type, value, name):
     """Runs a transform and persists (autosave). Shared by /run and the monitor.
     Raises ValueError/KeyError; the caller decides what to do with the error."""
     if not valid_type(type):
@@ -3836,14 +3836,14 @@ def _correr_transform_interno(type, value, nombre):
         _rotar_proxy()                                      # OPSEC: rotate proxy per transform (154)
     _higiene_request()                                      # OPSEC: randomize UA (155)
     _jitter()                                               # OPSEC: spacing between requests (156)
-    _registrar_huella(nombre, type, value)                  # OPSEC: log your footprint (160)
+    _registrar_huella(name, type, value)                  # OPSEC: log your footprint (160)
     with _almacen_lock:
         semilla = _almacen.add(semilla)
-        producidas = run_by_name(nombre, semilla, _almacen)
+        producidas = run_by_name(name, semilla, _almacen)
         if _ws_activo:                          # autosave (46) + audit (48)
             try:
                 _gestor.save(_ws_activo, _almacen)
-                _gestor.record(_ws_activo, nombre, value, len(producidas))
+                _gestor.record(_ws_activo, name, value, len(producidas))
             except Exception as _e:
                 log.warning("autosave failed: %s", _e)
     return producidas
@@ -3870,7 +3870,7 @@ def _estado_datos():
         if ts:
             por_tipo[tp] = len(ts)
             total += len(ts)
-            con_key += [t.nombre for t in ts if t.requiere_key]
+            con_key += [t.name for t in ts if t.requires_key]
     def _existe(cmd):
         return shutil.which(cmd) is not None
     try:
@@ -3954,8 +3954,8 @@ def api_v2_recon():
     con_keys = bool(d.get('con_keys'))
     with _almacen_lock:
         _almacen.create(type, value)
-    ts = [t for t in REGISTRO.applicable(type) if con_keys or not t.requiere_key]
-    tareas = [(type, value, t.nombre) for t in ts]
+    ts = [t for t in REGISTRO.applicable(type) if con_keys or not t.requires_key]
+    tareas = [(type, value, t.name) for t in ts]
     res = run_batch(tareas, _almacen, lock=_almacen_lock)
     if _ws_activo:
         with _almacen_lock:
@@ -3981,12 +3981,12 @@ def api_v2_recon_async():
     def trabajo(emit):
         with _almacen_lock:
             _almacen.create(type, value)
-        ts = [t for t in REGISTRO.applicable(type) if con_keys or not t.requiere_key]
-        tareas = [(type, value, t.nombre) for t in ts]
+        ts = [t for t in REGISTRO.applicable(type) if con_keys or not t.requires_key]
+        tareas = [(type, value, t.name) for t in ts]
         emit({'type': 'inicio', 'total': len(tareas)})
 
-        def prog(nombre, n, hechas, total):
-            emit({'type': 'progreso', 'transform': nombre, 'nuevas': n,
+        def prog(name, n, hechas, total):
+            emit({'type': 'progreso', 'transform': name, 'nuevas': n,
                   'hechas': hechas, 'total': total, 'entities': len(_almacen)})
         res = run_batch(tareas, _almacen, lock=_almacen_lock, on_progreso=prog)
         if _ws_activo:
@@ -4083,17 +4083,17 @@ def api_v2_workspaces():
     global _almacen, _ws_activo
     if request.method == 'GET':
         return jsonify({'workspaces': _gestor.list_ws(), 'activo': _ws_activo})
-    nombre = (request.json or {}).get('nombre', '')
+    name = (request.json or {}).get('name', '')
     if request.method == 'POST':
         try:
-            _almacen = _gestor.create(nombre)
+            _almacen = _gestor.create(name)
         except ValueError as e:
             return _error(str(e), 400)
-        _ws_activo = _slug_caso(nombre)
+        _ws_activo = _slug_caso(name)
         return jsonify({'ok': True, 'activo': _ws_activo})
     if request.method == 'DELETE':
-        _gestor.delete(nombre)
-        if _ws_activo == _slug_caso(nombre):
+        _gestor.delete(name)
+        if _ws_activo == _slug_caso(name):
             _almacen, _ws_activo = Store(), None
         return jsonify({'ok': True, 'activo': _ws_activo})
 
@@ -4101,12 +4101,12 @@ def api_v2_workspaces():
 def api_v2_workspace_abrir():
     """Loads a workspace into memory and makes it the active one (F3 step 45)."""
     global _almacen, _ws_activo
-    nombre = (request.json or {}).get('nombre', '')
+    name = (request.json or {}).get('name', '')
     try:
-        _almacen = _gestor.load(nombre)
+        _almacen = _gestor.load(name)
     except KeyError:
         return _error('workspace not found', 404)
-    _ws_activo = _slug_caso(nombre)
+    _ws_activo = _slug_caso(name)
     _aplicar_perfil_opsec(_ws_activo)                # non-attribution mode (157)
     return jsonify({'ok': True, 'activo': _ws_activo, 'total_entities': len(_almacen)})
 
@@ -4137,11 +4137,11 @@ def _set_anonimo(on):
 
 _HUELLA = []
 
-def _registrar_huella(nombre, type, value):
+def _registrar_huella(name, type, value):
     """Records which transform you ran on which target and whether it was anonymized
     -- your footprint/exposure while investigating (F13 step 160)."""
     _HUELLA.insert(0, {'ts': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                       'transform': nombre, 'target': f'{type}:{value}',
+                       'transform': name, 'target': f'{type}:{value}',
                        'anonimo': _OPSEC['anonimo'] or bool(_PROXIES['pool'])})
     del _HUELLA[500:]
 
@@ -4317,18 +4317,18 @@ _personas = PersonaManager(os.path.join(HOME, '.obsidian', 'personas.json'))
 def api_v2_personas():
     """Sock-puppet vault: non-attributable investigation identities (F13 step 152)."""
     if request.method == 'GET':
-        nombre = request.args.get('nombre')
-        if nombre:
-            return jsonify({'person': _personas.get(nombre)})
+        name = request.args.get('name')
+        if name:
+            return jsonify({'person': _personas.get(name)})
         return jsonify({'personas': _personas.list_ws()})
     d = request.json or {}
-    nombre = (d.get('nombre', '') or '').strip()
-    if not nombre:
+    name = (d.get('name', '') or '').strip()
+    if not name:
         return _error('missing persona name', 400)
     if request.method == 'POST':
-        _personas.create(nombre, d.get('datos', {}))
+        _personas.create(name, d.get('datos', {}))
         return jsonify({'ok': True, 'personas': _personas.list_ws()})
-    _personas.delete(nombre)   # DELETE
+    _personas.delete(name)   # DELETE
     return jsonify({'ok': True, 'personas': _personas.list_ws()})
 
 @app.route('/api/v2/keys', methods=['GET', 'POST', 'DELETE'])
@@ -4372,11 +4372,11 @@ def api_v2_keys_probar():
     mapeo = _TEST_SERVICIO.get(servicio)
     if not mapeo:
         return _error('service has no defined test', 400)
-    nombre, type, value = mapeo
+    name, type, value = mapeo
     tiene = bool(_boveda.get(servicio))
     alm = Store()
     try:
-        n = len(run_by_name(nombre, alm.create(type, value), alm))
+        n = len(run_by_name(name, alm.create(type, value), alm))
     except Exception as e:
         return jsonify({'servicio': servicio, 'ok': False, 'nota': f'error: {e}'})
     if n > 0:
@@ -4535,7 +4535,7 @@ def _tareas_monitor_default():
     usados = set()
     for e in _almacen.entities:
         usados |= set(e.sources)
-    applicable = {t.nombre for t in REGISTRO.applicable(seed.type)}
+    applicable = {t.name for t in REGISTRO.applicable(seed.type)}
     return [{'type': seed.type, 'value': seed.value, 'transform': n}
             for n in sorted(usados & applicable)]
 
@@ -4698,7 +4698,7 @@ def api_v2_consulta():
     pregunta = ((request.json or {}).get('pregunta', '') or '').strip()
     if not pregunta:
         return _error('empty question', 400)
-    disponibles = sorted({t.nombre for tp in TIPOS for t in REGISTRO.applicable(tp)})
+    disponibles = sorted({t.name for tp in TIPOS for t in REGISTRO.applicable(tp)})
     prompt = (f'You are OBSIDIAN, an OSINT engine. Available transforms: {", ".join(disponibles)}.\n'
               f'The user asks: "{pregunta}". Return a concrete PLAN: which transforms to run, '
               f'on which entity and in what order. Be specific.')

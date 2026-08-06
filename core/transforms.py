@@ -6,7 +6,7 @@ Design copied from REAL, proven contracts, not invented:
   - SpiderFoot: each module declares watchedEvents (consumes) / producedEvents
     (produces) / handleEvent (logic).
 
-Here: @transform(entrada=<type>, salidas=(<types>)) registers a function
+Here: @transform(input=<type>, outputs=(<types>)) registers a function
 fn(entidad, ctx). The Context (ctx) is the ergonomic API for the author: emit
 output entities that are added to the store, related to the input and get
 their provenance recorded -- automatic.
@@ -23,19 +23,19 @@ from core.modelo import Store, Entity, valid_type
 
 @dataclass
 class Transform:
-    """A transform's contract (step 26). entrada = entity type it runs on;
-    salidas = types it can produce; requiere_key = needs an API key."""
-    nombre: str
-    entrada: str
-    salidas: tuple = ()
+    """A transform's contract (step 26). input = entity type it runs on;
+    outputs = types it can produce; requires_key = needs an API key."""
+    name: str
+    input: str
+    outputs: tuple = ()
     fn: Callable = None
-    requiere_key: bool = False
-    descripcion: str = ''
+    requires_key: bool = False
+    description: str = ''
 
     def __post_init__(self):
-        if not valid_type(self.entrada):
-            raise ValueError(f"unknown input type: {self.entrada!r}")
-        for s in self.salidas:
+        if not valid_type(self.input):
+            raise ValueError(f"unknown input type: {self.input!r}")
+        for s in self.outputs:
             if not valid_type(s):
                 raise ValueError(f"unknown output type: {s!r}")
 
@@ -48,18 +48,18 @@ class _Registry:
         self._by_name: dict[str, Transform] = {}
 
     def registrar(self, t: Transform) -> Transform:
-        if t.nombre in self._by_name:
-            raise ValueError(f"duplicate transform: {t.nombre}")
-        self._by_name[t.nombre] = t
-        self._by_input.setdefault(t.entrada, []).append(t)
+        if t.name in self._by_name:
+            raise ValueError(f"duplicate transform: {t.name}")
+        self._by_name[t.name] = t
+        self._by_input.setdefault(t.input, []).append(t)
         return t
 
     def applicable(self, type: str) -> list:
         """Transforms that run on an entity of this type (step 35)."""
         return list(self._by_input.get(type, ()))
 
-    def by_name(self, nombre: str) -> Transform | None:
-        return self._by_name.get(nombre)
+    def by_name(self, name: str) -> Transform | None:
+        return self._by_name.get(name)
 
     def all_transforms(self) -> list:
         return list(self._by_name.values())
@@ -73,17 +73,17 @@ class _Registry:
 REGISTRO = _Registry()
 
 
-def transform(entrada: str, salidas=(), nombre=None, requiere_key=False, descripcion=''):
+def transform(input: str, outputs=(), name=None, requires_key=False, description=''):
     """Decorator that registers a function as a transform.
 
-    @transform(entrada='domain', salidas=('ip','subdomain'))
+    @transform(input='domain', outputs=('ip','subdomain'))
     def resolver(entidad, ctx):
         ctx.emit('ip', '1.2.3.4', label='A')
     """
     def deco(fn):
-        t = Transform(nombre=nombre or fn.__name__, entrada=entrada,
-                      salidas=tuple(salidas), fn=fn,
-                      requiere_key=requiere_key, descripcion=descripcion or (fn.__doc__ or '').strip())
+        t = Transform(name=name or fn.__name__, input=input,
+                      outputs=tuple(outputs), fn=fn,
+                      requires_key=requires_key, description=description or (fn.__doc__ or '').strip())
         REGISTRO.registrar(t)
         return fn
     return deco
@@ -93,9 +93,9 @@ class Context:
     """API the transform author receives. `emit` creates an output entity, adds
     it to the store (dedup + events), relates it to the input and sets its
     provenance -- all automatic."""
-    def __init__(self, almacen: Store, entrada: Entity, nombre_transform: str):
+    def __init__(self, almacen: Store, input: Entity, nombre_transform: str):
         self.almacen = almacen
-        self.entrada = entrada
+        self.input = input
         self._nombre = nombre_transform
         self.emitidas: list = []
 
@@ -105,8 +105,8 @@ class Context:
         except ValueError:
             return None   # garbage value: ignored, does not break the transform
         viva = self.almacen.add(ent)
-        viva.note_provenance(self._nombre, input_id=self.entrada.id)
-        self.almacen.relate(self.entrada, viva, label)
+        viva.note_provenance(self._nombre, input_id=self.input.id)
+        self.almacen.relate(self.input, viva, label)
         self.emitidas.append(viva)
         return viva
 
@@ -121,15 +121,15 @@ _LIMITES: dict = {}
 _lock_lim = _threading.Lock()
 
 
-def set_limite(nombre: str, max_concurrentes: int) -> None:
+def set_limite(name: str, max_concurrentes: int) -> None:
     """Configures a transform's max concurrency. <=0 removes the limit."""
     with _lock_lim:
         if max_concurrentes and max_concurrentes > 0:
-            _LIMITES[nombre] = max_concurrentes
-            _SEMAFOROS[nombre] = _threading.Semaphore(max_concurrentes)
+            _LIMITES[name] = max_concurrentes
+            _SEMAFOROS[name] = _threading.Semaphore(max_concurrentes)
         else:
-            _LIMITES.pop(nombre, None)
-            _SEMAFOROS.pop(nombre, None)
+            _LIMITES.pop(name, None)
+            _SEMAFOROS.pop(name, None)
 
 
 def limites() -> dict:
@@ -141,10 +141,10 @@ def run(t: Transform, entidad: Entity, almacen: Store) -> list:
     ISOLATES failures (step 38): if the transform crashes, it does not propagate
     -- it returns whatever it managed to emit. Honors the transform's rate limit
     (step 40)."""
-    if entidad.type != t.entrada:
-        raise ValueError(f"{t.nombre} expects '{t.entrada}', got '{entidad.type}'")
-    ctx = Context(almacen, entidad, t.nombre)
-    sem = _SEMAFOROS.get(t.nombre)
+    if entidad.type != t.input:
+        raise ValueError(f"{t.name} expects '{t.input}', got '{entidad.type}'")
+    ctx = Context(almacen, entidad, t.name)
+    sem = _SEMAFOROS.get(t.name)
     try:
         if sem is not None:
             with sem:                       # no more than N concurrent of this transform
@@ -156,10 +156,10 @@ def run(t: Transform, entidad: Entity, almacen: Store) -> list:
     return ctx.emitidas
 
 
-def run_by_name(nombre: str, entidad: Entity, almacen: Store) -> list:
-    t = REGISTRO.by_name(nombre)
+def run_by_name(name: str, entidad: Entity, almacen: Store) -> list:
+    t = REGISTRO.by_name(name)
     if t is None:
-        raise KeyError(f"transform not registered: {nombre}")
+        raise KeyError(f"transform not registered: {name}")
     return run(t, entidad, almacen)
 
 
@@ -170,7 +170,7 @@ def run_batch(tareas, almacen: Store, max_workers: int = 8, lock=None,
     shared state during the fetch. When done, results are merged into `almacen`
     (dedup by deterministic id). If `lock` is passed, the merge runs under it.
 
-    on_progreso(nombre, n, hechas, total): optional callback called as EACH
+    on_progreso(name, n, hechas, total): optional callback called as EACH
     transform finishes (step 37, for progress streaming).
 
     tareas: iterable of (type, value, transform_name).
@@ -183,26 +183,26 @@ def run_batch(tareas, almacen: Store, max_workers: int = 8, lock=None,
         return []
 
     def _uno(t):
-        type, value, nombre = t
+        type, value, name = t
         local = Store()
         n = 0
         try:
             semilla = local.create(type, value)
-            n = len(run_by_name(nombre, semilla, local))
+            n = len(run_by_name(name, semilla, local))
         except Exception:
             pass
-        return nombre, n, local
+        return name, n, local
 
     resultados, locales, total = [], [], len(tareas)
     with ThreadPoolExecutor(max_workers=min(max_workers, total)) as ex:
         futs = [ex.submit(_uno, t) for t in tareas]
         for i, fut in enumerate(as_completed(futs), 1):
-            nombre, n, local = fut.result()
-            resultados.append((nombre, n))
+            name, n, local = fut.result()
+            resultados.append((name, n))
             locales.append(local)
             if on_progreso:
                 try:
-                    on_progreso(nombre, n, i, total)
+                    on_progreso(name, n, i, total)
                 except Exception:
                     pass
 
@@ -221,9 +221,9 @@ def run_batch(tareas, almacen: Store, max_workers: int = 8, lock=None,
 class Machine:
     """A recipe: transforms in order that cascade from one type to the next.
     E.g. ['dns_resolver','port_scan'] -> domain->ips, then ips->ports."""
-    nombre: str
+    name: str
     pasos: tuple = ()
-    descripcion: str = ''
+    description: str = ''
 
 
 # ── Step 41: Runner with cache (don't repeat the same expensive query) ───────
@@ -234,12 +234,12 @@ class Runner:
         self.almacen = almacen
         self._hechos: set = set()   # {(transform_name, entity_id)}
 
-    def run(self, nombre: str, entidad: Entity) -> list:
-        clave = (nombre, entidad.id)
+    def run(self, name: str, entidad: Entity) -> list:
+        clave = (name, entidad.id)
         if clave in self._hechos:
             return []               # cache: already ran on this entity
         self._hechos.add(clave)
-        return run_by_name(nombre, entidad, self.almacen)
+        return run_by_name(name, entidad, self.almacen)
 
     def run_machine(self, machine: Machine, semilla: Entity) -> list:
         """Runs the recipe: each step runs on the entities of the type it
@@ -250,7 +250,7 @@ class Runner:
             t = REGISTRO.by_name(paso)
             if t is None:
                 continue
-            objetivos = [e for e in list(pool.values()) if e.type == t.entrada]
+            objetivos = [e for e in list(pool.values()) if e.type == t.input]
             for ent in objetivos:
                 for nueva in self.run(paso, ent):
                     pool[nueva.id] = nueva

@@ -25,7 +25,7 @@ def render_estado(data: dict) -> str:
 
     herr = data.get('herramientas', {})
     herr_html = ''.join(
-        f'<tr><td>{_e(nombre)}</td><td>{_punto(ok)}</td></tr>' for nombre, ok in herr.items())
+        f'<tr><td>{_e(name)}</td><td>{_punto(ok)}</td></tr>' for name, ok in herr.items())
 
     keys = data.get('keys', [])
     keys_html = (', '.join(_e(k) for k in keys)) if keys else '<span class="muted">none</span>'

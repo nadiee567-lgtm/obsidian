@@ -56,9 +56,9 @@ def cmd_transforms(a):
     if not ts:
         print(f"(no transforms for type '{a.type}')")
         return 0
-    for t in sorted(ts, key=lambda x: x.nombre):
-        key = '  [requires key]' if t.requiere_key else ''
-        print(f"  {t.nombre:22} → {', '.join(t.salidas)}{key}")
+    for t in sorted(ts, key=lambda x: x.name):
+        key = '  [requires key]' if t.requires_key else ''
+        print(f"  {t.name:22} → {', '.join(t.outputs)}{key}")
     return 0
 
 
@@ -85,12 +85,12 @@ def cmd_recon(a):
         return _err(f"invalid type: {a.type}")
     alm = _almacen(a.workspace)
     alm.create(a.type, a.value)
-    ts = [t for t in REGISTRO.applicable(a.type) if a.with_keys or not t.requiere_key]
-    tareas = [(a.type, a.value, t.nombre) for t in ts]
+    ts = [t for t in REGISTRO.applicable(a.type) if a.with_keys or not t.requires_key]
+    tareas = [(a.type, a.value, t.name) for t in ts]
     print(f"recon on {a.type} {a.value} -- {len(tareas)} transform(s) in parallel")
     t0 = time.time()
-    for nombre, n in sorted(run_batch(tareas, alm)):
-        print(f"  {nombre:22} +{n}")
+    for name, n in sorted(run_batch(tareas, alm)):
+        print(f"  {name:22} +{n}")
     _guardar(a.workspace, alm)
     h = correlate(alm)
     print(f"total: {len(alm)} entities · {len(h)} finding(s) · "

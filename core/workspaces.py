@@ -23,9 +23,9 @@ class Manager:
         self.dir = directorio
         os.makedirs(self.dir, exist_ok=True)
 
-    def _ruta(self, nombre):
+    def _ruta(self, name):
         """Sanitized .db path contained in self.dir, or None if the name is invalid."""
-        slug = _slug_caso(nombre)
+        slug = _slug_caso(name)
         if not slug:
             return None
         ruta = os.path.join(self.dir, slug + '.db')
@@ -37,13 +37,13 @@ class Manager:
         return sorted(os.path.splitext(os.path.basename(p))[0]
                       for p in glob.glob(os.path.join(self.dir, '*.db')))
 
-    def exists(self, nombre):
-        r = self._ruta(nombre)
+    def exists(self, name):
+        r = self._ruta(name)
         return bool(r and os.path.exists(r))
 
-    def create(self, nombre):
+    def create(self, name):
         """Creates an empty workspace (with its schema). Returns its Store."""
-        r = self._ruta(nombre)
+        r = self._ruta(name)
         if not r:
             raise ValueError('invalid workspace name')
         if os.path.exists(r):
@@ -52,20 +52,20 @@ class Manager:
         save_store(alm, r)   # creates the file + schema
         return alm
 
-    def load(self, nombre):
-        r = self._ruta(nombre)
+    def load(self, name):
+        r = self._ruta(name)
         if not r or not os.path.exists(r):
             raise KeyError('workspace not found')
         return load_store(r)
 
-    def save(self, nombre, almacen):
-        r = self._ruta(nombre)
+    def save(self, name, almacen):
+        r = self._ruta(name)
         if not r:
             raise ValueError('invalid workspace name')
         save_store(almacen, r)
 
-    def delete(self, nombre):
-        r = self._ruta(nombre)
+    def delete(self, name):
+        r = self._ruta(name)
         if r and os.path.exists(r):
             os.remove(r)
             return True
@@ -82,58 +82,58 @@ class Manager:
         os.rename(rv, rn)
 
     # ── History / audit (step 48) ──
-    def record(self, nombre, transform, entrada, salidas):
-        r = self._ruta(nombre)
+    def record(self, name, transform, input, outputs):
+        r = self._ruta(name)
         if r and os.path.exists(r):
-            record_event(r, transform, entrada, salidas)
+            record_event(r, transform, input, outputs)
 
-    def history(self, nombre):
-        r = self._ruta(nombre)
+    def history(self, name):
+        r = self._ruta(name)
         return read_history(r) if (r and os.path.exists(r)) else []
 
     # ── Snapshots / versions (step 49) ──
-    def _dir_snaps(self, nombre):
-        slug = _slug_caso(nombre)
+    def _dir_snaps(self, name):
+        slug = _slug_caso(name)
         d = os.path.join(self.dir, '_snapshots', slug) if slug else None
         if d:
             os.makedirs(d, exist_ok=True)
         return d
 
-    def snapshot(self, nombre):
+    def snapshot(self, name):
         """Copies the case .db to a timestamped snapshot. Returns its id."""
-        r = self._ruta(nombre)
-        d = self._dir_snaps(nombre)
+        r = self._ruta(name)
+        d = self._dir_snaps(name)
         if not r or not os.path.exists(r) or not d:
             raise KeyError('workspace not found')
         snap_id = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')  # us: unique ids
         shutil.copy2(r, os.path.join(d, snap_id + '.db'))
         return snap_id
 
-    def list_snapshots(self, nombre):
-        d = self._dir_snaps(nombre)
+    def list_snapshots(self, name):
+        d = self._dir_snaps(name)
         if not d:
             return []
         return sorted((os.path.splitext(os.path.basename(p))[0]
                        for p in glob.glob(os.path.join(d, '*.db'))), reverse=True)
 
-    def load_snapshot(self, nombre, snap_id):
+    def load_snapshot(self, name, snap_id):
         """Loads a snapshot's Store WITHOUT restoring it (for historical diff, step 151)."""
-        d = self._dir_snaps(nombre)
+        d = self._dir_snaps(name)
         sid = _slug_caso(snap_id)
         ruta = os.path.join(d, sid + '.db') if (d and sid) else None
         if not ruta or not os.path.exists(ruta):
             raise KeyError('snapshot not found')
         return load_store(ruta)
 
-    def restore(self, nombre, snap_id):
+    def restore(self, name, snap_id):
         """Reverts the case to an earlier snapshot (snapshots the current one first)."""
-        r = self._ruta(nombre)
-        d = self._dir_snaps(nombre)
+        r = self._ruta(name)
+        d = self._dir_snaps(name)
         if not r or not d:
             raise KeyError('workspace not found')
         source = os.path.join(d, _slug_caso(snap_id) + '.db') if _slug_caso(snap_id) else None
         if not source or not os.path.exists(source):
             raise KeyError('snapshot not found')
         if os.path.exists(r):
-            self.snapshot(nombre)     # back up the current state before overwriting
+            self.snapshot(name)     # back up the current state before overwriting
         shutil.copy2(source, r)

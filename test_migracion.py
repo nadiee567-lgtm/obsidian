@@ -7,7 +7,7 @@ from core.migracion import migrate_case
 
 # a realistic old case, as the OSINT modules used to leave it
 CASE_VIEJO = {
-    'nombre': 'caso1',
+    'name': 'caso1',
     'target': 'example.com',
     'datos': {
         'domain': {

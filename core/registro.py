@@ -14,10 +14,10 @@ os.makedirs(LOG_DIR, exist_ok=True)
 _FMT = logging.Formatter('%(asctime)s %(levelname)-7s %(message)s', '%Y-%m-%d %H:%M:%S')
 
 
-def get_logger(nombre='obsidian'):
+def get_logger(name='obsidian'):
     """Returns the OBSIDIAN logger, configured only once.
     File = DEBUG (everything, for diagnostics); console = WARNING (only serious)."""
-    log = logging.getLogger(nombre)
+    log = logging.getLogger(name)
     if not log.handlers:
         log.setLevel(logging.DEBUG)
         fh = logging.FileHandler(LOG_FILE, encoding='utf-8')

@@ -15,10 +15,10 @@ class _R:
         return self._data
 
 
-def _correr(nombre, type, value):
+def _correr(name, type, value):
     alm = Store()
     e = alm.create(type, value)
-    return run_by_name(nombre, e, alm), e, alm
+    return run_by_name(name, e, alm), e, alm
 
 
 # ── 137: wallet extraction ──────────────────────────────────────────────────

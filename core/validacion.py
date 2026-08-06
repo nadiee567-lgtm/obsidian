@@ -54,24 +54,24 @@ def _objetivo_seguro(arg):
     return not any(c in _SHELL_PELIGROSOS for c in arg)
 
 
-def _slug_caso(nombre):
+def _slug_caso(name):
     """Case name sanitized for use as a filename. Keeps only [A-Za-z0-9 _.-],
     no path separators or '..'. Returns '' if it ends up invalid -- so a name
     like '../../.bashrc' does not write/read outside CASES_DIR."""
-    nombre = (nombre or '').strip()
+    name = (name or '').strip()
     # Flatly reject anything that looks like a path, do not "fix" it.
-    if '/' in nombre or '\\' in nombre or '..' in nombre:
+    if '/' in name or '\\' in name or '..' in name:
         return ''
-    limpio = re.sub(r'[^A-Za-z0-9 _.-]', '', nombre).strip()[:80]
+    limpio = re.sub(r'[^A-Za-z0-9 _.-]', '', name).strip()[:80]
     if not limpio or set(limpio) <= {'.'}:   # empty, '.', '...'
         return ''
     return limpio
 
 
-def _ruta_caso_segura(nombre, sufijo='.json'):
+def _ruta_caso_segura(name, sufijo='.json'):
     """Path inside CASES_DIR for a sanitized case, or None if invalid or it would
     try to escape the directory (defense in depth with realpath)."""
-    slug = _slug_caso(nombre)
+    slug = _slug_caso(name)
     if not slug:
         return None
     path = os.path.join(CASES_DIR, slug + sufijo)

@@ -12,7 +12,7 @@ def _crear_db_vieja(path):
             confianza REAL, creada TEXT);
         CREATE TABLE relaciones (id TEXT PRIMARY KEY, origen TEXT, destino TEXT, etiqueta TEXT);
         CREATE TABLE history (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT,
-            transform TEXT, entrada TEXT, salidas INTEGER);
+            transform TEXT, input TEXT, outputs INTEGER);
     """)
     # old ids computed the old way: sha1("dominio:x.com") etc. -- but the migration
     # recomputes from type:value, so the stored id value here is irrelevant.

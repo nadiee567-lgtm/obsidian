@@ -17,7 +17,7 @@ def _client():
 
 
 def test_transforms_reales_registrados():
-    nombres = {t.nombre for t in REGISTRO.all_transforms()}
+    nombres = {t.name for t in REGISTRO.all_transforms()}
     assert {'dns_a', 'ptr', 'crtsh', 'geo_ip', 'github_usuario', 'puertos', 'dns_mx',
             'dns_ns', 'email_breaches', 'email_spoofable', 'rdap', 'greynoise',
             'dns_txt', 'ssl', 'subdominios_ht', 'http_probe', 'http_probe_sub',
@@ -26,11 +26,11 @@ def test_transforms_reales_registrados():
 
 
 def test_transforms_aplicables_por_tipo():
-    ip = {t.nombre for t in REGISTRO.applicable('ip')}
+    ip = {t.name for t in REGISTRO.applicable('ip')}
     assert {'ptr', 'geo_ip', 'puertos'} <= ip
-    dominio = {t.nombre for t in REGISTRO.applicable('domain')}
+    dominio = {t.name for t in REGISTRO.applicable('domain')}
     assert {'dns_a', 'crtsh', 'dns_mx', 'dns_ns'} <= dominio
-    usuario = {t.nombre for t in REGISTRO.applicable('user')}
+    usuario = {t.name for t in REGISTRO.applicable('user')}
     assert 'github_usuario' in usuario
 
 
@@ -44,7 +44,7 @@ def test_v2_transforms_aplicables():
     c = _client()
     r = c.get('/api/v2/transforms/domain')
     assert r.status_code == 200
-    nombres = [t['nombre'] for t in r.get_json()['transforms']]
+    nombres = [t['name'] for t in r.get_json()['transforms']]
     assert 'dns_a' in nombres and 'crtsh' in nombres
     # ptr applies to ip, not to domain
     assert 'ptr' not in nombres
@@ -92,7 +92,7 @@ def test_workspaces_flujo(tmp_path):
     try:
         c = _client()
         # create -> becomes active
-        r = c.post('/api/v2/workspaces', json={'nombre': 'caso demo'})
+        r = c.post('/api/v2/workspaces', json={'name': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['activo'] == 'caso demo'
         # list
         j = c.get('/api/v2/workspaces').get_json()
@@ -101,10 +101,10 @@ def test_workspaces_flujo(tmp_path):
         ob._almacen.create('ip', '8.8.8.8')
         ob._gestor.save('caso demo', ob._almacen)
         ob._almacen = ob.Store()
-        r = c.post('/api/v2/workspaces/open', json={'nombre': 'caso demo'})
+        r = c.post('/api/v2/workspaces/open', json={'name': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['total_entities'] == 1
         # delete -> no active
-        r = c.delete('/api/v2/workspaces', json={'nombre': 'caso demo'})
+        r = c.delete('/api/v2/workspaces', json={'name': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['activo'] is None
         assert c.get('/api/v2/workspaces').get_json()['workspaces'] == []
     finally:

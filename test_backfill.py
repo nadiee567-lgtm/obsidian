@@ -7,10 +7,10 @@ from core.modelo import Store
 from core.transforms import run_by_name
 
 
-def _correr(nombre, type, value):
+def _correr(name, type, value):
     alm = Store()
     e = alm.create(type, value)
-    return run_by_name(nombre, e, alm), e, alm
+    return run_by_name(name, e, alm), e, alm
 
 
 # ── 33: phone ───────────────────────────────────────────────────────────────
@@ -202,7 +202,7 @@ def test_rate_limit_concurrencia():
 
     estado, lock = {'activos': 0, 'max': 0}, threading.Lock()
 
-    @transform(entrada='domain', salidas=(), nombre='_test_rl')
+    @transform(input='domain', outputs=(), name='_test_rl')
     def _rl(entidad, ctx):
         with lock:
             estado['activos'] += 1

@@ -316,8 +316,8 @@ async function cargarModulos(type, value, cont){
   const grid=el('div','modgrid');
   lista.forEach(t=>{
     const b=el('button','modbtn');
-    b.innerHTML=esc(t.nombre)+(t.requiere_key?' <span class="key">⚿</span>':'');
-    b.title=(t.descripcion||'')+(t.requiere_key?' · necesita API key (🔑)':''); b.onclick=()=>correr(type, value, t.nombre, t.requiere_key);
+    b.innerHTML=esc(t.name)+(t.requires_key?' <span class="key">⚿</span>':'');
+    b.title=(t.description||'')+(t.requires_key?' · necesita API key (🔑)':''); b.onclick=()=>correr(type, value, t.name, t.requires_key);
     grid.appendChild(b);
   });
   cont.appendChild(grid);
@@ -350,37 +350,37 @@ async function menuTransforms(ids,ev){
   if(!d.transforms.length){ const b=el('button'); b.textContent='(no transforms)'; b.disabled=true; ctx.appendChild(b); }
   d.transforms.forEach(t=>{
     const b=el('button');
-    b.innerHTML=t.nombre+(t.requiere_key?' <span class="key">⚿</span>':'');
-    b.title=t.descripcion||'';
-    b.onclick=()=>{ ocultarCtx(); correrEn(mismos,t.nombre); };
+    b.innerHTML=t.name+(t.requires_key?' <span class="key">⚿</span>':'');
+    b.title=t.description||'';
+    b.onclick=()=>{ ocultarCtx(); correrEn(mismos,t.name); };
     ctx.appendChild(b);
   });
   ctx.style.left=Math.min(ev.clientX,innerWidth-210)+'px';
   ctx.style.top=Math.min(ev.clientY,innerHeight-40-d.transforms.length*30)+'px';
   ctx.style.display='block';
 }
-async function correrEn(ids,nombre){
-  setStatus('running '+nombre+' en '+ids.length+' nodo(s)…','run');
+async function correrEn(ids,name){
+  setStatus('running '+name+' en '+ids.length+' nodo(s)…','run');
   let ok=0;
   for(const i of ids){ const e=entMap[i]; if(!e) continue;
     try{ const r=await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({type:e.type,value:e.value,transform:nombre})}); if(r.ok)ok++; }catch(_){}
+      body:JSON.stringify({type:e.type,value:e.value,transform:name})}); if(r.ok)ok++; }catch(_){}
   }
-  setStatus('✓ '+nombre+' en '+ok+'/'+ids.length+' nodo(s)'); await pintarGrafo();
+  setStatus('✓ '+name+' en '+ok+'/'+ids.length+' nodo(s)'); await pintarGrafo();
 }
 function ocultarCtx(){ $('#ctx').style.display='none'; }
 document.addEventListener('click',e=>{ if(!$('#ctx').contains(e.target)) ocultarCtx(); });
 
-async function correr(type,value,nombre,requiereKey){
-  setStatus('running '+nombre+' sobre '+value+'…','run');
+async function correr(type,value,name,requiereKey){
+  setStatus('running '+name+' sobre '+value+'…','run');
   try{
     const r=await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({type,value,transform:nombre})});
+      body:JSON.stringify({type,value,transform:name})});
     const d=await r.json();
     if(!r.ok){ setStatus('error: '+(d.error||r.status),'err'); return; }
     const n=d.producidas?d.producidas.length:0;
-    if(n===0 && requiereKey){ setStatus('⚿ '+nombre+' returned nothing — needs an API key. Open it in 🔑 API keys (top). Without a key, use the modules without ⚿ (free).','err'); }
-    else setStatus('✓ '+nombre+': +'+n+' entities (total '+d.total_entities+')');
+    if(n===0 && requiereKey){ setStatus('⚿ '+name+' returned nothing — needs an API key. Open it in 🔑 API keys (top). Without a key, use the modules without ⚿ (free).','err'); }
+    else setStatus('✓ '+name+': +'+n+' entities (total '+d.total_entities+')');
     await pintarGrafo();
   }catch(e){ setStatus('error: '+e.message,'err'); }
 }
@@ -438,10 +438,10 @@ async function cargarWorkspaces(){
   $('#wsActivo').textContent=d.activo||'none (ephemeral)'; if(d.activo)sel.value=d.activo;
 }
 async function abrirWs(){ const n=$('#wsSel').value; if(!n)return;
-  await fetch('/api/v2/workspaces/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
+  await fetch('/api/v2/workspaces/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});
   setStatus('workspace abierto: '+n); await cargarWorkspaces(); await pintarGrafo(); }
-async function crearWs(){ const n=$('#wsNuevo').value.trim(); if(!n){setStatus('escribe un nombre','err');return;}
-  const r=await fetch('/api/v2/workspaces',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
+async function crearWs(){ const n=$('#wsNuevo').value.trim(); if(!n){setStatus('escribe un name','err');return;}
+  const r=await fetch('/api/v2/workspaces',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});
   const d=await r.json(); if(!r.ok){setStatus('error: '+(d.error||r.status),'err');return;}
   $('#wsNuevo').value=''; setStatus('workspace creado: '+d.activo); await cargarWorkspaces(); await pintarGrafo(); }
 

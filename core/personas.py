@@ -28,23 +28,23 @@ class PersonaManager:
         with open(self.ruta, 'w', encoding='utf-8') as f:
             json.dump(d, f, indent=2, ensure_ascii=False)
 
-    def create(self, nombre: str, datos: dict) -> str:
+    def create(self, name: str, datos: dict) -> str:
         d = self._leer()
-        d[nombre] = {**(datos or {}),
+        d[name] = {**(datos or {}),
                      'created': datetime.datetime.now().isoformat(timespec='seconds')}
         self._escribir(d)
-        return nombre
+        return name
 
     def list_ws(self) -> list:
         return sorted(self._leer().keys())
 
-    def get(self, nombre: str):
-        return self._leer().get(nombre)
+    def get(self, name: str):
+        return self._leer().get(name)
 
-    def delete(self, nombre: str) -> bool:
+    def delete(self, name: str) -> bool:
         d = self._leer()
-        if nombre in d:
-            del d[nombre]
+        if name in d:
+            del d[name]
             self._escribir(d)
             return True
         return False

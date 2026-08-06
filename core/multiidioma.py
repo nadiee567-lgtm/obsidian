@@ -90,9 +90,9 @@ def latino_a_cirilico(texto: str) -> str:
     return ''.join(out)
 
 
-def transliterar(nombre: str) -> dict:
+def transliterar(name: str) -> dict:
     """Name variants in each alphabet to find the same person (step 172)."""
-    return {'latino': cirilico_a_latino(nombre), 'cirilico': latino_a_cirilico(nombre)}
+    return {'latino': cirilico_a_latino(name), 'cirilico': latino_a_cirilico(name)}
 
 
 # ── Language detection by alphabet (step 175) ────────────────────────────────

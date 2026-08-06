@@ -18,14 +18,14 @@ from __future__ import annotations
 # 'join' = the engine's AND operator. 'cn' marks the Chinese engines.
 MOTORES = {
     'shodan': {
-        'label': 'Shodan', 'requiere_key': True, 'cn': False, 'join': ' ',
+        'label': 'Shodan', 'requires_key': True, 'cn': False, 'join': ' ',
         'campos': {
             'ip': 'ip:{v}', 'domain': 'hostname:{v}', 'favicon': 'http.favicon.hash:{v}',
             'cert': 'ssl.cert.subject.cn:{v}', 'port': 'port:{v}', 'producto': 'product:{v}',
             'org': 'org:"{v}"', 'country': 'country:{v}', 'titulo': 'http.title:"{v}"', 'asn': 'asn:{v}',
         }},
     'censys': {
-        'label': 'Censys', 'requiere_key': True, 'cn': False, 'join': ' and ',
+        'label': 'Censys', 'requires_key': True, 'cn': False, 'join': ' and ',
         'campos': {
             'ip': 'ip:{v}', 'domain': 'names:{v}',
             'cert': 'services.tls.certificates.leaf_data.subject.common_name:{v}',
@@ -33,46 +33,46 @@ MOTORES = {
             'country': 'location.country_code:{v}', 'asn': 'autonomous_system.asn:{v}',
         }},
     'zoomeye': {
-        'label': 'ZoomEye', 'requiere_key': True, 'cn': True, 'join': ' ',
+        'label': 'ZoomEye', 'requires_key': True, 'cn': True, 'join': ' ',
         'campos': {
             'ip': 'ip:"{v}"', 'domain': 'hostname:{v}', 'favicon': 'iconhash:"{v}"',
             'cert': 'ssl:"{v}"', 'port': 'port:{v}', 'producto': 'app:"{v}"',
             'country': 'country:"{v}"', 'titulo': 'title:"{v}"', 'asn': 'asn:{v}',
         }},
     'fofa': {
-        'label': 'FOFA', 'requiere_key': True, 'cn': True, 'join': ' && ',
+        'label': 'FOFA', 'requires_key': True, 'cn': True, 'join': ' && ',
         'campos': {
             'ip': 'ip="{v}"', 'domain': 'domain="{v}"', 'favicon': 'icon_hash="{v}"',
             'cert': 'cert="{v}"', 'port': 'port="{v}"', 'producto': 'app="{v}"',
             'org': 'org="{v}"', 'country': 'country="{v}"', 'titulo': 'title="{v}"', 'asn': 'asn="{v}"',
         }},
     'quake': {
-        'label': 'Quake', 'requiere_key': True, 'cn': True, 'join': ' AND ',
+        'label': 'Quake', 'requires_key': True, 'cn': True, 'join': ' AND ',
         'campos': {
             'ip': 'ip:"{v}"', 'domain': 'domain:"{v}"', 'favicon': 'favicon:"{v}"',
             'cert': 'cert:"{v}"', 'port': 'port:"{v}"', 'producto': 'app:"{v}"',
             'country': 'country:"{v}"', 'titulo': 'title:"{v}"',
         }},
     'hunter': {
-        'label': 'Hunter.how', 'requiere_key': True, 'cn': True, 'join': '&&',
+        'label': 'Hunter.how', 'requires_key': True, 'cn': True, 'join': '&&',
         'campos': {
             'ip': 'ip="{v}"', 'domain': 'domain="{v}"', 'favicon': 'favicon.hash="{v}"',
             'cert': 'cert="{v}"', 'port': 'port="{v}"', 'producto': 'product="{v}"',
             'country': 'country="{v}"', 'titulo': 'web.title="{v}"',
         }},
     'netlas': {
-        'label': 'Netlas', 'requiere_key': True, 'cn': False, 'join': ' AND ',
+        'label': 'Netlas', 'requires_key': True, 'cn': False, 'join': ' AND ',
         'campos': {
             'ip': 'ip:{v}', 'domain': 'domain:{v}',
             'cert': 'certificate.subject.common_name:{v}', 'port': 'port:{v}',
             'country': 'geo.country:{v}', 'titulo': 'http.title:{v}',
         }},
     'criminalip': {
-        'label': 'Criminal IP', 'requiere_key': True, 'cn': False, 'join': ' ',
+        'label': 'Criminal IP', 'requires_key': True, 'cn': False, 'join': ' ',
         'campos': {'ip': 'ip: {v}', 'port': 'open_port: {v}', 'producto': 'product: {v}',
                    'country': 'country: {v}', 'titulo': 'title: {v}'}},
     'binaryedge': {
-        'label': 'BinaryEdge', 'requiere_key': True, 'cn': False, 'join': ' ',
+        'label': 'BinaryEdge', 'requires_key': True, 'cn': False, 'join': ' ',
         'campos': {'ip': 'ip:{v}', 'port': 'port:{v}', 'producto': 'product:{v}',
                    'country': 'country:{v}'}},
 }

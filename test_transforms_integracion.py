@@ -15,10 +15,10 @@ class FakeResp:
         return self._data
 
 
-def _correr(nombre, type, value):
+def _correr(name, type, value):
     alm = Store()
     e = alm.create(type, value)
-    return run_by_name(nombre, e, alm)
+    return run_by_name(name, e, alm)
 
 
 def test_dns_a(monkeypatch):

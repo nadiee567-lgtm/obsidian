@@ -83,8 +83,8 @@ def _mig_usuario(alm, raiz, value, res, source):
     if gh.get('email') and gh['email'] != 'oculto':
         _rel(alm, u, alm.create('email', gh['email'], sources={source}), 'email')
     for repo in res.get('github_repos', [])[:10]:
-        if repo.get('nombre'):
-            _rel(alm, u, alm.create('repo', repo['nombre'], sources={source}), 'repo')
+        if repo.get('name'):
+            _rel(alm, u, alm.create('repo', repo['name'], sources={source}), 'repo')
 
 
 def _mig_email(alm, raiz, value, res, source):

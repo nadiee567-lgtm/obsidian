@@ -123,9 +123,9 @@ class Entity:
     def note_provenance(self, transform, input_id=None) -> None:
         """Records which transform (and on which input entity) created it."""
         self.sources.add(transform)
-        entrada = {'transform': transform, 'input': input_id}
-        if entrada not in self.provenance:
-            self.provenance.append(entrada)
+        input = {'transform': transform, 'input': input_id}
+        if input not in self.provenance:
+            self.provenance.append(input)
 
     def _compute_id(self) -> str:
         base = f"{self.type}:{self.value}".encode('utf-8')

@@ -51,7 +51,7 @@ _COLUMN_RENAME = {
                  'origenes': 'sources', 'procedencia': 'provenance',
                  'confianza': 'confidence', 'creada': 'created'},
     'relations': {'origen': 'source', 'destino': 'target', 'etiqueta': 'label'},
-    'history': {'entrada': 'input', 'salidas': 'outputs'},
+    'history': {'input': 'input', 'outputs': 'outputs'},
 }
 
 

@@ -7,10 +7,10 @@ from core.modelo import Store
 from core.transforms import run_by_name
 
 
-def _correr(nombre, type, value):
+def _correr(name, type, value):
     alm = Store()
     e = alm.create(type, value)
-    return run_by_name(nombre, e, alm), e
+    return run_by_name(name, e, alm), e
 
 
 # ── 171: regional social platforms ──────────────────────────────────────────
