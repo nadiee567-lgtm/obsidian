@@ -2288,8 +2288,8 @@ def _t_puertos(entidad, ctx):
         if not num.isdigit():
             continue
         servicio = parts[2] if len(parts) > 2 else '?'
-        # el valor lleva la IP: puerto 80 de dos hosts != el mismo nodo
-        ctx.emitir('puerto', f'{entidad.valor}:{num}', etiqueta='abierto', servicio=servicio)
+        # the value carries the IP: port 80 of two hosts != the same node
+        ctx.emitir('puerto', f'{entidad.valor}:{num}', etiqueta='open', servicio=servicio)
 
 @transform(entrada='dominio', salidas=('dominio',), nombre='dns_mx',
            descripcion='Mail servers of the domain (MX)')
@@ -2325,15 +2325,15 @@ def _t_email_breaches(entidad, ctx):
             for b in r.json():
                 nombre = b.get('Name')
                 if nombre:
-                    ctx.emitir('org', nombre, etiqueta='filtrado en')
+                    ctx.emitir('org', nombre, etiqueta='leaked in')
             entidad.etiquetar('filtrado')
     except Exception as _e:
         log.debug("hibp unavailable: %s", _e)
 
 def _pastes_github(entidad):
-    """Menciones del objetivo + indicadores de secreto en código público de
-    GitHub (donde de verdad se filtran credenciales). psbdmp murió; esta es la
-    ruta real, pero necesita un token gratis de GitHub (en la bóveda)."""
+    """Target mentions + secret indicators in public GitHub code (where credentials
+    really leak). psbdmp is dead; this is the real path, but it needs a free
+    GitHub token (in the vault)."""
     token = _key_rotativa('github') or os.environ.get('GITHUB_TOKEN', '')
     if not token:
         return
@@ -2371,7 +2371,7 @@ def _t_breaches_xon(entidad, ctx):
         lista = breaches[0] if breaches and isinstance(breaches[0], list) else breaches
         for nombre in (lista or [])[:30]:
             if nombre:
-                ctx.emitir('org', str(nombre), etiqueta='filtrado en')
+                ctx.emitir('org', str(nombre), etiqueta='leaked in')
         if lista:
             entidad.etiquetar('filtrado')
     except Exception as _e:
@@ -2402,7 +2402,7 @@ def _t_breaches(entidad, ctx):
             fuentes.update(b for b in br[0] if b)
     except Exception as _e:
         log.debug("breaches xon: %s", _e)
-    try:                                             # LeakCheck público (keyless)
+    try:                                             # LeakCheck public (keyless)
         d = SESSION.get('https://leakcheck.io/api/public', params={'check': email}, timeout=10).json() or {}
         if d.get('success'):
             for s in d.get('sources', []):
@@ -2412,7 +2412,7 @@ def _t_breaches(entidad, ctx):
     except Exception as _e:
         log.debug("breaches leakcheck: %s", _e)
     hibp = _key_rotativa('hibp') or os.environ.get('HIBP_API_KEY', '')
-    if hibp:                                          # HIBP (de pago, opcional)
+    if hibp:                                          # HIBP (paid, optional)
         try:
             r = SESSION.get(f'https://haveibeenpwned.com/api/v3/breachedaccount/{email}',
                             headers={'hibp-api-key': hibp, 'User-Agent': 'OBSIDIAN'}, timeout=10)
@@ -2424,7 +2424,7 @@ def _t_breaches(entidad, ctx):
         entidad.etiquetar('filtrado')
         entidad.propiedades['brechas'] = sorted(fuentes)
         for f in sorted(fuentes)[:30]:
-            ctx.emitir('org', f, etiqueta='brecha')
+            ctx.emitir('org', f, etiqueta='breach')
 
 @transform(entrada='email', salidas=('url',), nombre='intelx', requiere_key=True,
            descripcion='Historical leak search by selector (Intelligence X, key in vault) (F10 step 134)')
@@ -2495,19 +2495,19 @@ def _t_email_spoofable(entidad, ctx):
         return
     txt = run_tool(['dig', dominio, 'TXT', '+short'], timeout=10)
     tiene_spf = 'v=spf1' in txt.lower()
-    entidad.propiedades['spf'] = 'configurado' if tiene_spf else 'NO CONFIGURADO'
+    entidad.propiedades['spf'] = 'configured' if tiene_spf else 'NOT CONFIGURED'
     if not tiene_spf:
         entidad.etiquetar('spoofable')
 
 def _screenshot(entidad):
-    """Captura de la web con navegador headless (paso 68). No captura hosts
-    internos (_url_publica). Guarda el PNG en el static y deja la URL como prop."""
+    """Web capture with a headless browser (step 68). Does not capture internal
+    hosts (_url_publica). Saves the PNG in static and leaves the URL as a prop."""
     if not _url_publica('https://' + entidad.valor):
         return
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        log.debug("screenshot: falta playwright")
+        log.debug("screenshot: playwright missing")
         return
     shots = os.path.join(STATIC_DIR, 'screenshots')
     os.makedirs(shots, exist_ok=True)
@@ -2522,7 +2522,7 @@ def _screenshot(entidad):
         entidad.propiedades['screenshot'] = '/static/screenshots/' + archivo
         entidad.etiquetar('con-screenshot')
     except Exception as _e:
-        log.debug("screenshot falló: %s", _e)
+        log.debug("screenshot failed: %s", _e)
 
 @transform(entrada='dominio', salidas=(), nombre='screenshot',
            descripcion='Screenshot of the site (headless browser)')
@@ -2535,8 +2535,8 @@ def _t_screenshot_sub(entidad, ctx):
     _screenshot(entidad)
 
 def _nuclei(entidad):
-    """Escaneo de vulns con plantillas nuclei (paso 69). Solo hosts públicos.
-    Corre con run_tool (argv, sin shell); severidad media+ para no eternizarse."""
+    """Vulnerability scan with nuclei templates (step 69). Public hosts only.
+    Runs via run_tool (argv, no shell); medium+ severity so it does not drag on."""
     if not _which('nuclei') or not _url_publica('https://' + entidad.valor):
         return
     out = run_tool(['nuclei', '-u', 'https://' + entidad.valor, '-jsonl', '-silent',
@@ -2565,8 +2565,8 @@ def _t_nuclei_sub(entidad, ctx):
     _nuclei(entidad)
 
 def _http_probe(entidad):
-    """Sondea un host por HTTP y enriquece la entidad. Usa _fetch_seguro:
-    no sondea IPs internas (SSRF) y revalida redirects."""
+    """Probes a host over HTTP and enriches the entity. Uses _fetch_seguro:
+    does not probe internal IPs (SSRF) and revalidates redirects."""
     try:
         r = _fetch_seguro(entidad.valor, timeout=8, stream=False)
     except Exception:
@@ -2585,7 +2585,7 @@ def _http_probe(entidad):
     if str(r.url).rstrip('/') not in (f'https://{entidad.valor}', f'http://{entidad.valor}'):
         entidad.propiedades['http_redirect'] = str(r.url)
     entidad.etiquetar('http-vivo')
-    # detección de panel de login/admin (paso 56)
+    # login/admin panel detection (step 56)
     cuerpo = (r.text[:8000] or '').lower()
     titulo = (entidad.propiedades.get('http_title', '') or '').lower()
     señales = ('login', 'log in', 'sign in', 'iniciar sesión', 'admin', 'dashboard',
@@ -2595,8 +2595,8 @@ def _http_probe(entidad):
         entidad.etiquetar('panel-login')
 
 def _tech_detect(entidad):
-    """Fingerprint ligero de tecnologías desde la respuesta HTTP (server,
-    powered-by, meta generator, pistas comunes). No es Wappalyzer, pero sirve."""
+    """Lightweight technology fingerprint from the HTTP response (server,
+    powered-by, meta generator, common hints). Not Wappalyzer, but it works."""
     try:
         r = _fetch_seguro(entidad.valor, timeout=8, stream=False)
     except Exception:
@@ -2623,13 +2623,13 @@ def _tech_detect(entidad):
            descripcion='Technologies the site uses (HTTP fingerprint)')
 def _t_tech_dom(entidad, ctx):
     for t in _tech_detect(entidad):
-        ctx.emitir('tech', t, etiqueta='usa')
+        ctx.emitir('tech', t, etiqueta='uses')
 
 @transform(entrada='subdominio', salidas=('tech',), nombre='tech_sub',
            descripcion='Subdomain technologies (HTTP fingerprint)')
 def _t_tech_sub(entidad, ctx):
     for t in _tech_detect(entidad):
-        ctx.emitir('tech', t, etiqueta='usa')
+        ctx.emitir('tech', t, etiqueta='uses')
 
 @transform(entrada='tech', salidas=('cve',), nombre='cve_lookup',
            descripcion='Critical CVEs associated with the technology (NVD). NO version -> verify applicability')
@@ -2647,8 +2647,8 @@ def _t_cve_lookup(entidad, ctx):
         cid = cve.get('id')
         if not cid:
             continue
-        # filtro anti-ruido PRECISO: la tech debe estar en el CPE (producto oficial
-        # afectado), no solo mencionada de pasada en la descripción.
+        # PRECISE anti-noise filter: the tech must be in the CPE (official affected
+        # product), not just mentioned in passing in the description.
         cpes = json.dumps(cve.get('configurations', [])).lower()
         if f':{kw.lower()}:' in cpes:
             e = ctx.emitir('cve', cid, etiqueta='critical CVE')
@@ -2677,7 +2677,7 @@ def _t_reverse_whois(entidad, ctx):
         for reg in (d.get('response', {}) or {}).get('matches', [])[:50]:
             dom = reg.get('domain')
             if dom and dom != entidad.valor:
-                ctx.emitir('dominio', dom, etiqueta='mismo registrante')
+                ctx.emitir('dominio', dom, etiqueta='same registrant')
     except Exception as _e:
         log.debug("reverse_whois unavailable: %s", _e)
 
