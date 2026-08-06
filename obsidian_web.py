@@ -39,21 +39,21 @@ app   = Flask(__name__,
 os.makedirs(CASES_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
 
-# ── Manejo uniforme de errores (paso 11) ─────────────────────────────────────
+# ── Uniform error handling (step 11) ─────────────────────────────────────────
 def _error(mensaje, codigo=400):
-    """Respuesta de error consistente en JSON: {'error': msg, 'code': n}."""
+    """Consistent JSON error response: {'error': msg, 'code': n}."""
     return jsonify({'error': mensaje, 'code': codigo}), codigo
 
 @app.errorhandler(Exception)
 def _manejar_error(e):
-    """Cualquier error termina en JSON uniforme para rutas /api. Las excepciones
-    no controladas se loguean completas del lado servidor, pero al cliente solo
-    le llega un mensaje genérico — no filtrar el stack trace."""
+    """Any error ends as uniform JSON for /api routes. Unhandled exceptions are
+    logged in full server-side, but the client only gets a generic message --
+    do not leak the stack trace."""
     if isinstance(e, HTTPException):
         if request.path.startswith('/api/'):
             return _error(e.description or e.name, e.code)
-        return e   # páginas normales: 404/405 HTML por defecto
-    log.exception("error no controlado en %s %s", request.method, request.path)
+        return e   # normal pages: default 404/405 HTML
+    log.exception("unhandled error in %s %s", request.method, request.path)
     if request.path.startswith('/api/'):
         return _error('Internal server error', 500)
     return 'Internal server error', 500
@@ -70,7 +70,7 @@ def _db_init():
 _db_init()
 
 def _db_guardar_caso(caso_dict):
-    """Espejo del caso en SQLite — no reemplaza el JSON, solo lo hace buscable."""
+    """Mirror of the case in SQLite -- does not replace the JSON, only makes it searchable."""
     try:
         con = sqlite3.connect(CASES_DB)
         con.execute(
@@ -82,10 +82,10 @@ def _db_guardar_caso(caso_dict):
         con.commit()
         con.close()
     except Exception as e:
-        log.error("error guardando espejo SQLite: %s", e)
+        log.error("error saving SQLite mirror: %s", e)
 
 def _db_buscar(termino):
-    """Busca un término (email, dominio, usuario...) en todos los casos guardados."""
+    """Searches a term (email, domain, username...) across all saved cases."""
     con = sqlite3.connect(CASES_DB)
     con.row_factory = sqlite3.Row
     filas = con.execute(
@@ -106,14 +106,13 @@ def _db_buscar(termino):
             'actualizado': fila['actualizado'], 'modulos_con_match': modulos_con_match
         })
     return resultados
-# Si falta vis.js (grafo) en el static del usuario, copiar el que viene con el programa
+# If vis.js (graph) is missing from the user static dir, copy the one shipped with the program
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _WEB_DIR = os.path.join(_HERE, 'web')
 def _cargar_web(nombre):
-    """Carga un archivo de UI (HTML/JS/CSS) desde web/. El front vive en
-    archivos, no incrustado en el .py. Se lee como texto: los .replace()/
-    .format() de siempre siguen aplicando (nada de Jinja, que chocaría con
-    las llaves del CSS y los ${} de JS)."""
+    """Loads a UI file (HTML/JS/CSS) from web/. The front-end lives in files, not
+    embedded in the .py. It is read as text: the usual .replace()/.format() still
+    apply (no Jinja, which would clash with the CSS braces and the ${} of JS)."""
     with open(os.path.join(_WEB_DIR, nombre), encoding='utf-8') as _f:
         return _f.read()
 
@@ -122,7 +121,7 @@ if not os.path.exists(os.path.join(STATIC_DIR, _VIS)) and os.path.exists(os.path
 OLLAMA    = 'http://localhost:11434'
 MODEL     = 'qwen2.5:3b'
 
-# ── Auth: obligatoria si el server se expone fuera de 127.0.0.1 ───────────────
+# ── Auth: mandatory if the server is exposed beyond 127.0.0.1 ─────────────────
 CONFIG_DIR     = os.path.join(HOME, '.obsidian')
 SECRET_KEY_FILE = os.path.join(CONFIG_DIR, 'secret_key')
 AUTH_FILE       = os.path.join(CONFIG_DIR, 'auth.json')
