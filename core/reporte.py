@@ -35,12 +35,12 @@ def _resumen_severidad(hallazgos) -> dict:
 def _grafo_data(almacen) -> tuple:
     """Nodes/edges for vis-network, with the same per-type color as /v2."""
     nodos, aristas = [], []
-    for e in almacen.entidades:
-        color = TIPOS.get(e.tipo, {}).get('color', '#8b8b98')
-        nodos.append({'id': e.id, 'label': e.valor, 'color': color, 'shape': 'dot',
-                      'group': e.tipo})
-    for r in almacen.relaciones:
-        aristas.append({'from': r.origen, 'to': r.destino, 'label': r.etiqueta})
+    for e in almacen.entities:
+        color = TIPOS.get(e.type, {}).get('color', '#8b8b98')
+        nodos.append({'id': e.id, 'label': e.value, 'color': color, 'shape': 'dot',
+                      'group': e.type})
+    for r in almacen.relations:
+        aristas.append({'from': r.source, 'to': r.target, 'label': r.label})
     return nodos, aristas
 
 
@@ -73,7 +73,7 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
         for h in hallazgos:
             sev = getattr(h, 'severidad', 'low')
             col = _SEV_COLOR.get(sev, '#8b8b98')
-            n_ent = len(getattr(h, 'entidades', []) or [])
+            n_ent = len(getattr(h, 'entities', []) or [])
             filas.append(
                 f'<tr><td><span class="sev" style="background:{col}">{_e(sev)}</span></td>'
                 f'<td class="regla">{_e(getattr(h, "regla", ""))}</td>'
@@ -88,26 +88,26 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
 
     # ── entity inventory by type ──
     bloques = []
-    for tipo, info in TIPOS.items():
-        ents = almacen.of_type(tipo)
+    for type, info in TIPOS.items():
+        ents = almacen.of_type(type)
         if not ents:
             continue
         color = info['color']
         items = []
-        for e in sorted(ents, key=lambda x: x.valor):
+        for e in sorted(ents, key=lambda x: x.value):
             tags = ''.join(f'<span class="tag">{_e(t)}</span>' for t in sorted(e.tags))
-            props = e.propiedades or {}
+            props = e.properties or {}
             extra = ''
             if props:
                 pares = [f'{_e(k)}: {_e(str(v)[:80])}' for k, v in list(props.items())[:4]]
                 extra = '<div class="props">' + ' · '.join(pares) + '</div>'
-            fuentes = ', '.join(_e(o) for o in sorted(e.origenes)) or '—'
+            fuentes = ', '.join(_e(o) for o in sorted(e.sources)) or '—'
             items.append(
-                f'<li><span class="val">{_e(e.valor)}</span> {tags}'
+                f'<li><span class="val">{_e(e.value)}</span> {tags}'
                 f'<div class="fuente">sources: {fuentes}</div>{extra}</li>')
         bloques.append(
-            f'<section class="tipo"><h3><span class="dot" style="background:{color}"></span>'
-            f'{_e(info["etiqueta"])} <span class="cnt">{len(ents)}</span></h3>'
+            f'<section class="type"><h3><span class="dot" style="background:{color}"></span>'
+            f'{_e(info["label"])} <span class="cnt">{len(ents)}</span></h3>'
             f'<ul>{"".join(items)}</ul></section>')
     inventario_html = ''.join(bloques) or '<p class="vacio">No entities.</p>'
 
@@ -158,10 +158,10 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
   td.num,.num{{text-align:center;color:var(--muted);font-family:ui-monospace,monospace}}
   .regla{{font-family:ui-monospace,monospace;color:var(--cyan);font-size:.8rem}}
   .sev{{display:inline-block;padding:.1rem .5rem;border-radius:4px;color:#16161e;font-weight:700;font-size:.72rem;text-transform:uppercase}}
-  .tipo{{margin:1.2rem 0}} .tipo h3{{font-size:.92rem;margin:0 0 .5rem;display:flex;align-items:center;gap:.5rem}}
-  .tipo .dot{{width:.7rem;height:.7rem;border-radius:50%}} .tipo .cnt{{color:var(--muted);font-family:ui-monospace,monospace;font-size:.8rem}}
-  .tipo ul{{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.5rem}}
-  .tipo li{{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.6rem .7rem}}
+  .type{{margin:1.2rem 0}} .type h3{{font-size:.92rem;margin:0 0 .5rem;display:flex;align-items:center;gap:.5rem}}
+  .type .dot{{width:.7rem;height:.7rem;border-radius:50%}} .type .cnt{{color:var(--muted);font-family:ui-monospace,monospace;font-size:.8rem}}
+  .type ul{{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.5rem}}
+  .type li{{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.6rem .7rem}}
   .val{{font-family:ui-monospace,monospace;color:var(--txt);word-break:break-all}}
   .tag{{display:inline-block;background:#2a2a36;color:var(--amber);border-radius:4px;padding:.02rem .4rem;font-size:.68rem;margin-left:.3rem}}
   .fuente,.props{{color:var(--muted);font-size:.72rem;margin-top:.3rem;word-break:break-all}}
@@ -173,7 +173,7 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
   .toolbar button,.toolbar a{{background:var(--panel);color:var(--txt);border:1px solid var(--line);
     border-radius:6px;padding:.35rem .7rem;font-size:.8rem;cursor:pointer;text-decoration:none;font-family:inherit}}
   .toolbar button:hover,.toolbar a:hover{{border-color:var(--cyan);color:var(--cyan)}}
-  @media print{{body{{background:#fff;color:#111;max-width:none}} .tipo li,.score .barra,#grafo{{background:#f4f4f6}}
+  @media print{{body{{background:#fff;color:#111;max-width:none}} .type li,.score .barra,#grafo{{background:#f4f4f6}}
     h2{{border-color:#ccc}} td,th{{border-color:#ddd}} #grafo{{display:none}} .no-print{{display:none}}}}
 </style></head>
 <body>

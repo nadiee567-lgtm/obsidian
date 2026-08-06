@@ -54,9 +54,9 @@ class _Registry:
         self._by_input.setdefault(t.entrada, []).append(t)
         return t
 
-    def applicable(self, tipo: str) -> list:
+    def applicable(self, type: str) -> list:
         """Transforms that run on an entity of this type (step 35)."""
-        return list(self._by_input.get(tipo, ()))
+        return list(self._by_input.get(type, ()))
 
     def by_name(self, nombre: str) -> Transform | None:
         return self._by_name.get(nombre)
@@ -78,7 +78,7 @@ def transform(entrada: str, salidas=(), nombre=None, requiere_key=False, descrip
 
     @transform(entrada='dominio', salidas=('ip','subdominio'))
     def resolver(entidad, ctx):
-        ctx.emitir('ip', '1.2.3.4', etiqueta='A')
+        ctx.emitir('ip', '1.2.3.4', label='A')
     """
     def deco(fn):
         t = Transform(nombre=nombre or fn.__name__, entrada=entrada,
@@ -99,14 +99,14 @@ class Context:
         self._nombre = nombre_transform
         self.emitidas: list = []
 
-    def emitir(self, tipo, valor, etiqueta='', **propiedades) -> Entity | None:
+    def emitir(self, type, value, label='', **properties) -> Entity | None:
         try:
-            ent = Entity(tipo=tipo, valor=valor, propiedades=propiedades)
+            ent = Entity(type=type, value=value, properties=properties)
         except ValueError:
             return None   # garbage value: ignored, does not break the transform
         viva = self.almacen.add(ent)
         viva.note_provenance(self._nombre, input_id=self.entrada.id)
-        self.almacen.relate(self.entrada, viva, etiqueta)
+        self.almacen.relate(self.entrada, viva, label)
         self.emitidas.append(viva)
         return viva
 
@@ -141,8 +141,8 @@ def run(t: Transform, entidad: Entity, almacen: Store) -> list:
     ISOLATES failures (step 38): if the transform crashes, it does not propagate
     -- it returns whatever it managed to emit. Honors the transform's rate limit
     (step 40)."""
-    if entidad.tipo != t.entrada:
-        raise ValueError(f"{t.nombre} expects '{t.entrada}', got '{entidad.tipo}'")
+    if entidad.type != t.entrada:
+        raise ValueError(f"{t.nombre} expects '{t.entrada}', got '{entidad.type}'")
     ctx = Context(almacen, entidad, t.nombre)
     sem = _SEMAFOROS.get(t.nombre)
     try:
@@ -183,11 +183,11 @@ def run_batch(tareas, almacen: Store, max_workers: int = 8, lock=None,
         return []
 
     def _uno(t):
-        tipo, valor, nombre = t
+        type, value, nombre = t
         local = Store()
         n = 0
         try:
-            semilla = local.create(tipo, valor)
+            semilla = local.create(type, value)
             n = len(run_by_name(nombre, semilla, local))
         except Exception:
             pass
@@ -209,10 +209,10 @@ def run_batch(tareas, almacen: Store, max_workers: int = 8, lock=None,
     ctx = lock if lock is not None else contextlib.nullcontext()
     with ctx:                                    # serialized merge (consistent dedup)
         for local in locales:
-            for e in local.entidades:
+            for e in local.entities:
                 almacen.add(e)
-            for r in local.relaciones:
-                almacen.relate(r.origen, r.destino, r.etiqueta)
+            for r in local.relations:
+                almacen.relate(r.source, r.target, r.label)
     return resultados
 
 
@@ -250,7 +250,7 @@ class Runner:
             t = REGISTRO.by_name(paso)
             if t is None:
                 continue
-            objetivos = [e for e in list(pool.values()) if e.tipo == t.entrada]
+            objetivos = [e for e in list(pool.values()) if e.type == t.entrada]
             for ent in objetivos:
                 for nueva in self.run(paso, ent):
                     pool[nueva.id] = nueva

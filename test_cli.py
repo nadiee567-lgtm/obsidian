@@ -7,7 +7,7 @@ import obsidian_cli as cli
 
 def test_parser_run():
     a = cli.construir_parser().parse_args(['run', 'dominio', 'x.com', 'dns_a', '-w', 'c1'])
-    assert a.tipo == 'dominio' and a.valor == 'x.com' and a.transform == 'dns_a'
+    assert a.type == 'dominio' and a.value == 'x.com' and a.transform == 'dns_a'
     assert a.workspace == 'c1' and a.fn is cli.cmd_run
 
 

@@ -18,9 +18,9 @@ class FakeResp:
         return self._data
 
 
-def _correr(nombre, tipo, valor):
+def _correr(nombre, type, value):
     alm = Store()
-    e = alm.create(tipo, valor)
+    e = alm.create(type, value)
     return run_by_name(nombre, e, alm)
 
 
@@ -37,10 +37,10 @@ def test_censys(monkeypatch):
                      {'port': 22, 'service_name': 'SSH'}]}}
     _con_key(monkeypatch, resp, key='id:secret')
     prod = _correr('censys', 'ip', '1.2.3.4')
-    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
-    assert {e.valor for e in prod if e.tipo == 'tech'} == {'HTTP', 'SSH'}
-    assert any(e.tipo == 'asn' and e.valor == 'AS64500' for e in prod)
-    assert any(e.tipo == 'org' and e.valor == 'ACME' for e in prod)
+    assert {e.value for e in prod if e.type == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
+    assert {e.value for e in prod if e.type == 'tech'} == {'HTTP', 'SSH'}
+    assert any(e.type == 'asn' and e.value == 'AS64500' for e in prod)
+    assert any(e.type == 'org' and e.value == 'ACME' for e in prod)
 
 
 def test_censys_sin_key(monkeypatch):
@@ -55,8 +55,8 @@ def test_zoomeye(monkeypatch):
                         {'portinfo': {'port': 443, 'service': 'https', 'app': 'nginx'}}]}
     _con_key(monkeypatch, resp)
     prod = _correr('zoomeye', 'ip', '1.2.3.4')
-    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:80', '1.2.3.4:443'}
-    assert 'nginx' in {e.valor for e in prod if e.tipo == 'tech'}
+    assert {e.value for e in prod if e.type == 'puerto'} == {'1.2.3.4:80', '1.2.3.4:443'}
+    assert 'nginx' in {e.value for e in prod if e.type == 'tech'}
 
 
 def test_zoomeye_sin_key(monkeypatch):
@@ -72,8 +72,8 @@ def test_fofa(monkeypatch):
         ['1.2.3.4', '80', 'other.com']]}
     _con_key(monkeypatch, resp, key='correo@x.com:apikey')
     prod = _correr('fofa', 'ip', '1.2.3.4')
-    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:80'}
-    assert {e.valor for e in prod if e.tipo == 'dominio'} == {'site.com', 'other.com'}
+    assert {e.value for e in prod if e.type == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:80'}
+    assert {e.value for e in prod if e.type == 'dominio'} == {'site.com', 'other.com'}
 
 
 def test_fofa_error_api(monkeypatch):
@@ -94,8 +94,8 @@ def test_quake(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'fakekey')
     monkeypatch.setattr(ob.SESSION, 'post', lambda *a, **k: FakeResp(resp))
     prod = _correr('quake', 'ip', '1.2.3.4')
-    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
-    assert {e.valor for e in prod if e.tipo == 'tech'} == {'http/ssl', 'ssh'}
+    assert {e.value for e in prod if e.type == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
+    assert {e.value for e in prod if e.type == 'tech'} == {'http/ssl', 'ssh'}
 
 
 def test_quake_sin_key(monkeypatch):
@@ -109,15 +109,15 @@ def test_hunter(monkeypatch):
     resp = {'data': {'list': [{'port': 443, 'domain': 'a.com'}, {'port': 80, 'domain': 'b.com'}]}}
     _con_key(monkeypatch, resp)
     prod = _correr('hunter', 'ip', '1.2.3.4')
-    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:80'}
-    assert {e.valor for e in prod if e.tipo == 'dominio'} == {'a.com', 'b.com'}
+    assert {e.value for e in prod if e.type == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:80'}
+    assert {e.value for e in prod if e.type == 'dominio'} == {'a.com', 'b.com'}
 
 
 def test_netlas(monkeypatch):
     resp = {'items': [{'data': {'port': 443}}, {'data': {'port': 22}}]}
     _con_key(monkeypatch, resp)
     prod = _correr('netlas', 'ip', '1.2.3.4')
-    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
+    assert {e.value for e in prod if e.type == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
 
 
 def test_hunter_netlas_sin_key(monkeypatch):
@@ -134,14 +134,14 @@ def test_criminalip(monkeypatch):
                               {'open_port_no': 8080, 'app_name': 'HTTP'}]}}
     _con_key(monkeypatch, resp)
     prod = _correr('criminalip', 'ip', '1.2.3.4')
-    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:8080'}
+    assert {e.value for e in prod if e.type == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:8080'}
 
 
 def test_binaryedge(monkeypatch):
     resp = {'events': [{'port': 443}, {'port': 22}, {'port': 443}]}   # dedup by id
     _con_key(monkeypatch, resp)
     prod = _correr('binaryedge', 'ip', '1.2.3.4')
-    assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
+    assert {e.value for e in prod if e.type == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
 
 
 def test_criminalip_binaryedge_sin_key(monkeypatch):
@@ -162,16 +162,16 @@ def test_favicon_pivote(monkeypatch):
         return FakeResp({'matches': [{'ip_str': '7.7.7.7'}, {'ip_str': '9.9.9.9'}]})
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
     alm = Store()
-    h = alm.create('hash', '123456', propiedades={'tipo_hash': 'favicon'})
+    h = alm.create('hash', '123456', properties={'tipo_hash': 'favicon'})
     prod = run_by_name('favicon_pivote', h, alm)
-    ips = {e.valor for e in prod if e.tipo == 'ip'}
+    ips = {e.value for e in prod if e.type == 'ip'}
     assert ips == {'9.9.9.9', '8.8.8.8', '7.7.7.7'}   # cross-engine dedup of 9.9.9.9
 
 
 def test_favicon_pivote_ignora_hash_no_favicon(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'a@b.com:k')
     alm = Store()
-    h = alm.create('hash', 'abc', propiedades={'tipo_hash': 'sha1'})
+    h = alm.create('hash', 'abc', properties={'tipo_hash': 'sha1'})
     assert run_by_name('favicon_pivote', h, alm) == []
 
 
@@ -185,9 +185,9 @@ def test_cert_pivote(monkeypatch):
         return FakeResp({'matches': [{'ip_str': '6.6.6.6'}]})
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
     alm = Store()
-    d = alm.create('dominio', 'ejemplo.com', propiedades={'cert_cn': '*.ejemplo.com'})
+    d = alm.create('dominio', 'ejemplo.com', properties={'cert_cn': '*.ejemplo.com'})
     prod = run_by_name('cert_pivote', d, alm)
-    assert {e.valor for e in prod if e.tipo == 'ip'} == {'5.5.5.5', '6.6.6.6'}
+    assert {e.value for e in prod if e.type == 'ip'} == {'5.5.5.5', '6.6.6.6'}
 
 
 # ── Cross-engine dedup (116) ────────────────────────────────────────────────
@@ -204,9 +204,9 @@ def test_dedup_cross_engine(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: FakeResp({'result': {'services': [{'port': 443, 'service_name': 'HTTP'}]}}))
     run_by_name('censys', ip, alm)
-    puertos = [e for e in alm.entidades if e.tipo == 'puerto' and e.valor == '1.2.3.4:443']
+    puertos = [e for e in alm.entities if e.type == 'puerto' and e.value == '1.2.3.4:443']
     assert len(puertos) == 1                              # ONE single entity (deterministic id)
-    assert {'shodan', 'censys'} <= puertos[0].origenes    # with BOTH sources
+    assert {'shodan', 'censys'} <= puertos[0].sources    # with BOTH sources
 
 
 def test_todos_los_motores_registrados():

@@ -131,9 +131,9 @@ class Manager:
         d = self._dir_snaps(nombre)
         if not r or not d:
             raise KeyError('workspace not found')
-        origen = os.path.join(d, _slug_caso(snap_id) + '.db') if _slug_caso(snap_id) else None
-        if not origen or not os.path.exists(origen):
+        source = os.path.join(d, _slug_caso(snap_id) + '.db') if _slug_caso(snap_id) else None
+        if not source or not os.path.exists(source):
             raise KeyError('snapshot not found')
         if os.path.exists(r):
             self.snapshot(nombre)     # back up the current state before overwriting
-        shutil.copy2(origen, r)
+        shutil.copy2(source, r)

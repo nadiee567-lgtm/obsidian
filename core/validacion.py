@@ -31,16 +31,16 @@ def _es_ip(v):
         return False
 
 
-def _validar(arg, tipo):
-    """True only if `arg` matches EXACTLY the expected shape of `tipo`.
+def _validar(arg, type):
+    """True only if `arg` matches EXACTLY the expected shape of `type`.
     Allowlist: closes command injection AND argument injection at once."""
     arg = (arg or '').strip()
     if not arg or len(arg) > 253:
         return False
-    if tipo == 'dominio':  return bool(_RE_DOMINIO.match(arg))
-    if tipo == 'ip':       return _es_ip(arg)
-    if tipo == 'usuario':  return bool(_RE_USUARIO.match(arg))
-    if tipo == 'email':    return bool(_RE_EMAIL.match(arg))
+    if type == 'dominio':  return bool(_RE_DOMINIO.match(arg))
+    if type == 'ip':       return _es_ip(arg)
+    if type == 'usuario':  return bool(_RE_USUARIO.match(arg))
+    if type == 'email':    return bool(_RE_EMAIL.match(arg))
     # unknown type -> generic check
     return _objetivo_seguro(arg)
 

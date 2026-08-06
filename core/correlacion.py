@@ -21,7 +21,7 @@ class Finding:
     regla: str
     severidad: str          # critical | high | medium | low (severity value ids)
     mensaje: str
-    entidades: list = field(default_factory=list)   # ids involucrados
+    entities: list = field(default_factory=list)   # ids involucrados
 
     def to_dict(self):
         return asdict(self)
@@ -43,23 +43,23 @@ _SUPRIMIR = {'descartado', 'falso-positivo'}
 # evaluated alongside the built-in ones. Format:
 #   - nombre: ftp-anonimo
 #     severidad: alto            # critico|alto|medio|bajo
-#     mensaje: "Anonymous FTP on {valor}"
+#     mensaje: "Anonymous FTP on {value}"
 #     cuando:
-#       tipo: puerto             # entity type (optional)
+#       type: puerto             # entity type (optional)
 #       tag: ftp-anon            # required tag (optional)
 #       valor_contiene: ":21"    # substring in the value (optional)
-#       propiedad: {nombre: servicio, valor: ftp}   # prop == value (optional)
+#       propiedad: {nombre: servicio, value: ftp}   # prop == value (optional)
 _REGLAS_YAML = []
 
 
 def _coincide_yaml(ent, cuando) -> bool:
     if 'tag' in cuando and cuando['tag'] not in ent.tags:
         return False
-    if 'valor_contiene' in cuando and str(cuando['valor_contiene']) not in ent.valor:
+    if 'valor_contiene' in cuando and str(cuando['valor_contiene']) not in ent.value:
         return False
     prop = cuando.get('propiedad')
     if isinstance(prop, dict):
-        if str(ent.propiedades.get(prop.get('nombre'))) != str(prop.get('valor')):
+        if str(ent.properties.get(prop.get('nombre'))) != str(prop.get('value')):
             return False
     return True
 
@@ -86,11 +86,11 @@ def _evaluar_yaml(almacen) -> list:
     out = []
     for spec in _REGLAS_YAML:
         cuando = spec.get('cuando', {}) or {}
-        tipo = cuando.get('tipo')
-        ents = almacen.of_type(tipo) if tipo else almacen.entidades
+        type = cuando.get('type')
+        ents = almacen.of_type(type) if type else almacen.entities
         for e in ents:
             if _coincide_yaml(e, cuando):
-                msg = str(spec.get('mensaje', spec['nombre'])).replace('{valor}', e.valor)
+                msg = str(spec.get('mensaje', spec['nombre'])).replace('{value}', e.value)
                 out.append(Finding(spec['nombre'], spec.get('severidad', 'medium'), msg, [e.id]))
     return out
 
@@ -110,9 +110,9 @@ def correlate(almacen) -> list:
         out.extend(_evaluar_yaml(almacen))
     except Exception:
         pass
-    idx = {e.id: e for e in almacen.entidades}
+    idx = {e.id: e for e in almacen.entities}
     def suprimido(h):
-        ids = [eid for eid in h.entidades if eid in idx]
+        ids = [eid for eid in h.entities if eid in idx]
         return bool(ids) and all(_SUPRIMIR & idx[eid].tags for eid in ids)
     out = [h for h in out if not suprimido(h)]
     out.sort(key=lambda h: -SEVERIDADES.get(h.severidad, 0))
@@ -147,17 +147,17 @@ _PUERTOS_SENSIBLES = {
 def r_puerto_sensible(alm):
     """Administrative/database port exposed to the internet (step 58)."""
     for p in alm.of_type('puerto'):
-        num = p.valor.split(':')[-1]
+        num = p.value.split(':')[-1]
         if num in _PUERTOS_SENSIBLES:
             yield Finding('puerto-sensible', 'high',
-                           f'Port {num} ({_PUERTOS_SENSIBLES[num]}) exposed: {p.valor}', [p.id])
+                           f'Port {num} ({_PUERTOS_SENSIBLES[num]}) exposed: {p.value}', [p.id])
 
 @regla
 def r_cert_vencido(alm):
     """Expired TLS certificate on a domain (step 61)."""
     ahora = datetime.datetime.now()
     for d in alm.of_type('dominio'):
-        exp = d.propiedades.get('cert_expira')
+        exp = d.properties.get('cert_expira')
         if not exp:
             continue
         try:
@@ -166,7 +166,7 @@ def r_cert_vencido(alm):
             continue
         if fecha < ahora:
             yield Finding('cert-vencido', 'medium',
-                           f'Expired TLS certificate on {d.valor} ({exp})', [d.id])
+                           f'Expired TLS certificate on {d.value} ({exp})', [d.id])
 
 @regla
 def r_ip_maliciosa(alm):
@@ -174,7 +174,7 @@ def r_ip_maliciosa(alm):
     for ip in alm.of_type('ip'):
         if 'malicioso' in ip.tags:
             yield Finding('ip-maliciosa', 'critical',
-                           f'IP {ip.valor} classified as malicious (GreyNoise)', [ip.id])
+                           f'IP {ip.value} classified as malicious (GreyNoise)', [ip.id])
 
 @regla
 def r_ip_listada(alm):
@@ -182,9 +182,9 @@ def r_ip_listada(alm):
     verdict (feeds have false positives)."""
     for ip in alm.of_type('ip'):
         if 'listado-amenaza' in ip.tags:
-            fuente = ip.propiedades.get('amenaza_fuente', 'threat feed')
+            fuente = ip.properties.get('amenaza_fuente', 'threat feed')
             yield Finding('ip-listada', 'high',
-                           f'IP {ip.valor} listed in {fuente} -- verify (possible false positive)', [ip.id])
+                           f'IP {ip.value} listed in {fuente} -- verify (possible false positive)', [ip.id])
 
 @regla
 def r_email_filtrado(alm):
@@ -192,7 +192,7 @@ def r_email_filtrado(alm):
     for e in alm.of_type('email'):
         if 'filtrado' in e.tags:
             yield Finding('email-filtrado', 'high',
-                           f'{e.valor} appeared in data breaches', [e.id])
+                           f'{e.value} appeared in data breaches', [e.id])
 
 @regla
 def r_stealer(alm):
@@ -200,7 +200,7 @@ def r_stealer(alm):
     for e in alm.of_type('email'):
         if 'stealer-infectado' in e.tags:
             yield Finding('stealer-infectado', 'critical',
-                           f'{e.valor} came from an infostealer machine: compromised credentials', [e.id])
+                           f'{e.value} came from an infostealer machine: compromised credentials', [e.id])
 
 @regla
 def r_email_spoofable(alm):
@@ -208,7 +208,7 @@ def r_email_spoofable(alm):
     for e in alm.of_type('email'):
         if 'spoofable' in e.tags:
             yield Finding('email-spoofable', 'medium',
-                           f'The domain of {e.valor} has no SPF: spoofing possible', [e.id])
+                           f'The domain of {e.value} has no SPF: spoofing possible', [e.id])
 
 @regla
 def r_takeover(alm):
@@ -216,7 +216,7 @@ def r_takeover(alm):
     for s in alm.of_type('subdominio'):
         if 'takeover' in s.tags:
             yield Finding('subdominio-takeover', 'high',
-                           f'Subdomain vulnerable to takeover: {s.valor}', [s.id])
+                           f'Subdomain vulnerable to takeover: {s.value}', [s.id])
 
 @regla
 def r_shadow_it(alm):
@@ -225,30 +225,30 @@ def r_shadow_it(alm):
     for b in alm.of_type('bucket'):
         if 'publico' in b.tags:
             yield Finding('shadow-it', 'high',
-                           f'Public bucket -- exposed storage: {b.valor}', [b.id])
+                           f'Public bucket -- exposed storage: {b.value}', [b.id])
     for s in alm.of_type('subdominio'):
-        st = s.propiedades.get('http_status')
+        st = s.properties.get('http_status')
         if isinstance(st, int) and st >= 500:
             yield Finding('shadow-it', 'medium',
-                           f'Broken/forgotten subdomain (HTTP {st}): {s.valor}', [s.id])
+                           f'Broken/forgotten subdomain (HTTP {st}): {s.value}', [s.id])
 
 @regla
 def r_infra_compartida(alm):
     """Assets sharing a favicon or cert = probably the same organization (step 147).
     Groups domains/subdomains/ips by shared attribute."""
     from collections import defaultdict
-    for campo, etiqueta in (('favicon_hash', 'favicon'), ('cert_cn', 'cert')):
+    for campo, label in (('favicon_hash', 'favicon'), ('cert_cn', 'cert')):
         grupos = defaultdict(list)
-        for tipo in ('dominio', 'subdominio', 'ip'):
-            for e in alm.of_type(tipo):
-                v = e.propiedades.get(campo)
+        for type in ('dominio', 'subdominio', 'ip'):
+            for e in alm.of_type(type):
+                v = e.properties.get(campo)
                 if v:
                     grupos[str(v)].append(e)
         for v, ents in grupos.items():
             if len(ents) >= 2:
                 yield Finding('infra-compartida', 'low',
-                               f'{len(ents)} assets share {etiqueta} ({v[:40]}) -- same '
-                               f'infrastructure: ' + ', '.join(e.valor for e in ents[:4]),
+                               f'{len(ents)} assets share {label} ({v[:40]}) -- same '
+                               f'infrastructure: ' + ', '.join(e.value for e in ents[:4]),
                                [e.id for e in ents])
 
 @regla
@@ -257,7 +257,7 @@ def r_wallet_ransomware(alm):
     for w in alm.of_type('wallet'):
         if 'ransomware' in w.tags:
             yield Finding('wallet-ransomware', 'critical',
-                           f'Wallet linked to ransomware: {w.valor}', [w.id])
+                           f'Wallet linked to ransomware: {w.value}', [w.id])
 
 @regla
 def r_leak_login(alm):
@@ -267,12 +267,12 @@ def r_leak_login(alm):
     filtrados = [e for e in alm.of_type('email') if 'filtrado' in e.tags]
     if not filtrados:
         return
-    paneles = [e for tipo in ('dominio', 'subdominio')
-               for e in alm.of_type(tipo) if 'panel-login' in e.tags]
+    paneles = [e for type in ('dominio', 'subdominio')
+               for e in alm.of_type(type) if 'panel-login' in e.tags]
     for panel in paneles:
         for cred in filtrados[:3]:
             yield Finding('leak-login', 'critical',
-                           f'Leaked credential ({cred.valor}) + exposed panel ({panel.valor}) '
+                           f'Leaked credential ({cred.value}) + exposed panel ({panel.value}) '
                            f'= possible account access', [cred.id, panel.id])
 
 @regla
@@ -282,13 +282,13 @@ def r_pivote_plataformas(alm):
     usuarios = {e.id: e for e in alm.of_type('usuario')}
     ids_plat = {e.id for e in alm.of_type('plataforma')}
     conteo = {}
-    for r in alm.relaciones:
-        if r.origen in usuarios and r.destino in ids_plat:
-            conteo[r.origen] = conteo.get(r.origen, 0) + 1
+    for r in alm.relations:
+        if r.source in usuarios and r.target in ids_plat:
+            conteo[r.source] = conteo.get(r.source, 0) + 1
     for uid, n in conteo.items():
         if n >= 5:
             yield Finding('pivote-plataformas', 'low',
-                           f'{usuarios[uid].valor} present on {n} platforms -- strong pivot to cross identity',
+                           f'{usuarios[uid].value} present on {n} platforms -- strong pivot to cross identity',
                            [uid])
 
 @regla
@@ -298,30 +298,30 @@ def r_login_expuesto(alm):
     hay_cred = (any('filtrado' in e.tags or 'stealer-infectado' in e.tags
                     for e in alm.of_type('email'))
                 or bool(alm.of_type('credencial')))
-    for tipo in ('dominio', 'subdominio'):
-        for e in alm.of_type(tipo):
+    for type in ('dominio', 'subdominio'):
+        for e in alm.of_type(type):
             if 'panel-login' in e.tags:
                 sev = 'critical' if hay_cred else 'high'
                 extra = ' + there are leaked credentials in the case' if hay_cred else ''
                 yield Finding('login-expuesto', sev,
-                               f'Login/admin panel exposed: {e.valor}{extra}', [e.id])
+                               f'Login/admin panel exposed: {e.value}{extra}', [e.id])
 
 @regla
 def r_secreto_github(alm):
     """Hardcoded credential/secret found in a GitHub commit (step 60)."""
     for c in alm.of_type('credencial'):
         if 'secreto-github' in c.tags:
-            tipo = c.propiedades.get('tipo_secreto', 'secret')
-            repo = c.propiedades.get('repo', '?')
+            type = c.properties.get('tipo_secreto', 'secret')
+            repo = c.properties.get('repo', '?')
             yield Finding('secreto-github', 'critical',
-                           f'{tipo} exposed in a commit of {repo}', [c.id])
+                           f'{type} exposed in a commit of {repo}', [c.id])
 
 @regla
 def r_nuclei_vuln(alm):
     """Host with high+ severity nuclei findings."""
-    for tipo in ('dominio', 'subdominio'):
-        for e in alm.of_type(tipo):
+    for type in ('dominio', 'subdominio'):
+        for e in alm.of_type(type):
             if 'vulnerable' in e.tags:
-                n = len(e.propiedades.get('nuclei', []))
+                n = len(e.properties.get('nuclei', []))
                 yield Finding('vuln-nuclei', 'high',
-                               f'{e.valor}: {n} nuclei finding(s) (high+ severity)', [e.id])
+                               f'{e.value}: {n} nuclei finding(s) (high+ severity)', [e.id])

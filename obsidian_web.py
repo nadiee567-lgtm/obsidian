@@ -99,8 +99,8 @@ def _db_buscar(termino):
             datos = json.loads(fila['datos_json'])
         except Exception:
             datos = {}
-        modulos_con_match = [clave for clave, valor in datos.items()
-                              if termino.lower() in json.dumps(valor, default=str).lower()]
+        modulos_con_match = [clave for clave, value in datos.items()
+                              if termino.lower() in json.dumps(value, default=str).lower()]
         resultados.append({
             'caso': fila['nombre'], 'objetivo': fila['objetivo'],
             'actualizado': fila['actualizado'], 'modulos_con_match': modulos_con_match
@@ -286,10 +286,10 @@ def _fetch_seguro(url, timeout=10, stream=False, max_redirs=3):
 def _which(cmd):
     return subprocess.run(['which',cmd], capture_output=True).returncode == 0
 
-def _guardar_dato(clave, valor):
+def _guardar_dato(clave, value):
     with case_lock:
-        case['datos'][clave] = valor
-        case['historial'].append({'ts': time.time(), 'clave': clave, 'resumen': str(valor)[:100]})
+        case['datos'][clave] = value
+        case['historial'].append({'ts': time.time(), 'clave': clave, 'resumen': str(value)[:100]})
 
 def _ai_stream(prompt):
     try:
@@ -335,7 +335,7 @@ def _tailscale_ip():
 # ── OSINT modules ─────────────────────────────────────────────────────────────
 
 def _osint_persona(nombre):
-    datos = {'tipo':'persona','objetivo':nombre,'resultados':{}}
+    datos = {'type':'persona','objetivo':nombre,'resultados':{}}
     # DuckDuckGo
     try:
         r = SESSION.get(f"https://api.duckduckgo.com/?q={requests.utils.quote(nombre)}&format=json&no_html=1", timeout=8)
@@ -365,7 +365,7 @@ def _osint_persona(nombre):
     return datos
 
 def _osint_usuario(username):
-    datos = {'tipo':'usuario','objetivo':username,'resultados':{}}
+    datos = {'type':'usuario','objetivo':username,'resultados':{}}
     plataformas = {
         'GitHub':    f'https://github.com/{username}',
         'Twitter/X': f'https://x.com/{username}',
@@ -437,7 +437,7 @@ def _osint_usuario(username):
 
 def _osint_dominio(dominio):
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
-    datos = {'tipo':'dominio','objetivo':dominio,'resultados':{}}
+    datos = {'type':'dominio','objetivo':dominio,'resultados':{}}
     # WHOIS
     whois_raw = _cmd(f'whois {dominio} 2>/dev/null')
     whois_lines = [l.strip() for l in whois_raw.splitlines()
@@ -488,7 +488,7 @@ def _osint_dominio(dominio):
     return datos
 
 def _osint_ip(ip):
-    datos = {'tipo':'ip','objetivo':ip,'resultados':{}}
+    datos = {'type':'ip','objetivo':ip,'resultados':{}}
     # Geo
     try:
         r = SESSION.get(f'http://ip-api.com/json/{ip}?fields=status,country,regionName,city,isp,org,as,lat,lon,mobile,proxy,hosting', timeout=8)
@@ -512,7 +512,7 @@ def _osint_ip(ip):
     return datos
 
 def _osint_email(email):
-    datos = {'tipo':'email','objetivo':email,'resultados':{}}
+    datos = {'type':'email','objetivo':email,'resultados':{}}
     dominio = email.split('@')[1] if '@' in email else ''
     # Breach check
     try:
@@ -547,7 +547,7 @@ def _osint_email(email):
     return datos
 
 def _osint_phone(numero):
-    datos = {'tipo':'telefono','objetivo':numero,'resultados':{}}
+    datos = {'type':'telefono','objetivo':numero,'resultados':{}}
     numero_limpio = re.sub(r'[^\d+]','',numero)
     # Basic public API
     try:
@@ -563,7 +563,7 @@ def _osint_phone(numero):
                 'valid': d.get('valid', False),
                 'pais': d.get('country_name','?'),
                 'carrier': d.get('carrier','?'),
-                'tipo': d.get('line_type','?')
+                'type': d.get('line_type','?')
             }
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # Search social networks
@@ -577,7 +577,7 @@ def _osint_phone(numero):
     return datos
 
 def _recon_github_secrets(username_or_org):
-    datos = {'tipo':'github_secrets','objetivo':username_or_org,'resultados':{}}
+    datos = {'type':'github_secrets','objetivo':username_or_org,'resultados':{}}
     patrones = [
         ('API Key',      r'api[_-]?key\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{20,})'),
         ('Secret',       r'secret\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{20,})'),
@@ -608,8 +608,8 @@ def _recon_github_secrets(username_or_org):
                         matches = re.findall(patron, patch, re.IGNORECASE)
                         for m in matches:
                             hallazgos.append({
-                                'repo': repo_name, 'tipo': nombre_pat,
-                                'valor': m[:50]+'...' if len(m)>50 else m,
+                                'repo': repo_name, 'type': nombre_pat,
+                                'value': m[:50]+'...' if len(m)>50 else m,
                                 'commit': sha[:8], 'archivo': f.get('filename','?')
                             })
         datos['resultados']['hallazgos'] = hallazgos
@@ -620,7 +620,7 @@ def _recon_github_secrets(username_or_org):
     return datos
 
 def _recon_ssl(dominio):
-    datos = {'tipo':'ssl','objetivo':dominio,'resultados':{}}
+    datos = {'type':'ssl','objetivo':dominio,'resultados':{}}
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
     # Basic info
     cert_info = _cmd(f'echo | openssl s_client -connect {dominio}:443 -servername {dominio} 2>/dev/null | openssl x509 -noout -subject -issuer -dates -fingerprint 2>/dev/null')
@@ -642,7 +642,7 @@ def _recon_ssl(dominio):
 
 def _recon_favicon(dominio):
     """mmh3 hash of the favicon (Shodan algorithm) -- pivots to related infrastructure."""
-    datos = {'tipo':'favicon','objetivo':dominio,'resultados':{}}
+    datos = {'type':'favicon','objetivo':dominio,'resultados':{}}
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
     try:
         import mmh3
@@ -684,7 +684,7 @@ def _recon_favicon(dominio):
     return datos
 
 def _recon_typosquatting(dominio):
-    datos = {'tipo':'typosquatting','objetivo':dominio,'resultados':{}}
+    datos = {'type':'typosquatting','objetivo':dominio,'resultados':{}}
     nombre, ext = dominio.rsplit('.',1) if '.' in dominio else (dominio,'com')
     variantes = set()
     # Common substitutions
@@ -719,7 +719,7 @@ def _recon_typosquatting(dominio):
     return datos
 
 def _recon_buckets(empresa):
-    datos = {'tipo':'buckets','objetivo':empresa,'resultados':{}}
+    datos = {'type':'buckets','objetivo':empresa,'resultados':{}}
     nombre = empresa.lower().replace(' ','-').replace('_','-')
     variantes = [nombre, f'{nombre}-backup', f'{nombre}-dev', f'{nombre}-prod',
                  f'{nombre}-staging', f'{nombre}-assets', f'{nombre}-media',
@@ -750,7 +750,7 @@ def _recon_buckets(empresa):
     return datos
 
 def _recon_subdomain_takeover(dominio):
-    datos = {'tipo':'subdomain_takeover','objetivo':dominio,'resultados':{}}
+    datos = {'type':'subdomain_takeover','objetivo':dominio,'resultados':{}}
     try:
         r = SESSION.get(f'https://crt.sh/?q=%.{dominio}&output=json', timeout=12)
         subs = set()
@@ -794,7 +794,7 @@ def _recon_subdomain_takeover(dominio):
 
 def _recon_passivedns(dominio):
     """History of IPs the domain has resolved to, via VirusTotal (reuses the Analyze key)."""
-    datos = {'tipo':'passivedns','objetivo':dominio,'resultados':{}}
+    datos = {'type':'passivedns','objetivo':dominio,'resultados':{}}
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
     vt_key = os.environ.get('VT_API_KEY','')
     if not vt_key:
@@ -823,7 +823,7 @@ def _recon_passivedns(dominio):
 def _recon_metadata(url):
     if '://' not in url:
         url = 'https://' + url
-    datos = {'tipo':'metadata','objetivo':url,'resultados':{}}
+    datos = {'type':'metadata','objetivo':url,'resultados':{}}
     try:
         r = _fetch_seguro(url, timeout=10, stream=True)
         content_type = r.headers.get('Content-Type','')
@@ -860,7 +860,7 @@ def _recon_metadata(url):
 
 def _recon_render_js(url):
     """Renders the page with a headless browser -- sees what loads via JS, screenshot included."""
-    datos = {'tipo':'render_js','objetivo':url,'resultados':{}}
+    datos = {'type':'render_js','objetivo':url,'resultados':{}}
     if not url.startswith(('http://','https://')):
         url = 'https://' + url
     try:
@@ -893,7 +893,7 @@ def _recon_render_js(url):
 
 def _recon_yara_bulk(carpeta):
     """Scans every file in a folder with yara-rules -- only makes sense on a full PC."""
-    datos = {'tipo':'yara_bulk','objetivo':carpeta,'resultados':{}}
+    datos = {'type':'yara_bulk','objetivo':carpeta,'resultados':{}}
     if not os.path.isdir(carpeta):
         datos['resultados']['error'] = f'Not a valid folder: {carpeta}'
         _guardar_dato(f'yara_bulk_{carpeta}', datos)
@@ -932,7 +932,7 @@ def _recon_yara_bulk(carpeta):
     return datos
 
 def _gen_wordlist(objetivo):
-    datos = {'tipo':'wordlist','objetivo':objetivo,'resultados':{}}
+    datos = {'type':'wordlist','objetivo':objetivo,'resultados':{}}
     datos_osint = json.dumps(case['datos'], default=str)[:3000]
     prompt = f"""Based on the OSINT data collected about "{objetivo}", generate a likely password wordlist.
 Include variations of:
@@ -1172,7 +1172,7 @@ def _kali_run(tool_id, arg):
 
 def _check_url(url):
     """Analyzes a URL with VirusTotal (if a key exists) or local heuristics"""
-    datos = {'tipo': 'url_check', 'url': url, 'resultados': {}}
+    datos = {'type': 'url_check', 'url': url, 'resultados': {}}
     score = 0
     flags = []
 
@@ -1263,7 +1263,7 @@ def _check_url(url):
 
 def _analizar_password(password):
     """Analyze password strength locally without sending it to any server"""
-    datos = {'tipo': 'password', 'resultados': {}}
+    datos = {'type': 'password', 'resultados': {}}
     score = 0
     problemas = []
     puntos_fuertes = []
@@ -1403,14 +1403,14 @@ def _build_grafo():
     obj_id = nid(obj)
     add_node(obj_id, obj, 'objetivo', f'Target: {obj}', size=35)
 
-    for clave, valor in case['datos'].items():
-        if not isinstance(valor, dict): continue
-        res = valor.get('resultados', {})
-        tipo = valor.get('tipo', '')
+    for clave, value in case['datos'].items():
+        if not isinstance(value, dict): continue
+        res = value.get('resultados', {})
+        type = value.get('type', '')
 
         # ── DOMAIN ───────────────────────────────────────────────
-        if tipo == 'dominio':
-            dom = valor.get('objetivo','')
+        if type == 'dominio':
+            dom = value.get('objetivo','')
             dom_id = nid('dom_'+dom)
             add_node(dom_id, dom, 'dominio', f'Domain: {dom}', size=28)
             add_edge(obj_id, dom_id, 'dominio')
@@ -1436,8 +1436,8 @@ def _build_grafo():
                 add_edge(dom_id, tid, h.lower())
 
         # ── PASSIVE DNS ──────────────────────────────────────────
-        elif tipo == 'passivedns':
-            dom = valor.get('objetivo','')
+        elif type == 'passivedns':
+            dom = value.get('objetivo','')
             dom_id = nid('dom_'+dom)
             add_node(dom_id, dom, 'dominio', f'Domain: {dom}', size=28)
             for h in res.get('historial', [])[:15]:
@@ -1448,8 +1448,8 @@ def _build_grafo():
                 add_edge(dom_id, iid3, f'resolved {h.get("fecha","?")}')
 
         # ── IP ────────────────────────────────────────────────────
-        elif tipo == 'ip':
-            ip = valor.get('objetivo','')
+        elif type == 'ip':
+            ip = value.get('objetivo','')
             iid = nid('ip_'+ip)
             add_node(iid, ip, 'ip', f'IP: {ip}', size=25)
             add_edge(obj_id, iid, 'ip')
@@ -1468,8 +1468,8 @@ def _build_grafo():
                 add_edge(iid, pid, 'PTR')
 
         # ── FAVICON HASH ─────────────────────────────────────────
-        elif tipo == 'favicon':
-            dom = valor.get('objetivo','')
+        elif type == 'favicon':
+            dom = value.get('objetivo','')
             for m in res.get('relacionados', [])[:15]:
                 ip_f = m.get('ip')
                 if not ip_f: continue
@@ -1479,8 +1479,8 @@ def _build_grafo():
                 add_edge(obj_id, iid2, 'shared favicon')
 
         # ── USER ─────────────────────────────────────────────────
-        elif tipo == 'usuario':
-            user = valor.get('objetivo','')
+        elif type == 'usuario':
+            user = value.get('objetivo','')
             uid = nid('user_'+user)
             add_node(uid, '@'+user, 'usuario', f'User: {user}', size=28)
             add_edge(obj_id, uid, 'usuario')
@@ -1500,8 +1500,8 @@ def _build_grafo():
                 add_edge(uid, rid, 'repo')
 
         # ── EMAIL ─────────────────────────────────────────────────
-        elif tipo == 'email':
-            email = valor.get('objetivo','')
+        elif type == 'email':
+            email = value.get('objetivo','')
             eid4 = nid('mail_'+email)
             add_node(eid4, email, 'email', f'Email: {email}', size=25)
             add_edge(obj_id, eid4, 'email')
@@ -1516,7 +1516,7 @@ def _build_grafo():
                 add_edge(eid4, bid, 'leaked in')
 
         # ── BUCKETS ───────────────────────────────────────────────
-        elif tipo == 'buckets':
+        elif type == 'buckets':
             for bucket in res.get('buckets',[]):
                 bid2 = nid('bucket_'+bucket['bucket'])
                 label = ('🔓 ' if bucket['publico'] else '🔒 ') + bucket['bucket']
@@ -1524,7 +1524,7 @@ def _build_grafo():
                 add_edge(obj_id, bid2, 'bucket')
 
         # ── SUBDOMAIN TAKEOVER ────────────────────────────────────
-        elif tipo == 'subdomain_takeover':
+        elif type == 'subdomain_takeover':
             for v2 in res.get('vulnerables',[]):
                 vid = nid('vuln_'+v2['subdominio'])
                 add_node(vid, '💀 '+v2['subdominio'][:20], 'subdominio_vuln',
@@ -1532,7 +1532,7 @@ def _build_grafo():
                 add_edge(obj_id, vid, 'takeover')
 
         # ── TYPOSQUATTING ─────────────────────────────────────────
-        elif tipo == 'typosquatting':
+        elif type == 'typosquatting':
             for dom2 in res.get('registrados',[]):
                 tid2 = nid('typo_'+dom2['dominio'])
                 add_node(tid2, '🎭 '+dom2['dominio'], 'subdominio',
@@ -1540,11 +1540,11 @@ def _build_grafo():
                 add_edge(obj_id, tid2, 'typosquat')
 
         # ── GITHUB SECRETS ────────────────────────────────────────
-        elif tipo == 'github_secrets':
+        elif type == 'github_secrets':
             for h in res.get('hallazgos',[])[:8]:
-                hid = nid('secret_'+h['repo']+h['tipo'])
-                add_node(hid, f"🔑 {h['tipo']}", 'cve',
-                         f"{h['repo']} @{h['commit']}: {h['valor']}")
+                hid = nid('secret_'+h['repo']+h['type'])
+                add_node(hid, f"🔑 {h['type']}", 'cve',
+                         f"{h['repo']} @{h['commit']}: {h['value']}")
                 add_edge(obj_id, hid, 'exposed secret')
 
     return {
@@ -1562,7 +1562,7 @@ def _build_grafo():
 # ── Dark Web Monitor ──────────────────────────────────────────────────────────
 
 def _darkweb_search(query):
-    datos = {'tipo': 'darkweb', 'objetivo': query, 'resultados': {}}
+    datos = {'type': 'darkweb', 'objetivo': query, 'resultados': {}}
 
     # Ahmia -- indexes .onion without needing Tor
     try:
@@ -1602,7 +1602,7 @@ def _darkweb_search(query):
 NETLAS_KEY = os.environ.get('NETLAS_API_KEY', '')
 
 def _netlas_search(query):
-    datos = {'tipo': 'netlas', 'objetivo': query, 'resultados': {}}
+    datos = {'type': 'netlas', 'objetivo': query, 'resultados': {}}
     if not NETLAS_KEY:
         datos['resultados']['nota'] = 'Add a free Netlas API key (50 searches/day at netlas.io) for infrastructure search'
         _guardar_dato(f'netlas_{query}', datos)
@@ -1632,7 +1632,7 @@ def _netlas_search(query):
 SHODAN_KEY = os.environ.get('SHODAN_API_KEY', '')
 
 def _shodan_search(query):
-    datos = {'tipo': 'shodan', 'objetivo': query, 'resultados': {}}
+    datos = {'type': 'shodan', 'objetivo': query, 'resultados': {}}
     if not SHODAN_KEY:
         # No API key -- use Censys as a free alternative
         try:
@@ -1688,7 +1688,7 @@ def _shodan_search(query):
     return datos
 
 def _shodan_ip(ip):
-    datos = {'tipo': 'shodan_ip', 'objetivo': ip, 'resultados': {}}
+    datos = {'type': 'shodan_ip', 'objetivo': ip, 'resultados': {}}
     if not SHODAN_KEY:
         out = run_tool(['nmap','-sV','-T4','--top-ports','50',ip], timeout=60)
         datos['resultados']['nmap_full'] = out
@@ -1718,10 +1718,10 @@ def _build_timeline():
         r'(\d{2}/\d{2}/\d{4})',
         r'(\d{4}\d{2}\d{2})',
     ]
-    for clave, valor in case['datos'].items():
-        texto = json.dumps(valor, default=str)
-        tipo  = valor.get('tipo', clave) if isinstance(valor, dict) else clave
-        objetivo = valor.get('objetivo', '') if isinstance(valor, dict) else ''
+    for clave, value in case['datos'].items():
+        texto = json.dumps(value, default=str)
+        type  = value.get('type', clave) if isinstance(value, dict) else clave
+        objetivo = value.get('objetivo', '') if isinstance(value, dict) else ''
         for pat in DATE_PATTERNS:
             for fecha in re.findall(pat, texto):
                 try:
@@ -1732,8 +1732,8 @@ def _build_timeline():
                     dt = datetime.datetime.strptime(fecha_fmt[:10], '%Y-%m-%d')
                     eventos.append({
                         'fecha': fecha_fmt[:10], 'timestamp': dt.timestamp(),
-                        'modulo': tipo, 'objetivo': objetivo,
-                        'descripcion': f'{tipo}: {objetivo or clave}'
+                        'modulo': type, 'objetivo': objetivo,
+                        'descripcion': f'{type}: {objetivo or clave}'
                     })
                 except Exception as _e: log.debug("source unavailable: %s", _e)
     # Add the history of executed modules
@@ -1764,14 +1764,14 @@ def _monitor_loop():
             time.sleep(60); continue
         # Re-scan domain and user
         try:
-            tipo = 'dominio' if re.match(r'^[\w\.-]+\.[a-z]{2,}$', objetivo) else 'persona'
-            if tipo == 'dominio':
+            type = 'dominio' if re.match(r'^[\w\.-]+\.[a-z]{2,}$', objetivo) else 'persona'
+            if type == 'dominio':
                 nuevo = _osint_dominio(objetivo)
                 viejo = case['datos'].get(f'dominio_{objetivo}', {})
                 if str(nuevo) != str(viejo):
                     monitor_state['alertas'].append({
                         'ts': datetime.datetime.now().isoformat(),
-                        'tipo': 'cambio_dominio',
+                        'type': 'cambio_dominio',
                         'mensaje': f'Change detected on {objetivo}',
                         'nuevo': nuevo
                     })
@@ -1795,8 +1795,8 @@ def _generar_reporte_html():
     path = _ruta_caso_segura(nombre, '_reporte.html') or os.path.join(CASES_DIR, f'reporte_{int(time.time())}_reporte.html')
     ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
     secciones = ''
-    for clave, valor in case['datos'].items():
-        v = json.dumps(valor, ensure_ascii=False, indent=2, default=str) if isinstance(valor,(dict,list)) else str(valor)
+    for clave, value in case['datos'].items():
+        v = json.dumps(value, ensure_ascii=False, indent=2, default=str) if isinstance(value,(dict,list)) else str(value)
         secciones += f'<div class="section"><h2>{html.escape(clave.replace("_"," ").upper())}</h2><pre>{html.escape(v[:3000])}</pre></div>'
     contenido = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <title>OBSIDIAN — {html.escape(str(case.get('objetivo','?')))}</title>
@@ -1953,10 +1953,10 @@ def api_run():
         'wordlist':   lambda: _gen_wordlist(arg or case.get('objetivo','')),
         'yara_bulk':  lambda: _recon_yara_bulk(arg),
         'render_js':  lambda: _recon_render_js(arg),
-        'cve':        lambda: {'tipo':'cve','resultados':{'analisis':_cve_correlacion(arg)}},
-        'escenario':  lambda: {'tipo':'escenario','resultados':{'analisis':_sim_escenario(arg or case.get('objetivo',''))}},
-        'superficie': lambda: {'tipo':'superficie','resultados':{'analisis':_sim_superficie(arg or case.get('objetivo',''))}},
-        'analizar':   lambda: {'tipo':'analisis','resultados':{'analisis':_analizar_todo()}},
+        'cve':        lambda: {'type':'cve','resultados':{'analisis':_cve_correlacion(arg)}},
+        'escenario':  lambda: {'type':'escenario','resultados':{'analisis':_sim_escenario(arg or case.get('objetivo',''))}},
+        'superficie': lambda: {'type':'superficie','resultados':{'analisis':_sim_superficie(arg or case.get('objetivo',''))}},
+        'analizar':   lambda: {'type':'analisis','resultados':{'analisis':_analizar_todo()}},
         'darkweb':    lambda: _darkweb_search(arg),
         'shodan':     lambda: _shodan_search(arg),
         'netlas':     lambda: _netlas_search(arg),
@@ -1990,20 +1990,20 @@ def api_run():
 @transform(entrada='dominio', salidas=('ip',), nombre='dns_a',
            descripcion='A records of the domain (dig)')
 def _t_dns_a(entidad, ctx):
-    out = run_tool(['dig', entidad.valor, 'A', '+short'], timeout=10)
+    out = run_tool(['dig', entidad.value, 'A', '+short'], timeout=10)
     for linea in out.splitlines():
         linea = linea.strip()
         if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', linea):
-            ctx.emitir('ip', linea, etiqueta='A')
+            ctx.emitir('ip', linea, label='A')
 
 @transform(entrada='ip', salidas=('dominio',), nombre='ptr',
            descripcion='PTR / reverse DNS (dig -x)')
 def _t_ptr(entidad, ctx):
-    out = run_tool(['dig', '-x', entidad.valor, '+short'], timeout=10)
+    out = run_tool(['dig', '-x', entidad.value, '+short'], timeout=10)
     for linea in out.splitlines():
         linea = linea.strip().rstrip('.')
         if linea and not linea.startswith(';'):
-            ctx.emitir('dominio', linea, etiqueta='PTR')
+            ctx.emitir('dominio', linea, label='PTR')
 
 @transform(entrada='url', salidas=('tech', 'persona', 'url'), nombre='metadata',
            descripcion='EXIF metadata as pivotable entities: GPS, device, software, author (F9)')
@@ -2011,7 +2011,7 @@ def _t_metadata(entidad, ctx):
     if not _which('exiftool'):
         return
     try:
-        r = _fetch_seguro(entidad.valor, timeout=10, stream=True)   # anti-SSRF
+        r = _fetch_seguro(entidad.value, timeout=10, stream=True)   # anti-SSRF
     except Exception:
         return
     with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as f:
@@ -2031,23 +2031,23 @@ def _t_metadata(entidad, ctx):
                                             'camera', 'make', 'model', 'artist')):
                 interesantes[k] = v[:100]
         if interesantes:
-            entidad.propiedades['metadata'] = interesantes
+            entidad.properties['metadata'] = interesantes
             # ── EXIF as pivotable entities (step 120) ──
             from urllib.parse import quote as _q
             disp = (f"{interesantes.get('Make', '')} "
                     f"{interesantes.get('Camera Model Name') or interesantes.get('Model', '')}").strip()
             if disp:
-                ctx.emitir('tech', disp, etiqueta='device')
+                ctx.emitir('tech', disp, label='device')
             if interesantes.get('Software'):
-                ctx.emitir('tech', interesantes['Software'], etiqueta='software')
+                ctx.emitir('tech', interesantes['Software'], label='software')
             for kk in ('Author', 'Creator', 'Artist'):
                 if interesantes.get(kk):
-                    ctx.emitir('persona', interesantes[kk], etiqueta=kk.lower())
+                    ctx.emitir('persona', interesantes[kk], label=kk.lower())
             gps = interesantes.get('GPS Position') or interesantes.get('GPS Latitude')
             if gps:
                 entidad.tag('tiene-gps')
                 ctx.emitir('url', f'https://www.google.com/maps/search/?api=1&query={_q(gps)}',
-                           etiqueta='gps', gps=gps)
+                           label='gps', gps=gps)
     finally:
         try:
             os.unlink(fname)
@@ -2058,7 +2058,7 @@ def _t_metadata(entidad, ctx):
            descripcion='Generates useful Google dorks for the domain (files, panels, indexes, backups)')
 def _t_dorks(entidad, ctx):
     from urllib.parse import quote_plus
-    d = entidad.valor
+    d = entidad.value
     plantillas = [
         ('Exposed files', f'site:{d} (filetype:pdf OR filetype:xls OR filetype:doc)'),
         ('Directory indexes', f'site:{d} intitle:"index of"'),
@@ -2067,20 +2067,20 @@ def _t_dorks(entidad, ctx):
         ('Subdomains', f'site:*.{d}'),
         ('Error messages', f'site:{d} ("stack trace" OR "sql syntax" OR "warning")'),
     ]
-    entidad.propiedades['dorks'] = [
+    entidad.properties['dorks'] = [
         {'que': q, 'url': f'https://www.google.com/search?q={quote_plus(query)}'}
         for q, query in plantillas]
 
 @transform(entrada='wallet', salidas=(), nombre='wallet_balance',
            descripcion='Balance and activity of a BTC wallet (blockchain.info, keyless)')
 def _t_wallet_balance(entidad, ctx):
-    if not re.fullmatch(r'[a-zA-Z0-9]{20,90}', entidad.valor):   # BTC shape, no junk in the URL
+    if not re.fullmatch(r'[a-zA-Z0-9]{20,90}', entidad.value):   # BTC shape, no junk in the URL
         return
     try:
-        d = SESSION.get(f'https://blockchain.info/rawaddr/{entidad.valor}?limit=0', timeout=10).json()
-        entidad.propiedades['btc_balance'] = round(d.get('final_balance', 0) / 1e8, 8)
-        entidad.propiedades['btc_tx'] = d.get('n_tx', 0)
-        entidad.propiedades['btc_recibido'] = round(d.get('total_received', 0) / 1e8, 8)
+        d = SESSION.get(f'https://blockchain.info/rawaddr/{entidad.value}?limit=0', timeout=10).json()
+        entidad.properties['btc_balance'] = round(d.get('final_balance', 0) / 1e8, 8)
+        entidad.properties['btc_tx'] = d.get('n_tx', 0)
+        entidad.properties['btc_recibido'] = round(d.get('total_received', 0) / 1e8, 8)
         if d.get('n_tx'):
             entidad.tag('wallet-activa')
     except Exception as _e:
@@ -2095,13 +2095,13 @@ def _t_favicon_hash(entidad, ctx):
     except ImportError:
         return
     try:
-        r = _fetch_seguro(f'https://{entidad.valor}/favicon.ico', timeout=8, stream=False)
+        r = _fetch_seguro(f'https://{entidad.value}/favicon.ico', timeout=8, stream=False)
         if r.status_code != 200 or not r.content:
             return
         # standard Shodan/FOFA method: base64 (with line breaks) + mmh3
         h = mmh3.hash(codecs.encode(r.content, 'base64'))
-        entidad.propiedades['favicon_hash'] = h
-        ctx.emitir('hash', str(h), etiqueta='favicon', tipo_hash='favicon')   # pivotable node
+        entidad.properties['favicon_hash'] = h
+        ctx.emitir('hash', str(h), label='favicon', tipo_hash='favicon')   # pivotable node
     except Exception as _e:
         log.debug("favicon_hash unavailable: %s", _e)
 
@@ -2138,35 +2138,35 @@ def _pivote_ips(campos):
 @transform(entrada='hash', salidas=('ip',), nombre='favicon_pivote', requiere_key=True,
            descripcion='Enumerates IPs serving this favicon (FOFA/Shodan) -- without touching the target (F8)')
 def _t_favicon_pivote(entidad, ctx):
-    if entidad.propiedades.get('tipo_hash') != 'favicon':
+    if entidad.properties.get('tipo_hash') != 'favicon':
         return
-    for ip in _pivote_ips({'favicon': entidad.valor}):
-        ctx.emitir('ip', ip, etiqueta='mismo-favicon')
+    for ip in _pivote_ips({'favicon': entidad.value}):
+        ctx.emitir('ip', ip, label='mismo-favicon')
 
 @transform(entrada='dominio', salidas=('subdominio',), nombre='wayback',
            descripcion='Historical snapshot + old subdomains of the domain (Wayback Machine)')
 def _t_wayback(entidad, ctx):
     # 1. is there a snapshot? ('available' endpoint, reliable)
     try:
-        snap = ((SESSION.get(f'http://archive.org/wayback/available?url={entidad.valor}', timeout=8).json()
+        snap = ((SESSION.get(f'http://archive.org/wayback/available?url={entidad.value}', timeout=8).json()
                  .get('archived_snapshots', {}) or {}).get('closest', {}))
         if snap.get('available'):
-            entidad.propiedades['wayback_desde'] = (snap.get('timestamp', '') or '')[:8]
-            entidad.propiedades['wayback_url'] = snap.get('url')
+            entidad.properties['wayback_desde'] = (snap.get('timestamp', '') or '')[:8]
+            entidad.properties['wayback_url'] = snap.get('url')
             entidad.tag('archivado')
     except Exception as _e:
         log.debug("wayback available: %s", _e)
     # 2. historical subdomains (CDX; may be blocked in some environments)
     try:
         filas = SESSION.get('http://web.archive.org/cdx/search/cdx',
-                            params={'url': f'*.{entidad.valor}', 'output': 'json', 'limit': 300,
+                            params={'url': f'*.{entidad.value}', 'output': 'json', 'limit': 300,
                                     'collapse': 'urlkey', 'fl': 'original'}, timeout=15).json()
         vistos = set()
         for fila in (filas[1:] if isinstance(filas, list) else []):
             host = (urlparse(fila[0] if isinstance(fila, list) else fila).hostname or '').lstrip('*.')
-            if host.endswith(entidad.valor) and host != entidad.valor and host not in vistos:
+            if host.endswith(entidad.value) and host != entidad.value and host not in vistos:
                 vistos.add(host)
-                ctx.emitir('subdominio', host, etiqueta='historical (wayback)')
+                ctx.emitir('subdominio', host, label='historical (wayback)')
     except Exception as _e:
         log.debug("wayback cdx: %s", _e)
 
@@ -2174,18 +2174,18 @@ def _t_wayback(entidad, ctx):
            descripcion='Subdomains (+ their IP) via HackerTarget hostsearch (keyless)')
 def _t_subdominios_ht(entidad, ctx):
     try:
-        texto = SESSION.get(f'https://api.hackertarget.com/hostsearch/?q={entidad.valor}', timeout=12).text
+        texto = SESSION.get(f'https://api.hackertarget.com/hostsearch/?q={entidad.value}', timeout=12).text
         if 'API count exceeded' in texto or 'error' in texto.lower():
             return
         for linea in texto.splitlines()[:150]:
             if ',' not in linea:
                 continue
             sub, ip = (x.strip() for x in linea.split(',', 1))
-            if not sub.endswith(entidad.valor) or sub == entidad.valor:
+            if not sub.endswith(entidad.value) or sub == entidad.value:
                 continue
-            sub_ent = ctx.emitir('subdominio', sub, etiqueta='subdominio')
+            sub_ent = ctx.emitir('subdominio', sub, label='subdominio')
             if sub_ent and re.fullmatch(r'\d+\.\d+\.\d+\.\d+', ip):
-                ip_ent = ctx.almacen.create('ip', ip, origenes={'subdominios_ht'})
+                ip_ent = ctx.almacen.create('ip', ip, sources={'subdominios_ht'})
                 ip_ent.note_provenance('subdominios_ht', input_id=sub_ent.id)
                 ctx.almacen.relate(sub_ent, ip_ent, 'A')
     except Exception as _e:
@@ -2195,14 +2195,14 @@ def _t_subdominios_ht(entidad, ctx):
            descripcion='Subdomains from crt.sh (Certificate Transparency)')
 def _t_crtsh(entidad, ctx):
     try:
-        r = SESSION.get(f'https://crt.sh/?q=%.{entidad.valor}&output=json', timeout=12)
+        r = SESSION.get(f'https://crt.sh/?q=%.{entidad.value}&output=json', timeout=12)
         vistos = set()
         for cert in r.json():
             for s in cert.get('name_value', '').split('\n'):
                 s = s.strip().lstrip('*.')
-                if s.endswith(entidad.valor) and s != entidad.valor and s not in vistos:
+                if s.endswith(entidad.value) and s != entidad.value and s not in vistos:
                     vistos.add(s)
-                    ctx.emitir('subdominio', s, etiqueta='subdominio')
+                    ctx.emitir('subdominio', s, label='subdominio')
     except Exception as _e:
         log.debug("crtsh unavailable: %s", _e)
 
@@ -2211,7 +2211,7 @@ def _t_crtsh(entidad, ctx):
 def _t_ct_certspotter(entidad, ctx):
     try:
         data = SESSION.get('https://api.certspotter.com/v1/issuances',
-                           params={'domain': entidad.valor, 'include_subdomains': 'true',
+                           params={'domain': entidad.value, 'include_subdomains': 'true',
                                    'expand': 'dns_names'}, timeout=12).json()
         if not isinstance(data, list):   # rate limit / error -> {message: ...}
             return
@@ -2219,9 +2219,9 @@ def _t_ct_certspotter(entidad, ctx):
         for cert in data:
             for nombre in cert.get('dns_names', []):
                 nombre = nombre.lstrip('*.')
-                if nombre.endswith(entidad.valor) and nombre != entidad.valor and nombre not in vistos:
+                if nombre.endswith(entidad.value) and nombre != entidad.value and nombre not in vistos:
                     vistos.add(nombre)
-                    ctx.emitir('subdominio', nombre, etiqueta='subdominio')
+                    ctx.emitir('subdominio', nombre, label='subdominio')
     except Exception as _e:
         log.debug("certspotter unavailable: %s", _e)
 
@@ -2229,18 +2229,18 @@ def _t_ct_certspotter(entidad, ctx):
            descripcion='Geolocation and network info of the IP (ip-api.com)')
 def _t_geo_ip(entidad, ctx):
     try:
-        r = SESSION.get(f'http://ip-api.com/json/{entidad.valor}'
+        r = SESSION.get(f'http://ip-api.com/json/{entidad.value}'
                         '?fields=status,country,org,isp,as', timeout=8)
         d = r.json()
         if d.get('status') != 'success':
             return
         if d.get('country'):
-            ctx.emitir('pais', d['country'], etiqueta='location')
+            ctx.emitir('pais', d['country'], label='location')
         org = d.get('org') or d.get('isp')
         if org:
-            ctx.emitir('org', org, etiqueta='org')
+            ctx.emitir('org', org, label='org')
         if d.get('as'):
-            ctx.emitir('asn', d['as'], etiqueta='asn')
+            ctx.emitir('asn', d['as'], label='asn')
     except Exception as _e:
         log.debug("geo_ip unavailable: %s", _e)
 
@@ -2249,27 +2249,27 @@ def _t_geo_ip(entidad, ctx):
 def _t_sherlock(entidad, ctx):
     if not _which('sherlock'):
         return
-    out = run_tool(['sherlock', entidad.valor, '--timeout', '5', '--print-found', '--no-color'], timeout=150)
+    out = run_tool(['sherlock', entidad.value, '--timeout', '5', '--print-found', '--no-color'], timeout=150)
     for linea in out.splitlines():
         m = re.match(r'\[\+\]\s*(.+?):\s*(https?://\S+)', linea.strip())
         if m:
-            ctx.emitir('plataforma', m.group(1).strip(), etiqueta='profile', url=m.group(2).strip())
+            ctx.emitir('plataforma', m.group(1).strip(), label='profile', url=m.group(2).strip())
 
 @transform(entrada='usuario', salidas=('email', 'repo'), nombre='github_usuario',
            descripcion='User email and public repos on GitHub')
 def _t_github(entidad, ctx):
     try:
-        gh = SESSION.get(f'https://api.github.com/users/{entidad.valor}', timeout=8).json()
+        gh = SESSION.get(f'https://api.github.com/users/{entidad.value}', timeout=8).json()
         if not gh.get('login'):
             return
         if gh.get('email') and gh['email'] != 'hidden':
-            ctx.emitir('email', gh['email'], etiqueta='github email')
-        repos = SESSION.get(f'https://api.github.com/users/{entidad.valor}/repos'
+            ctx.emitir('email', gh['email'], label='github email')
+        repos = SESSION.get(f'https://api.github.com/users/{entidad.value}/repos'
                             '?per_page=10&sort=updated', timeout=8)
         if repos.status_code == 200:
             for repo in repos.json():
                 if repo.get('name'):
-                    ctx.emitir('repo', repo['name'], etiqueta='repo',
+                    ctx.emitir('repo', repo['name'], label='repo',
                                lenguaje=repo.get('language'), stars=repo.get('stargazers_count'))
     except Exception as _e:
         log.debug("github_usuario unavailable: %s", _e)
@@ -2279,7 +2279,7 @@ def _t_github(entidad, ctx):
 def _t_puertos(entidad, ctx):
     if not _which('nmap'):
         return
-    out = run_tool(['nmap', '-T4', '--top-ports', '20', '-sV', '--open', entidad.valor], timeout=60)
+    out = run_tool(['nmap', '-T4', '--top-ports', '20', '-sV', '--open', entidad.value], timeout=60)
     for linea in out.splitlines():
         if '/tcp' not in linea and '/udp' not in linea:
             continue
@@ -2289,28 +2289,28 @@ def _t_puertos(entidad, ctx):
             continue
         servicio = parts[2] if len(parts) > 2 else '?'
         # the value carries the IP: port 80 of two hosts != the same node
-        ctx.emitir('puerto', f'{entidad.valor}:{num}', etiqueta='open', servicio=servicio)
+        ctx.emitir('puerto', f'{entidad.value}:{num}', label='open', servicio=servicio)
 
 @transform(entrada='dominio', salidas=('dominio',), nombre='dns_mx',
            descripcion='Mail servers of the domain (MX)')
 def _t_dns_mx(entidad, ctx):
-    out = run_tool(['dig', entidad.valor, 'MX', '+short'], timeout=10)
+    out = run_tool(['dig', entidad.value, 'MX', '+short'], timeout=10)
     for linea in out.splitlines():
         linea = linea.strip().rstrip('.')
         if not linea:
             continue
         host = linea.split()[-1]   # "10 mail.example.com" -> "mail.example.com"
         if host:
-            ctx.emitir('dominio', host, etiqueta='MX')
+            ctx.emitir('dominio', host, label='MX')
 
 @transform(entrada='dominio', salidas=('dominio',), nombre='dns_ns',
            descripcion='Name servers of the domain (NS)')
 def _t_dns_ns(entidad, ctx):
-    out = run_tool(['dig', entidad.valor, 'NS', '+short'], timeout=10)
+    out = run_tool(['dig', entidad.value, 'NS', '+short'], timeout=10)
     for linea in out.splitlines():
         host = linea.strip().rstrip('.')
         if host:
-            ctx.emitir('dominio', host, etiqueta='NS')
+            ctx.emitir('dominio', host, label='NS')
 
 @transform(entrada='email', salidas=('org',), nombre='email_breaches',
            descripcion='Breaches the email appeared in (HIBP; requires a real HIBP_API_KEY)')
@@ -2318,14 +2318,14 @@ def _t_email_breaches(entidad, ctx):
     try:
         hibp_key = _key_rotativa('hibp') or os.environ.get('HIBP_API_KEY', '')
         r = SESSION.get(
-            f'https://haveibeenpwned.com/api/v3/breachedaccount/{requests.utils.quote(entidad.valor)}',
+            f'https://haveibeenpwned.com/api/v3/breachedaccount/{requests.utils.quote(entidad.value)}',
             timeout=8,
             headers={'hibp-api-key': hibp_key, 'User-Agent': 'OBSIDIAN-OSINT'})
         if r.status_code == 200:
             for b in r.json():
                 nombre = b.get('Name')
                 if nombre:
-                    ctx.emitir('org', nombre, etiqueta='leaked in')
+                    ctx.emitir('org', nombre, label='leaked in')
             entidad.tag('filtrado')
     except Exception as _e:
         log.debug("hibp unavailable: %s", _e)
@@ -2339,12 +2339,12 @@ def _pastes_github(entidad):
         return
     try:
         d = SESSION.get('https://api.github.com/search/code',
-                        params={'q': f'"{entidad.valor}" (password OR secret OR api_key OR token)', 'per_page': 10},
+                        params={'q': f'"{entidad.value}" (password OR secret OR api_key OR token)', 'per_page': 10},
                         headers={'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json'},
                         timeout=12).json()
         n = d.get('total_count')
         if n:
-            entidad.propiedades['github_menciones'] = n
+            entidad.properties['github_menciones'] = n
             entidad.tag('mencionado-github')
     except Exception as _e:
         log.debug("pastes_github unavailable: %s", _e)
@@ -2363,7 +2363,7 @@ def _t_pastes_github_email(entidad, ctx):
            descripcion='Breaches the email appeared in (XposedOrNot, keyless)')
 def _t_breaches_xon(entidad, ctx):
     try:
-        r = SESSION.get(f'https://api.xposedornot.com/v1/check-email/{requests.utils.quote(entidad.valor)}',
+        r = SESSION.get(f'https://api.xposedornot.com/v1/check-email/{requests.utils.quote(entidad.value)}',
                         timeout=10)
         if r.status_code != 200:
             return
@@ -2371,7 +2371,7 @@ def _t_breaches_xon(entidad, ctx):
         lista = breaches[0] if breaches and isinstance(breaches[0], list) else breaches
         for nombre in (lista or [])[:30]:
             if nombre:
-                ctx.emitir('org', str(nombre), etiqueta='leaked in')
+                ctx.emitir('org', str(nombre), label='leaked in')
         if lista:
             entidad.tag('filtrado')
     except Exception as _e:
@@ -2382,18 +2382,18 @@ def _t_breaches_xon(entidad, ctx):
 def _t_stealer(entidad, ctx):
     try:
         r = SESSION.get('https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email',
-                        params={'email': entidad.valor}, timeout=10)
+                        params={'email': entidad.value}, timeout=10)
         msg = (r.json() or {}).get('message', '')
         if 'infected by an info-stealer' in msg:
             entidad.tag('stealer-infectado')
-            entidad.propiedades['stealer'] = 'yes (HudsonRock)'
+            entidad.properties['stealer'] = 'yes (HudsonRock)'
     except Exception as _e:
         log.debug("hudsonrock unavailable: %s", _e)
 
 @transform(entrada='email', salidas=('org',), nombre='breaches',
            descripcion='Breach aggregator: XposedOrNot + LeakCheck (keyless) + HIBP (if key), unified (F10 step 135)')
 def _t_breaches(entidad, ctx):
-    email = entidad.valor
+    email = entidad.value
     fuentes = set()
     try:                                             # XposedOrNot (keyless)
         d = SESSION.get(f'https://api.xposedornot.com/v1/check-email/{email}', timeout=10).json() or {}
@@ -2422,9 +2422,9 @@ def _t_breaches(entidad, ctx):
             log.debug("breaches hibp: %s", _e)
     if fuentes:
         entidad.tag('filtrado')
-        entidad.propiedades['brechas'] = sorted(fuentes)
+        entidad.properties['brechas'] = sorted(fuentes)
         for f in sorted(fuentes)[:30]:
-            ctx.emitir('org', f, etiqueta='breach')
+            ctx.emitir('org', f, label='breach')
 
 @transform(entrada='email', salidas=('url',), nombre='intelx', requiere_key=True,
            descripcion='Historical leak search by selector (Intelligence X, key in vault) (F10 step 134)')
@@ -2435,7 +2435,7 @@ def _t_intelx(entidad, ctx):
     try:
         sid = (SESSION.post('https://2.intelx.io/intelligent/search',
                             headers={'x-key': key, 'Content-Type': 'application/json'},
-                            json={'term': entidad.valor, 'maxresults': 20, 'media': 0,
+                            json={'term': entidad.value, 'maxresults': 20, 'media': 0,
                                   'sort': 2, 'terminate': []}, timeout=12).json() or {}).get('id')
         if not sid:
             return
@@ -2445,7 +2445,7 @@ def _t_intelx(entidad, ctx):
         for rec in recs[:20]:
             sysid = rec.get('systemid')
             if sysid:
-                ctx.emitir('url', f'https://intelx.io/?did={sysid}', etiqueta='intelx',
+                ctx.emitir('url', f'https://intelx.io/?did={sysid}', label='intelx',
                            nombre=(rec.get('name') or '')[:120], bucket=rec.get('bucket', ''))
     except Exception as _e:
         log.debug("intelx unavailable: %s", _e)
@@ -2454,25 +2454,25 @@ def _t_intelx(entidad, ctx):
            descripcion='Paste monitoring: psbdmp + dorks to Pastebin/Ghostbin/etc (keyless) (F10 step 133)')
 def _t_pastes(entidad, ctx):
     from urllib.parse import quote as _q
-    q = entidad.valor
+    q = entidad.value
     try:
         d = SESSION.get(f'https://psbdmp.ws/api/v3/search/{_q(q)}', timeout=8).json() or {}
         for p in (d.get('data') or [])[:10]:
             pid = p.get('id')
             if pid:
-                ctx.emitir('url', f'https://pastebin.com/{pid}', etiqueta='paste', fuente='psbdmp')
+                ctx.emitir('url', f'https://pastebin.com/{pid}', label='paste', fuente='psbdmp')
     except Exception as _e:
         log.debug("psbdmp unavailable: %s", _e)
     for sitio in ('pastebin.com', 'ghostbin.com', 'rentry.co', 'justpaste.it'):
         ctx.emitir('url', f'https://www.google.com/search?q={_q(f"{q} site:{sitio}")}',
-                   etiqueta=f'paste-dork:{sitio}', sitio=sitio)
+                   label=f'paste-dork:{sitio}', sitio=sitio)
 
 @transform(entrada='dominio', salidas=(), nombre='stealer_dominio',
            descripcion='Domain exposure in stealer logs (infected employees/users, HudsonRock keyless) (F10 step 132)')
 def _t_stealer_dominio(entidad, ctx):
     try:
         d = SESSION.get('https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-domain',
-                        params={'domain': entidad.valor}, timeout=10).json() or {}
+                        params={'domain': entidad.value}, timeout=10).json() or {}
         data = d.get('data', d) or {}
         emp = data.get('employees') or data.get('total_employees') or 0
         usr = data.get('users') or data.get('total_users') or 0
@@ -2481,8 +2481,8 @@ def _t_stealer_dominio(entidad, ctx):
         if isinstance(usr, dict):
             usr = usr.get('total', 0)
         if emp or usr:
-            entidad.propiedades['stealer_empleados'] = emp
-            entidad.propiedades['stealer_usuarios'] = usr
+            entidad.properties['stealer_empleados'] = emp
+            entidad.properties['stealer_usuarios'] = usr
             entidad.tag('stealer-expuesto')
     except Exception as _e:
         log.debug("stealer_dominio unavailable: %s", _e)
@@ -2490,19 +2490,19 @@ def _t_stealer_dominio(entidad, ctx):
 @transform(entrada='email', salidas=(), nombre='email_spoofable',
            descripcion='Checks the SPF of the email domain (spoofing risk)')
 def _t_email_spoofable(entidad, ctx):
-    dominio = entidad.valor.split('@')[-1]
+    dominio = entidad.value.split('@')[-1]
     if not dominio:
         return
     txt = run_tool(['dig', dominio, 'TXT', '+short'], timeout=10)
     tiene_spf = 'v=spf1' in txt.lower()
-    entidad.propiedades['spf'] = 'configured' if tiene_spf else 'NOT CONFIGURED'
+    entidad.properties['spf'] = 'configured' if tiene_spf else 'NOT CONFIGURED'
     if not tiene_spf:
         entidad.tag('spoofable')
 
 def _screenshot(entidad):
     """Web capture with a headless browser (step 68). Does not capture internal
     hosts (_url_publica). Saves the PNG in static and leaves the URL as a prop."""
-    if not _url_publica('https://' + entidad.valor):
+    if not _url_publica('https://' + entidad.value):
         return
     try:
         from playwright.sync_api import sync_playwright
@@ -2511,15 +2511,15 @@ def _screenshot(entidad):
         return
     shots = os.path.join(STATIC_DIR, 'screenshots')
     os.makedirs(shots, exist_ok=True)
-    archivo = hashlib.md5(entidad.valor.encode()).hexdigest()[:12] + '.png'
+    archivo = hashlib.md5(entidad.value.encode()).hexdigest()[:12] + '.png'
     try:
         with sync_playwright() as p:
             navegador = p.chromium.launch(headless=True)
             pagina = navegador.new_page(viewport={'width': 1280, 'height': 800})
-            pagina.goto('https://' + entidad.valor, timeout=15000, wait_until='domcontentloaded')
+            pagina.goto('https://' + entidad.value, timeout=15000, wait_until='domcontentloaded')
             pagina.screenshot(path=os.path.join(shots, archivo))
             navegador.close()
-        entidad.propiedades['screenshot'] = '/static/screenshots/' + archivo
+        entidad.properties['screenshot'] = '/static/screenshots/' + archivo
         entidad.tag('con-screenshot')
     except Exception as _e:
         log.debug("screenshot failed: %s", _e)
@@ -2537,9 +2537,9 @@ def _t_screenshot_sub(entidad, ctx):
 def _nuclei(entidad):
     """Vulnerability scan with nuclei templates (step 69). Public hosts only.
     Runs via run_tool (argv, no shell); medium+ severity so it does not drag on."""
-    if not _which('nuclei') or not _url_publica('https://' + entidad.valor):
+    if not _which('nuclei') or not _url_publica('https://' + entidad.value):
         return
-    out = run_tool(['nuclei', '-u', 'https://' + entidad.valor, '-jsonl', '-silent',
+    out = run_tool(['nuclei', '-u', 'https://' + entidad.value, '-jsonl', '-silent',
                     '-severity', 'medium,high,critical', '-timeout', '5'], timeout=150)
     hallados = []
     for linea in out.splitlines():
@@ -2552,7 +2552,7 @@ def _nuclei(entidad):
         if info.get('severity') in ('high', 'critical'):
             entidad.tag('vulnerable')
     if hallados:
-        entidad.propiedades['nuclei'] = hallados[:20]
+        entidad.properties['nuclei'] = hallados[:20]
 
 @transform(entrada='dominio', salidas=(), nombre='nuclei',
            descripcion='Template-based vulnerability scan (nuclei)')
@@ -2568,26 +2568,26 @@ def _http_probe(entidad):
     """Probes a host over HTTP and enriches the entity. Uses _fetch_seguro:
     does not probe internal IPs (SSRF) and revalidates redirects."""
     try:
-        r = _fetch_seguro(entidad.valor, timeout=8, stream=False)
+        r = _fetch_seguro(entidad.value, timeout=8, stream=False)
     except Exception:
         return
-    entidad.propiedades['http_status'] = r.status_code
-    entidad.propiedades['http_server'] = r.headers.get('Server', '?')
+    entidad.properties['http_status'] = r.status_code
+    entidad.properties['http_server'] = r.headers.get('Server', '?')
     powered = r.headers.get('X-Powered-By')
     if powered:
-        entidad.propiedades['http_tech'] = powered
+        entidad.properties['http_tech'] = powered
     try:
         m = re.search(r'<title[^>]*>(.*?)</title>', r.text[:8000], re.I | re.S)
         if m:
-            entidad.propiedades['http_title'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
+            entidad.properties['http_title'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
     except Exception:
         pass
-    if str(r.url).rstrip('/') not in (f'https://{entidad.valor}', f'http://{entidad.valor}'):
-        entidad.propiedades['http_redirect'] = str(r.url)
+    if str(r.url).rstrip('/') not in (f'https://{entidad.value}', f'http://{entidad.value}'):
+        entidad.properties['http_redirect'] = str(r.url)
     entidad.tag('http-vivo')
     # login/admin panel detection (step 56)
     cuerpo = (r.text[:8000] or '').lower()
-    titulo = (entidad.propiedades.get('http_title', '') or '').lower()
+    titulo = (entidad.properties.get('http_title', '') or '').lower()
     señales = ('login', 'log in', 'sign in', 'iniciar sesión', 'admin', 'dashboard',
                'wp-admin', 'phpmyadmin', 'authentication', 'panel')
     if (any(s in titulo for s in señales)
@@ -2598,7 +2598,7 @@ def _tech_detect(entidad):
     """Lightweight technology fingerprint from the HTTP response (server,
     powered-by, meta generator, common hints). Not Wappalyzer, but it works."""
     try:
-        r = _fetch_seguro(entidad.valor, timeout=8, stream=False)
+        r = _fetch_seguro(entidad.value, timeout=8, stream=False)
     except Exception:
         return set()
     techs = set()
@@ -2623,18 +2623,18 @@ def _tech_detect(entidad):
            descripcion='Technologies the site uses (HTTP fingerprint)')
 def _t_tech_dom(entidad, ctx):
     for t in _tech_detect(entidad):
-        ctx.emitir('tech', t, etiqueta='uses')
+        ctx.emitir('tech', t, label='uses')
 
 @transform(entrada='subdominio', salidas=('tech',), nombre='tech_sub',
            descripcion='Subdomain technologies (HTTP fingerprint)')
 def _t_tech_sub(entidad, ctx):
     for t in _tech_detect(entidad):
-        ctx.emitir('tech', t, etiqueta='uses')
+        ctx.emitir('tech', t, label='uses')
 
 @transform(entrada='tech', salidas=('cve',), nombre='cve_lookup',
            descripcion='Critical CVEs associated with the technology (NVD). NO version -> verify applicability')
 def _t_cve_lookup(entidad, ctx):
-    kw = entidad.valor
+    kw = entidad.value
     try:
         d = SESSION.get('https://services.nvd.nist.gov/rest/json/cves/2.0',
                         params={'keywordSearch': kw, 'cvssV3Severity': 'CRITICAL', 'resultsPerPage': 8},
@@ -2651,7 +2651,7 @@ def _t_cve_lookup(entidad, ctx):
         # product), not just mentioned in passing in the description.
         cpes = json.dumps(cve.get('configurations', [])).lower()
         if f':{kw.lower()}:' in cpes:
-            e = ctx.emitir('cve', cid, etiqueta='critical CVE')
+            e = ctx.emitir('cve', cid, label='critical CVE')
             if e:
                 e.tag('sin-verificar-version')
 
@@ -2673,11 +2673,11 @@ def _t_reverse_whois(entidad, ctx):
         return
     try:
         d = SESSION.get('https://api.viewdns.info/reversewhois/',
-                        params={'q': entidad.valor, 'apikey': key, 'output': 'json'}, timeout=12).json()
+                        params={'q': entidad.value, 'apikey': key, 'output': 'json'}, timeout=12).json()
         for reg in (d.get('response', {}) or {}).get('matches', [])[:50]:
             dom = reg.get('domain')
-            if dom and dom != entidad.valor:
-                ctx.emitir('dominio', dom, etiqueta='same registrant')
+            if dom and dom != entidad.value:
+                ctx.emitir('dominio', dom, label='same registrant')
     except Exception as _e:
         log.debug("reverse_whois unavailable: %s", _e)
 
@@ -2685,7 +2685,7 @@ def _t_reverse_whois(entidad, ctx):
            descripcion='Modern WHOIS (RDAP, no key): registrar, name servers, dates')
 def _t_rdap(entidad, ctx):
     try:
-        r = SESSION.get(f'https://rdap.org/domain/{entidad.valor}', timeout=12,
+        r = SESSION.get(f'https://rdap.org/domain/{entidad.value}', timeout=12,
                         headers={'Accept': 'application/rdap+json'})
         if r.status_code != 200:
             return
@@ -2698,17 +2698,17 @@ def _t_rdap(entidad, ctx):
                         if campo and campo[0] == 'fn':
                             nombre = campo[3]
                 if nombre:
-                    ctx.emitir('org', nombre, etiqueta='registrar')
+                    ctx.emitir('org', nombre, label='registrar')
         for ns in d.get('nameservers', []):
             if ns.get('ldhName'):
-                ctx.emitir('dominio', ns['ldhName'], etiqueta='NS')
+                ctx.emitir('dominio', ns['ldhName'], label='NS')
         fechas = {e.get('eventAction'): (e.get('eventDate') or '')[:10] for e in d.get('events', [])}
         if fechas.get('registration'):
-            entidad.propiedades['creado'] = fechas['registration']
+            entidad.properties['creado'] = fechas['registration']
         if fechas.get('expiration'):
-            entidad.propiedades['expira'] = fechas['expiration']
+            entidad.properties['expira'] = fechas['expiration']
         if d.get('status'):
-            entidad.propiedades['status'] = d['status']
+            entidad.properties['status'] = d['status']
     except Exception as _e:
         log.debug("rdap unavailable: %s", _e)
 
@@ -2716,7 +2716,7 @@ def _t_rdap(entidad, ctx):
            descripcion='IP reputation: proxy/VPN, hosting/datacenter, mobile (ip-api, keyless)')
 def _t_reputacion_ip(entidad, ctx):
     try:
-        d = SESSION.get(f'http://ip-api.com/json/{entidad.valor}?fields=status,proxy,hosting,mobile',
+        d = SESSION.get(f'http://ip-api.com/json/{entidad.value}?fields=status,proxy,hosting,mobile',
                         timeout=8).json()
         if d.get('status') != 'success':
             return
@@ -2726,8 +2726,8 @@ def _t_reputacion_ip(entidad, ctx):
             entidad.tag('hosting')
         if d.get('mobile'):
             entidad.tag('movil')
-        entidad.propiedades['proxy'] = bool(d.get('proxy'))
-        entidad.propiedades['hosting'] = bool(d.get('hosting'))
+        entidad.properties['proxy'] = bool(d.get('proxy'))
+        entidad.properties['hosting'] = bool(d.get('hosting'))
     except Exception as _e:
         log.debug("reputacion_ip unavailable: %s", _e)
 
@@ -2739,12 +2739,12 @@ def _t_abuseipdb(entidad, ctx):
         return
     try:
         r = SESSION.get('https://api.abuseipdb.com/api/v2/check',
-                        params={'ipAddress': entidad.valor, 'maxAgeInDays': 90},
+                        params={'ipAddress': entidad.value, 'maxAgeInDays': 90},
                         headers={'Key': key, 'Accept': 'application/json'}, timeout=8)
         d = (r.json() or {}).get('data', {}) or {}
         score = d.get('abuseConfidenceScore')
         if score is not None:
-            entidad.propiedades['abuse_score'] = score
+            entidad.properties['abuse_score'] = score
             if score >= 50:
                 entidad.tag('abusiva')
     except Exception as _e:
@@ -2758,21 +2758,21 @@ def _t_shodan(entidad, ctx):
     if not key:
         return
     try:
-        r = SESSION.get(f'https://api.shodan.io/shodan/host/{entidad.valor}',
+        r = SESSION.get(f'https://api.shodan.io/shodan/host/{entidad.value}',
                         params={'key': key}, timeout=12)
         d = r.json() or {}
         if d.get('org'):
-            ctx.emitir('org', d['org'], etiqueta='org')
+            ctx.emitir('org', d['org'], label='org')
         vistos_prod = set()
         for serv in d.get('data', []):
             port = serv.get('port')
             if port:
-                ctx.emitir('puerto', f'{entidad.valor}:{port}', etiqueta='shodan',
+                ctx.emitir('puerto', f'{entidad.value}:{port}', label='shodan',
                            servicio=serv.get('_shodan', {}).get('module') or serv.get('product', ''))
             prod = serv.get('product')
             if prod and prod not in vistos_prod:
                 vistos_prod.add(prod)
-                ctx.emitir('tech', prod, etiqueta='shodan')
+                ctx.emitir('tech', prod, label='shodan')
     except Exception as _e:
         log.debug("shodan unavailable: %s", _e)
 
@@ -2785,24 +2785,24 @@ def _t_censys(entidad, ctx):
         return
     cid, secret = cred.split(':', 1)
     try:
-        r = SESSION.get(f'https://search.censys.io/api/v2/hosts/{entidad.valor}',
+        r = SESSION.get(f'https://search.censys.io/api/v2/hosts/{entidad.value}',
                         auth=(cid, secret), timeout=12)
         res = (r.json() or {}).get('result', {}) or {}
         aut = res.get('autonomous_system', {}) or {}
         if aut.get('name'):
-            ctx.emitir('org', aut['name'], etiqueta='censys')
+            ctx.emitir('org', aut['name'], label='censys')
         if aut.get('asn'):
-            ctx.emitir('asn', f"AS{aut['asn']}", etiqueta='censys')
+            ctx.emitir('asn', f"AS{aut['asn']}", label='censys')
         vistos = set()
         for s in res.get('services', []):
             p = s.get('port')
             if p:
-                ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='censys',
+                ctx.emitir('puerto', f"{entidad.value}:{p}", label='censys',
                            servicio=s.get('service_name', ''))
             prod = s.get('service_name')
             if prod and prod not in vistos:
                 vistos.add(prod)
-                ctx.emitir('tech', prod, etiqueta='censys')
+                ctx.emitir('tech', prod, label='censys')
     except Exception as _e:
         log.debug("censys unavailable: %s", _e)
 
@@ -2815,17 +2815,17 @@ def _t_zoomeye(entidad, ctx):
         return
     try:
         r = SESSION.get('https://api.zoomeye.org/host/search',
-                        params={'query': _motor_query('zoomeye', {'ip': entidad.valor})},
+                        params={'query': _motor_query('zoomeye', {'ip': entidad.value})},
                         headers={'API-KEY': key}, timeout=12)
         for m in (r.json() or {}).get('matches', []):
             pi = m.get('portinfo', {}) or {}
             p = pi.get('port') or m.get('port')
             if p:
-                ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='zoomeye',
+                ctx.emitir('puerto', f"{entidad.value}:{p}", label='zoomeye',
                            servicio=pi.get('service', ''))
             app = pi.get('app')
             if app:
-                ctx.emitir('tech', app, etiqueta='zoomeye')
+                ctx.emitir('tech', app, label='zoomeye')
     except Exception as _e:
         log.debug("zoomeye unavailable: %s", _e)
 
@@ -2837,7 +2837,7 @@ def _t_fofa(entidad, ctx):
     if not cred or ':' not in cred:
         return
     email, key = cred.split(':', 1)
-    q = _motor_query('fofa', {'ip': entidad.valor})
+    q = _motor_query('fofa', {'ip': entidad.value})
     qb = base64.b64encode(q.encode()).decode()
     try:
         r = SESSION.get('https://fofa.info/api/v1/search/all',
@@ -2850,9 +2850,9 @@ def _t_fofa(entidad, ctx):
             port = row[1] if len(row) > 1 else None
             dom = row[2] if len(row) > 2 else None
             if port:
-                ctx.emitir('puerto', f"{entidad.valor}:{port}", etiqueta='fofa')
+                ctx.emitir('puerto', f"{entidad.value}:{port}", label='fofa')
             if dom:
-                ctx.emitir('dominio', dom, etiqueta='fofa')
+                ctx.emitir('dominio', dom, label='fofa')
     except Exception as _e:
         log.debug("fofa unavailable: %s", _e)
 
@@ -2866,15 +2866,15 @@ def _t_quake(entidad, ctx):
     try:
         r = SESSION.post('https://quake.360.net/api/v3/search/quake_service',
                          headers={'X-QuakeToken': key, 'Content-Type': 'application/json'},
-                         json={'query': _motor_query('quake', {'ip': entidad.valor}), 'size': 50},
+                         json={'query': _motor_query('quake', {'ip': entidad.value}), 'size': 50},
                          timeout=12)
         for m in (r.json() or {}).get('data', []):
             p = m.get('port')
             nombre = (m.get('service', {}) or {}).get('name')
             if p:
-                ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='quake', servicio=nombre or '')
+                ctx.emitir('puerto', f"{entidad.value}:{p}", label='quake', servicio=nombre or '')
             if nombre:
-                ctx.emitir('tech', nombre, etiqueta='quake')
+                ctx.emitir('tech', nombre, label='quake')
     except Exception as _e:
         log.debug("quake unavailable: %s", _e)
 
@@ -2885,16 +2885,16 @@ def _t_hunter(entidad, ctx):
     key = _key_rotativa('hunter') or os.environ.get('HUNTER_KEY', '')
     if not key:
         return
-    q = base64.urlsafe_b64encode(_motor_query('hunter', {'ip': entidad.valor}).encode()).decode()
+    q = base64.urlsafe_b64encode(_motor_query('hunter', {'ip': entidad.value}).encode()).decode()
     try:
         r = SESSION.get('https://api.hunter.how/search',
                         params={'api-key': key, 'query': q, 'page': 1, 'page_size': 20}, timeout=12)
         for m in ((r.json() or {}).get('data', {}) or {}).get('list', []):
             p, dom = m.get('port'), m.get('domain')
             if p:
-                ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='hunter')
+                ctx.emitir('puerto', f"{entidad.value}:{p}", label='hunter')
             if dom:
-                ctx.emitir('dominio', dom, etiqueta='hunter')
+                ctx.emitir('dominio', dom, label='hunter')
     except Exception as _e:
         log.debug("hunter unavailable: %s", _e)
 
@@ -2907,12 +2907,12 @@ def _t_netlas(entidad, ctx):
         return
     try:
         r = SESSION.get('https://app.netlas.io/api/responses/',
-                        params={'q': _motor_query('netlas', {'ip': entidad.valor})},
+                        params={'q': _motor_query('netlas', {'ip': entidad.value})},
                         headers={'X-API-Key': key}, timeout=12)
         for it in (r.json() or {}).get('items', []):
             p = (it.get('data', {}) or {}).get('port')
             if p:
-                ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='netlas')
+                ctx.emitir('puerto', f"{entidad.value}:{p}", label='netlas')
     except Exception as _e:
         log.debug("netlas unavailable: %s", _e)
 
@@ -2925,11 +2925,11 @@ def _t_criminalip(entidad, ctx):
         return
     try:
         r = SESSION.get('https://api.criminalip.io/v1/asset/ip/report',
-                        params={'ip': entidad.valor}, headers={'x-api-key': key}, timeout=12)
+                        params={'ip': entidad.value}, headers={'x-api-key': key}, timeout=12)
         for p in ((r.json() or {}).get('port', {}) or {}).get('data', []) or []:
             num = p.get('open_port_no') or p.get('port')
             if num:
-                ctx.emitir('puerto', f"{entidad.valor}:{num}", etiqueta='criminalip',
+                ctx.emitir('puerto', f"{entidad.value}:{num}", label='criminalip',
                            servicio=p.get('app_name', ''))
     except Exception as _e:
         log.debug("criminalip unavailable: %s", _e)
@@ -2942,32 +2942,32 @@ def _t_binaryedge(entidad, ctx):
     if not key:
         return
     try:
-        r = SESSION.get(f'https://api.binaryedge.io/v2/query/ip/{entidad.valor}',
+        r = SESSION.get(f'https://api.binaryedge.io/v2/query/ip/{entidad.value}',
                         headers={'X-Key': key}, timeout=12)
         for ev in (r.json() or {}).get('events', []):
             p = ev.get('port')
             if p:
-                ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='binaryedge')
+                ctx.emitir('puerto', f"{entidad.value}:{p}", label='binaryedge')
     except Exception as _e:
         log.debug("binaryedge unavailable: %s", _e)
 
 @transform(entrada='url', salidas=('url',), nombre='reverse_image',
            descripcion='Reverse image search in Yandex/Google/TinEye/Bing (F9, keyless)')
 def _t_reverse_image(entidad, ctx):
-    for motor, enlace in enlaces_reverse(entidad.valor).items():
-        ctx.emitir('url', enlace, etiqueta=f'reverse:{motor}', motor=motor)
+    for motor, enlace in enlaces_reverse(entidad.value).items():
+        ctx.emitir('url', enlace, label=f'reverse:{motor}', motor=motor)
 
 @transform(entrada='url', salidas=('url',), nombre='busqueda_facial',
            descripcion='Facial recognition: Yandex (by URL) + FaceCheck/PimEyes (manual upload) (F9)')
 def _t_busqueda_facial(entidad, ctx):
-    for motor, info in enlaces_facial(entidad.valor).items():
-        ctx.emitir('url', info['url'], etiqueta=f'facial:{motor}', motor=motor, modo=info['modo'])
+    for motor, info in enlaces_facial(entidad.value).items():
+        ctx.emitir('url', info['url'], label=f'facial:{motor}', motor=motor, modo=info['modo'])
 
 @transform(entrada='telefono', salidas=('url', 'pais'), nombre='telefono_dorks',
            descripcion='Phone search dorks (Truecaller/messaging) + carrier if key (F2 step 33)')
 def _t_telefono_dorks(entidad, ctx):
     from urllib.parse import quote as _q
-    num = entidad.valor
+    num = entidad.value
     limpio = re.sub(r'[^\d+]', '', num)
     dorks = {
         'truecaller': f'{num} site:truecaller.com',
@@ -2976,7 +2976,7 @@ def _t_telefono_dorks(entidad, ctx):
         'general': limpio,
     }
     for nombre, q in dorks.items():
-        ctx.emitir('url', f'https://www.google.com/search?q={_q(q)}', etiqueta=f'dork:{nombre}', dork=nombre)
+        ctx.emitir('url', f'https://www.google.com/search?q={_q(q)}', label=f'dork:{nombre}', dork=nombre)
     key = _key_rotativa('numverify') or os.environ.get('NUMVERIFY_KEY', '')
     if key:
         try:
@@ -2984,17 +2984,17 @@ def _t_telefono_dorks(entidad, ctx):
                             params={'access_key': key, 'number': limpio}, timeout=8)
             d = r.json() or {}
             if d.get('valid'):
-                entidad.propiedades['carrier'] = d.get('carrier', '')
-                entidad.propiedades['tipo_linea'] = d.get('line_type', '')
+                entidad.properties['carrier'] = d.get('carrier', '')
+                entidad.properties['tipo_linea'] = d.get('line_type', '')
                 if d.get('country_name'):
-                    ctx.emitir('pais', d['country_name'], etiqueta='country')
+                    ctx.emitir('pais', d['country_name'], label='country')
         except Exception as _e:
             log.debug("numverify unavailable: %s", _e)
 
 @transform(entrada='dominio', salidas=('dominio',), nombre='typosquatting',
            descripcion='Typosquat variants of the domain that ARE registered (F2 step 34)')
 def _t_typosquatting(entidad, ctx):
-    dom = entidad.valor
+    dom = entidad.value
     nombre, ext = dom.rsplit('.', 1) if '.' in dom else (dom, 'com')
     variantes = set()
     subs = {'a': '4', 'e': '3', 'i': '1', 'o': '0', 's': '5', 'l': '1'}
@@ -3024,14 +3024,14 @@ def _t_typosquatting(entidad, ctx):
     for t in ths:
         t.join(timeout=12)
     for v, ip in registrados.items():
-        d = ctx.emitir('dominio', v, etiqueta='typosquat', resuelve=ip)
+        d = ctx.emitir('dominio', v, label='typosquat', resuelve=ip)
         if d:
             d.tag('typosquat')
 
 @transform(entrada='org', salidas=('bucket',), nombre='buckets',
            descripcion='Public S3/GCS/Azure buckets by organization name (F2 step 34)')
 def _t_buckets(entidad, ctx):
-    base = re.sub(r'[^a-z0-9-]', '', entidad.valor.lower().replace(' ', '-').replace('_', '-'))
+    base = re.sub(r'[^a-z0-9-]', '', entidad.value.lower().replace(' ', '-').replace('_', '-'))
     if not base:
         return
     variantes = [base, f'{base}-backup', f'{base}-dev', f'{base}-prod', f'{base}-staging',
@@ -3055,7 +3055,7 @@ def _t_buckets(entidad, ctx):
     for t in ths:
         t.join(timeout=15)
     for bucket, info in hallados.items():
-        b = ctx.emitir('bucket', bucket, etiqueta='bucket', url=info['url'], publico=info['publico'])
+        b = ctx.emitir('bucket', bucket, label='bucket', url=info['url'], publico=info['publico'])
         if b and info['publico']:
             b.tag('publico')
 
@@ -3070,7 +3070,7 @@ _TAKEOVER_FP = {
 @transform(entrada='dominio', salidas=('subdominio',), nombre='takeover',
            descripcion='Orphaned subdomains vulnerable to takeover (CNAME to abandoned service) (F2 step 34)')
 def _t_takeover(entidad, ctx):
-    dom = entidad.valor
+    dom = entidad.value
     try:
         r = SESSION.get(f'https://crt.sh/?q=%.{dom}&output=json', timeout=12)
         subs = {s.strip().lstrip('*.') for cert in r.json()
@@ -3100,7 +3100,7 @@ def _t_takeover(entidad, ctx):
     for t in ths:
         t.join(timeout=20)
     for sub, info in vulnerables.items():
-        s = ctx.emitir('subdominio', sub, etiqueta='takeover',
+        s = ctx.emitir('subdominio', sub, label='takeover',
                        servicio=info['servicio'], cname=info['cname'], estado=info['estado'])
         if s:
             s.tag('takeover')          # triggers the r_takeover rule (F4/55)
@@ -3112,7 +3112,7 @@ def _t_passivedns(entidad, ctx):
     if not key:
         return
     try:
-        r = SESSION.get(f'https://www.virustotal.com/api/v3/domains/{entidad.valor}/resolutions',
+        r = SESSION.get(f'https://www.virustotal.com/api/v3/domains/{entidad.value}/resolutions',
                         headers={'x-apikey': key}, params={'limit': 20}, timeout=12)
         for item in (r.json() or {}).get('data', []):
             attr = item.get('attributes', {}) or {}
@@ -3121,7 +3121,7 @@ def _t_passivedns(entidad, ctx):
                 fecha = attr.get('date')
                 visto = (datetime.datetime.fromtimestamp(fecha, datetime.timezone.utc)
                          .strftime('%Y-%m-%d')) if fecha else ''
-                ctx.emitir('ip', ip, etiqueta='pdns-historical', visto=visto)
+                ctx.emitir('ip', ip, label='pdns-historical', visto=visto)
     except Exception as _e:
         log.debug("passivedns unavailable: %s", _e)
 
@@ -3137,7 +3137,7 @@ _SECRET_PATTERNS = [
 @transform(entrada='usuario', salidas=('credencial', 'repo'), nombre='github_sec',
            descripcion='Hardcoded secrets in commits of the user public repos (F4 step 60)')
 def _t_github_sec(entidad, ctx):
-    user = entidad.valor
+    user = entidad.value
     tok = _key_rotativa('github') or os.environ.get('GITHUB_TOKEN', '')
     hdr = {'Authorization': f'token {tok}'} if tok else {}
     try:
@@ -3150,7 +3150,7 @@ def _t_github_sec(entidad, ctx):
         for repo in repos[:10]:
             full = repo.get('full_name', '')
             if full:
-                ctx.emitir('repo', full, etiqueta='repo')
+                ctx.emitir('repo', full, label='repo')
             cr = SESSION.get(f'https://api.github.com/repos/{full}/commits?per_page=5', headers=hdr, timeout=8)
             if cr.status_code != 200:
                 continue
@@ -3164,7 +3164,7 @@ def _t_github_sec(entidad, ctx):
                     for nombre_pat, patron in _SECRET_PATTERNS:
                         for m in re.findall(patron, patch, re.IGNORECASE):
                             val = (m if isinstance(m, str) else ':'.join(x for x in m if x)) or nombre_pat
-                            c = ctx.emitir('credencial', val[:60], etiqueta='secret',
+                            c = ctx.emitir('credencial', val[:60], label='secret',
                                            tipo_secreto=nombre_pat, repo=full,
                                            commit=sha[:8], archivo=f.get('filename', '?'))
                             if c:
@@ -3176,11 +3176,11 @@ def _t_github_sec(entidad, ctx):
            descripcion='OSINT on a person: summary (DuckDuckGo) + dorks (LinkedIn/X/GitHub...) (keyless)')
 def _t_persona(entidad, ctx):
     from urllib.parse import quote as _q
-    nombre = entidad.valor
+    nombre = entidad.value
     try:
         d = SESSION.get(f'https://api.duckduckgo.com/?q={_q(nombre)}&format=json&no_html=1', timeout=8).json()
         if d.get('AbstractText'):
-            entidad.propiedades['resumen'] = d['AbstractText'][:400]
+            entidad.properties['resumen'] = d['AbstractText'][:400]
     except Exception as _e:
         log.debug("persona ddg: %s", _e)
     dorks = {'linkedin': f'"{nombre}" site:linkedin.com',
@@ -3190,17 +3190,17 @@ def _t_persona(entidad, ctx):
              'github': f'"{nombre}" site:github.com',
              'facebook': f'"{nombre}" site:facebook.com'}
     for k, q in dorks.items():
-        ctx.emitir('url', f'https://www.google.com/search?q={_q(q)}', etiqueta=f'dork:{k}', dork=k)
+        ctx.emitir('url', f'https://www.google.com/search?q={_q(q)}', label=f'dork:{k}', dork=k)
 
 @transform(entrada='persona', salidas=('url',), nombre='darkweb',
            descripcion='Dark web search (Ahmia, clearnet .onion index, no Tor) (keyless)')
 def _t_darkweb(entidad, ctx):
     from urllib.parse import quote as _q
     try:
-        r = SESSION.get(f'https://ahmia.fi/search/?q={_q(entidad.valor)}', timeout=12)
+        r = SESSION.get(f'https://ahmia.fi/search/?q={_q(entidad.value)}', timeout=12)
         n = 0
         for m in re.finditer(r'<h4[^>]*><a href="([^"]+)"[^>]*>([^<]+)</a>', r.text, re.DOTALL):
-            ctx.emitir('url', m.group(1), etiqueta='onion', titulo=m.group(2).strip()[:80])
+            ctx.emitir('url', m.group(1), label='onion', titulo=m.group(2).strip()[:80])
             n += 1
             if n >= 15:
                 break
@@ -3212,9 +3212,9 @@ def _t_darkweb(entidad, ctx):
 def _t_url_check(entidad, ctx):
     try:
         d = SESSION.post('https://urlhaus-api.abuse.ch/v1/url/',
-                         data={'url': entidad.valor}, timeout=8).json() or {}
+                         data={'url': entidad.value}, timeout=8).json() or {}
         if d.get('query_status') == 'ok':
-            entidad.propiedades['urlhaus'] = d.get('threat', 'listed')
+            entidad.properties['urlhaus'] = d.get('threat', 'listed')
             entidad.tag('url-maliciosa')
     except Exception as _e:
         log.debug("url_check urlhaus: %s", _e)
@@ -3222,7 +3222,7 @@ def _t_url_check(entidad, ctx):
 @transform(entrada='url', salidas=('email',), nombre='render_js',
            descripcion='Renders the page with a headless browser (playwright): emails from the final DOM')
 def _t_render_js(entidad, ctx):
-    url = entidad.valor
+    url = entidad.value
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
     if not _url_publica(url):                    # anti-SSRF: do not render internal hosts
@@ -3236,19 +3236,19 @@ def _t_render_js(entidad, ctx):
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={'width': 1280, 'height': 900})
             page.goto(url, timeout=20000, wait_until='networkidle')
-            entidad.propiedades['render_titulo'] = page.title()
+            entidad.properties['render_titulo'] = page.title()
             html_render = page.content()
             browser.close()
         for em in list(set(re.findall(
                 r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', html_render)))[:15]:
-            ctx.emitir('email', em, etiqueta='in-render')
+            ctx.emitir('email', em, label='in-render')
     except Exception as _e:
         log.debug("render_js: %s", _e)
 
 @transform(entrada='archivo', salidas=(), nombre='yara_bulk',
            descripcion='Scans a folder with yara-rules (local only)')
 def _t_yara_bulk(entidad, ctx):
-    carpeta = entidad.valor
+    carpeta = entidad.value
     if not os.path.isdir(carpeta) or not _which('yara-rules'):
         return
     archivos = []
@@ -3272,7 +3272,7 @@ def _t_yara_bulk(entidad, ctx):
             if len(hallazgos) >= 50:
                 break
     if hallazgos:
-        entidad.propiedades['yara_hallazgos'] = hallazgos[:20]
+        entidad.properties['yara_hallazgos'] = hallazgos[:20]
         entidad.tag('yara-match')
 
 @transform(entrada='persona', salidas=(), nombre='wordlist',
@@ -3281,7 +3281,7 @@ def _t_wordlist(entidad, ctx):
     if not ia.disponible():
         return
     contexto = json.dumps(ctx.almacen.to_dict(), default=str)[:3000]
-    prompt = (f'From the OSINT of the target "{entidad.valor}", generate a wordlist of '
+    prompt = (f'From the OSINT of the target "{entidad.value}", generate a wordlist of '
               f'likely passwords: names, dates, organization, combinations (name+year, '
               f'name+123), leet speak. 30-50 entries, one per line, passwords only.\n\n'
               f'Data:\n{contexto}')
@@ -3293,39 +3293,39 @@ def _t_wordlist(entidad, ctx):
     palabras = [w.strip() for w in resp.split('\n') if len(w.strip()) >= 6][:50]
     if not palabras:
         return
-    entidad.propiedades['wordlist'] = palabras
-    entidad.propiedades['wordlist_total'] = len(palabras)
+    entidad.properties['wordlist'] = palabras
+    entidad.properties['wordlist_total'] = len(palabras)
     try:
-        slug = _slug_caso(entidad.valor.lower()) or 'objetivo'
+        slug = _slug_caso(entidad.value.lower()) or 'objetivo'
         ruta = os.path.join(CASES_DIR, f'wordlist_{slug}.txt')
         with open(ruta, 'w', encoding='utf-8') as f:
             f.write('\n'.join(palabras))
-        entidad.propiedades['wordlist_archivo'] = ruta
+        entidad.properties['wordlist_archivo'] = ruta
     except Exception as _e:
         log.debug("wordlist guardar: %s", _e)
 
 @transform(entrada='url', salidas=('url',), nombre='cronolocalizacion',
            descripcion='Chronolocation by shadows: SunCalc/ShadowMap (Bellingcat technique) (F9 step 121)')
 def _t_cronolocalizacion(entidad, ctx):
-    coords = parse_gps(entidad.propiedades.get('gps', ''))
+    coords = parse_gps(entidad.properties.get('gps', ''))
     enlaces = enlaces_cronolocalizacion(*(coords if coords else (None, None)))
     for herr, url in enlaces.items():
-        ctx.emitir('url', url, etiqueta=f'sun:{herr}', herramienta=herr)
+        ctx.emitir('url', url, label=f'sun:{herr}', herramienta=herr)
 
 @transform(entrada='url', salidas=('url',), nombre='satelital',
            descripcion='Satellite cross-check of the location (Google Earth/Sentinel/Bing) -- requires GPS (F9 step 122)')
 def _t_satelital(entidad, ctx):
-    coords = parse_gps(entidad.propiedades.get('gps', ''))
+    coords = parse_gps(entidad.properties.get('gps', ''))
     if not coords:
         return
     for herr, url in enlaces_satelital(*coords).items():
-        ctx.emitir('url', url, etiqueta=f'satellite:{herr}', herramienta=herr)
+        ctx.emitir('url', url, label=f'satellite:{herr}', herramienta=herr)
 
 @transform(entrada='url', salidas=('url',), nombre='landmarks',
            descripcion='Landmark matching by image (Google Lens/Mapillary/Wikimapia) (F9 step 123)')
 def _t_landmarks(entidad, ctx):
-    for herr, url in enlaces_landmark(entidad.valor).items():
-        ctx.emitir('url', url, etiqueta=f'landmark:{herr}', herramienta=herr)
+    for herr, url in enlaces_landmark(entidad.value).items():
+        ctx.emitir('url', url, label=f'landmark:{herr}', herramienta=herr)
 
 @transform(entrada='url', salidas=(), nombre='ocr',
            descripcion='Cyrillic/Chinese/Latin OCR of the image (tesseract, langs rus+chi_sim+eng) (F9 step 125)')
@@ -3333,7 +3333,7 @@ def _t_ocr(entidad, ctx):
     if not _which('tesseract'):
         return                                       # degrades: tesseract + langs missing
     try:
-        r = _fetch_seguro(entidad.valor, timeout=10, stream=True)
+        r = _fetch_seguro(entidad.value, timeout=10, stream=True)
     except Exception:
         return
     with tempfile.NamedTemporaryFile(delete=False, suffix='.img') as f:
@@ -3348,7 +3348,7 @@ def _t_ocr(entidad, ctx):
         if not texto:                                # langs not installed -> try eng only
             texto = (run_tool(['tesseract', fn, 'stdout'], timeout=25) or '').strip()
         if texto:
-            entidad.propiedades['ocr'] = texto[:1000]
+            entidad.properties['ocr'] = texto[:1000]
             entidad.tag('tiene-texto')
     finally:
         try:
@@ -3374,13 +3374,13 @@ def _fetch_tor(url, timeout=25):
 @transform(entrada='url', salidas=('email', 'url'), nombre='onion_fetch',
            descripcion='Opens a .onion site via Tor and extracts title, emails and .onion links (F10 step 128)')
 def _t_onion_fetch(entidad, ctx):
-    url = entidad.valor
+    url = entidad.value
     if '.onion' not in url:
         return                                       # .onion ONLY (no SSRF to internal IPs)
     if not url.startswith('http'):
         url = 'http://' + url
     if not _tor_disponible():
-        entidad.propiedades['tor'] = 'Tor unavailable (start the tor service)'
+        entidad.properties['tor'] = 'Tor unavailable (start the tor service)'
         return
     try:
         r = _fetch_tor(url)
@@ -3389,11 +3389,11 @@ def _t_onion_fetch(entidad, ctx):
         return
     m = re.search(r'<title[^>]*>(.*?)</title>', r.text[:8000], re.I | re.S)
     if m:
-        entidad.propiedades['onion_titulo'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
+        entidad.properties['onion_titulo'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
     for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', r.text)))[:15]:
-        ctx.emitir('email', em, etiqueta='in-onion')
+        ctx.emitir('email', em, label='in-onion')
     for on in list(set(re.findall(r'[a-z2-7]{16,56}\.onion', r.text)))[:15]:
-        ctx.emitir('url', 'http://' + on, etiqueta='onion-link')
+        ctx.emitir('url', 'http://' + on, label='onion-link')
     entidad.tag('onion-vivo')
 
 _TG_SESION = os.path.join(HOME, '.obsidian', 'telegram.session')
@@ -3433,17 +3433,17 @@ def _tg_mensajes(usuario, limite=30):
            requiere_key=True,
            descripcion='Mentions/links of the user or channel in Telegram (Telethon) (F10 step 130)')
 def _t_telegram(entidad, ctx):
-    ok, res = _tg_mensajes(entidad.valor)
+    ok, res = _tg_mensajes(entidad.value)
     if not ok:
-        entidad.propiedades['telegram'] = res
+        entidad.properties['telegram'] = res
         return
     tid, textos = res
-    entidad.propiedades['telegram_id'] = tid
+    entidad.properties['telegram_id'] = tid
     texto = '\n'.join(textos)
     for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', texto)))[:15]:
-        ctx.emitir('email', em, etiqueta='in-telegram')
+        ctx.emitir('email', em, label='in-telegram')
     for u in list(set(re.findall(r'https?://[^\s"\'<>]+', texto)))[:15]:
-        ctx.emitir('url', u[:200], etiqueta='in-telegram')
+        ctx.emitir('url', u[:200], label='in-telegram')
 
 _LEAK_KW = ['leak', 'breach', 'database', 'combolist', 'stealer', 'ransomware',
             'dump', 'fullz', 'rdp access', 'initial access', 'base de datos', 'filtracion']
@@ -3463,22 +3463,22 @@ def coincidencias_leak(textos, keywords=None):
            requiere_key=True,
            descripcion='Watches a Telegram channel for mentions of leaks/breaches/ransomware (F10 step 131)')
 def _t_canal_leaks(entidad, ctx):
-    ok, res = _tg_mensajes(entidad.valor, limite=100)
+    ok, res = _tg_mensajes(entidad.value, limite=100)
     if not ok:
-        entidad.propiedades['canal_leaks'] = res
+        entidad.properties['canal_leaks'] = res
         return
     _tid, textos = res
     hits = coincidencias_leak(textos)
     if not hits:
         return
     entidad.tag('canal-leaks')
-    entidad.propiedades['leaks_menciones'] = len(hits)
-    entidad.propiedades['leaks_muestra'] = [h['texto'] for h in hits[:5]]
+    entidad.properties['leaks_menciones'] = len(hits)
+    entidad.properties['leaks_muestra'] = [h['texto'] for h in hits[:5]]
     unido = '\n'.join(h['texto'] for h in hits)
     for dom in list(set(re.findall(r'\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b', unido.lower())))[:15]:
-        ctx.emitir('dominio', dom, etiqueta='mentioned-in-leaks')
+        ctx.emitir('dominio', dom, label='mentioned-in-leaks')
     for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', unido)))[:15]:
-        ctx.emitir('email', em, etiqueta='mentioned-in-leaks')
+        ctx.emitir('email', em, label='mentioned-in-leaks')
 
 _HAYSTAK_ONION = ('http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion')
 
@@ -3486,16 +3486,16 @@ _HAYSTAK_ONION = ('http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxf
            descripcion='Dark web search in Haystak (via Tor) -- .onion links (F10 step 129)')
 def _t_haystak(entidad, ctx):
     if not _tor_disponible():
-        entidad.propiedades['haystak'] = 'requires Tor (start the tor service)'
+        entidad.properties['haystak'] = 'requires Tor (start the tor service)'
         return
     from urllib.parse import quote as _q
     try:
-        r = _fetch_tor(f'{_HAYSTAK_ONION}/?q={_q(entidad.valor)}', timeout=30)
+        r = _fetch_tor(f'{_HAYSTAK_ONION}/?q={_q(entidad.value)}', timeout=30)
     except Exception as _e:
         log.debug("haystak: %s", _e)
         return
     for on in list(set(re.findall(r'[a-z2-7]{16,56}\.onion', r.text)))[:15]:
-        ctx.emitir('url', 'http://' + on, etiqueta='haystak')
+        ctx.emitir('url', 'http://' + on, label='haystak')
 
 def _descargar_imagen(url):
     """Downloads an image to a temp file (anti-SSRF). Returns the path or None."""
@@ -3513,17 +3513,17 @@ def _descargar_imagen(url):
 @transform(entrada='url', salidas=(), nombre='ela', requiere_key=False,
            descripcion='Edit detection via Error Level Analysis (generates ELA image) (F9 step 126)')
 def _t_ela(entidad, ctx):
-    fn = _descargar_imagen(entidad.valor)
+    fn = _descargar_imagen(entidad.value)
     if not fn:
         return
     try:
         salida_dir = os.path.join(STATIC_DIR, 'ela')
         os.makedirs(salida_dir, exist_ok=True)
-        nombre_img = f'{hashlib.md5(entidad.valor.encode()).hexdigest()[:10]}.png'
+        nombre_img = f'{hashlib.md5(entidad.value.encode()).hexdigest()[:10]}.png'
         max_diff = _ela(fn, os.path.join(salida_dir, nombre_img))
         if max_diff is not None:
-            entidad.propiedades['ela_img'] = f'/static/ela/{nombre_img}'
-            entidad.propiedades['ela_max_diff'] = max_diff
+            entidad.properties['ela_img'] = f'/static/ela/{nombre_img}'
+            entidad.properties['ela_max_diff'] = max_diff
             entidad.tag('ela-generado')
             if max_diff >= 50:                       # heuristic: review visually
                 entidad.tag('revisar-edicion')
@@ -3536,14 +3536,14 @@ def _t_ela(entidad, ctx):
 @transform(entrada='url', salidas=('hash',), nombre='phash',
            descripcion='Perceptual hash (dHash): groups the same image reused across profiles (F9 step 127)')
 def _t_phash(entidad, ctx):
-    fn = _descargar_imagen(entidad.valor)
+    fn = _descargar_imagen(entidad.value)
     if not fn:
         return
     try:
         h = _phash(fn)
         if h:
-            entidad.propiedades['phash'] = h
-            ctx.emitir('hash', h, etiqueta='phash', tipo_hash='phash')
+            entidad.properties['phash'] = h
+            ctx.emitir('hash', h, label='phash', tipo_hash='phash')
     finally:
         try:
             os.unlink(fn)
@@ -3560,7 +3560,7 @@ _ES_BTC = re.compile(r'(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\Z'
 @transform(entrada='wallet', salidas=('wallet',), nombre='tx_grafo',
            descripcion='Transaction counterparties of a BTC wallet (blockchain.info, keyless) (F11 step 138)')
 def _t_tx_grafo(entidad, ctx):
-    addr = entidad.valor
+    addr = entidad.value
     if not _ES_BTC.match(addr):
         return                                       # BTC only for now (keyless)
     try:
@@ -3580,22 +3580,22 @@ def _t_tx_grafo(entidad, ctx):
             if a and a != addr:
                 contrapartes.add(a)
     for c in list(contrapartes)[:30]:
-        ctx.emitir('wallet', c, etiqueta='tx', cadena='btc')
+        ctx.emitir('wallet', c, label='tx', cadena='btc')
 
 _ES_ETH = re.compile(r'0x[a-fA-F0-9]{40}\Z')
 
 @transform(entrada='wallet', salidas=(), nombre='eth_balance',
            descripcion='Balance of an Ethereum wallet (public RPC cloudflare-eth, keyless) (F11 step 142)')
 def _t_eth_balance(entidad, ctx):
-    if not _ES_ETH.match(entidad.valor):
+    if not _ES_ETH.match(entidad.value):
         return                                       # ETH addresses only
     try:
         d = SESSION.post('https://cloudflare-eth.com',
                          json={'jsonrpc': '2.0', 'method': 'eth_getBalance',
-                               'params': [entidad.valor, 'latest'], 'id': 1}, timeout=10).json() or {}
+                               'params': [entidad.value, 'latest'], 'id': 1}, timeout=10).json() or {}
         wei = int(d.get('result', '0x0'), 16)
-        entidad.propiedades['eth_balance'] = wei / 1e18
-        entidad.propiedades['cadena'] = 'eth'
+        entidad.properties['eth_balance'] = wei / 1e18
+        entidad.properties['cadena'] = 'eth'
     except Exception as _e:
         log.debug("eth_balance unavailable: %s", _e)
 
@@ -3616,26 +3616,26 @@ def _ransom_addrs():
 @transform(entrada='wallet', salidas=(), nombre='riesgo_wallet',
            descripcion='Address risk: linked to ransomware? (Ransomwhere, CC0, keyless) (F11 step 141)')
 def _t_riesgo_wallet(entidad, ctx):
-    if entidad.valor in _ransom_addrs():
+    if entidad.value in _ransom_addrs():
         entidad.tag('ransomware')
-        entidad.propiedades['riesgo'] = 'linked to ransomware (Ransomwhere)'
+        entidad.properties['riesgo'] = 'linked to ransomware (Ransomwhere)'
 
 @transform(entrada='wallet', salidas=('url',), nombre='exchange_attrib',
            descripcion='Exchange attribution: links to Blockchair/WalletExplorer/Arkham/OXT (F11 step 140)')
 def _t_exchange_attrib(entidad, ctx):
     from urllib.parse import quote as _q
-    a = _q(entidad.valor)
+    a = _q(entidad.value)
     enlaces = {'blockchair': f'https://blockchair.com/search?q={a}',
                'walletexplorer': f'https://www.walletexplorer.com/address/{a}',
                'arkham': f'https://intel.arkm.com/explorer/address/{a}',
                'oxt': f'https://oxt.me/address/{a}'}
     for herr, url in enlaces.items():
-        ctx.emitir('url', url, etiqueta=f'attrib:{herr}', herramienta=herr)
+        ctx.emitir('url', url, label=f'attrib:{herr}', herramienta=herr)
 
 @transform(entrada='wallet', salidas=('wallet',), nombre='cluster_wallets',
            descripcion='Clustering by co-inputs: addresses of the same owner (heuristic, blockchain.info) (F11 step 139)')
 def _t_cluster_wallets(entidad, ctx):
-    addr = entidad.valor
+    addr = entidad.value
     if not _ES_BTC.match(addr):
         return
     try:
@@ -3651,7 +3651,7 @@ def _t_cluster_wallets(entidad, ctx):
         if addr in inputs:                           # the seed spent alongside these -> same owner
             mismo.update(a for a in inputs if a != addr)
     for a in list(mismo)[:30]:
-        w = ctx.emitir('wallet', a, etiqueta='mismo-dueño', cadena='btc')
+        w = ctx.emitir('wallet', a, label='mismo-dueño', cadena='btc')
         if w:
             w.tag('mismo-dueño')
 
@@ -3659,46 +3659,46 @@ def _t_cluster_wallets(entidad, ctx):
            descripcion='Extracts BTC/ETH addresses from a page (F11 step 137)')
 def _t_extraer_wallets(entidad, ctx):
     try:
-        r = _fetch_seguro(entidad.valor, timeout=10, stream=False)
+        r = _fetch_seguro(entidad.value, timeout=10, stream=False)
     except Exception:
         return
     texto = r.text[:200000]
     for cadena, rx in _WALLET_RE.items():
         for addr in list(set(rx.findall(texto)))[:30]:
-            ctx.emitir('wallet', addr, etiqueta=cadena, cadena=cadena)
+            ctx.emitir('wallet', addr, label=cadena, cadena=cadena)
 
 @transform(entrada='persona', salidas=('url',), nombre='dorks_idioma',
            descripcion='Dorks adapted to the name language (Cyrillic/Chinese/Latin) (F15 step 176)')
 def _t_dorks_idioma(entidad, ctx):
     from urllib.parse import quote as _q
-    idioma = _ml.detectar_idioma(entidad.valor)
-    for d in _ml.dorks_por_idioma(entidad.valor, idioma):
-        ctx.emitir('url', f'https://www.google.com/search?q={_q(d)}', etiqueta=f'dork:{idioma}', idioma=idioma)
+    idioma = _ml.detectar_idioma(entidad.value)
+    for d in _ml.dorks_por_idioma(entidad.value, idioma):
+        ctx.emitir('url', f'https://www.google.com/search?q={_q(d)}', label=f'dork:{idioma}', idioma=idioma)
 
 @transform(entrada='persona', salidas=('url',), nombre='motores_locales',
            descripcion='Search in local engines: Yandex, Baidu, Sogou (they index another internet) (F15 step 174)')
 def _t_motores_locales(entidad, ctx):
-    for motor, url in _ml.motores_locales(entidad.valor).items():
-        ctx.emitir('url', url, etiqueta=f'motor:{motor}', motor=motor)
+    for motor, url in _ml.motores_locales(entidad.value).items():
+        ctx.emitir('url', url, label=f'motor:{motor}', motor=motor)
 
 @transform(entrada='org', salidas=('url',), nombre='registros_regionales',
            descripcion='Company registries by region: QCC (China), RusProfile (Russia), OpenCorporates (F15 step 173)')
 def _t_registros_regionales(entidad, ctx):
-    for reg, url in _ml.registros_regionales(entidad.valor).items():
-        ctx.emitir('url', url, etiqueta=f'registro:{reg}', registro=reg)
+    for reg, url in _ml.registros_regionales(entidad.value).items():
+        ctx.emitir('url', url, label=f'registro:{reg}', registro=reg)
 
 @transform(entrada='persona', salidas=('persona',), nombre='transliterar',
            descripcion='Name variants in Cyrillic/Latin to search in each alphabet (F15 step 172)')
 def _t_transliterar(entidad, ctx):
-    for alfabeto, variante in _ml.transliterar(entidad.valor).items():
-        if variante and variante.lower() != entidad.valor.lower():
-            ctx.emitir('persona', variante, etiqueta=f'translit:{alfabeto}')
+    for alfabeto, variante in _ml.transliterar(entidad.value).items():
+        if variante and variante.lower() != entidad.value.lower():
+            ctx.emitir('persona', variante, label=f'translit:{alfabeto}')
 
 @transform(entrada='usuario', salidas=('url',), nombre='plataformas_regionales',
            descripcion='Profiles on regional platforms: VK, Weibo, Douyin, OK, Telegram (F15 step 171)')
 def _t_plataformas_regionales(entidad, ctx):
-    for plat, url in _ml.perfiles_regionales(entidad.valor).items():
-        ctx.emitir('url', url, etiqueta=f'plataforma:{plat}', plataforma=plat)
+    for plat, url in _ml.perfiles_regionales(entidad.value).items():
+        ctx.emitir('url', url, label=f'plataforma:{plat}', plataforma=plat)
 
 _BLOCKLIST = {'nets': None, 'ts': 0}   # in-memory cache (refreshes every 6h)
 
@@ -3734,20 +3734,20 @@ def _cargar_blocklist():
            descripcion='Is the IP in high-confidence CC0 threat feeds? (abuse.ch, keyless)')
 def _t_ip_blocklist(entidad, ctx):
     try:
-        ip = ipaddress.ip_address(entidad.valor)
+        ip = ipaddress.ip_address(entidad.value)
     except ValueError:
         return
     for red, fuente in _cargar_blocklist():
         if ip in red:
             entidad.tag('listado-amenaza')   # signal, NOT a 'malicious' verdict
-            entidad.propiedades['amenaza_fuente'] = fuente
+            entidad.properties['amenaza_fuente'] = fuente
             return
 
 @transform(entrada='ip', salidas=('org',), nombre='greynoise',
            descripcion='Threat intel of the IP (GreyNoise Community, keyless but 25/day; 404=not observed)')
 def _t_greynoise(entidad, ctx):
     try:
-        r = SESSION.get(f'https://api.greynoise.io/v3/community/{entidad.valor}', timeout=8)
+        r = SESSION.get(f'https://api.greynoise.io/v3/community/{entidad.value}', timeout=8)
         if r.status_code != 200:   # 404 = IP not observed scanning -> no enrichment
             return
         d = r.json()
@@ -3756,10 +3756,10 @@ def _t_greynoise(entidad, ctx):
         if d.get('riot'):
             entidad.tag('servicio-conocido')
             if d.get('name'):
-                ctx.emitir('org', d['name'], etiqueta='greynoise')
+                ctx.emitir('org', d['name'], label='greynoise')
         clasif = d.get('classification')
         if clasif:
-            entidad.propiedades['greynoise'] = clasif
+            entidad.properties['greynoise'] = clasif
             if clasif == 'malicious':
                 entidad.tag('malicioso')
     except Exception as _e:
@@ -3768,40 +3768,40 @@ def _t_greynoise(entidad, ctx):
 @transform(entrada='dominio', salidas=(), nombre='dns_txt',
            descripcion='TXT records of the domain (SPF, verifications, etc.)')
 def _t_dns_txt(entidad, ctx):
-    out = run_tool(['dig', entidad.valor, 'TXT', '+short'], timeout=10)
+    out = run_tool(['dig', entidad.value, 'TXT', '+short'], timeout=10)
     txt = [l.strip().strip('"') for l in out.splitlines() if l.strip()]
     if txt:
-        entidad.propiedades['txt'] = txt[:10]
+        entidad.properties['txt'] = txt[:10]
 
 @transform(entrada='dominio', salidas=('org',), nombre='ssl',
            descripcion='TLS certificate of the domain: issuer and validity')
 def _t_ssl(entidad, ctx):
     try:
         contexto = ssl.create_default_context()
-        with socket.create_connection((entidad.valor, 443), timeout=8) as sock:
-            with contexto.wrap_socket(sock, server_hostname=entidad.valor) as segura:
+        with socket.create_connection((entidad.value, 443), timeout=8) as sock:
+            with contexto.wrap_socket(sock, server_hostname=entidad.value) as segura:
                 cert = segura.getpeercert()
         issuer = dict(x[0] for x in cert.get('issuer', []))
         org = issuer.get('organizationName')
         if org:
-            ctx.emitir('org', org, etiqueta='cert issuer')
+            ctx.emitir('org', org, label='cert issuer')
         cn = dict(x[0] for x in cert.get('subject', [])).get('commonName')
         if cn:
-            entidad.propiedades['cert_cn'] = cn          # to pivot (step 115)
-        entidad.propiedades['cert_desde'] = cert.get('notBefore')
-        entidad.propiedades['cert_expira'] = cert.get('notAfter')
+            entidad.properties['cert_cn'] = cn          # to pivot (step 115)
+        entidad.properties['cert_desde'] = cert.get('notBefore')
+        entidad.properties['cert_expira'] = cert.get('notAfter')
     except Exception as _e:
         log.debug("ssl unavailable: %s", _e)
 
 @transform(entrada='dominio', salidas=('ip',), nombre='cert_pivote', requiere_key=True,
            descripcion='IPs with the same TLS cert (CN) across FOFA/Shodan -- same infra (F8)')
 def _t_cert_pivote(entidad, ctx):
-    cn = entidad.propiedades.get('cert_cn')
+    cn = entidad.properties.get('cert_cn')
     if not cn:                                            # if ssl did not run, get the CN now
         try:
             contexto = ssl.create_default_context()
-            with socket.create_connection((entidad.valor, 443), timeout=8) as sock:
-                with contexto.wrap_socket(sock, server_hostname=entidad.valor) as segura:
+            with socket.create_connection((entidad.value, 443), timeout=8) as sock:
+                with contexto.wrap_socket(sock, server_hostname=entidad.value) as segura:
                     cert = segura.getpeercert()
             cn = dict(x[0] for x in cert.get('subject', [])).get('commonName')
         except Exception:
@@ -3809,52 +3809,52 @@ def _t_cert_pivote(entidad, ctx):
     if not cn:
         return
     for ip in _pivote_ips({'cert': cn}):
-        ctx.emitir('ip', ip, etiqueta='mismo-cert')
+        ctx.emitir('ip', ip, label='mismo-cert')
 
 
-@app.route('/api/v2/transforms/<tipo>')
-def api_v2_transforms(tipo):
+@app.route('/api/v2/transforms/<type>')
+def api_v2_transforms(type):
     """Transforms that apply to an entity type (step 35)."""
     ts = [{'nombre': t.nombre, 'salidas': list(t.salidas),
            'requiere_key': t.requiere_key, 'descripcion': t.descripcion}
-          for t in REGISTRO.applicable(tipo)]
-    return jsonify({'tipo': tipo, 'transforms': ts})
+          for t in REGISTRO.applicable(type)]
+    return jsonify({'type': type, 'transforms': ts})
 
 # The store is mutated by the /run endpoint AND the monitor thread (step 95): a
 # lock serializes those writes and the monitor's snapshot reads.
 _almacen_lock = threading.RLock()
 
-def _correr_transform_interno(tipo, valor, nombre):
+def _correr_transform_interno(type, value, nombre):
     """Runs a transform and persists (autosave). Shared by /run and the monitor.
     Raises ValueError/KeyError; the caller decides what to do with the error."""
-    if not valid_type(tipo):
+    if not valid_type(type):
         raise ValueError('invalid entity type')
-    semilla = Entity(tipo, (valor or '').strip())          # may raise ValueError
+    semilla = Entity(type, (value or '').strip())          # may raise ValueError
     if not semilla.well_formed():
-        raise ValueError(f'malformed value for {tipo}')
+        raise ValueError(f'malformed value for {type}')
     if _PROXIES['pool']:
         _rotar_proxy()                                      # OPSEC: rotate proxy per transform (154)
     _higiene_request()                                      # OPSEC: randomize UA (155)
     _jitter()                                               # OPSEC: spacing between requests (156)
-    _registrar_huella(nombre, tipo, valor)                  # OPSEC: log your footprint (160)
+    _registrar_huella(nombre, type, value)                  # OPSEC: log your footprint (160)
     with _almacen_lock:
         semilla = _almacen.add(semilla)
         producidas = run_by_name(nombre, semilla, _almacen)
         if _ws_activo:                          # autosave (46) + audit (48)
             try:
                 _gestor.guardar(_ws_activo, _almacen)
-                _gestor.record(_ws_activo, nombre, valor, len(producidas))
+                _gestor.record(_ws_activo, nombre, value, len(producidas))
             except Exception as _e:
                 log.warning("autosave failed: %s", _e)
     return producidas
 
 @app.route('/api/v2/run', methods=['POST'])
 def api_v2_run():
-    """Runs a transform on an entity {tipo, valor} (step 36)."""
+    """Runs a transform on an entity {type, value} (step 36)."""
     d = request.json or {}
     try:
         producidas = _correr_transform_interno(
-            d.get('tipo', ''), d.get('valor', ''), d.get('transform', ''))
+            d.get('type', ''), d.get('value', ''), d.get('transform', ''))
     except (KeyError, ValueError) as e:
         return _error(str(e), 400)
     return jsonify({'producidas': [e.to_dict() for e in producidas],
@@ -3947,15 +3947,15 @@ def v2_estado():
 def api_v2_recon():
     """Runs all transforms applicable to the seed in parallel (step 102)."""
     d = request.json or {}
-    tipo = d.get('tipo', '')
-    valor = (d.get('valor', '') or '').strip()
-    if not valid_type(tipo):
+    type = d.get('type', '')
+    value = (d.get('value', '') or '').strip()
+    if not valid_type(type):
         return _error('invalid entity type', 400)
     con_keys = bool(d.get('con_keys'))
     with _almacen_lock:
-        _almacen.create(tipo, valor)
-    ts = [t for t in REGISTRO.applicable(tipo) if con_keys or not t.requiere_key]
-    tareas = [(tipo, valor, t.nombre) for t in ts]
+        _almacen.create(type, value)
+    ts = [t for t in REGISTRO.applicable(type) if con_keys or not t.requiere_key]
+    tareas = [(type, value, t.nombre) for t in ts]
     res = run_batch(tareas, _almacen, lock=_almacen_lock)
     if _ws_activo:
         with _almacen_lock:
@@ -3972,22 +3972,22 @@ def api_v2_recon_async():
     """Launches the recon in the background (step 37) and returns a job_id. Progress
     is listened to on /api/v2/tarea/<id>/stream (SSE). Does not block the request."""
     d = request.json or {}
-    tipo = d.get('tipo', '')
-    valor = (d.get('valor', '') or '').strip()
-    if not valid_type(tipo):
+    type = d.get('type', '')
+    value = (d.get('value', '') or '').strip()
+    if not valid_type(type):
         return _error('invalid entity type', 400)
     con_keys = bool(d.get('con_keys'))
 
     def trabajo(emit):
         with _almacen_lock:
-            _almacen.create(tipo, valor)
-        ts = [t for t in REGISTRO.applicable(tipo) if con_keys or not t.requiere_key]
-        tareas = [(tipo, valor, t.nombre) for t in ts]
-        emit({'tipo': 'inicio', 'total': len(tareas)})
+            _almacen.create(type, value)
+        ts = [t for t in REGISTRO.applicable(type) if con_keys or not t.requiere_key]
+        tareas = [(type, value, t.nombre) for t in ts]
+        emit({'type': 'inicio', 'total': len(tareas)})
 
         def prog(nombre, n, hechas, total):
-            emit({'tipo': 'progreso', 'transform': nombre, 'nuevas': n,
-                  'hechas': hechas, 'total': total, 'entidades': len(_almacen)})
+            emit({'type': 'progreso', 'transform': nombre, 'nuevas': n,
+                  'hechas': hechas, 'total': total, 'entities': len(_almacen)})
         res = run_batch(tareas, _almacen, lock=_almacen_lock, on_progreso=prog)
         if _ws_activo:
             with _almacen_lock:
@@ -4020,16 +4020,16 @@ def api_v2_entidad():
     """Adds a seed entity to the graph WITHOUT running transforms (Maltego-style:
     you add the node, then right-click -> transform). F6."""
     d = request.json or {}
-    tipo = d.get('tipo', '')
-    valor = (d.get('valor', '') or '').strip()
-    if not valid_type(tipo):
+    type = d.get('type', '')
+    value = (d.get('value', '') or '').strip()
+    if not valid_type(type):
         return _error('invalid entity type', 400)
     try:
-        ent = Entity(tipo, valor)
+        ent = Entity(type, value)
     except ValueError as e:
         return _error(str(e), 400)
     if not ent.well_formed():
-        return _error(f'malformed value for {tipo}', 400)
+        return _error(f'malformed value for {type}', 400)
     ent = _almacen.add(ent)
     if _ws_activo:
         try:
@@ -4052,7 +4052,7 @@ def api_v2_nota():
     e = _almacen.get(d.get('id', ''))
     if not e:
         return _error('entity not found', 404)
-    e.propiedades['nota'] = (d.get('nota', '') or '')[:1000]
+    e.properties['nota'] = (d.get('nota', '') or '')[:1000]
     _autosave()
     return jsonify({'ok': True})
 
@@ -4137,11 +4137,11 @@ def _set_anonimo(on):
 
 _HUELLA = []
 
-def _registrar_huella(nombre, tipo, valor):
+def _registrar_huella(nombre, type, value):
     """Records which transform you ran on which target and whether it was anonymized
     -- your footprint/exposure while investigating (F13 step 160)."""
     _HUELLA.insert(0, {'ts': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                       'transform': nombre, 'objetivo': f'{tipo}:{valor}',
+                       'transform': nombre, 'objetivo': f'{type}:{value}',
                        'anonimo': _OPSEC['anonimo'] or bool(_PROXIES['pool'])})
     del _HUELLA[500:]
 
@@ -4342,10 +4342,10 @@ def api_v2_keys():
     if not servicio:
         return _error('missing service', 400)
     if request.method == 'POST':
-        valor = d.get('valor', '')
-        if not valor:
+        value = d.get('value', '')
+        if not value:
             return _error('missing key value', 400)
-        _boveda.guardar(servicio, valor)
+        _boveda.guardar(servicio, value)
         return jsonify({'ok': True, 'servicios': _boveda.servicios()})
     _boveda.delete(servicio)   # DELETE
     return jsonify({'ok': True, 'servicios': _boveda.servicios()})
@@ -4372,19 +4372,19 @@ def api_v2_keys_probar():
     mapeo = _TEST_SERVICIO.get(servicio)
     if not mapeo:
         return _error('service has no defined test', 400)
-    nombre, tipo, valor = mapeo
+    nombre, type, value = mapeo
     tiene = bool(_boveda.get(servicio))
     alm = Store()
     try:
-        n = len(run_by_name(nombre, alm.create(tipo, valor), alm))
+        n = len(run_by_name(nombre, alm.create(type, value), alm))
     except Exception as e:
         return jsonify({'servicio': servicio, 'ok': False, 'nota': f'error: {e}'})
     if n > 0:
-        return jsonify({'servicio': servicio, 'ok': True, 'entidades': n,
+        return jsonify({'servicio': servicio, 'ok': True, 'entities': n,
                         'nota': f'✓ worked -- {n} real entity(ies)'})
     if not tiene:
         return jsonify({'servicio': servicio, 'ok': False, 'nota': 'no key configured'})
-    return jsonify({'servicio': servicio, 'ok': False, 'entidades': 0,
+    return jsonify({'servicio': servicio, 'ok': False, 'entities': 0,
                     'nota': 'key present but 0 results (invalid, out of quota, or different schema?)'})
 
 _TIPOS_ACTIVO = ('dominio', 'subdominio', 'ip', 'puerto', 'tech', 'url', 'cve', 'bucket', 'org')
@@ -4396,9 +4396,9 @@ def api_v2_inventario():
     for t in _TIPOS_ACTIVO:
         ents = _almacen.of_type(t)
         if ents:
-            inv[t] = [{'valor': e.valor, 'tags': sorted(e.tags),
-                       'props': {k: e.propiedades[k] for k in list(e.propiedades)[:4]}}
-                      for e in sorted(ents, key=lambda x: x.valor)]
+            inv[t] = [{'value': e.value, 'tags': sorted(e.tags),
+                       'props': {k: e.properties[k] for k in list(e.properties)[:4]}}
+                      for e in sorted(ents, key=lambda x: x.value)]
     return jsonify({'objetivo': _objetivo_del_almacen(),
                     'total_activos': sum(len(v) for v in inv.values()),
                     'inventario': inv})
@@ -4416,10 +4416,10 @@ def api_v2_diff_historico():
         viejo = _gestor.load_snapshot(_ws_activo, sid)
     except KeyError:
         return _error('snapshot not found', 404)
-    ids_v = {e.id: e for e in viejo.entidades}
-    ids_n = {e.id: e for e in _almacen.entidades}
-    agregados = [{'tipo': e.tipo, 'valor': e.valor} for i, e in ids_n.items() if i not in ids_v]
-    removidos = [{'tipo': e.tipo, 'valor': e.valor} for i, e in ids_v.items() if i not in ids_n]
+    ids_v = {e.id: e for e in viejo.entities}
+    ids_n = {e.id: e for e in _almacen.entities}
+    agregados = [{'type': e.type, 'value': e.value} for i, e in ids_n.items() if i not in ids_v]
+    removidos = [{'type': e.type, 'value': e.value} for i, e in ids_v.items() if i not in ids_n]
     return jsonify({'snapshot': sid, 'agregados': agregados, 'removidos': removidos,
                     'total_antes': len(viejo), 'total_ahora': len(_almacen)})
 
@@ -4442,16 +4442,16 @@ def _objetivo_del_almacen():
     """Best 'objetivo' candidate of the case for the report header. Prefers the SEED
     (entity with no provenance = added by hand, not derived by a transform), so the
     report shows the real target and not a child datum."""
-    ents = _almacen.entidades
+    ents = _almacen.entities
     if not ents:
         return None
     obj = _almacen.of_type('objetivo')
     if obj:
-        return sorted(obj, key=lambda e: e.valor)[0].valor
+        return sorted(obj, key=lambda e: e.value)[0].value
     orden = {'dominio': 0, 'ip': 1, 'email': 2, 'usuario': 3, 'url': 4, 'wallet': 5}
-    semillas = [e for e in ents if not e.procedencia]     # no provenance = seed
-    cand = [e for e in (semillas or ents) if e.tipo in orden] or (semillas or ents)
-    return sorted(cand, key=lambda e: (orden.get(e.tipo, 9), e.valor))[0].valor
+    semillas = [e for e in ents if not e.provenance]     # no provenance = seed
+    cand = [e for e in (semillas or ents) if e.type in orden] or (semillas or ents)
+    return sorted(cand, key=lambda e: (orden.get(e.type, 9), e.value))[0].value
 
 @app.route('/api/v2/reporte')
 @app.route('/v2/reporte')
@@ -4502,7 +4502,7 @@ def _monitor_snapshot():
 def _monitor_refrescar():
     for t in _monitor_tareas:
         try:
-            _correr_transform_interno(t['tipo'], t['valor'], t['transform'])
+            _correr_transform_interno(t['type'], t['value'], t['transform'])
         except Exception as e:
             log.debug("monitor: transform %s failed: %s", t.get('transform'), e)
 
@@ -4529,14 +4529,14 @@ def _tareas_monitor_default():
     seed_valor = _objetivo_del_almacen()
     if not seed_valor:
         return []
-    seed = next((e for e in _almacen.entidades if e.valor == seed_valor), None)
+    seed = next((e for e in _almacen.entities if e.value == seed_valor), None)
     if not seed:
         return []
     usados = set()
-    for e in _almacen.entidades:
-        usados |= set(e.origenes)
-    applicable = {t.nombre for t in REGISTRO.applicable(seed.tipo)}
-    return [{'tipo': seed.tipo, 'valor': seed.valor, 'transform': n}
+    for e in _almacen.entities:
+        usados |= set(e.sources)
+    applicable = {t.nombre for t in REGISTRO.applicable(seed.type)}
+    return [{'type': seed.type, 'value': seed.value, 'transform': n}
             for n in sorted(usados & applicable)]
 
 @app.route('/api/v2/monitor', methods=['GET'])
@@ -4640,10 +4640,10 @@ def api_v2_extraer_texto():
     texto = (request.json or {}).get('texto', '')
     agregadas = []
     with _almacen_lock:
-        for tipo, valor in extract_entities(texto):
+        for type, value in extract_entities(texto):
             try:
-                e = _almacen.create(tipo, valor)
-                agregadas.append({'tipo': e.tipo, 'valor': e.valor})
+                e = _almacen.create(type, value)
+                agregadas.append({'type': e.type, 'value': e.value})
             except Exception:
                 pass
         if _ws_activo:
@@ -4746,8 +4746,8 @@ def api_v2_hallazgos_ia():
     if not h:
         return jsonify({'resumen': 'No findings to analyze yet. Run more transforms.'})
     conteo = {}
-    for e in _almacen.entidades:
-        conteo[e.tipo] = conteo.get(e.tipo, 0) + 1
+    for e in _almacen.entities:
+        conteo[e.type] = conteo.get(e.type, 0) + 1
     ents = ', '.join(f'{n} {t}' for t, n in conteo.items())
     lista = '\n'.join(f'- [{x.severidad}] {x.mensaje}' for x in h)
     prompt = (
@@ -4771,14 +4771,14 @@ def api_v2_verificar():
     h = correlate(_almacen)
     if not h:
         return jsonify({'revisiones': []})
-    idmap = {e.id: e for e in _almacen.entidades}
+    idmap = {e.id: e for e in _almacen.entities}
     revisiones = []
     for hall in h[:6]:   # cap so it does not run forever
         ev = []
-        for eid in hall.entidades:
+        for eid in hall.entities:
             e = idmap.get(eid)
             if e:
-                ev.append(f"{e.tipo} {e.valor} | props: {e.propiedades} | tags: {sorted(e.tags)} | fuentes: {sorted(e.origenes)}")
+                ev.append(f"{e.type} {e.value} | props: {e.properties} | tags: {sorted(e.tags)} | fuentes: {sorted(e.sources)}")
         prompt = (
             "You are a security analyst reviewing an AUTOMATIC alert. Be VERY skeptical "
             "of single-source signals: they can be false positives (CDNs like Cloudflare, "

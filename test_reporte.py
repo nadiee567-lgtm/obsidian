@@ -9,8 +9,8 @@ from core.reporte import generar_reporte
 
 def _almacen_demo():
     alm = Store()
-    d = alm.create('dominio', 'objetivo.com', propiedades={'org': 'ACME'})
-    ip = alm.create('ip', '93.184.216.34', propiedades={'pais': 'US'})
+    d = alm.create('dominio', 'objetivo.com', properties={'org': 'ACME'})
+    ip = alm.create('ip', '93.184.216.34', properties={'pais': 'US'})
     ip.tag('listado-amenaza')
     alm.relate(d.id, ip.id, 'resuelve')
     return alm, d, ip
@@ -42,7 +42,7 @@ def test_reporte_escapa_xss():
     """Raw target data with a payload → must come out escaped, never executable."""
     alm = Store()
     alm.create('dominio', 'malo.com',
-              propiedades={'nota': '<script>alert(1)</script>'})
+              properties={'nota': '<script>alert(1)</script>'})
     h = [Finding('r', 'critical', 'injection <img src=x onerror=alert(1)>', [])]
     html = generar_reporte(alm, hallazgos=h, score=40)
     assert '<script>alert(1)</script>' not in html          # raw NO

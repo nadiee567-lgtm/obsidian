@@ -7,16 +7,16 @@ from core.modelo import Store
 from core.transforms import run_by_name
 
 
-def _correr(nombre, tipo, valor):
+def _correr(nombre, type, value):
     alm = Store()
-    e = alm.create(tipo, valor)
+    e = alm.create(type, value)
     return run_by_name(nombre, e, alm), e
 
 
 # ── 171: regional social platforms ──────────────────────────────────────────
 def test_plataformas_regionales():
     prod, _ = _correr('plataformas_regionales', 'usuario', 'nadiee')
-    plats = {p.propiedades.get('plataforma') for p in prod if p.tipo == 'url'}
+    plats = {p.properties.get('plataforma') for p in prod if p.type == 'url'}
     assert {'vk', 'ok', 'weibo', 'douyin', 'telegram'} == plats
 
 
@@ -29,21 +29,21 @@ def test_transliterar_funciones():
 
 def test_transliterar_transform():
     prod, _ = _correr('transliterar', 'persona', 'Иван')
-    variantes = {p.valor for p in prod if p.tipo == 'persona'}
+    variantes = {p.value for p in prod if p.type == 'persona'}
     assert 'ivan' in variantes                    # latin variant
 
 
 # ── 173: regional registries ────────────────────────────────────────────────
 def test_registros_regionales():
     prod, _ = _correr('registros_regionales', 'org', 'ACME Corp')
-    regs = {p.propiedades.get('registro') for p in prod if p.tipo == 'url'}
+    regs = {p.properties.get('registro') for p in prod if p.type == 'url'}
     assert {'china_qcc', 'rusia_rusprofile', 'opencorporates'} == regs
 
 
 # ── 174: local engines ──────────────────────────────────────────────────────
 def test_motores_locales():
     prod, _ = _correr('motores_locales', 'persona', 'Ivan Petrov')
-    motores = {p.propiedades.get('motor') for p in prod if p.tipo == 'url'}
+    motores = {p.properties.get('motor') for p in prod if p.type == 'url'}
     assert {'yandex', 'baidu', 'sogou'} == motores
 
 
@@ -72,7 +72,7 @@ def test_dorks_por_idioma():
 
 def test_dorks_idioma_transform():
     prod, _ = _correr('dorks_idioma', 'persona', 'Иван Петров')   # cyrillic -> ru
-    idiomas = {p.propiedades.get('idioma') for p in prod if p.tipo == 'url'}
+    idiomas = {p.properties.get('idioma') for p in prod if p.type == 'url'}
     assert idiomas == {'ru'}
 
 

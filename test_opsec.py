@@ -11,7 +11,7 @@ def test_gestor_personas(tmp_path):
     g.create('juan_investigador', {'email': 'juan@proton.me', 'usuario': 'juanx'})
     assert 'juan_investigador' in g.list_ws()
     p = g.get('juan_investigador')
-    assert p['email'] == 'juan@proton.me' and 'creada' in p
+    assert p['email'] == 'juan@proton.me' and 'created' in p
     assert g.delete('juan_investigador') is True and g.list_ws() == []
     assert g.delete('no_existe') is False
 

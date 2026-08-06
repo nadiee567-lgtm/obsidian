@@ -11,7 +11,7 @@ CASE_VIEJO = {
     'objetivo': 'example.com',
     'datos': {
         'dominio': {
-            'tipo': 'dominio', 'objetivo': 'example.com',
+            'type': 'dominio', 'objetivo': 'example.com',
             'resultados': {
                 'dns': {'A': '93.184.216.34'},
                 'subdominios': ['mail.example.com', 'www.example.com'],
@@ -20,19 +20,19 @@ CASE_VIEJO = {
             },
         },
         'ip': {
-            'tipo': 'ip', 'objetivo': '93.184.216.34',
+            'type': 'ip', 'objetivo': '93.184.216.34',
             'resultados': {'geo': {'country': 'US', 'org': 'Edgecast'}, 'ptr': 'edge.example.com'},
         },
         'email': {
-            'tipo': 'email', 'objetivo': 'admin@example.com',
+            'type': 'email', 'objetivo': 'admin@example.com',
             'resultados': {'email_sec': {'spoofable': True}, 'hibp_breaches': ['LinkedIn']},
         },
         'takeover': {
-            'tipo': 'subdomain_takeover', 'objetivo': 'example.com',
+            'type': 'subdomain_takeover', 'objetivo': 'example.com',
             'resultados': {'vulnerables': [{'subdominio': 'old.example.com',
                                             'servicio': 'GitHub Pages', 'status': '404'}]},
         },
-        'roto': {'tipo': 'ip'},   # malformed module: must not break anything
+        'roto': {'type': 'ip'},   # malformed module: must not break anything
     },
 }
 
@@ -53,14 +53,14 @@ def test_migracion_dedup_email_entre_modulos():
     # it must be ONE single entity with both sources
     alm = migrate_case(CASE_VIEJO)
     e = alm.buscar('email', 'admin@example.com')
-    assert 'dominio' in e.origenes and 'email' in e.origenes
+    assert 'dominio' in e.sources and 'email' in e.sources
 
 
 def test_migracion_tags_y_props():
     alm = migrate_case(CASE_VIEJO)
     e = alm.buscar('email', 'admin@example.com')
     assert 'spoofable' in e.tags and 'filtrado' in e.tags
-    assert e.propiedades.get('hibp_breaches') == ['LinkedIn']
+    assert e.properties.get('hibp_breaches') == ['LinkedIn']
     sub = alm.buscar('subdominio', 'old.example.com')
     assert 'takeover' in sub.tags
 

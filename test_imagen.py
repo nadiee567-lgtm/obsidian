@@ -27,8 +27,8 @@ def test_reverse_image_transform():
     alm = Store()
     e = alm.create('url', 'https://x.com/a.jpg')
     prod = run_by_name('reverse_image', e, alm)
-    assert {p.propiedades.get('motor') for p in prod} == {'yandex', 'google', 'tineye', 'bing'}
-    assert all(p.tipo == 'url' for p in prod)
+    assert {p.properties.get('motor') for p in prod} == {'yandex', 'google', 'tineye', 'bing'}
+    assert all(p.type == 'url' for p in prod)
 
 
 def test_enlaces_facial():
@@ -43,7 +43,7 @@ def test_busqueda_facial_transform():
     alm = Store()
     e = alm.create('url', 'https://x.com/cara.jpg')
     prod = run_by_name('busqueda_facial', e, alm)
-    motores = {p.propiedades.get('motor'): p.propiedades.get('modo') for p in prod}
+    motores = {p.properties.get('motor'): p.properties.get('modo') for p in prod}
     assert motores == {'yandex': 'url', 'facecheck': 'upload', 'pimeyes': 'upload'}
 
 
@@ -53,7 +53,7 @@ class _FakeStream:
 
 
 def test_metadata_exif_como_entidades(monkeypatch):
-    """El EXIF se vuelve entidades pivotables: dispositivo, software, autor, GPS."""
+    """El EXIF se vuelve entities pivotables: dispositivo, software, autor, GPS."""
     monkeypatch.setattr(ob, '_which', lambda x: True)
     monkeypatch.setattr(ob, '_fetch_seguro', lambda *a, **k: _FakeStream())
     salida = ("Make                     : Apple\n"
@@ -65,12 +65,12 @@ def test_metadata_exif_como_entidades(monkeypatch):
     alm = Store()
     e = alm.create('url', 'https://x.com/foto.jpg')
     prod = run_by_name('metadata', e, alm)
-    techs = {p.valor for p in prod if p.tipo == 'tech'}
-    personas = {p.valor for p in prod if p.tipo == 'persona'}
-    urls = [p for p in prod if p.tipo == 'url']
+    techs = {p.value for p in prod if p.type == 'tech'}
+    personas = {p.value for p in prod if p.type == 'persona'}
+    urls = [p for p in prod if p.type == 'url']
     assert 'Apple iPhone 12' in techs and '14.2' in techs
     assert 'Jane Doe' in personas
-    assert urls and 'maps' in urls[0].valor          # GPS -> link de mapa pivotable
+    assert urls and 'maps' in urls[0].value          # GPS -> link de mapa pivotable
     assert 'tiene-gps' in e.tags
 
 
@@ -85,10 +85,10 @@ def test_parse_gps():
 def test_cronolocalizacion(monkeypatch):
     from core.transforms import run_by_name
     alm = Store()
-    u = alm.create('url', 'https://x.com/f.jpg', propiedades={'gps': "40 deg 26' N, 79 deg 58' W"})
+    u = alm.create('url', 'https://x.com/f.jpg', properties={'gps': "40 deg 26' N, 79 deg 58' W"})
     prod = run_by_name('cronolocalizacion', u, alm)
-    assert {p.propiedades.get('herramienta') for p in prod} == {'suncalc', 'shadowmap'}
-    assert any('40' in p.valor for p in prod)         # coords en el link
+    assert {p.properties.get('herramienta') for p in prod} == {'suncalc', 'shadowmap'}
+    assert any('40' in p.value for p in prod)         # coords en el link
 
 
 def test_satelital_requiere_gps():
@@ -103,7 +103,7 @@ def test_landmarks():
     alm = Store()
     u = alm.create('url', 'https://x.com/f.jpg')
     prod = run_by_name('landmarks', u, alm)
-    assert {p.propiedades.get('herramienta') for p in prod} == {'google_lens', 'mapillary', 'wikimapia'}
+    assert {p.properties.get('herramienta') for p in prod} == {'google_lens', 'mapillary', 'wikimapia'}
 
 
 def test_ocr_sin_tesseract(monkeypatch):
@@ -154,9 +154,9 @@ def test_phash_transform(monkeypatch):
     alm = Store()
     u = alm.create('url', 'https://x.com/a.jpg')
     prod = run_by_name('phash', u, alm)
-    hs = [e for e in prod if e.tipo == 'hash']
-    assert hs and hs[0].propiedades.get('tipo_hash') == 'phash'
-    assert u.propiedades.get('phash')
+    hs = [e for e in prod if e.type == 'hash']
+    assert hs and hs[0].properties.get('tipo_hash') == 'phash'
+    assert u.properties.get('phash')
 
 
 def test_ela_transform(monkeypatch):
@@ -165,4 +165,4 @@ def test_ela_transform(monkeypatch):
     alm = Store()
     u = alm.create('url', 'https://x.com/a.jpg')
     run_by_name('ela', u, alm)
-    assert 'ela-generado' in u.tags and u.propiedades.get('ela_img')
+    assert 'ela-generado' in u.tags and u.properties.get('ela_img')

@@ -52,7 +52,7 @@
   .vacio{color:var(--muted);font-family:var(--mono);font-size:.78rem}
 
   #detalle .v{font-family:var(--mono);font-size:.9rem;word-break:break-all;color:var(--text)}
-  #detalle .tipo{font-family:var(--mono);font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:var(--tc,var(--muted))}
+  #detalle .type{font-family:var(--mono);font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:var(--tc,var(--muted))}
   #detalle .kv{font-family:var(--mono);font-size:.74rem;color:#9aa2b5;margin-top:.5rem;word-break:break-all}
   #detalle .kv b{color:var(--text)}
   #detalle .tag{display:inline-block;font-family:var(--mono);font-size:.62rem;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 .3rem;margin:.15rem .15rem 0 0}
@@ -123,7 +123,7 @@
   </div>
 
   <div class="barra">
-    <select id="tipo">
+    <select id="type">
       <option value="dominio">dominio</option>
       <option value="ip">ip</option>
       <option value="email">email</option>
@@ -131,7 +131,7 @@
       <option value="wallet">wallet (BTC)</option>
       <option value="url">url (imagen/doc)</option>
     </select>
-    <input id="valor" placeholder="example.com">
+    <input id="value" placeholder="example.com">
     <button class="primary" id="btnAgregar">+ Add to graph →</button>
   </div>
   <div id="status">Add a target and right-click its node to run transforms.</div>
@@ -190,7 +190,7 @@ const COLOR={objetivo:'#d99a4e',dominio:'#5b9bd5',subdominio:'#7fb8d9',ip:'#d956
 const SHAPE={objetivo:'star',ip:'diamond',email:'triangle',usuario:'hexagon',org:'box',pais:'box',
   puerto:'square',cve:'triangleDown',tech:'dot',plataforma:'dot',repo:'dot',wallet:'diamond',
   credencial:'triangleDown',asn:'box'};
-const SEVCOLOR={critico:'#f7768e',alto:'#ff9e64',medio:'#e0af68',bajo:'#7dcfff'};
+const SEVCOLOR={critical:'#f7768e',high:'#ff9e64',medium:'#e0af68',low:'#7dcfff'};
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
 let entMap={};   // id -> entidad
@@ -223,29 +223,29 @@ function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 
 async function pintarGrafo(){
   const g=await(await fetch('/api/v2/grafo')).json();
-  entMap={}; g.entidades.forEach(e=>entMap[e.id]=e);
-  const idsAhora=new Set(g.entidades.map(e=>e.id));
+  entMap={}; g.entities.forEach(e=>entMap[e.id]=e);
+  const idsAhora=new Set(g.entities.map(e=>e.id));
   nodes.get().forEach(n=>{ if(!idsAhora.has(n.id)) nodes.remove(n.id); });
-  g.entidades.forEach(e=>{
-    const nodo={id:e.id,label:e.valor.length>26?e.valor.slice(0,26)+'…':e.valor,
-      color:{background:COLOR[e.tipo]||'#8b8b98',border:'#0b0d12'},shape:SHAPE[e.tipo]||'dot',
-      title:e.tipo+': '+e.valor};
-    if(e.tags&&e.tags.length) nodo.color.border=SEVCOLOR.critico;   // resaltar entidades con tags
-    nodo.hidden=tiposOcultos.has(e.tipo);
+  g.entities.forEach(e=>{
+    const nodo={id:e.id,label:e.value.length>26?e.value.slice(0,26)+'…':e.value,
+      color:{background:COLOR[e.type]||'#8b8b98',border:'#0b0d12'},shape:SHAPE[e.type]||'dot',
+      title:e.type+': '+e.value};
+    if(e.tags&&e.tags.length) nodo.color.border=SEVCOLOR.critical;   // resaltar entidades con tags
+    nodo.hidden=tiposOcultos.has(e.type);
     nodes.update(nodo);
   });
-  const idsRel=new Set(g.relaciones.map(r=>r.id));
+  const idsRel=new Set(g.relations.map(r=>r.id));
   edges.get().forEach(x=>{ if(!idsRel.has(x.id)) edges.remove(x.id); });
-  g.relaciones.forEach(r=>edges.update({id:r.id,from:r.origen,to:r.destino,label:r.etiqueta}));
+  g.relations.forEach(r=>edges.update({id:r.id,from:r.source,to:r.target,label:r.label}));
   reconstruirFiltros(g);
   pintarHallazgos();
 }
 
 function reconstruirFiltros(g){
-  const tipos=[...new Set(g.entidades.map(e=>e.tipo))].sort();
+  const tipos=[...new Set(g.entities.map(e=>e.type))].sort();
   const cont=$('#filtros'); cont.textContent='';
   tipos.forEach(t=>{
-    const n=g.entidades.filter(e=>e.tipo===t).length;
+    const n=g.entities.filter(e=>e.type===t).length;
     const chip=el('span','chip'+(tiposOcultos.has(t)?' off':''));
     chip.innerHTML='<i style="background:'+(COLOR[t]||'#8b8b98')+'"></i>'+t+' ('+n+')';
     chip.onclick=()=>{ tiposOcultos.has(t)?tiposOcultos.delete(t):tiposOcultos.add(t); aplicarFiltro(); reconstruirFiltros(g); };
@@ -253,12 +253,12 @@ function reconstruirFiltros(g){
   });
 }
 function aplicarFiltro(){
-  nodes.get().forEach(n=>{ const e=entMap[n.id]; if(e) nodes.update({id:n.id,hidden:tiposOcultos.has(e.tipo)}); });
+  nodes.get().forEach(n=>{ const e=entMap[n.id]; if(e) nodes.update({id:n.id,hidden:tiposOcultos.has(e.type)}); });
 }
 function buscarNodo(){
   const q=$('#buscar').value.trim().toLowerCase(); if(!q) return;
-  const hit=Object.values(entMap).find(e=>e.valor.toLowerCase().includes(q));
-  if(hit){ network.selectNodes([hit.id]); network.focus(hit.id,{scale:1.3,animation:true}); mostrarDetalle(hit.id); setStatus('↳ '+hit.valor); }
+  const hit=Object.values(entMap).find(e=>e.value.toLowerCase().includes(q));
+  if(hit){ network.selectNodes([hit.id]); network.focus(hit.id,{scale:1.3,animation:true}); mostrarDetalle(hit.id); setStatus('↳ '+hit.value); }
   else setStatus('no encontrado: '+q,'err');
 }
 function exportarPNG(){
@@ -272,19 +272,19 @@ function reacomodar(){ network.setOptions({physics:{enabled:true}}); network.sta
 function mostrarDetalle(id){
   const e=entMap[id]; if(!e) return;
   const d=$('#detalle'); d.textContent='';
-  const t=el('div','tipo'); t.style.setProperty('--tc',COLOR[e.tipo]); t.textContent=e.tipo; d.appendChild(t);
-  const v=el('div','v'); v.textContent=e.valor; d.appendChild(v);
+  const t=el('div','type'); t.style.setProperty('--tc',COLOR[e.type]); t.textContent=e.type; d.appendChild(t);
+  const v=el('div','v'); v.textContent=e.value; d.appendChild(v);
   (e.tags||[]).forEach(tg=>{const s=el('span','tag');s.textContent=tg;d.appendChild(s);});
-  Object.entries(e.propiedades||{}).slice(0,8).forEach(([k,val])=>{
+  Object.entries(e.properties||{}).slice(0,8).forEach(([k,val])=>{
     const kv=el('div','kv'); kv.innerHTML='<b>'+esc(k)+':</b> '+esc(String(typeof val==='object'?JSON.stringify(val):val).slice(0,140));
     d.appendChild(kv);
   });
-  if((e.origenes||[]).length){const o=el('div','kv');o.innerHTML='<b>fuentes:</b> '+e.origenes.map(esc).join(', ');d.appendChild(o);}
+  if((e.sources||[]).length){const o=el('div','kv');o.innerHTML='<b>fuentes:</b> '+e.sources.map(esc).join(', ');d.appendChild(o);}
   // evidence chain (step 89): how this datum was reached
-  if((e.procedencia||[]).length){
-    const p=e.procedencia[0], inp=entMap[p.input];
+  if((e.provenance||[]).length){
+    const p=e.provenance[0], inp=entMap[p.input];
     const c=el('div','kv');
-    c.innerHTML='<b>hallado por:</b> '+esc(p.transform)+(inp?' ← <span style="color:var(--cyan)">'+esc(inp.valor)+'</span>':'');
+    c.innerHTML='<b>hallado por:</b> '+esc(p.transform)+(inp?' ← <span style="color:var(--cyan)">'+esc(inp.value)+'</span>':'');
     d.appendChild(c);
     const bc=el('button','tagbtn'); bc.textContent='🔗 highlight chain'; bc.style.marginTop='.3rem';
     bc.onclick=()=>{ const ch=cadenaIds(e.id); network.selectNodes(ch); network.fit({nodes:ch,animation:true}); setStatus('chain: '+ch.length+' pasos'); };
@@ -299,33 +299,33 @@ function mostrarDetalle(id){
   });
   d.appendChild(tb);
   // nota del analista
-  const ta=el('textarea','nota'); ta.placeholder='analyst note…'; ta.value=e.propiedades.nota||'';
+  const ta=el('textarea','nota'); ta.placeholder='analyst note…'; ta.value=e.properties.nota||'';
   ta.onchange=()=>guardarNota(e.id,ta.value); d.appendChild(ta);
   // MÓDULOS: transforms aplicables a este nodo, visibles y a un click
   const modBox=el('div','modbox');
-  const mt=el('div','modtit'); mt.textContent='MODULES · '+e.tipo; modBox.appendChild(mt);
+  const mt=el('div','modtit'); mt.textContent='MODULES · '+e.type; modBox.appendChild(mt);
   d.appendChild(modBox);
-  cargarModulos(e.tipo, e.valor, modBox);
+  cargarModulos(e.type, e.value, modBox);
   const h=el('div','hint'); h.textContent='↳ click a module to run it (or right-click the node)'; d.appendChild(h);
 }
 const _transformsCache={};
-async function cargarModulos(tipo, valor, cont){
-  let lista=_transformsCache[tipo];
-  if(!lista){ try{ lista=(await (await fetch('/api/v2/transforms/'+tipo)).json()).transforms||[]; _transformsCache[tipo]=lista; }catch(_){ lista=[]; } }
+async function cargarModulos(type, value, cont){
+  let lista=_transformsCache[type];
+  if(!lista){ try{ lista=(await (await fetch('/api/v2/transforms/'+type)).json()).transforms||[]; _transformsCache[type]=lista; }catch(_){ lista=[]; } }
   if(!lista.length){ const x=el('div','vacio'); x.textContent='(no modules for this type)'; cont.appendChild(x); return; }
   const grid=el('div','modgrid');
   lista.forEach(t=>{
     const b=el('button','modbtn');
     b.innerHTML=esc(t.nombre)+(t.requiere_key?' <span class="key">⚿</span>':'');
-    b.title=(t.descripcion||'')+(t.requiere_key?' · necesita API key (🔑)':''); b.onclick=()=>correr(tipo, valor, t.nombre, t.requiere_key);
+    b.title=(t.descripcion||'')+(t.requiere_key?' · necesita API key (🔑)':''); b.onclick=()=>correr(type, value, t.nombre, t.requiere_key);
     grid.appendChild(b);
   });
   cont.appendChild(grid);
 }
 function cadenaIds(id){   // walk backward through provenance to the seed
   const chain=[id], visto=new Set([id]); let cur=entMap[id];
-  while(cur&&cur.procedencia&&cur.procedencia.length){
-    const inp=cur.procedencia[0].input;
+  while(cur&&cur.provenance&&cur.provenance.length){
+    const inp=cur.provenance[0].input;
     if(!inp||visto.has(inp))break;
     chain.push(inp); visto.add(inp); cur=entMap[inp];
   }
@@ -342,11 +342,11 @@ async function guardarNota(id,nota){
 
 async function menuTransforms(ids,ev){
   const primero=entMap[ids[0]]; if(!primero) return;
-  const tipo=primero.tipo;
-  const mismos=ids.filter(i=>entMap[i]&&entMap[i].tipo===tipo);   // paso 86: solo del mismo tipo
+  const type=primero.type;
+  const mismos=ids.filter(i=>entMap[i]&&entMap[i].type===type);   // paso 86: solo del mismo type
   const ctx=$('#ctx'); ctx.textContent='';
-  const tit=el('div','titulo'); tit.textContent='transforms · '+tipo+(mismos.length>1?' ('+mismos.length+' nodos)':''); ctx.appendChild(tit);
-  const d=await(await fetch('/api/v2/transforms/'+tipo)).json();
+  const tit=el('div','titulo'); tit.textContent='transforms · '+type+(mismos.length>1?' ('+mismos.length+' nodos)':''); ctx.appendChild(tit);
+  const d=await(await fetch('/api/v2/transforms/'+type)).json();
   if(!d.transforms.length){ const b=el('button'); b.textContent='(no transforms)'; b.disabled=true; ctx.appendChild(b); }
   d.transforms.forEach(t=>{
     const b=el('button');
@@ -364,18 +364,18 @@ async function correrEn(ids,nombre){
   let ok=0;
   for(const i of ids){ const e=entMap[i]; if(!e) continue;
     try{ const r=await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({tipo:e.tipo,valor:e.valor,transform:nombre})}); if(r.ok)ok++; }catch(_){}
+      body:JSON.stringify({type:e.type,value:e.value,transform:nombre})}); if(r.ok)ok++; }catch(_){}
   }
   setStatus('✓ '+nombre+' en '+ok+'/'+ids.length+' nodo(s)'); await pintarGrafo();
 }
 function ocultarCtx(){ $('#ctx').style.display='none'; }
 document.addEventListener('click',e=>{ if(!$('#ctx').contains(e.target)) ocultarCtx(); });
 
-async function correr(tipo,valor,nombre,requiereKey){
-  setStatus('running '+nombre+' sobre '+valor+'…','run');
+async function correr(type,value,nombre,requiereKey){
+  setStatus('running '+nombre+' sobre '+value+'…','run');
   try{
     const r=await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({tipo,valor,transform:nombre})});
+      body:JSON.stringify({type,value,transform:nombre})});
     const d=await r.json();
     if(!r.ok){ setStatus('error: '+(d.error||r.status),'err'); return; }
     const n=d.producidas?d.producidas.length:0;
@@ -386,13 +386,13 @@ async function correr(tipo,valor,nombre,requiereKey){
 }
 
 async function agregar(){
-  const tipo=$('#tipo').value, valor=$('#valor').value.trim();
-  if(!valor){ setStatus('type a target first.','err'); return; }
+  const type=$('#type').value, value=$('#value').value.trim();
+  if(!value){ setStatus('type a target first.','err'); return; }
   const r=await fetch('/api/v2/entidad',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({tipo,valor})});
+    body:JSON.stringify({type,value})});
   const d=await r.json();
   if(!r.ok){ setStatus('error: '+(d.error||r.status),'err'); return; }
-  $('#valor').value=''; setStatus('node added. Right-click it to run transforms.');
+  $('#value').value=''; setStatus('node added. Right-click it to run transforms.');
   await pintarGrafo(); if(d.id){ network.selectNodes([d.id]); mostrarDetalle(d.id); }
 }
 
@@ -446,7 +446,7 @@ async function crearWs(){ const n=$('#wsNuevo').value.trim(); if(!n){setStatus('
   $('#wsNuevo').value=''; setStatus('workspace creado: '+d.activo); await cargarWorkspaces(); await pintarGrafo(); }
 
 $('#btnAgregar').onclick=agregar;
-$('#valor').addEventListener('keydown',e=>{ if(e.key==='Enter')agregar(); });
+$('#value').addEventListener('keydown',e=>{ if(e.key==='Enter')agregar(); });
 $('#btnAbrir').onclick=abrirWs; $('#btnCrear').onclick=crearWs;
 $('#wsNuevo').addEventListener('keydown',e=>{ if(e.key==='Enter')crearWs(); });
 $('#btnIA').onclick=analizarIA; $('#btnEscudo').onclick=segundoEscudo;
@@ -459,7 +459,7 @@ function timeline(){
   const campos={creado:'dominio registrado',cert_desde:'cert emitido',cert_expira:'cert expira',wayback_desde:'primer snapshot'};
   const ent=[];
   Object.values(entMap).forEach(e=>Object.entries(campos).forEach(([k,ev])=>{
-    if(e.propiedades&&e.propiedades[k]){ const f=parseFecha(String(e.propiedades[k])); if(f) ent.push({f,ev,quien:e.valor}); }
+    if(e.properties&&e.properties[k]){ const f=parseFecha(String(e.properties[k])); if(f) ent.push({f,ev,quien:e.value}); }
   }));
   ent.sort((a,b)=>a.f-b.f);
   const ov=$('#timeline');
@@ -494,7 +494,7 @@ async function panelKeys(){
     const lab=el('span','ks'); lab.innerHTML=esc(s)+(ok?' <b style="color:var(--green)">●</b>':''); row.appendChild(lab);
     const inp=el('input'); inp.type='password'; inp.placeholder=ok?'(configurada) — nueva para reemplazar':hint; row.appendChild(inp);
     const g=el('button'); g.textContent='guardar'; g.onclick=async()=>{ if(!inp.value)return;
-      await fetch('/api/v2/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({servicio:s,valor:inp.value})});
+      await fetch('/api/v2/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({servicio:s,value:inp.value})});
       inp.value=''; setStatus('🔑 '+s+' guardada'); panelKeys(); }; row.appendChild(g);
     const st=el('span','kst');
     if(OBTENER[s]){ const o=el('a'); o.textContent='get'; o.href=OBTENER[s]; o.target='_blank'; o.style.cssText='color:var(--muted);font-size:.68rem;text-decoration:underline'; row.appendChild(o); }

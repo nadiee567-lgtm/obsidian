@@ -13,7 +13,7 @@ from core.exportar import exportar_json, exportar_csv
 
 def _demo():
     alm = Store()
-    d = alm.create('dominio', 'objetivo.com', propiedades={'org': 'ACME'})
+    d = alm.create('dominio', 'objetivo.com', properties={'org': 'ACME'})
     ip = alm.create('ip', '93.184.216.34')
     ip.tag('listado-amenaza')
     alm.relate(d.id, ip.id, 'resuelve')
@@ -31,8 +31,8 @@ def test_json_reimportable():
     # the full case can be reconstructed
     alm2 = Store.from_dict(obj)
     assert len(alm2) == len(alm) == 2
-    assert {e.valor for e in alm2.entidades} == {'objetivo.com', '93.184.216.34'}
-    assert len(alm2.relaciones) == 1
+    assert {e.value for e in alm2.entities} == {'objetivo.com', '93.184.216.34'}
+    assert len(alm2.relations) == 1
 
 
 def test_csv_tiene_cabecera_y_filas():

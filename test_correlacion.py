@@ -8,7 +8,7 @@ from core.correlacion import correlate, risk_score, Finding
 
 def test_puerto_sensible():
     alm = Store()
-    alm.create('puerto', '1.2.3.4:3389', propiedades={'servicio': 'rdp'})
+    alm.create('puerto', '1.2.3.4:3389', properties={'servicio': 'rdp'})
     alm.create('puerto', '1.2.3.4:443')   # https, not sensitive
     h = correlate(alm)
     reglas = [x.regla for x in h]
@@ -18,8 +18,8 @@ def test_puerto_sensible():
 
 def test_cert_vencido():
     alm = Store()
-    alm.create('dominio', 'viejo.com', propiedades={'cert_expira': 'Jan 1 00:00:00 2020 GMT'})
-    alm.create('dominio', 'nuevo.com', propiedades={'cert_expira': 'Jan 1 00:00:00 2099 GMT'})
+    alm.create('dominio', 'viejo.com', properties={'cert_expira': 'Jan 1 00:00:00 2020 GMT'})
+    alm.create('dominio', 'nuevo.com', properties={'cert_expira': 'Jan 1 00:00:00 2099 GMT'})
     reglas = [x.regla for x in correlate(alm)]
     assert reglas.count('cert-vencido') == 1   # only the 2020 one
 

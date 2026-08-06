@@ -6,7 +6,7 @@ progress via Server-Sent Events. PURE module (knows nothing of Flask): exposes
 events as a queue that the SSE endpoint drains.
 
 The job receives an `emit(event)` to publish progress. When it finishes an event
-{'tipo':'fin'} is enqueued."""
+{'type':'fin'} is enqueued."""
 from __future__ import annotations
 import queue
 import threading
@@ -33,7 +33,7 @@ class TaskManager:
                 est['estado'] = 'error'
                 est['resultado'] = {'error': str(e)}
             finally:
-                est['eventos'].put({'tipo': 'fin', 'estado': est['estado']})
+                est['eventos'].put({'type': 'fin', 'estado': est['estado']})
 
         threading.Thread(target=_run, daemon=True).start()
         return tid
@@ -51,5 +51,5 @@ class TaskManager:
         while True:
             ev = q.get()
             yield ev
-            if ev.get('tipo') == 'fin':
+            if ev.get('type') == 'fin':
                 break

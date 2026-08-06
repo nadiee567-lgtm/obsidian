@@ -21,22 +21,22 @@ from dataclasses import dataclass, field
 def snapshot(almacen) -> dict:
     """Snapshot of the relevant state to detect changes."""
     ents = {}
-    for e in almacen.entidades:
+    for e in almacen.entities:
         ents[e.id] = {
-            'tipo': e.tipo,
-            'valor': e.valor,
-            'props': {k: str(v) for k, v in (e.propiedades or {}).items()},
+            'type': e.type,
+            'value': e.value,
+            'props': {k: str(v) for k, v in (e.properties or {}).items()},
             'tags': sorted(e.tags),
         }
-    return {'ents': ents, 'rels': {r.id for r in almacen.relaciones}}
+    return {'ents': ents, 'rels': {r.id for r in almacen.relations}}
 
 
 @dataclass
 class Changes:
     """What changed between two snapshots."""
-    nuevas_entidades: list = field(default_factory=list)   # dicts {tipo,valor}  # noqa
+    nuevas_entidades: list = field(default_factory=list)   # dicts {type,value}  # noqa
     nuevas_relaciones: list = field(default_factory=list)  # ids
-    cambios_prop: list = field(default_factory=list)       # {entidad,tipo,campo,antes,ahora}  # noqa
+    cambios_prop: list = field(default_factory=list)       # {entidad,type,campo,antes,ahora}  # noqa
 
     def hay(self) -> bool:
         return bool(self.nuevas_entidades or self.nuevas_relaciones or self.cambios_prop)
@@ -44,7 +44,7 @@ class Changes:
     def resumen(self) -> str:
         partes = []
         if self.nuevas_entidades:
-            ej = ', '.join(e['valor'] for e in self.nuevas_entidades[:3])
+            ej = ', '.join(e['value'] for e in self.nuevas_entidades[:3])
             mas = f' (+{len(self.nuevas_entidades) - 3} more)' if len(self.nuevas_entidades) > 3 else ''
             partes.append(f'{len(self.nuevas_entidades)} new entity(ies): {ej}{mas}')
         if self.cambios_prop:
@@ -62,7 +62,7 @@ class Changes:
 def diff(antes: dict, despues: dict) -> Changes:
     """Compares two snapshots and returns the changes."""
     a, d = antes['ents'], despues['ents']
-    nuevas = [{'tipo': d[i]['tipo'], 'valor': d[i]['valor']} for i in d if i not in a]
+    nuevas = [{'type': d[i]['type'], 'value': d[i]['value']} for i in d if i not in a]
     nuevas_rel = sorted(despues['rels'] - antes['rels'])
     cambios = []
     for i in d:
@@ -71,11 +71,11 @@ def diff(antes: dict, despues: dict) -> Changes:
         # properties that appeared or changed value
         for k, v in d[i]['props'].items():
             if a[i]['props'].get(k) != v:
-                cambios.append({'entidad': d[i]['valor'], 'tipo': d[i]['tipo'],
+                cambios.append({'entidad': d[i]['value'], 'type': d[i]['type'],
                                 'campo': k, 'antes': a[i]['props'].get(k), 'ahora': v})
         # new tags (e.g. 'vulnerable', 'takeover' appear after a re-scan)
         for t in sorted(set(d[i]['tags']) - set(a[i]['tags'])):
-            cambios.append({'entidad': d[i]['valor'], 'tipo': d[i]['tipo'],
+            cambios.append({'entidad': d[i]['value'], 'type': d[i]['type'],
                             'campo': 'tag', 'antes': None, 'ahora': t})
     return Changes(nuevas, nuevas_rel, cambios)
 

@@ -14,7 +14,7 @@ def test_diff_detecta_entidad_nueva():
     cambios = diff(antes, snapshot(alm))
     assert cambios.hay()
     assert len(cambios.nuevas_entidades) == 1
-    assert cambios.nuevas_entidades[0]['valor'] == 'nuevo.objetivo.com'
+    assert cambios.nuevas_entidades[0]['value'] == 'nuevo.objetivo.com'
 
 
 def test_diff_detecta_relacion_nueva():
@@ -29,9 +29,9 @@ def test_diff_detecta_relacion_nueva():
 
 def test_diff_detecta_cambio_de_propiedad():
     alm = Store()
-    d = alm.create('dominio', 'objetivo.com', propiedades={'cert_expira': '2027'})
+    d = alm.create('dominio', 'objetivo.com', properties={'cert_expira': '2027'})
     antes = snapshot(alm)
-    d.propiedades['cert_expira'] = '2020'              # the cert changed (expired)
+    d.properties['cert_expira'] = '2020'              # the cert changed (expired)
     cambios = diff(antes, snapshot(alm))
     assert len(cambios.cambios_prop) == 1
     c = cambios.cambios_prop[0]

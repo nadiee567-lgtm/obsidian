@@ -52,19 +52,19 @@ def test_v2_transforms_aplicables():
 
 def test_v2_run_rechaza_arg_injection():
     c = _client()
-    r = c.post('/api/v2/run', json={'tipo': 'ip', 'valor': '-oG/tmp/x', 'transform': 'ptr'})
+    r = c.post('/api/v2/run', json={'type': 'ip', 'value': '-oG/tmp/x', 'transform': 'ptr'})
     assert r.status_code == 400
 
 
 def test_v2_run_tipo_invalido():
     c = _client()
-    r = c.post('/api/v2/run', json={'tipo': 'inventado', 'valor': 'x', 'transform': 'ptr'})
+    r = c.post('/api/v2/run', json={'type': 'inventado', 'value': 'x', 'transform': 'ptr'})
     assert r.status_code == 400
 
 
 def test_v2_run_transform_inexistente():
     c = _client()
-    r = c.post('/api/v2/run', json={'tipo': 'dominio', 'valor': 'example.com', 'transform': 'noexiste'})
+    r = c.post('/api/v2/run', json={'type': 'dominio', 'value': 'example.com', 'transform': 'noexiste'})
     assert r.status_code == 400
 
 
@@ -72,7 +72,7 @@ def test_v2_grafo_migrar_vacio():
     c = _client()
     r = c.get('/api/v2/grafo?migrar=1')
     assert r.status_code == 200
-    assert r.get_json() == {'entidades': [], 'relaciones': []}
+    assert r.get_json() == {'entities': [], 'relations': []}
 
 
 def test_auth_protege_v2():

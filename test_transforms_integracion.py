@@ -15,17 +15,17 @@ class FakeResp:
         return self._data
 
 
-def _correr(nombre, tipo, valor):
+def _correr(nombre, type, value):
     alm = Store()
-    e = alm.create(tipo, valor)
+    e = alm.create(type, value)
     return run_by_name(nombre, e, alm)
 
 
 def test_dns_a(monkeypatch):
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: '1.2.3.4\n5.6.7.8\n')
     prod = _correr('dns_a', 'dominio', 'ejemplo.com')
-    assert {e.valor for e in prod} == {'1.2.3.4', '5.6.7.8'}
-    assert all(e.tipo == 'ip' for e in prod)
+    assert {e.value for e in prod} == {'1.2.3.4', '5.6.7.8'}
+    assert all(e.type == 'ip' for e in prod)
 
 
 def test_dns_a_sin_resultados(monkeypatch):
@@ -36,22 +36,22 @@ def test_dns_a_sin_resultados(monkeypatch):
 def test_dns_a_ignora_basura(monkeypatch):
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: ';; connection timed out\n1.2.3.4\n')
     prod = _correr('dns_a', 'dominio', 'ejemplo.com')
-    assert {e.valor for e in prod} == {'1.2.3.4'}      # discards non-IP
+    assert {e.value for e in prod} == {'1.2.3.4'}      # discards non-IP
 
 
 def test_ptr(monkeypatch):
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: 'host.ejemplo.com.\n')
     prod = _correr('ptr', 'ip', '1.2.3.4')
-    assert prod[0].tipo == 'dominio' and prod[0].valor == 'host.ejemplo.com'
+    assert prod[0].type == 'dominio' and prod[0].value == 'host.ejemplo.com'
 
 
 def test_crtsh(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: FakeResp([{'name_value': 'a.ejemplo.com\n*.b.ejemplo.com'}]))
     prod = _correr('crtsh', 'dominio', 'ejemplo.com')
-    vals = {e.valor for e in prod}
+    vals = {e.value for e in prod}
     assert 'a.ejemplo.com' in vals and 'b.ejemplo.com' in vals
-    assert all(e.tipo == 'subdominio' for e in prod)
+    assert all(e.type == 'subdominio' for e in prod)
 
 
 def test_geo_ip(monkeypatch):
@@ -59,7 +59,7 @@ def test_geo_ip(monkeypatch):
                         lambda *a, **k: FakeResp({'status': 'success', 'country': 'United States',
                                                   'org': 'ACME', 'as': 'AS123 ACME'}))
     prod = _correr('geo_ip', 'ip', '1.2.3.4')
-    assert {e.tipo for e in prod} == {'pais', 'org', 'asn'}
+    assert {e.type for e in prod} == {'pais', 'org', 'asn'}
 
 
 def test_geo_ip_status_fail(monkeypatch):
@@ -76,9 +76,9 @@ def test_shodan(monkeypatch):
         {'port': 8443, 'product': 'nginx'}]}       # nginx repeated → a single tech
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: FakeResp(host))
     prod = _correr('shodan', 'ip', '1.2.3.4')
-    puertos = {e.valor for e in prod if e.tipo == 'puerto'}
-    techs = {e.valor for e in prod if e.tipo == 'tech'}
-    orgs = {e.valor for e in prod if e.tipo == 'org'}
+    puertos = {e.value for e in prod if e.type == 'puerto'}
+    techs = {e.value for e in prod if e.type == 'tech'}
+    orgs = {e.value for e in prod if e.type == 'org'}
     assert puertos == {'1.2.3.4:443', '1.2.3.4:22', '1.2.3.4:8443'}
     assert techs == {'nginx', 'OpenSSH'}
     assert orgs == {'ACME Corp'}

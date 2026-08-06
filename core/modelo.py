@@ -27,55 +27,55 @@ _TIPO_VALIDACION = {
 
 # ── Step 13: entity type catalog ─────────────────────────────────────────────
 # Single source of truth for which types exist and how they look (the graph will
-# read from here in F6). etiqueta = readable name; color = palette used in the graph.
+# read from here in F6). label = readable name; color = palette used in the graph.
 TIPOS = {
-    'objetivo':   {'etiqueta': 'Target',       'color': '#d99a4e'},
-    'dominio':    {'etiqueta': 'Domain',       'color': '#5b9bd5'},
-    'subdominio': {'etiqueta': 'Subdomain',    'color': '#7fb8d9'},
-    'ip':         {'etiqueta': 'IP',           'color': '#d9564b'},
-    'email':      {'etiqueta': 'Email',        'color': '#6fae7c'},
-    'usuario':    {'etiqueta': 'Username',     'color': '#cc9a3c'},
-    'telefono':   {'etiqueta': 'Phone',        'color': '#c99a6b'},
-    'persona':    {'etiqueta': 'Person',       'color': '#e0af68'},
-    'org':        {'etiqueta': 'Organization', 'color': '#b07a9e'},
-    'url':        {'etiqueta': 'URL',          'color': '#5fa8a0'},
-    'puerto':     {'etiqueta': 'Port',         'color': '#8b8b98'},
-    'hash':       {'etiqueta': 'Hash',         'color': '#9a7ecc'},
-    'archivo':    {'etiqueta': 'File',         'color': '#7a85b0'},
-    'cve':        {'etiqueta': 'CVE',          'color': '#d9564b'},
-    'bucket':     {'etiqueta': 'Bucket',       'color': '#d9564b'},
-    'credencial': {'etiqueta': 'Credential',   'color': '#f7768e'},
-    'asn':        {'etiqueta': 'ASN',          'color': '#7a85b0'},
-    'pais':       {'etiqueta': 'Country',      'color': '#7a85b0'},
-    'tech':       {'etiqueta': 'Technology',   'color': '#5fa8a0'},
-    'imagen':     {'etiqueta': 'Image',        'color': '#73daca'},
-    'wallet':     {'etiqueta': 'Wallet',       'color': '#e0af68'},
-    'plataforma': {'etiqueta': 'Platform',     'color': '#c17a52'},
-    'repo':       {'etiqueta': 'Repository',   'color': '#d99a4e'},
+    'objetivo':   {'label': 'Target',       'color': '#d99a4e'},
+    'dominio':    {'label': 'Domain',       'color': '#5b9bd5'},
+    'subdominio': {'label': 'Subdomain',    'color': '#7fb8d9'},
+    'ip':         {'label': 'IP',           'color': '#d9564b'},
+    'email':      {'label': 'Email',        'color': '#6fae7c'},
+    'usuario':    {'label': 'Username',     'color': '#cc9a3c'},
+    'telefono':   {'label': 'Phone',        'color': '#c99a6b'},
+    'persona':    {'label': 'Person',       'color': '#e0af68'},
+    'org':        {'label': 'Organization', 'color': '#b07a9e'},
+    'url':        {'label': 'URL',          'color': '#5fa8a0'},
+    'puerto':     {'label': 'Port',         'color': '#8b8b98'},
+    'hash':       {'label': 'Hash',         'color': '#9a7ecc'},
+    'archivo':    {'label': 'File',         'color': '#7a85b0'},
+    'cve':        {'label': 'CVE',          'color': '#d9564b'},
+    'bucket':     {'label': 'Bucket',       'color': '#d9564b'},
+    'credencial': {'label': 'Credential',   'color': '#f7768e'},
+    'asn':        {'label': 'ASN',          'color': '#7a85b0'},
+    'pais':       {'label': 'Country',      'color': '#7a85b0'},
+    'tech':       {'label': 'Technology',   'color': '#5fa8a0'},
+    'imagen':     {'label': 'Image',        'color': '#73daca'},
+    'wallet':     {'label': 'Wallet',       'color': '#e0af68'},
+    'plataforma': {'label': 'Platform',     'color': '#c17a52'},
+    'repo':       {'label': 'Repository',   'color': '#d99a4e'},
 }
 
 
-def valid_type(tipo: str) -> bool:
-    return tipo in TIPOS
+def valid_type(type: str) -> bool:
+    return type in TIPOS
 
 
 # ── Step 22: per-type normalizers (for stable dedup) ─────────────────────────
-def normalize(tipo: str, valor: str) -> str:
+def normalize(type: str, value: str) -> str:
     """Canonical form of a value, so two writes of the same datum yield the same
     id. E.g.: 'WWW.Example.COM.' and 'example.com' -> 'example.com'."""
-    v = (valor or '').strip()
-    if tipo in ('dominio', 'subdominio'):
+    v = (value or '').strip()
+    if type in ('dominio', 'subdominio'):
         v = v.lower().rstrip('.')
         if v.startswith('www.'):
             v = v[4:]
-    elif tipo == 'ip':
+    elif type == 'ip':
         try:
             v = str(ipaddress.ip_address(v))   # compresses IPv6, validates
         except ValueError:
             pass
-    elif tipo == 'email':
+    elif type == 'email':
         v = v.lower()
-    elif tipo == 'url':
+    elif type == 'url':
         v = v.rstrip('/')
     return v
 
@@ -89,25 +89,25 @@ def _ahora() -> str:
 class Entity:
     """Atomic unit of data. The id derives from (type, normalized value), so two
     entities of the same datum are the SAME entity even if another source creates
-    it. `origenes` accumulates which transforms produced it (traceability)."""
-    tipo: str
-    valor: str
-    propiedades: dict = field(default_factory=dict)
-    origenes: set = field(default_factory=set)     # transform/source names
-    procedencia: list = field(default_factory=list)  # step 18: [{transform, input}]
+    it. `sources` accumulates which transforms produced it (traceability)."""
+    type: str
+    value: str
+    properties: dict = field(default_factory=dict)
+    sources: set = field(default_factory=set)     # transform/source names
+    provenance: list = field(default_factory=list)  # step 18: [{transform, input}]
     tags: set = field(default_factory=set)          # step 23: interesting/suspicious/...
-    confianza: float = 1.0                          # 0..1
-    creada: str = field(default_factory=_ahora)
+    confidence: float = 1.0                          # 0..1
+    created: str = field(default_factory=_ahora)
     id: str = field(default='', init=False)
 
     def __post_init__(self):
-        if not valid_type(self.tipo):
-            raise ValueError(f"unknown entity type: {self.tipo!r}")
-        self.valor = normalize(self.tipo, self.valor)
-        if not self.valor:
+        if not valid_type(self.type):
+            raise ValueError(f"unknown entity type: {self.type!r}")
+        self.value = normalize(self.type, self.value)
+        if not self.value:
             raise ValueError("empty entity value")
-        if isinstance(self.origenes, (list, tuple)):
-            self.origenes = set(self.origenes)
+        if isinstance(self.sources, (list, tuple)):
+            self.sources = set(self.sources)
         if isinstance(self.tags, (list, tuple)):
             self.tags = set(self.tags)
         self.id = self._compute_id()
@@ -122,13 +122,13 @@ class Entity:
     # ── Step 18: detailed traceability ──
     def note_provenance(self, transform, input_id=None) -> None:
         """Records which transform (and on which input entity) created it."""
-        self.origenes.add(transform)
+        self.sources.add(transform)
         entrada = {'transform': transform, 'input': input_id}
-        if entrada not in self.procedencia:
-            self.procedencia.append(entrada)
+        if entrada not in self.provenance:
+            self.provenance.append(entrada)
 
     def _compute_id(self) -> str:
-        base = f"{self.tipo}:{self.valor}".encode('utf-8')
+        base = f"{self.type}:{self.value}".encode('utf-8')
         return hashlib.sha1(base).hexdigest()[:16]
 
     def well_formed(self) -> bool:
@@ -136,41 +136,41 @@ class Entity:
         validators (step 25). Types without a strict shape (persona, org, hash...)
         return True. Not enforced at construction: it's an optional check so
         transforms can filter junk before adding."""
-        tv = _TIPO_VALIDACION.get(self.tipo)
-        return True if tv is None else _validar(self.valor, tv)
+        tv = _TIPO_VALIDACION.get(self.type)
+        return True if tv is None else _validar(self.value, tv)
 
     def merge(self, otra: 'Entity') -> None:
         """Absorbs another entity of the same id (step 17): merges origins and
         properties, raises confidence, keeps the oldest date."""
         if otra.id != self.id:
             raise ValueError("cannot merge entities of different id")
-        self.origenes |= otra.origenes
+        self.sources |= otra.sources
         self.tags |= otra.tags
-        for p in otra.procedencia:
-            if p not in self.procedencia:
-                self.procedencia.append(p)
-        for k, v in otra.propiedades.items():
+        for p in otra.provenance:
+            if p not in self.provenance:
+                self.provenance.append(p)
+        for k, v in otra.properties.items():
             if v not in (None, '', [], {}):
-                self.propiedades[k] = v
-        self.confianza = max(self.confianza, otra.confianza)
-        self.creada = min(self.creada, otra.creada)
+                self.properties[k] = v
+        self.confidence = max(self.confidence, otra.confidence)
+        self.created = min(self.created, otra.created)
 
     # ── Step 21: serialization ──
     def to_dict(self) -> dict:
         d = asdict(self)
-        d['origenes'] = sorted(self.origenes)   # a set is not JSON-serializable
+        d['sources'] = sorted(self.sources)   # a set is not JSON-serializable
         d['tags'] = sorted(self.tags)
         return d
 
     @classmethod
     def from_dict(cls, d: dict) -> 'Entity':
-        e = cls(tipo=d['tipo'], valor=d['valor'],
-                propiedades=dict(d.get('propiedades', {})),
-                origenes=set(d.get('origenes', [])),
-                procedencia=list(d.get('procedencia', [])),
+        e = cls(type=d['type'], value=d['value'],
+                properties=dict(d.get('properties', {})),
+                sources=set(d.get('sources', [])),
+                provenance=list(d.get('provenance', [])),
                 tags=set(d.get('tags', [])),
-                confianza=d.get('confianza', 1.0))
-        e.creada = d.get('creada', e.creada)
+                confidence=d.get('confidence', 1.0))
+        e.created = d.get('created', e.created)
         return e
 
 
@@ -179,13 +179,13 @@ class Entity:
 class Relation:
     """Typed, directed edge between two entities (by id). Deterministic id from
     (source, target, label) -> the same relation is never duplicated."""
-    origen: str        # entity id
-    destino: str       # entity id
-    etiqueta: str = ''
+    source: str        # entity id
+    target: str       # entity id
+    label: str = ''
     id: str = field(default='', init=False)
 
     def __post_init__(self):
-        base = f"{self.origen}>{self.destino}:{self.etiqueta}".encode('utf-8')
+        base = f"{self.source}>{self.target}:{self.label}".encode('utf-8')
         self.id = hashlib.sha1(base).hexdigest()[:16]
 
     def to_dict(self) -> dict:
@@ -193,7 +193,7 @@ class Relation:
 
     @classmethod
     def from_dict(cls, d: dict) -> 'Relation':
-        return cls(origen=d['origen'], destino=d['destino'], etiqueta=d.get('etiqueta', ''))
+        return cls(source=d['source'], target=d['target'], label=d.get('label', ''))
 
 
 # ── Steps 16 + 17: the Store with automatic dedup ────────────────────────────
@@ -220,31 +220,31 @@ class Store:
             self._publish('entidad_actualizada', existente)
             return existente
         self._entidades[ent.id] = ent
-        self._por_tipo.setdefault(ent.tipo, set()).add(ent.id)
+        self._por_tipo.setdefault(ent.type, set()).add(ent.id)
         self._publish('entidad_nueva', ent)
         return ent
 
-    def create(self, tipo, valor, **kw) -> Entity:
+    def create(self, type, value, **kw) -> Entity:
         """Shortcut: builds an Entity and adds it (deduplicating)."""
-        return self.add(Entity(tipo=tipo, valor=valor, **kw))
+        return self.add(Entity(type=type, value=value, **kw))
 
     def get(self, id_: str) -> Entity | None:
         return self._entidades.get(id_)
 
-    def buscar(self, tipo, valor) -> Entity | None:
+    def buscar(self, type, value) -> Entity | None:
         """Looks up by (type, value) without adding -- respects normalization."""
-        eid = hashlib.sha1(f"{tipo}:{normalize(tipo, valor)}".encode()).hexdigest()[:16]
+        eid = hashlib.sha1(f"{type}:{normalize(type, value)}".encode()).hexdigest()[:16]
         return self._entidades.get(eid)
 
-    def of_type(self, tipo) -> list:
-        return [self._entidades[i] for i in self._por_tipo.get(tipo, ())]
+    def of_type(self, type) -> list:
+        return [self._entidades[i] for i in self._por_tipo.get(type, ())]
 
     # -- relations --
-    def relate(self, origen, destino, etiqueta='') -> Relation:
+    def relate(self, source, target, label='') -> Relation:
         """Connects two entities (by id or Entity object). Deduplicates."""
-        oid = origen.id if isinstance(origen, Entity) else origen
-        did = destino.id if isinstance(destino, Entity) else destino
-        rel = Relation(origen=oid, destino=did, etiqueta=etiqueta)
+        oid = source.id if isinstance(source, Entity) else source
+        did = target.id if isinstance(target, Entity) else target
+        rel = Relation(source=oid, target=did, label=label)
         if rel.id not in self._relaciones:
             self._relaciones[rel.id] = rel
             self._publish('relacion_nueva', rel)
@@ -252,11 +252,11 @@ class Store:
 
     # -- views --
     @property
-    def entidades(self) -> list:
+    def entities(self) -> list:
         return list(self._entidades.values())
 
     @property
-    def relaciones(self) -> list:
+    def relations(self) -> list:
         return list(self._relaciones.values())
 
     def __len__(self) -> int:
@@ -265,16 +265,16 @@ class Store:
     # ── Step 21: full-case serialization ──
     def to_dict(self) -> dict:
         return {
-            'entidades': [e.to_dict() for e in self._entidades.values()],
-            'relaciones': [r.to_dict() for r in self._relaciones.values()],
+            'entities': [e.to_dict() for e in self._entidades.values()],
+            'relations': [r.to_dict() for r in self._relaciones.values()],
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> 'Store':
         alm = cls()
-        for ed in d.get('entidades', []):
+        for ed in d.get('entities', []):
             alm.add(Entity.from_dict(ed))
-        for rd in d.get('relaciones', []):
+        for rd in d.get('relations', []):
             r = Relation.from_dict(rd)
             alm._relaciones[r.id] = r
         return alm

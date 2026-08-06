@@ -16,7 +16,7 @@ def _fake_a(entidad, ctx):
 
 @transform(entrada='dominio', salidas=('subdominio',), nombre='_test_lote_b')
 def _fake_b(entidad, ctx):
-    ctx.emitir('subdominio', 'x.' + entidad.valor)
+    ctx.emitir('subdominio', 'x.' + entidad.value)
 
 
 def test_lote_fusiona_resultados():
@@ -26,9 +26,9 @@ def test_lote_fusiona_resultados():
     assert dict(res) == {'_test_lote_a': 2, '_test_lote_b': 1}
     # shared seed (dedup) + 2 ip + 1 subdomain = 4
     assert len(alm) == 4
-    assert {e.tipo for e in alm.entidades} == {'dominio', 'ip', 'subdominio'}
+    assert {e.type for e in alm.entities} == {'dominio', 'ip', 'subdominio'}
     # the seed→output relations were merged too
-    assert len(alm.relaciones) == 3
+    assert len(alm.relations) == 3
 
 
 def test_lote_con_lock():

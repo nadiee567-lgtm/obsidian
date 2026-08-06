@@ -34,19 +34,19 @@ def test_valor_vacio_falla():
         Entity('dominio', '   ')
 
 def test_todos_los_tipos_del_catalogo_sirven():
-    for tipo in TIPOS:
-        assert valid_type(tipo)
-        Entity(tipo, 'valor-de-prueba')   # must not raise
+    for type in TIPOS:
+        assert valid_type(type)
+        Entity(type, 'value-de-prueba')   # must not raise
 
 
 # ── merge / dedup (step 17) ──────────────────────────────────────────────────
 def test_fusionar_une_origenes_y_props():
-    a = Entity('ip', '8.8.8.8', origenes={'shodan'}, propiedades={'pais': 'US'}, confianza=0.5)
-    b = Entity('ip', '8.8.8.8', origenes={'nmap'}, propiedades={'puerto': 53}, confianza=0.9)
+    a = Entity('ip', '8.8.8.8', sources={'shodan'}, properties={'pais': 'US'}, confidence=0.5)
+    b = Entity('ip', '8.8.8.8', sources={'nmap'}, properties={'puerto': 53}, confidence=0.9)
     a.merge(b)
-    assert a.origenes == {'shodan', 'nmap'}
-    assert a.propiedades == {'pais': 'US', 'puerto': 53}
-    assert a.confianza == 0.9
+    assert a.sources == {'shodan', 'nmap'}
+    assert a.properties == {'pais': 'US', 'puerto': 53}
+    assert a.confidence == 0.9
 
 def test_fusionar_distinto_id_falla():
     with pytest.raises(ValueError):
@@ -56,11 +56,11 @@ def test_fusionar_distinto_id_falla():
 # ── store: automatic dedup (steps 16, 17) ───────────────────────────────────
 def test_almacen_deduplica():
     alm = Store()
-    alm.create('dominio', 'example.com', origenes={'whois'})
-    alm.create('dominio', 'WWW.example.com', origenes={'crtsh'})   # same domain
+    alm.create('dominio', 'example.com', sources={'whois'})
+    alm.create('dominio', 'WWW.example.com', sources={'crtsh'})   # same domain
     assert len(alm) == 1, "must collapse into a single entity"
     ent = alm.buscar('dominio', 'example.com')
-    assert ent.origenes == {'whois', 'crtsh'}, "merged sources"
+    assert ent.sources == {'whois', 'crtsh'}, "merged sources"
 
 def test_almacen_de_tipo_y_buscar():
     alm = Store()
@@ -78,24 +78,24 @@ def test_relaciones_dedup():
     i = alm.create('ip', '93.184.216.34')
     alm.relate(d, i, 'resuelve_a')
     alm.relate(d, i, 'resuelve_a')   # same relation again
-    assert len(alm.relaciones) == 1
+    assert len(alm.relations) == 1
 
 
 # ── round-trip serialization (step 21) ──────────────────────────────────────
 def test_roundtrip_almacen():
     alm = Store()
-    d = alm.create('dominio', 'example.com', origenes={'whois'}, propiedades={'reg': 'GoDaddy'})
-    i = alm.create('ip', '93.184.216.34', origenes={'dns'})
+    d = alm.create('dominio', 'example.com', sources={'whois'}, properties={'reg': 'GoDaddy'})
+    i = alm.create('ip', '93.184.216.34', sources={'dns'})
     alm.relate(d, i, 'resuelve_a')
 
     d2 = alm.to_dict()
     alm2 = Store.from_dict(d2)
 
     assert len(alm2) == 2
-    assert len(alm2.relaciones) == 1
+    assert len(alm2.relations) == 1
     ent = alm2.buscar('dominio', 'example.com')
-    assert ent.origenes == {'whois'}
-    assert ent.propiedades == {'reg': 'GoDaddy'}
+    assert ent.sources == {'whois'}
+    assert ent.properties == {'reg': 'GoDaddy'}
 
 
 # ── analyst tags (step 23) ──────────────────────────────────────────────────
@@ -130,11 +130,11 @@ def test_valor_bien_formado():
 def test_procedencia():
     e = Entity('subdominio', 'mail.example.com')
     e.note_provenance('transform_subdominios', input_id='abc123')
-    assert 'transform_subdominios' in e.origenes
-    assert {'transform': 'transform_subdominios', 'input': 'abc123'} in e.procedencia
+    assert 'transform_subdominios' in e.sources
+    assert {'transform': 'transform_subdominios', 'input': 'abc123'} in e.provenance
     # does not duplicate the same provenance
     e.note_provenance('transform_subdominios', input_id='abc123')
-    assert len(e.procedencia) == 1
+    assert len(e.provenance) == 1
 
 
 # ── event bus (step 19) ─────────────────────────────────────────────────────

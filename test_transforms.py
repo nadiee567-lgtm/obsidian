@@ -48,8 +48,8 @@ def test_no_duplicar_nombre():
 def test_ejecutar_emite_relaciona_y_anota_procedencia():
     @tr.transform(entrada='dominio', salidas=('ip', 'subdominio'), nombre='dns')
     def _dns(entidad, ctx):
-        ctx.emitir('ip', '93.184.216.34', etiqueta='A')
-        ctx.emitir('subdominio', 'www.' + entidad.valor, etiqueta='subdominio')
+        ctx.emitir('ip', '93.184.216.34', label='A')
+        ctx.emitir('subdominio', 'www.' + entidad.value, label='subdominio')
 
     alm = Store()
     dom = alm.create('dominio', 'example.com')
@@ -59,9 +59,9 @@ def test_ejecutar_emite_relaciona_y_anota_procedencia():
     ip = alm.buscar('ip', '93.184.216.34')
     assert ip is not None
     # provenance recorded
-    assert any(p['transform'] == 'dns' and p['input'] == dom.id for p in ip.procedencia)
+    assert any(p['transform'] == 'dns' and p['input'] == dom.id for p in ip.provenance)
     # relation created domain -> ip
-    assert len(alm.relaciones) == 2
+    assert len(alm.relations) == 2
 
 def test_ejecutar_valida_tipo_de_entrada():
     @tr.transform(entrada='dominio', nombre='solo_dominio')
@@ -133,18 +133,18 @@ def test_corredor_cachea():
 def test_machine_cascada():
     @tr.transform(entrada='dominio', salidas=('ip',), nombre='dns')
     def _dns(entidad, ctx):
-        ctx.emitir('ip', '93.184.216.34', etiqueta='A')
+        ctx.emitir('ip', '93.184.216.34', label='A')
 
     @tr.transform(entrada='ip', salidas=('puerto',), nombre='ports')
     def _ports(entidad, ctx):
-        ctx.emitir('puerto', '443', etiqueta='open')
+        ctx.emitir('puerto', '443', label='open')
 
     alm = Store()
     dom = alm.create('dominio', 'example.com')
     receta = tr.Machine(nombre='recon', pasos=('dns', 'ports'))
     producidas = tr.Runner(alm).run_machine(receta, dom)
 
-    tipos = sorted(e.tipo for e in producidas)
+    tipos = sorted(e.type for e in producidas)
     assert tipos == ['ip', 'puerto']              # cascade: domain→ip→port
     assert alm.buscar('puerto', '443') is not None
 

@@ -31,7 +31,7 @@ class PersonaManager:
     def create(self, nombre: str, datos: dict) -> str:
         d = self._leer()
         d[nombre] = {**(datos or {}),
-                     'creada': datetime.datetime.now().isoformat(timespec='seconds')}
+                     'created': datetime.datetime.now().isoformat(timespec='seconds')}
         self._escribir(d)
         return nombre
 

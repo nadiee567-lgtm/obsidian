@@ -26,7 +26,7 @@ def test_persistencia_aislada(tmp_path):
     """Each workspace stores its own, without mixing with another."""
     g = Manager(str(tmp_path))
     a = g.create('caso_a')
-    a.create('dominio', 'example.com', origenes={'whois'})
+    a.create('dominio', 'example.com', sources={'whois'})
     g.guardar('caso_a', a)
 
     b = g.create('caso_b')
@@ -80,7 +80,7 @@ def test_historial(tmp_path):
     g.record('caso', 'rdap', 'example.com', 5)
     h = g.historial('caso')
     assert len(h) == 2
-    assert h[0]['transform'] == 'rdap' and h[0]['salidas'] == 5   # most recent first
+    assert h[0]['transform'] == 'rdap' and h[0]['outputs'] == 5   # most recent first
 
 
 def test_snapshots(tmp_path):

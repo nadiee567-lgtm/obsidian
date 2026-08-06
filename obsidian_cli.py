@@ -52,9 +52,9 @@ def _err(msg):
 
 
 def cmd_transforms(a):
-    ts = REGISTRO.applicable(a.tipo)
+    ts = REGISTRO.applicable(a.type)
     if not ts:
-        print(f"(no transforms for type '{a.tipo}')")
+        print(f"(no transforms for type '{a.type}')")
         return 0
     for t in sorted(ts, key=lambda x: x.nombre):
         key = '  [requires key]' if t.requiere_key else ''
@@ -63,31 +63,31 @@ def cmd_transforms(a):
 
 
 def cmd_run(a):
-    if not valid_type(a.tipo):
-        return _err(f"invalid type: {a.tipo}")
+    if not valid_type(a.type):
+        return _err(f"invalid type: {a.type}")
     alm = _almacen(a.workspace)
     try:
-        semilla = alm.create(a.tipo, a.valor)
+        semilla = alm.create(a.type, a.value)
         producidas = run_by_name(a.transform, semilla, alm)
     except (KeyError, ValueError) as e:
         return _err(str(e))
     _guardar(a.workspace, alm)
     print(f"✓ {a.transform} → +{len(producidas)} entity(ies) (total {len(alm)})")
     for e in producidas:
-        print(f"    {e.tipo:12} {e.valor}")
+        print(f"    {e.type:12} {e.value}")
     return 0
 
 
 def cmd_recon(a):
     """Runs ALL applicable transforms IN PARALLEL (keyless, unless --with-keys)."""
     import time
-    if not valid_type(a.tipo):
-        return _err(f"invalid type: {a.tipo}")
+    if not valid_type(a.type):
+        return _err(f"invalid type: {a.type}")
     alm = _almacen(a.workspace)
-    alm.create(a.tipo, a.valor)
-    ts = [t for t in REGISTRO.applicable(a.tipo) if a.with_keys or not t.requiere_key]
-    tareas = [(a.tipo, a.valor, t.nombre) for t in ts]
-    print(f"recon on {a.tipo} {a.valor} -- {len(tareas)} transform(s) in parallel")
+    alm.create(a.type, a.value)
+    ts = [t for t in REGISTRO.applicable(a.type) if a.with_keys or not t.requiere_key]
+    tareas = [(a.type, a.value, t.nombre) for t in ts]
+    print(f"recon on {a.type} {a.value} -- {len(tareas)} transform(s) in parallel")
     t0 = time.time()
     for nombre, n in sorted(run_batch(tareas, alm)):
         print(f"  {nombre:22} +{n}")
@@ -156,16 +156,16 @@ def construir_parser():
     sub = p.add_subparsers(dest='cmd', required=True)
 
     s = sub.add_parser('transforms', help='list transforms of a type')
-    s.add_argument('tipo')
+    s.add_argument('type')
     s.set_defaults(fn=cmd_transforms)
 
     s = sub.add_parser('run', help='run a transform')
-    s.add_argument('tipo'); s.add_argument('valor'); s.add_argument('transform')
+    s.add_argument('type'); s.add_argument('value'); s.add_argument('transform')
     s.add_argument('-w', '--workspace')
     s.set_defaults(fn=cmd_run)
 
     s = sub.add_parser('recon', help='run all applicable transforms')
-    s.add_argument('tipo'); s.add_argument('valor')
+    s.add_argument('type'); s.add_argument('value')
     s.add_argument('-w', '--workspace')
     s.add_argument('--with-keys', action='store_true', help='include transforms that require a key')
     s.set_defaults(fn=cmd_recon)

@@ -43,9 +43,9 @@ def exportar_csv(almacen) -> str:
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(['type', 'value', 'tags', 'sources', 'confidence', 'properties'])
-    for e in sorted(almacen.entidades, key=lambda x: (x.tipo, x.valor)):
-        props = '; '.join(f'{k}={v}' for k, v in (e.propiedades or {}).items())
-        w.writerow([_celda(e.tipo), _celda(e.valor), _celda(' '.join(sorted(e.tags))),
-                    _celda(' '.join(sorted(e.origenes))),
-                    _celda(getattr(e, 'confianza', 1.0)), _celda(props)])
+    for e in sorted(almacen.entities, key=lambda x: (x.type, x.value)):
+        props = '; '.join(f'{k}={v}' for k, v in (e.properties or {}).items())
+        w.writerow([_celda(e.type), _celda(e.value), _celda(' '.join(sorted(e.tags))),
+                    _celda(' '.join(sorted(e.sources))),
+                    _celda(getattr(e, 'confidence', 1.0)), _celda(props)])
     return buf.getvalue()

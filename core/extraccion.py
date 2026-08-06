@@ -26,16 +26,16 @@ def extract_entities(texto: str) -> list:
     file names (known extension) are discarded."""
     texto = texto or ''
     out, vistos = [], set()
-    for tipo, rx in _RX:
+    for type, rx in _RX:
         for m in rx.findall(texto):
             v = m.strip().rstrip('.,);:')
-            if tipo == 'ip':
+            if type == 'ip':
                 if any(int(o) > 255 for o in v.split('.')):
                     continue                     # invalid octet
-            if tipo == 'dominio' and v.rsplit('.', 1)[-1].lower() in _NO_TLD:
+            if type == 'dominio' and v.rsplit('.', 1)[-1].lower() in _NO_TLD:
                 continue                         # it's a file, not a domain
-            key = (tipo, v.lower())
+            key = (type, v.lower())
             if v and key not in vistos:
                 vistos.add(key)
-                out.append((tipo, v))
+                out.append((type, v))
     return out

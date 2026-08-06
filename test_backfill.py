@@ -7,25 +7,25 @@ from core.modelo import Store
 from core.transforms import run_by_name
 
 
-def _correr(nombre, tipo, valor):
+def _correr(nombre, type, value):
     alm = Store()
-    e = alm.create(tipo, valor)
+    e = alm.create(type, value)
     return run_by_name(nombre, e, alm), e, alm
 
 
 # ── 33: phone ───────────────────────────────────────────────────────────────
 def test_telefono_dorks_keyless():
     prod, _, _ = _correr('telefono_dorks', 'telefono', '+14155552671')
-    dorks = {p.propiedades.get('dork') for p in prod if p.tipo == 'url'}
+    dorks = {p.properties.get('dork') for p in prod if p.type == 'url'}
     assert dorks == {'truecaller', 'whitepages', 'messaging', 'general'}
-    assert all(p.tipo == 'url' for p in prod)      # no key: only dorks, no country
+    assert all(p.type == 'url' for p in prod)      # no key: only dorks, no country
 
 
 # ── 34: typosquatting / buckets / takeover / passivedns ─────────────────────
 def test_typosquatting(monkeypatch):
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: '1.2.3.4\n')   # everything "resolves"
     prod, _, _ = _correr('typosquatting', 'dominio', 'google.com')
-    assert prod and all(p.tipo == 'dominio' and 'typosquat' in p.tags for p in prod)
+    assert prod and all(p.type == 'dominio' and 'typosquat' in p.tags for p in prod)
 
 
 def test_buckets(monkeypatch):
@@ -34,7 +34,7 @@ def test_buckets(monkeypatch):
         text = ''
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: R())
     prod, _, _ = _correr('buckets', 'org', 'ACME Corp')
-    assert prod and all(p.tipo == 'bucket' for p in prod)
+    assert prod and all(p.type == 'bucket' for p in prod)
     assert any('publico' in p.tags for p in prod)
 
 
@@ -48,7 +48,7 @@ def test_takeover(monkeypatch):
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: 'user.github.io.\n')  # orphan CNAME
     prod, _, _ = _correr('takeover', 'dominio', 'ejemplo.com')
     vulns = [p for p in prod if 'takeover' in p.tags]
-    assert vulns and vulns[0].valor == 'abandonado.ejemplo.com'
+    assert vulns and vulns[0].value == 'abandonado.ejemplo.com'
 
 
 def test_passivedns(monkeypatch):
@@ -58,7 +58,7 @@ def test_passivedns(monkeypatch):
             return {'data': [{'attributes': {'ip_address': '9.9.9.9', 'date': 1600000000}}]}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: R())
     prod, _, _ = _correr('passivedns', 'dominio', 'ejemplo.com')
-    assert {p.valor for p in prod if p.tipo == 'ip'} == {'9.9.9.9'}
+    assert {p.value for p in prod if p.type == 'ip'} == {'9.9.9.9'}
 
 
 def test_passivedns_sin_key(monkeypatch):
@@ -90,7 +90,7 @@ def test_github_sec_y_regla(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: '')
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
     prod, _, alm = _correr('github_sec', 'usuario', 'user')
-    creds = [p for p in prod if p.tipo == 'credencial']
+    creds = [p for p in prod if p.type == 'credencial']
     assert creds and 'secreto-github' in creds[0].tags
     h = correlate(alm)
     assert any(x.regla == 'secreto-github' and x.severidad == 'critical' for x in h)
@@ -127,7 +127,7 @@ def test_leak_login():
     p = alm.create('subdominio', 'panel.acme.com'); p.tag('panel-login')
     r = [x for x in correlate(alm) if x.regla == 'leak-login']
     assert r and r[0].severidad == 'critical'
-    assert e.id in r[0].entidades and p.id in r[0].entidades   # names both
+    assert e.id in r[0].entities and p.id in r[0].entities   # names both
 
 
 def test_leak_login_sin_filtrado():
@@ -164,9 +164,9 @@ def test_reglas_yaml():
     yaml_txt = """
 - nombre: puerto-ftp
   severidad: high
-  mensaje: "FTP en {valor}"
+  mensaje: "FTP en {value}"
   cuando:
-    tipo: puerto
+    type: puerto
     valor_contiene: ":21"
 """
     try:
@@ -232,13 +232,13 @@ def test_gestor_tareas():
     g = TaskManager()
 
     def trabajo(emit):
-        emit({'tipo': 'inicio', 'total': 2})
-        emit({'tipo': 'progreso', 'hechas': 1})
+        emit({'type': 'inicio', 'total': 2})
+        emit({'type': 'progreso', 'hechas': 1})
         return {'ok': True}
 
     tid = g.create(trabajo)
     eventos = list(g.stream(tid))                # blocks until 'fin'
-    tipos = [e['tipo'] for e in eventos]
+    tipos = [e['type'] for e in eventos]
     assert tipos[0] == 'inicio' and tipos[-1] == 'fin'
     assert g.estado(tid)['estado'] == 'hecho'
     assert g.estado(tid)['resultado'] == {'ok': True}
@@ -253,7 +253,7 @@ def test_gestor_tareas_error_no_cuelga():
 
     tid = g.create(trabajo)
     eventos = list(g.stream(tid))                # must close with 'fin' even on failure
-    assert eventos[-1]['tipo'] == 'fin'
+    assert eventos[-1]['type'] == 'fin'
     assert g.estado(tid)['estado'] == 'error'
 
 
@@ -272,8 +272,8 @@ def test_persona(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _Rj({'AbstractText': 'Person bio.'}))
     prod, e, _ = _correr('persona', 'persona', 'Juan Perez')
-    assert {p.propiedades.get('dork') for p in prod} == {'linkedin', 'x', 'contact', 'pdf', 'github', 'facebook'}
-    assert e.propiedades.get('resumen') == 'Person bio.'
+    assert {p.properties.get('dork') for p in prod} == {'linkedin', 'x', 'contact', 'pdf', 'github', 'facebook'}
+    assert e.properties.get('resumen') == 'Person bio.'
 
 
 def test_darkweb_ahmia(monkeypatch):
@@ -282,7 +282,7 @@ def test_darkweb_ahmia(monkeypatch):
         text = html
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: R())
     prod, _, _ = _correr('darkweb', 'persona', 'algo')
-    urls = {p.valor for p in prod if p.tipo == 'url'}
+    urls = {p.value for p in prod if p.type == 'url'}
     assert urls == {'http://abc.onion', 'http://xyz.onion'}   # normalizer strips the trailing /
 
 
@@ -290,7 +290,7 @@ def test_url_check_urlhaus(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'post',
                         lambda *a, **k: _Rj({'query_status': 'ok', 'threat': 'malware_download'}))
     _, e, _ = _correr('url_check', 'url', 'http://malo.com/x')
-    assert 'url-maliciosa' in e.tags and e.propiedades.get('urlhaus') == 'malware_download'
+    assert 'url-maliciosa' in e.tags and e.properties.get('urlhaus') == 'malware_download'
 
 
 def test_render_js_bloquea_ssrf(monkeypatch):
@@ -308,7 +308,7 @@ def test_wordlist_ia(monkeypatch):
     monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'juan2024\npassword123\nperez.juan\nabc')
     _, e, _ = _correr('wordlist', 'persona', 'Juan')
-    palabras = e.propiedades.get('wordlist')
+    palabras = e.properties.get('wordlist')
     assert 'juan2024' in palabras and 'abc' not in palabras   # filters <6 chars
 
 

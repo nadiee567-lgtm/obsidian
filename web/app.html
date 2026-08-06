@@ -1256,7 +1256,7 @@ async function ejecutar() {
                 append(out, `\n✓ No exposed secrets in ${repos} analyzed repos.\n`, 'ok');
               } else {
                 append(out, `\n⚠ ${h.length} SECRETS FOUND in ${repos} repos:\n`, 'warn');
-                h.forEach(x => append(out, `  [${x.tipo}] ${x.repo} · commit ${x.commit} · ${x.archivo}\n  → ${x.valor}\n`, 'error'));
+                h.forEach(x => append(out, `  [${x.type}] ${x.repo} · commit ${x.commit} · ${x.archivo}\n  → ${x.value}\n`, 'error'));
               }
             } else {
               append(out, '\n✅ COMPLETED\n', 'ok');
