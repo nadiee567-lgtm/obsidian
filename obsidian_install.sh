@@ -104,32 +104,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo -e "${BLUE}[*] Installing OBSIDIAN to ~/.obsidian/...${NC}"
 cp "$SCRIPT_DIR/obsidian_web.py" ~/.obsidian/obsidian_web.py
 
-# Check license
-echo ""
-if [ -f ~/.obsidian/obsidian.key ]; then
-    TIER=$(python3 -c "
-import json, hashlib, datetime
-SECRET = 'OBSIDIAN_SEBASTIAN_2025_X9K'
-try:
-    data = json.load(open('$HOME/.obsidian/obsidian.key'))
-    tier, email, expira, sig = data.get('tier','lite'), data.get('email',''), data.get('expira',''), data.get('sig','')
-    raw = SECRET + email + tier + expira
-    expected = hashlib.sha256(raw.encode()).hexdigest()[:16]
-    exp = datetime.datetime.strptime(expira, '%Y-%m-%d')
-    if sig == expected and exp >= datetime.datetime.now():
-        print(tier)
-    else:
-        print('lite')
-except: print('lite')
-" 2>/dev/null)
-    declare -A NOMBRES=([lite]="Investigator" [normal]="Analyst" [pro]="Professional")
-    echo -e "${GREEN}[+] License detected: OBSIDIAN ${NOMBRES[$TIER]:-Investigator}${NC}"
-else
-    echo -e "${CYAN}[i] No license found — running as OBSIDIAN Investigator (Free)${NC}"
-    echo -e "${CYAN}    To activate a license, place obsidian.key in ~/.obsidian/${NC}"
-fi
+# OBSIDIAN is free and open -- no licenses or tiers.
 
-# ── Tailscale — remote access ──────────────────────────────────────────────────
+# ── Tailscale -- remote access ─────────────────────────────────────────────────
 echo ""
 echo -e "${CYAN}${BOLD}━━━ Remote access with Tailscale (optional) ━━━${NC}"
 echo -e "${CYAN}    Access OBSIDIAN from anywhere — traveling,${NC}"
