@@ -51,14 +51,14 @@ def test_traducir_sin_ia(monkeypatch):
 # ── 163: natural-language case summary (AI mode) ────────────────────────────
 def test_resumen_modo_ia(monkeypatch):
     import obsidian_web as ob
-    assert 'resumen' in ob._PROMPTS_IA
+    assert 'summary' in ob._PROMPTS_IA
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'The target has 3 exposed subdomains.')
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    d = c.post('/api/v2/ia/resumen').get_json()
-    assert d['modo'] == 'resumen' and 'subdomains' in d['resultado']
+    d = c.post('/api/v2/ia/summary').get_json()
+    assert d['modo'] == 'summary' and 'subdomains' in d['resultado']
 
 
 # ── 164/166/167: AI modes (next step, narrative, classification) ────────────

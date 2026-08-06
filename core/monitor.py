@@ -41,7 +41,7 @@ class Changes:
     def hay(self) -> bool:
         return bool(self.nuevas_entidades or self.nuevas_relaciones or self.cambios_prop)
 
-    def resumen(self) -> str:
+    def summary(self) -> str:
         partes = []
         if self.nuevas_entidades:
             ej = ', '.join(e['value'] for e in self.nuevas_entidades[:3])
@@ -114,7 +114,7 @@ class Monitor:
         cambios = diff(antes, despues)
         self.ultimo_ciclo = _ahora()
         if cambios.hay():
-            alerta = {'ts': self.ultimo_ciclo, 'resumen': cambios.resumen(),
+            alerta = {'ts': self.ultimo_ciclo, 'summary': cambios.summary(),
                       'cambios': cambios.to_dict()}
             self.alertas.insert(0, alerta)
             del self.alertas[self.max_alertas:]

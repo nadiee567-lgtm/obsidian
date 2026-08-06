@@ -289,7 +289,7 @@ def _which(cmd):
 def _save_datum(key, value):
     with case_lock:
         case['data'][key] = value
-        case['history'].append({'ts': time.time(), 'key': key, 'resumen': str(value)[:100]})
+        case['history'].append({'ts': time.time(), 'key': key, 'summary': str(value)[:100]})
 
 def _ai_stream(prompt):
     try:
@@ -341,7 +341,7 @@ def _osint_person(name):
         r = SESSION.get(f"https://api.duckduckgo.com/?q={requests.utils.quote(name)}&format=json&no_html=1", timeout=8)
         d = r.json()
         if d.get('AbstractText'):
-            data['results']['resumen'] = d['AbstractText'][:400]
+            data['results']['summary'] = d['AbstractText'][:400]
         topics = [t['Text'][:200] for t in d.get('RelatedTopics',[])[:5] if isinstance(t,dict) and t.get('Text')]
         if topics: data['results']['temas'] = topics
     except Exception as _e: log.debug("source unavailable: %s", _e)
@@ -3180,7 +3180,7 @@ def _t_person(entidad, ctx):
     try:
         d = SESSION.get(f'https://api.duckduckgo.com/?q={_q(name)}&format=json&no_html=1', timeout=8).json()
         if d.get('AbstractText'):
-            entidad.properties['resumen'] = d['AbstractText'][:400]
+            entidad.properties['summary'] = d['AbstractText'][:400]
     except Exception as _e:
         log.debug("persona ddg: %s", _e)
     dorks = {'linkedin': f'"{name}" site:linkedin.com',
@@ -3448,7 +3448,7 @@ def _t_telegram(entidad, ctx):
 _LEAK_KW = ['leak', 'breach', 'database', 'combolist', 'stealer', 'ransomware',
             'dump', 'fullz', 'rdp access', 'initial access', 'base de data', 'filtracion']
 
-def coincidencias_leak(textos, keywords=None):
+def leak_matches(textos, keywords=None):
     """Messages that mention leak/breach terms (step 131). PURE/testable."""
     kws = keywords or _LEAK_KW
     hits = []
@@ -3468,7 +3468,7 @@ def _t_canal_leaks(entidad, ctx):
         entidad.properties['canal_leaks'] = res
         return
     _tid, textos = res
-    hits = coincidencias_leak(textos)
+    hits = leak_matches(textos)
     if not hits:
         return
     entidad.tag('leaks-channel')
@@ -4518,10 +4518,10 @@ def _ntfy_topic():
 
 def _monitor_alerta(cambios):
     """Monitor alert hook (step 95): notifies the phone via ntfy (step 96)."""
-    log.info("MONITOR: %s", cambios.resumen())
+    log.info("MONITOR: %s", cambios.summary())
     topic = _ntfy_topic()
     if topic:
-        send_ntfy(topic, cambios.resumen(), titulo='OBSIDIAN · change detected',
+        send_ntfy(topic, cambios.summary(), titulo='OBSIDIAN · change detected',
                     prioridad='high', tags='satellite,warning')
 
 def _tareas_monitor_default():
@@ -4600,7 +4600,7 @@ _PROMPTS_IA = {
                    '6. HARDENING RECOMMENDATIONS\n\nData:\n{data}'),
     'analizar': ('Analyze the WHOLE OSINT case of "{target}" and correlate: what story the data tells '
                  'together, non-obvious findings, and the next 3 investigation steps.\n\nData:\n{data}'),
-    'resumen': ('Summarize the OSINT case of "{target}" in ONE clear paragraph understandable to a '
+    'summary': ('Summarize the OSINT case of "{target}" in ONE clear paragraph understandable to a '
                 'non-technical person: what was found and what it means.\n\nData:\n{data}'),
     'siguiente': ('You are an OSINT analyst. Given the case of "{target}", suggest the NEXT 3-5 '
                   'concrete investigation steps (what to run and why), prioritized.\n\nData:\n{data}'),
@@ -4744,7 +4744,7 @@ def api_v2_findings_ai():
     suggests the next step from the case findings."""
     h = correlate(_store)
     if not h:
-        return jsonify({'resumen': 'No findings to analyze yet. Run more transforms.'})
+        return jsonify({'summary': 'No findings to analyze yet. Run more transforms.'})
     conteo = {}
     for e in _store.entities:
         conteo[e.type] = conteo.get(e.type, 0) + 1
@@ -4758,7 +4758,7 @@ def api_v2_findings_ai():
         f"investigation step. Direct, no filler.")
     try:
         texto = ia.ask(prompt, max_tokens=300)
-        return jsonify({'resumen': texto or 'The AI returned no text.'})
+        return jsonify({'summary': texto or 'The AI returned no text.'})
     except Exception as e:
         log.warning("AI correlation failed: %s", e)
         return _error('Ollama unavailable (is it running on :11434?)', 503)

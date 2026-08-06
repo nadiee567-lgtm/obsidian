@@ -72,7 +72,7 @@ def test_telegram_sin_sesion(monkeypatch):
 
 # ── 131: channel monitoring (testable logic; fetch degrades without an account) ─
 def test_coincidencias_leak():
-    hits = ob.coincidencias_leak(['hola mundo', 'nueva DATABASE a la venta', 'ransomware group', 'nada'])
+    hits = ob.leak_matches(['hola mundo', 'nueva DATABASE a la venta', 'ransomware group', 'nada'])
     assert len(hits) == 2 and {h['keyword'] for h in hits} == {'database', 'ransomware'}
 
 

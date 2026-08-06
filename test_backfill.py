@@ -273,7 +273,7 @@ def test_person(monkeypatch):
                         lambda *a, **k: _Rj({'AbstractText': 'Person bio.'}))
     prod, e, _ = _run_one('person', 'person', 'Juan Perez')
     assert {p.properties.get('dork') for p in prod} == {'linkedin', 'x', 'contact', 'pdf', 'github', 'facebook'}
-    assert e.properties.get('resumen') == 'Person bio.'
+    assert e.properties.get('summary') == 'Person bio.'
 
 
 def test_darkweb_ahmia(monkeypatch):

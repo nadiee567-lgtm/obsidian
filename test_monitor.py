@@ -66,7 +66,7 @@ def test_monitor_ciclo_alerta_en_cambio():
     assert cambios.hay()
     assert len(m.alertas) == 1
     assert len(disparos) == 1                          # the callback (future ntfy) was called
-    assert 'nuevo.target.com' in m.alertas[0]['resumen']
+    assert 'nuevo.target.com' in m.alertas[0]['summary']
 
 
 def test_monitor_ciclo_sin_cambios_no_alerta():
