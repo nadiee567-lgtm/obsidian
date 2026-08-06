@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
@@ -42,7 +42,7 @@ body{background:#0a0a0e;color:#e8e8ee;font-family:system-ui,-apple-system,'Segoe
 .card-title{font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.12em;color:#8b8b98;
   text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
 
-/* Módulos */
+/* Modules */
 .mod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-bottom:8px}
 .mod-btn{background:#101014;border:1px solid #26262f;border-radius:2px;
   padding:9px 8px;cursor:pointer;text-align:center;transition:.15s;user-select:none}
@@ -84,12 +84,12 @@ input[type=text]::placeholder{color:#55555f}
 .badge.g{background:#6fae7c1c;color:var(--g)}
 .badge.p{background:#d99a4e1c;color:var(--p)}
 
-/* Caso panel */
+/* Case panel */
 .caso-info{background:#101014;border:1px solid #1c1c24;border-radius:2px;padding:10px 12px;
   font-size:.75rem;color:#8b8b98;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .caso-info b{color:#e8e8ee;font-family:var(--mono)}
 
-/* Rail nav (reemplaza la barra de tabs horizontal) */
+/* Rail nav (replaces the horizontal tab bar) */
 .rgroup-label{font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:#55555f;
   text-transform:uppercase;padding:14px 8px 6px}
 .rgroup-label:first-child{padding-top:2px}
@@ -116,7 +116,7 @@ input[type=text]::placeholder{color:#55555f}
 ::-webkit-scrollbar-track{background:#0a0a0e}
 ::-webkit-scrollbar-thumb{background:#26262f;border-radius:2px}
 
-/* Stage: lienzo dominante (Grafo) — sin card, borde a borde */
+/* Stage: dominant canvas (Graph) -- no card, edge to edge */
 .stage{position:relative;background:#0a0a0e;border-radius:2px;border:1px solid #16161c;
   overflow:hidden;height:calc(100vh - 128px);min-height:420px}
 .stage-toolbar{position:absolute;top:10px;left:10px;z-index:5;display:flex;gap:6px;
@@ -150,27 +150,27 @@ input[type=text]::placeholder{color:#55555f}
 
 <div class="shell">
 
-  <!-- RAIL: navegación por módulos, agrupada -->
+  <!-- RAIL: module navigation, grouped -->
   <div class="rail-nav">
-    <div class="rgroup-label">Investigación</div>
-    <div class="tab active" data-tab="grafo" onclick="switchTab('grafo')">Grafo</div>
+    <div class="rgroup-label">Investigation</div>
+    <div class="tab active" data-tab="grafo" onclick="switchTab('grafo')">Graph</div>
     <div class="tab" data-tab="osint" onclick="switchTab('osint')">OSINT</div>
     <div class="tab" data-tab="recon" onclick="switchTab('recon')">Recon</div>
     <div class="tab" data-tab="timeline" onclick="switchTab('timeline')">Timeline</div>
     <div class="tab" data-tab="datos" onclick="switchTab('datos')">Data</div>
 
-    <div class="rgroup-label">Inteligencia</div>
+    <div class="rgroup-label">Intelligence</div>
     <div class="tab" data-tab="dark" onclick="switchTab('dark')">Dark Web</div>
     <div class="tab" data-tab="shodan" onclick="switchTab('shodan')">Shodan</div>
 
-    <div class="rgroup-label">IA / Análisis</div>
+    <div class="rgroup-label">AI / Analysis</div>
     <div class="tab" data-tab="sim" onclick="switchTab('sim')">Sim</div>
     <div class="tab" data-tab="analyze" onclick="switchTab('analyze')">Analyze</div>
 
-    <div class="rgroup-label">Vigilancia</div>
+    <div class="rgroup-label">Surveillance</div>
     <div class="tab" data-tab="monitor" onclick="switchTab('monitor')">Monitor</div>
 
-    <div class="rgroup-label">Ofensivo</div>
+    <div class="rgroup-label">Offensive</div>
     <div class="tab" data-tab="kali" onclick="switchTab('kali')">Kali</div>
     <div class="tab" data-tab="parrot" onclick="switchTab('parrot')">Parrot</div>
     <div class="tab" data-tab="remnux" onclick="switchTab('remnux')">REMnux</div>
@@ -179,7 +179,7 @@ input[type=text]::placeholder{color:#55555f}
 
   <div class="main-content">
 
-  <!-- CASO ACTIVO -->
+  <!-- ACTIVE CASE -->
   <div class="card" style="margin-bottom:12px">
     <div class="card-title">Active Investigation</div>
     <div class="caso-info" id="caso-info">No active case</div>
@@ -214,7 +214,7 @@ input[type=text]::placeholder{color:#55555f}
     </div>
   </div>
 
-  <!-- TAB: RECONOCIMIENTO -->
+  <!-- TAB: RECON -->
   <div class="tab-panel" id="tab-recon">
     <div class="card">
       <div class="card-title">Advanced Reconnaissance</div>
@@ -240,7 +240,7 @@ input[type=text]::placeholder{color:#55555f}
     </div>
   </div>
 
-  <!-- TAB: SIMULACIÓN -->
+  <!-- TAB: SIMULATION -->
   <div class="tab-panel" id="tab-sim">
     <div class="card">
       <div class="card-title">Simulation & Analysis</div>
@@ -303,7 +303,7 @@ input[type=text]::placeholder{color:#55555f}
         Detects phishing, malware and dangerous URLs. Add VirusTotal and AbuseIPDB keys for better accuracy.
       </div>
       <div class="input-row">
-        <input type="text" id="url-check-input" placeholder="https://ejemplo.com/login">
+        <input type="text" id="url-check-input" placeholder="https://example.com/login">
         <button class="btn" onclick="checkURL()">Analyze</button>
       </div>
       <div class="output" id="output-url"><span class="info">Paste a suspicious URL to analyze it.</span></div>
@@ -371,7 +371,7 @@ input[type=text]::placeholder{color:#55555f}
     </div>
   </div>
 
-  <!-- TAB: GRAFO -->
+  <!-- TAB: GRAPH -->
   <div class="tab-panel active" id="tab-grafo">
     <div class="stage" id="grafo-container">
       <div class="stage-toolbar">
@@ -402,7 +402,7 @@ input[type=text]::placeholder{color:#55555f}
     </div>
   </div>
 
-  <!-- TAB: DATOS -->
+  <!-- TAB: DATA -->
   <!-- TAB: KALI -->
   <div class="tab-panel" id="tab-kali">
     <div class="card">
@@ -653,7 +653,7 @@ function selKaliTool(tool) {
   kaliToolActiva = tool;
   document.querySelectorAll('#kali-tools-grid .mod-btn').forEach(b => b.classList.remove('active'));
   event.currentTarget.classList.add('active');
-  document.getElementById('kali-arg').placeholder = tool.placeholder || 'Argumento...';
+  document.getElementById('kali-arg').placeholder = tool.placeholder || 'Argument...';
   document.getElementById('kali-cmd-preview').textContent = '→ ' + tool.cmd;
   document.getElementById('kali-arg').focus();
 }
@@ -736,7 +736,7 @@ function selParrotTool(tool, el) {
   parrotToolActiva = tool;
   document.querySelectorAll('#parrot-tools-grid .mod-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  document.getElementById('parrot-arg').placeholder = tool.placeholder || 'Argumento...';
+  document.getElementById('parrot-arg').placeholder = tool.placeholder || 'Argument...';
   document.getElementById('parrot-cmd-preview').textContent = '→ ' + tool.cmd;
   document.getElementById('parrot-arg').focus();
 }
@@ -1082,7 +1082,7 @@ async function refreshMonitor() {
     const st = document.getElementById('mon-status');
     st.innerHTML = d.activo
       ? `<span style="color:#6fae7c">● ACTIVE</span> — target: <b>${d.objetivo||'active case'}</b> · interval: ${d.intervalo/60}min`
-      : '<span style="color:#55555f">● INACTIVO</span>';
+      : '<span style="color:#55555f">● INACTIVE</span>';
     const out = document.getElementById('output-monitor');
     if (d.alertas && d.alertas.length) {
       out.innerHTML = '';
@@ -1115,7 +1115,7 @@ async function cargarGrafo() {
     cont.innerHTML = '';
 
     document.getElementById('grafo-stats').textContent =
-      `${d.stats.nodos} nodos · ${d.stats.conexiones} conexiones`;
+      `${d.stats.nodos} nodes · ${d.stats.conexiones} connections`;
 
     const data = {
       nodes: new vis.DataSet(d.nodes),
@@ -1158,7 +1158,7 @@ async function cargarGrafo() {
       const nodo = d.nodes.find(n => n.id === params.nodes[0]);
       if (nodo) {
         const det = document.getElementById('grafo-detalle');
-        // Los datos OSINT los controla el objetivo investigado: nunca con innerHTML.
+        // The OSINT data is controlled by the investigated target: never via innerHTML.
         det.textContent = '';
         const nom = document.createElement('b');
         nom.style.color = nodo.color;
@@ -1240,7 +1240,7 @@ async function ejecutar() {
             const res = d.resultado;
             const tipo = res?.tipo || '';
             const resultados = res?.resultados || {};
-            // Renderizado inteligente por tipo
+            // Smart rendering by type
             if (tipo === 'render_js' && resultados.screenshot) {
               append(out, `\n✅ Rendered — ${resultados.titulo || '?'}\n`, 'ok');
               const img = document.createElement('img');
@@ -1306,7 +1306,7 @@ async function runSim(mod) {
 }
 
 async function nuevoCaso() {
-  const nombre = document.getElementById('caso-nombre').value.trim() || 'caso1';
+  const nombre = document.getElementById('caso-nombre').value.trim() || 'case1';
   const objetivo = document.getElementById('caso-obj').value.trim();
   if (!objetivo) { toast('Enter the target'); return; }
   await fetch('/api/caso', {method:'POST', headers:{'Content-Type':'application/json'},
@@ -1394,7 +1394,7 @@ function toast(msg) {
 (async () => { await refreshStatus(); if (window.casoActivo) cargarGrafo(); })();
 setInterval(refreshStatus, 8000);
 
-// Enter en inputs
+// Enter in inputs
 document.querySelectorAll('input[type=text]').forEach(inp => {
   inp.addEventListener('keydown', e => { if(e.key==='Enter') ejecutar(); });
 });
