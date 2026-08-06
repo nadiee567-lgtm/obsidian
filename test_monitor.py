@@ -29,13 +29,13 @@ def test_diff_detects_new_relation():
 
 def test_diff_detecta_cambio_de_propiedad():
     alm = Store()
-    d = alm.create('domain', 'target.com', properties={'cert_expira': '2027'})
+    d = alm.create('domain', 'target.com', properties={'cert_expires': '2027'})
     antes = snapshot(alm)
-    d.properties['cert_expira'] = '2020'              # the cert changed (expired)
+    d.properties['cert_expires'] = '2020'              # the cert changed (expired)
     cambios = diff(antes, snapshot(alm))
     assert len(cambios.cambios_prop) == 1
     c = cambios.cambios_prop[0]
-    assert c['campo'] == 'cert_expira' and c['antes'] == '2027' and c['ahora'] == '2020'
+    assert c['campo'] == 'cert_expires' and c['antes'] == '2027' and c['ahora'] == '2020'
 
 
 def test_diff_detecta_tag_nuevo():
@@ -61,20 +61,20 @@ def test_monitor_ciclo_alerta_en_cambio():
     def refrescar():                                   # simulates a re-scan with news
         alm.create('subdomain', 'nuevo.target.com')
     m = Monitor(lambda: snapshot(alm), refrescar,
-                on_alerta=lambda c: disparos.append(c), intervalo=999)
-    cambios = m.ciclo()
+                on_alerta=lambda c: disparos.append(c), interval=999)
+    cambios = m.cycle()
     assert cambios.hay()
-    assert len(m.alertas) == 1
+    assert len(m.alerts) == 1
     assert len(disparos) == 1                          # the callback (future ntfy) was called
-    assert 'nuevo.target.com' in m.alertas[0]['summary']
+    assert 'nuevo.target.com' in m.alerts[0]['summary']
 
 
 def test_monitor_ciclo_sin_cambios_no_alerta():
     alm = Store()
     alm.create('domain', 'target.com')
-    m = Monitor(lambda: snapshot(alm), lambda: None, intervalo=999)
-    m.ciclo()
-    assert m.alertas == []
+    m = Monitor(lambda: snapshot(alm), lambda: None, interval=999)
+    m.cycle()
+    assert m.alerts == []
 
 
 def test_monitor_refrescar_que_falla_no_tumba_el_ciclo():
@@ -82,6 +82,6 @@ def test_monitor_refrescar_que_falla_no_tumba_el_ciclo():
     alm.create('domain', 'target.com')
     def refrescar():
         raise RuntimeError('network down')
-    m = Monitor(lambda: snapshot(alm), refrescar, intervalo=999)
-    m.ciclo()                                          # must not raise
-    assert m.alertas == []                             # no real changes
+    m = Monitor(lambda: snapshot(alm), refrescar, interval=999)
+    m.cycle()                                          # must not raise
+    assert m.alerts == []                             # no real changes

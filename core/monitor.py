@@ -11,7 +11,7 @@ It receives
   - refrescar_fn(): re-runs the transforms (mutates the store),
   - on_alerta(cambios): optional callback (ntfy in step 96).
 So tests inject fake functions and never touch the network. The thread only wraps
-`ciclo()`, which is pure except for the callbacks."""
+`cycle()`, which is pure except for the callbacks."""
 from __future__ import annotations
 import datetime
 import threading
@@ -85,25 +85,25 @@ def _ahora() -> str:
 
 
 class Monitor:
-    """Runs `ciclo()` every `intervalo` seconds in a daemon thread."""
+    """Runs `cycle()` every `interval` seconds in a daemon thread."""
 
     def __init__(self, snapshot_fn, refrescar_fn, on_alerta=None,
-                 intervalo: int = 300, max_alertas: int = 100):
+                 interval: int = 300, max_alertas: int = 100):
         self.snapshot_fn = snapshot_fn
         self.refrescar_fn = refrescar_fn
         self.on_alerta = on_alerta
-        self.intervalo = intervalo
+        self.interval = interval
         self.max_alertas = max_alertas
-        self.alertas: list = []          # history of detected changes (newest first)
-        self.ultimo_ciclo: str | None = None
+        self.alerts: list = []          # history of detected changes (newest first)
+        self.last_cycle: str | None = None
         self._hilo: threading.Thread | None = None
         self._parar = threading.Event()
 
     @property
-    def activo(self) -> bool:
+    def active(self) -> bool:
         return self._hilo is not None and self._hilo.is_alive()
 
-    def ciclo(self) -> Changes:
+    def cycle(self) -> Changes:
         """One cycle: snapshot, refresh, snapshot, diff, alert. Never raises (isolates failures)."""
         antes = self.snapshot_fn()
         try:
@@ -112,12 +112,12 @@ class Monitor:
             pass                          # a network failure does not take down the monitor
         despues = self.snapshot_fn()
         cambios = diff(antes, despues)
-        self.ultimo_ciclo = _ahora()
+        self.last_cycle = _ahora()
         if cambios.hay():
-            alerta = {'ts': self.ultimo_ciclo, 'summary': cambios.summary(),
+            alerta = {'ts': self.last_cycle, 'summary': cambios.summary(),
                       'cambios': cambios.to_dict()}
-            self.alertas.insert(0, alerta)
-            del self.alertas[self.max_alertas:]
+            self.alerts.insert(0, alerta)
+            del self.alerts[self.max_alertas:]
             if self.on_alerta:
                 try:
                     self.on_alerta(cambios)
@@ -127,16 +127,16 @@ class Monitor:
 
     def _loop(self):
         # wait() returns True if stop was requested; False on timeout -> runs a cycle
-        while not self._parar.wait(self.intervalo):
-            self.ciclo()
+        while not self._parar.wait(self.interval):
+            self.cycle()
 
-    def iniciar(self):
-        if self.activo:
+    def start(self):
+        if self.active:
             return
         self._parar.clear()
         self._hilo = threading.Thread(target=self._loop, daemon=True)
         self._hilo.start()
 
-    def detener(self):
+    def stop(self):
         self._parar.set()
         self._hilo = None

@@ -39,15 +39,15 @@ def test_inventario(monkeypatch):
 def test_descubrimiento_y_cambios_via_monitor():
     from core.monitor import snapshot, diff
     alm = Store()
-    d = alm.create('domain', 'x.com', properties={'cert_expira': '2027'})
+    d = alm.create('domain', 'x.com', properties={'cert_expires': '2027'})
     antes = snapshot(alm)
     alm.create('subdomain', 'nuevo.x.com')       # new asset (145)
     alm.create('port', '1.2.3.4:22')            # new port (146)
-    d.properties['cert_expira'] = '2020'        # cert changed (146)
+    d.properties['cert_expires'] = '2020'        # cert changed (146)
     cambios = diff(antes, snapshot(alm))
     valores = {e['value'] for e in cambios.nuevas_entidades}
     assert {'nuevo.x.com', '1.2.3.4:22'} <= valores
-    assert any(c['campo'] == 'cert_expira' for c in cambios.cambios_prop)
+    assert any(c['campo'] == 'cert_expires' for c in cambios.cambios_prop)
 
 
 # ── 147: infrastructure clustering ──────────────────────────────────────────

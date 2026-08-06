@@ -86,10 +86,10 @@ def cmd_recon(a):
     alm = _store(a.workspace)
     alm.create(a.type, a.value)
     ts = [t for t in REGISTRO.applicable(a.type) if a.with_keys or not t.requires_key]
-    tareas = [(a.type, a.value, t.name) for t in ts]
-    print(f"recon on {a.type} {a.value} -- {len(tareas)} transform(s) in parallel")
+    tasks = [(a.type, a.value, t.name) for t in ts]
+    print(f"recon on {a.type} {a.value} -- {len(tasks)} transform(s) in parallel")
     t0 = time.time()
-    for name, n in sorted(run_batch(tareas, alm)):
+    for name, n in sorted(run_batch(tasks, alm)):
         print(f"  {name:22} +{n}")
     _save(a.workspace, alm)
     h = correlate(alm)

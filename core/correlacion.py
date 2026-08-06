@@ -157,7 +157,7 @@ def r_cert_vencido(alm):
     """Expired TLS certificate on a domain (step 61)."""
     ahora = datetime.datetime.now()
     for d in alm.of_type('domain'):
-        exp = d.properties.get('cert_expira')
+        exp = d.properties.get('cert_expires')
         if not exp:
             continue
         try:
@@ -182,7 +182,7 @@ def r_ip_listada(alm):
     verdict (feeds have false positives)."""
     for ip in alm.of_type('ip'):
         if 'threat-listed' in ip.tags:
-            fuente = ip.properties.get('amenaza_fuente', 'threat feed')
+            fuente = ip.properties.get('threat_source', 'threat feed')
             yield Finding('ip-listed', 'high',
                            f'IP {ip.value} listed in {fuente} -- verify (possible false positive)', [ip.id])
 
@@ -311,7 +311,7 @@ def r_secreto_github(alm):
     """Hardcoded credential/secret found in a GitHub commit (step 60)."""
     for c in alm.of_type('credential'):
         if 'github-secret' in c.tags:
-            type = c.properties.get('tipo_secreto', 'secret')
+            type = c.properties.get('secret_type', 'secret')
             repo = c.properties.get('repo', '?')
             yield Finding('github-secret', 'critical',
                            f'{type} exposed in a commit of {repo}', [c.id])

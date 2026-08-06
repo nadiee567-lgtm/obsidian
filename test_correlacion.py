@@ -18,8 +18,8 @@ def test_puerto_sensible():
 
 def test_cert_vencido():
     alm = Store()
-    alm.create('domain', 'viejo.com', properties={'cert_expira': 'Jan 1 00:00:00 2020 GMT'})
-    alm.create('domain', 'nuevo.com', properties={'cert_expira': 'Jan 1 00:00:00 2099 GMT'})
+    alm.create('domain', 'viejo.com', properties={'cert_expires': 'Jan 1 00:00:00 2020 GMT'})
+    alm.create('domain', 'nuevo.com', properties={'cert_expires': 'Jan 1 00:00:00 2099 GMT'})
     reglas = [x.rule for x in correlate(alm)]
     assert reglas.count('cert-expired') == 1   # only the 2020 one
 

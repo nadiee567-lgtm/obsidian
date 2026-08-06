@@ -142,7 +142,7 @@ def _mig_github_secrets(alm, raiz, value, res, source):
         if not h.get('value'):
             continue
         e = alm.create('credential', h['value'], sources={source},
-                      properties={'tipo_secreto': h.get('type'), 'repo': h.get('repo'),
+                      properties={'secret_type': h.get('type'), 'repo': h.get('repo'),
                                    'commit': h.get('commit')})
         e.tag('exposed')
         _rel(alm, raiz, e, 'exposed secret')

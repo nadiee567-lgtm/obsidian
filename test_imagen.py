@@ -155,7 +155,7 @@ def test_phash_transform(monkeypatch):
     u = alm.create('url', 'https://x.com/a.jpg')
     prod = run_by_name('phash', u, alm)
     hs = [e for e in prod if e.type == 'hash']
-    assert hs and hs[0].properties.get('tipo_hash') == 'phash'
+    assert hs and hs[0].properties.get('hash_type') == 'phash'
     assert u.properties.get('phash')
 
 

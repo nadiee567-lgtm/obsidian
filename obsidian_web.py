@@ -22,7 +22,7 @@ from core.monitor import Monitor, snapshot as _snap_estado
 from core.notificar import send_ntfy, build_ntfy
 from core.estado import render_estado
 from core.motores import traducir as _motor_query, traducir_todos, MOTORES
-from core.tareas import TaskManager
+from core.tasks import TaskManager
 from core.personas import PersonaManager
 from core.extraccion import extract_entities
 from core import multiidioma as _ml
@@ -397,7 +397,7 @@ def _osint_user(username):
                 'name': gh.get('name','?'), 'bio': gh.get('bio','?'),
                 'repos': gh.get('public_repos',0), 'seguidores': gh.get('followers',0),
                 'ubicacion': gh.get('location','?'), 'email': gh.get('email','hidden'),
-                'web': gh.get('blog','?'), 'creado': gh.get('created_at','?')
+                'web': gh.get('blog','?'), 'created': gh.get('created_at','?')
             }
             # Public repos
             repos_r = SESSION.get(f'https://api.github.com/users/{username}/repos?per_page=10&sort=updated', timeout=8)
@@ -1755,10 +1755,10 @@ def _build_timeline():
 
 # ── Continuous monitor ────────────────────────────────────────────────────────
 
-monitor_state = {'activo': False, 'thread': None, 'alertas': [], 'target': None, 'intervalo': 3600}
+monitor_state = {'active': False, 'thread': None, 'alerts': [], 'target': None, 'interval': 3600}
 
 def _monitor_loop():
-    while monitor_state['activo']:
+    while monitor_state['active']:
         target = monitor_state['target']
         if not target:
             time.sleep(60); continue
@@ -1769,26 +1769,26 @@ def _monitor_loop():
                 nuevo = _osint_domain(target)
                 viejo = case['data'].get(f'dominio_{target}', {})
                 if str(nuevo) != str(viejo):
-                    monitor_state['alertas'].append({
+                    monitor_state['alerts'].append({
                         'ts': datetime.datetime.now().isoformat(),
                         'type': 'cambio_dominio',
                         'message': f'Change detected on {target}',
                         'nuevo': nuevo
                     })
         except Exception as _e: log.debug("source unavailable: %s", _e)
-        time.sleep(monitor_state['intervalo'])
+        time.sleep(monitor_state['interval'])
 
-def _monitor_start(target, intervalo=3600):
-    if monitor_state['activo']: return False
-    monitor_state.update({'activo': True, 'target': target,
-                          'intervalo': intervalo, 'alertas': []})
+def _monitor_start(target, interval=3600):
+    if monitor_state['active']: return False
+    monitor_state.update({'active': True, 'target': target,
+                          'interval': interval, 'alerts': []})
     t = threading.Thread(target=_monitor_loop, daemon=True)
     monitor_state['thread'] = t
     t.start()
     return True
 
 def _monitor_stop():
-    monitor_state['activo'] = False
+    monitor_state['active'] = False
 
 def _generate_html_report():
     name = case['name'] or f'reporte_{int(time.time())}'
@@ -1972,10 +1972,10 @@ def api_run():
         return jsonify({'error': f'Invalid target: not shaped like {_MODULO_TIPO[mod]}'}), 400
 
     def _run_stream():
-        yield f"data: {json.dumps({'status':'iniciando','module':mod})}\n\n"
+        yield f"data: {json.dumps({'status':'starting','module':mod})}\n\n"
         try:
             resultado = MODULOS[mod]()
-            yield f"data: {json.dumps({'status':'completado','resultado':resultado})}\n\n"
+            yield f"data: {json.dumps({'status':'completed','resultado':resultado})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'status':'error','message':str(e)})}\n\n"
 
@@ -2101,7 +2101,7 @@ def _t_favicon_hash(entidad, ctx):
         # standard Shodan/FOFA method: base64 (with line breaks) + mmh3
         h = mmh3.hash(codecs.encode(r.content, 'base64'))
         entidad.properties['favicon_hash'] = h
-        ctx.emit('hash', str(h), label='favicon', tipo_hash='favicon')   # pivotable node
+        ctx.emit('hash', str(h), label='favicon', hash_type='favicon')   # pivotable node
     except Exception as _e:
         log.debug("favicon_hash unavailable: %s", _e)
 
@@ -2138,7 +2138,7 @@ def _pivote_ips(campos):
 @transform(input='hash', outputs=('ip',), name='favicon_pivote', requires_key=True,
            description='Enumerates IPs serving this favicon (FOFA/Shodan) -- without touching the target (F8)')
 def _t_favicon_pivote(entidad, ctx):
-    if entidad.properties.get('tipo_hash') != 'favicon':
+    if entidad.properties.get('hash_type') != 'favicon':
         return
     for ip in _pivote_ips({'favicon': entidad.value}):
         ctx.emit('ip', ip, label='same-favicon')
@@ -2151,7 +2151,7 @@ def _t_wayback(entidad, ctx):
         snap = ((SESSION.get(f'http://archive.org/wayback/available?url={entidad.value}', timeout=8).json()
                  .get('archived_snapshots', {}) or {}).get('closest', {}))
         if snap.get('available'):
-            entidad.properties['wayback_desde'] = (snap.get('timestamp', '') or '')[:8]
+            entidad.properties['wayback_since'] = (snap.get('timestamp', '') or '')[:8]
             entidad.properties['wayback_url'] = snap.get('url')
             entidad.tag('archived')
     except Exception as _e:
@@ -2344,7 +2344,7 @@ def _pastes_github(entidad):
                         timeout=12).json()
         n = d.get('total_count')
         if n:
-            entidad.properties['github_menciones'] = n
+            entidad.properties['github_mentions'] = n
             entidad.tag('github-mentioned')
     except Exception as _e:
         log.debug("pastes_github unavailable: %s", _e)
@@ -2422,7 +2422,7 @@ def _t_breaches(entidad, ctx):
             log.debug("breaches hibp: %s", _e)
     if fuentes:
         entidad.tag('leaked')
-        entidad.properties['brechas'] = sorted(fuentes)
+        entidad.properties['breaches'] = sorted(fuentes)
         for f in sorted(fuentes)[:30]:
             ctx.emit('org', f, label='breach')
 
@@ -2481,8 +2481,8 @@ def _t_stealer_domain(entidad, ctx):
         if isinstance(usr, dict):
             usr = usr.get('total', 0)
         if emp or usr:
-            entidad.properties['stealer_empleados'] = emp
-            entidad.properties['stealer_usuarios'] = usr
+            entidad.properties['stealer_employees'] = emp
+            entidad.properties['stealer_users'] = usr
             entidad.tag('stealer-exposed')
     except Exception as _e:
         log.debug("stealer_dominio unavailable: %s", _e)
@@ -2704,7 +2704,7 @@ def _t_rdap(entidad, ctx):
                 ctx.emit('domain', ns['ldhName'], label='NS')
         fechas = {e.get('eventAction'): (e.get('eventDate') or '')[:10] for e in d.get('events', [])}
         if fechas.get('registration'):
-            entidad.properties['creado'] = fechas['registration']
+            entidad.properties['created'] = fechas['registration']
         if fechas.get('expiration'):
             entidad.properties['expira'] = fechas['expiration']
         if d.get('status'):
@@ -2985,7 +2985,7 @@ def _t_phone_dorks(entidad, ctx):
             d = r.json() or {}
             if d.get('valid'):
                 entidad.properties['carrier'] = d.get('carrier', '')
-                entidad.properties['tipo_linea'] = d.get('line_type', '')
+                entidad.properties['line_type'] = d.get('line_type', '')
                 if d.get('country_name'):
                     ctx.emit('country', d['country_name'], label='country')
         except Exception as _e:
@@ -3121,7 +3121,7 @@ def _t_passivedns(entidad, ctx):
                 date = attr.get('date')
                 visto = (datetime.datetime.fromtimestamp(date, datetime.timezone.utc)
                          .strftime('%Y-%m-%d')) if date else ''
-                ctx.emit('ip', ip, label='pdns-historical', visto=visto)
+                ctx.emit('ip', ip, label='pdns-historical', seen=visto)
     except Exception as _e:
         log.debug("passivedns unavailable: %s", _e)
 
@@ -3165,7 +3165,7 @@ def _t_github_sec(entidad, ctx):
                         for m in re.findall(patron, patch, re.IGNORECASE):
                             val = (m if isinstance(m, str) else ':'.join(x for x in m if x)) or nombre_pat
                             c = ctx.emit('credential', val[:60], label='secret',
-                                           tipo_secreto=nombre_pat, repo=full,
+                                           secret_type=nombre_pat, repo=full,
                                            commit=sha[:8], archivo=f.get('filename', '?'))
                             if c:
                                 c.tag('github-secret')
@@ -3236,7 +3236,7 @@ def _t_render_js(entidad, ctx):
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={'width': 1280, 'height': 900})
             page.goto(url, timeout=20000, wait_until='networkidle')
-            entidad.properties['render_titulo'] = page.title()
+            entidad.properties['render_title'] = page.title()
             html_render = page.content()
             browser.close()
         for em in list(set(re.findall(
@@ -3300,7 +3300,7 @@ def _t_wordlist(entidad, ctx):
         ruta = os.path.join(CASES_DIR, f'wordlist_{slug}.txt')
         with open(ruta, 'w', encoding='utf-8') as f:
             f.write('\n'.join(palabras))
-        entidad.properties['wordlist_archivo'] = ruta
+        entidad.properties['wordlist_file'] = ruta
     except Exception as _e:
         log.debug("wordlist save: %s", _e)
 
@@ -3389,7 +3389,7 @@ def _t_onion_fetch(entidad, ctx):
         return
     m = re.search(r'<title[^>]*>(.*?)</title>', r.text[:8000], re.I | re.S)
     if m:
-        entidad.properties['onion_titulo'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
+        entidad.properties['onion_title'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
     for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', r.text)))[:15]:
         ctx.emit('email', em, label='in-onion')
     for on in list(set(re.findall(r'[a-z2-7]{16,56}\.onion', r.text)))[:15]:
@@ -3472,8 +3472,8 @@ def _t_canal_leaks(entidad, ctx):
     if not hits:
         return
     entidad.tag('leaks-channel')
-    entidad.properties['leaks_menciones'] = len(hits)
-    entidad.properties['leaks_muestra'] = [h['texto'] for h in hits[:5]]
+    entidad.properties['leaks_mentions'] = len(hits)
+    entidad.properties['leaks_sample'] = [h['texto'] for h in hits[:5]]
     unido = '\n'.join(h['texto'] for h in hits)
     for dom in list(set(re.findall(r'\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b', unido.lower())))[:15]:
         ctx.emit('domain', dom, label='mentioned-in-leaks')
@@ -3543,7 +3543,7 @@ def _t_phash(entidad, ctx):
         h = _phash(fn)
         if h:
             entidad.properties['phash'] = h
-            ctx.emit('hash', h, label='phash', tipo_hash='phash')
+            ctx.emit('hash', h, label='phash', hash_type='phash')
     finally:
         try:
             os.unlink(fn)
@@ -3740,7 +3740,7 @@ def _t_ip_blocklist(entidad, ctx):
     for red, fuente in _load_blocklist():
         if ip in red:
             entidad.tag('threat-listed')   # signal, NOT a 'malicious' verdict
-            entidad.properties['amenaza_fuente'] = fuente
+            entidad.properties['threat_source'] = fuente
             return
 
 @transform(input='ip', outputs=('org',), name='greynoise',
@@ -3788,8 +3788,8 @@ def _t_ssl(entidad, ctx):
         cn = dict(x[0] for x in cert.get('subject', [])).get('commonName')
         if cn:
             entidad.properties['cert_cn'] = cn          # to pivot (step 115)
-        entidad.properties['cert_desde'] = cert.get('notBefore')
-        entidad.properties['cert_expira'] = cert.get('notAfter')
+        entidad.properties['cert_since'] = cert.get('notBefore')
+        entidad.properties['cert_expires'] = cert.get('notAfter')
     except Exception as _e:
         log.debug("ssl unavailable: %s", _e)
 
@@ -3893,7 +3893,7 @@ def _status_data():
         'keys': keys,
         'ia': {'available': ia.available(), 'modelo': ia.MODELO},
         'workspaces': len(_gestor.list_ws()),
-        'monitor': bool(_monitor and _monitor.activo),
+        'monitor': bool(_monitor and _monitor.active),
         'ntfy': bool(_ntfy_topic()),
     }
 
@@ -3955,8 +3955,8 @@ def api_v2_recon():
     with _almacen_lock:
         _store.create(type, value)
     ts = [t for t in REGISTRO.applicable(type) if con_keys or not t.requires_key]
-    tareas = [(type, value, t.name) for t in ts]
-    res = run_batch(tareas, _store, lock=_almacen_lock)
+    tasks = [(type, value, t.name) for t in ts]
+    res = run_batch(tasks, _store, lock=_almacen_lock)
     if _ws_activo:
         with _almacen_lock:
             try:
@@ -3982,13 +3982,13 @@ def api_v2_recon_async():
         with _almacen_lock:
             _store.create(type, value)
         ts = [t for t in REGISTRO.applicable(type) if con_keys or not t.requires_key]
-        tareas = [(type, value, t.name) for t in ts]
-        emit({'type': 'inicio', 'total': len(tareas)})
+        tasks = [(type, value, t.name) for t in ts]
+        emit({'type': 'inicio', 'total': len(tasks)})
 
         def prog(name, n, hechas, total):
             emit({'type': 'progreso', 'transform': name, 'nuevas': n,
                   'hechas': hechas, 'total': total, 'entities': len(_store)})
-        res = run_batch(tareas, _store, lock=_almacen_lock, on_progreso=prog)
+        res = run_batch(tasks, _store, lock=_almacen_lock, on_progreso=prog)
         if _ws_activo:
             with _almacen_lock:
                 try:
@@ -4082,7 +4082,7 @@ def api_v2_workspaces():
     """Workspace CRUD (F3 step 44). Each one is an isolated SQLite case."""
     global _store, _ws_activo
     if request.method == 'GET':
-        return jsonify({'workspaces': _gestor.list_ws(), 'activo': _ws_activo})
+        return jsonify({'workspaces': _gestor.list_ws(), 'active': _ws_activo})
     name = (request.json or {}).get('name', '')
     if request.method == 'POST':
         try:
@@ -4090,12 +4090,12 @@ def api_v2_workspaces():
         except ValueError as e:
             return _error(str(e), 400)
         _ws_activo = _case_slug(name)
-        return jsonify({'ok': True, 'activo': _ws_activo})
+        return jsonify({'ok': True, 'active': _ws_activo})
     if request.method == 'DELETE':
         _gestor.delete(name)
         if _ws_activo == _case_slug(name):
             _store, _ws_activo = Store(), None
-        return jsonify({'ok': True, 'activo': _ws_activo})
+        return jsonify({'ok': True, 'active': _ws_activo})
 
 @app.route('/api/v2/workspaces/open', methods=['POST'])
 def api_v2_workspace_abrir():
@@ -4108,7 +4108,7 @@ def api_v2_workspace_abrir():
         return _error('workspace not found', 404)
     _ws_activo = _case_slug(name)
     _apply_opsec_profile(_ws_activo)                # non-attribution mode (157)
-    return jsonify({'ok': True, 'activo': _ws_activo, 'total_entities': len(_store)})
+    return jsonify({'ok': True, 'active': _ws_activo, 'total_entities': len(_store)})
 
 @app.route('/api/v2/workspaces/history')
 def api_v2_ws_historial():
@@ -4307,7 +4307,7 @@ def api_v2_opsec_perfil():
         if ws == _ws_activo:
             _apply_opsec_profile(ws)
         return jsonify({'ok': True})
-    return jsonify({'perfil': _read_profiles().get(_ws_activo, {}), 'activo': _ws_activo,
+    return jsonify({'perfil': _read_profiles().get(_ws_activo, {}), 'active': _ws_activo,
                     'estado': {'anonimo': _OPSEC['anonimo'], 'higiene': _OPSEC_HIGIENE['on'],
                                'proxies': len(_PROXIES['pool']), 'person': _OPSEC.get('person')}})
 
@@ -4543,12 +4543,12 @@ def _tareas_monitor_default():
 def api_v2_monitor():
     """Monitor status + alert history."""
     return jsonify({
-        'activo': bool(_monitor and _monitor.activo),
-        'intervalo': _monitor.intervalo if _monitor else None,
-        'ultimo_ciclo': _monitor.ultimo_ciclo if _monitor else None,
-        'tareas': _monitor_tareas,
+        'active': bool(_monitor and _monitor.active),
+        'interval': _monitor.interval if _monitor else None,
+        'last_cycle': _monitor.last_cycle if _monitor else None,
+        'tasks': _monitor_tareas,
         'ntfy': bool(_ntfy_topic()),
-        'alertas': _monitor.alertas if _monitor else []})
+        'alerts': _monitor.alerts if _monitor else []})
 
 @app.route('/api/v2/monitor/ntfy', methods=['POST'])
 def api_v2_monitor_ntfy():
@@ -4569,22 +4569,22 @@ def api_v2_monitor_ntfy():
 def api_v2_monitor_start():
     global _monitor, _monitor_tareas
     d = request.json or {}
-    intervalo = max(30, int(d.get('intervalo', 300)))     # minimum 30s (do not hammer)
-    _monitor_tareas = d.get('tareas') or _tareas_monitor_default()
+    interval = max(30, int(d.get('interval', 300)))     # minimum 30s (do not hammer)
+    _monitor_tareas = d.get('tasks') or _tareas_monitor_default()
     if not _monitor_tareas:
         return _error('nothing to monitor: add a target and run transforms first', 400)
-    if _monitor and _monitor.activo:
-        _monitor.detener()
+    if _monitor and _monitor.active:
+        _monitor.stop()
     _monitor = Monitor(_monitor_snapshot, _monitor_refrescar,
-                       on_alerta=_monitor_alerta, intervalo=intervalo)
-    _monitor.iniciar()
-    return jsonify({'activo': True, 'intervalo': intervalo, 'tareas': _monitor_tareas})
+                       on_alerta=_monitor_alerta, interval=interval)
+    _monitor.start()
+    return jsonify({'active': True, 'interval': interval, 'tasks': _monitor_tareas})
 
 @app.route('/api/v2/monitor/stop', methods=['POST'])
 def api_v2_monitor_stop():
     if _monitor:
-        _monitor.detener()
-    return jsonify({'activo': False})
+        _monitor.stop()
+    return jsonify({'active': False})
 
 _PROMPTS_IA = {
     'escenario': ('OSINT collected on "{target}". Generate an ETHICAL pentesting scenario:\n'
@@ -4846,10 +4846,10 @@ def api_kali():
     tool_id = d.get('tool', '')
     arg = d.get('arg', '').strip()
     def _stream():
-        yield f"data: {json.dumps({'status':'iniciando','tool':tool_id})}\n\n"
+        yield f"data: {json.dumps({'status':'starting','tool':tool_id})}\n\n"
         try:
             resultado = _kali_run(tool_id, arg)
-            yield f"data: {json.dumps({'status':'completado','resultado':resultado})}\n\n"
+            yield f"data: {json.dumps({'status':'completed','resultado':resultado})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'status':'error','message':str(e)})}\n\n"
     return Response(stream_with_context(_stream()),
@@ -4866,10 +4866,10 @@ def api_parrot():
     tool_id = d.get('tool','')
     arg = d.get('arg','').strip()
     def _stream():
-        yield f"data: {json.dumps({'status':'iniciando','tool':tool_id})}\n\n"
+        yield f"data: {json.dumps({'status':'starting','tool':tool_id})}\n\n"
         try:
             resultado = _distrobox_run('parrot', PARROT_TOOLS, tool_id, arg)
-            yield f"data: {json.dumps({'status':'completado','resultado':resultado})}\n\n"
+            yield f"data: {json.dumps({'status':'completed','resultado':resultado})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'status':'error','message':str(e)})}\n\n"
     return Response(stream_with_context(_stream()),
@@ -4886,10 +4886,10 @@ def api_remnux():
     tool_id = d.get('tool','')
     arg = d.get('arg','').strip()
     def _stream():
-        yield f"data: {json.dumps({'status':'iniciando','tool':tool_id})}\n\n"
+        yield f"data: {json.dumps({'status':'starting','tool':tool_id})}\n\n"
         try:
             resultado = _distrobox_run('remnux', REMNUX_TOOLS, tool_id, arg)
-            yield f"data: {json.dumps({'status':'completado','resultado':resultado})}\n\n"
+            yield f"data: {json.dumps({'status':'completed','resultado':resultado})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'status':'error','message':str(e)})}\n\n"
     return Response(stream_with_context(_stream()),
@@ -4941,14 +4941,14 @@ def api_timeline():
 @app.route('/api/monitor', methods=['GET','POST','DELETE'])
 def api_monitor():
     if request.method == 'GET':
-        return jsonify({'activo': monitor_state['activo'],
+        return jsonify({'active': monitor_state['active'],
                        'target': monitor_state['target'],
-                       'alertas': monitor_state['alertas'][-20:],
-                       'intervalo': monitor_state['intervalo']})
+                       'alerts': monitor_state['alerts'][-20:],
+                       'interval': monitor_state['interval']})
     if request.method == 'POST':
         d = request.json or {}
         ok = _monitor_start(d.get('target', case.get('target','')),
-                            int(d.get('intervalo', 3600)))
+                            int(d.get('interval', 3600)))
         return jsonify({'ok': ok})
     if request.method == 'DELETE':
         _monitor_stop()
@@ -4984,14 +4984,14 @@ if __name__ == '__main__':
         _set_anonimo(True)
     host = os.environ.get('OBSIDIAN_HOST', '127.0.0.1')
     ts = _tailscale_ip()
-    lineas = [f"   Este equipo: http://localhost:{PORT}"]
+    lineas = [f"   This machine: http://localhost:{PORT}"]
     if host in ('0.0.0.0', '::'):
-        lineas.append(f"   LAN:         http://{_get_local_ip()}:{PORT}  (⚠ expuesto a toda la red local)")
+        lineas.append(f"   LAN:         http://{_get_local_ip()}:{PORT}  (⚠ exposed to the whole local network)")
     else:
-        lineas.append(f"   LAN:         apagada (bind local). Para exponer: OBSIDIAN_HOST=0.0.0.0")
+        lineas.append(f"   LAN:         off (local bind). To expose: OBSIDIAN_HOST=0.0.0.0")
     if ts:
-        lineas.append(f"   Tailscale:   http://{ts}:{PORT}  (remoto seguro ✓)")
+        lineas.append(f"   Tailscale:   http://{ts}:{PORT}  (secure remote ✓)")
     else:
-        lineas.append(f"   Tailscale:   sin detectar — recomendado para acceso remoto sin abrir la LAN")
-    print("\n⬛ OBSIDIAN Web — iniciando...\n" + "\n".join(lineas) + "\n")
+        lineas.append(f"   Tailscale:   not detected — recommended for remote access without opening the LAN")
+    print("\n⬛ OBSIDIAN Web — starting...\n" + "\n".join(lineas) + "\n")
     app.run(host=host, port=PORT, debug=False, threaded=True)

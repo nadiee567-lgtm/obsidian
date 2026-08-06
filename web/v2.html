@@ -323,7 +323,7 @@ async function cargarModulos(type, value, cont){
   cont.appendChild(grid);
 }
 function cadenaIds(id){   // walk backward through provenance to the seed
-  const chain=[id], visto=new Set([id]); let cur=entMap[id];
+  const chain=[id], seen=new Set([id]); let cur=entMap[id];
   while(cur&&cur.provenance&&cur.provenance.length){
     const inp=cur.provenance[0].input;
     if(!inp||visto.has(inp))break;
@@ -372,7 +372,7 @@ function ocultarCtx(){ $('#ctx').style.display='none'; }
 document.addEventListener('click',e=>{ if(!$('#ctx').contains(e.target)) ocultarCtx(); });
 
 async function correr(type,value,name,requiereKey){
-  setStatus('running '+name+' sobre '+value+'…','run');
+  setStatus('running '+name+' on '+value+'…','run');
   try{
     const r=await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({type,value,transform:name})});
@@ -435,7 +435,7 @@ async function cargarWorkspaces(){
   const d=await(await fetch('/api/v2/workspaces')).json();
   const sel=$('#wsSel'); sel.textContent='';
   d.workspaces.forEach(w=>{const o=el('option');o.value=w;o.textContent=w;sel.appendChild(o);});
-  $('#wsActivo').textContent=d.activo||'none (ephemeral)'; if(d.activo)sel.value=d.activo;
+  $('#wsActivo').textContent=d.active||'none (ephemeral)'; if(d.active)sel.value=d.active;
 }
 async function abrirWs(){ const n=$('#wsSel').value; if(!n)return;
   await fetch('/api/v2/workspaces/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});
@@ -443,7 +443,7 @@ async function abrirWs(){ const n=$('#wsSel').value; if(!n)return;
 async function crearWs(){ const n=$('#wsNuevo').value.trim(); if(!n){setStatus('escribe un name','err');return;}
   const r=await fetch('/api/v2/workspaces',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});
   const d=await r.json(); if(!r.ok){setStatus('error: '+(d.error||r.status),'err');return;}
-  $('#wsNuevo').value=''; setStatus('workspace creado: '+d.activo); await cargarWorkspaces(); await pintarGrafo(); }
+  $('#wsNuevo').value=''; setStatus('workspace created: '+d.active); await cargarWorkspaces(); await pintarGrafo(); }
 
 $('#btnAgregar').onclick=agregar;
 $('#value').addEventListener('keydown',e=>{ if(e.key==='Enter')agregar(); });
@@ -456,7 +456,7 @@ $('#btnExport').onclick=exportarPNG; $('#btnReacomodar').onclick=reacomodar;
 function parseFecha(v){ if(/^\d{8}$/.test(v)) v=v.slice(0,4)+'-'+v.slice(4,6)+'-'+v.slice(6,8);
   const d=new Date(v); return isNaN(d)?null:d; }
 function timeline(){
-  const campos={creado:'domain registrado',cert_desde:'cert emitido',cert_expira:'cert expira',wayback_desde:'primer snapshot'};
+  const campos={created:'domain registered',cert_since:'cert issued',cert_expires:'cert expires',wayback_since:'first snapshot'};
   const ent=[];
   Object.values(entMap).forEach(e=>Object.entries(campos).forEach(([k,ev])=>{
     if(e.properties&&e.properties[k]){ const f=parseFecha(String(e.properties[k])); if(f) ent.push({f,ev,quien:e.value}); }
@@ -517,23 +517,23 @@ async function iaCaso(modo){
 
 async function pintarMonitor(d){
   const est=$('#monEstado'), info=$('#monInfo'), al=$('#monAlertas'), btn=$('#btnMonitor');
-  est.textContent = d.activo?'vigilando':'apagado'; est.className='score '+(d.activo?'on':'off');
-  btn.textContent = d.activo?'■ detener':'▶ vigilar';
-  if(d.activo){ info.className=''; info.textContent='cada '+Math.round(d.intervalo/60)+' min · '+(d.tareas||[]).length+' transform(s)'+(d.ultimo_ciclo?' · last: '+d.ultimo_ciclo:''); }
-  else if(!(d.alertas||[]).length){ info.className='vacio'; info.textContent='Re-scans the target every N minutes and alerts if something changes.'; }
+  est.textContent = d.active?'watching':'off'; est.className='score '+(d.active?'on':'off');
+  btn.textContent = d.active?'■ stop':'▶ watch';
+  if(d.active){ info.className=''; info.textContent='every '+Math.round(d.interval/60)+' min · '+(d.tasks||[]).length+' transform(s)'+(d.last_cycle?' · last: '+d.last_cycle:''); }
+  else if(!(d.alerts||[]).length){ info.className='vacio'; info.textContent='Re-scans the target every N minutes and alerts if something changes.'; }
   else { info.className='vacio'; info.textContent=''; }
   al.textContent='';
-  (d.alertas||[]).forEach(a=>{ const x=el('div','alerta');
+  (d.alerts||[]).forEach(a=>{ const x=el('div','alerta');
     x.innerHTML='<div class="ts">'+esc(a.ts)+'</div><div class="res">'+esc(a.resumen)+'</div>'; al.appendChild(x); });
 }
 async function cargarMonitor(){ try{ pintarMonitor(await (await fetch('/api/v2/monitor')).json()); }catch(_){} }
 $('#btnMonitor').onclick=async()=>{
   const d=await (await fetch('/api/v2/monitor')).json();
-  if(d.activo){ await fetch('/api/v2/monitor/stop',{method:'POST'}); setStatus('monitor stopped'); }
+  if(d.active){ await fetch('/api/v2/monitor/stop',{method:'POST'}); setStatus('monitor stopped'); }
   else{
     const min=Math.max(1,parseInt($('#monIntervalo').value)||10);
     const r=await fetch('/api/v2/monitor/start',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({intervalo:min*60})});
+      body:JSON.stringify({interval:min*60})});
     const j=await r.json();
     if(!r.ok){ setStatus('error: '+(j.error||r.status),'err'); } else setStatus('👁 monitor active every '+min+' min');
   }

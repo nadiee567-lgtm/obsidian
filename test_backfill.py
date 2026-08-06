@@ -228,7 +228,7 @@ def test_rate_limit_concurrencia():
 
 # ── 37: background queue + SSE ──────────────────────────────────────────────
 def test_task_manager():
-    from core.tareas import TaskManager
+    from core.tasks import TaskManager
     g = TaskManager()
 
     def trabajo(emit):
@@ -245,7 +245,7 @@ def test_task_manager():
 
 
 def test_task_manager_error_no_hang():
-    from core.tareas import TaskManager
+    from core.tasks import TaskManager
     g = TaskManager()
 
     def trabajo(emit):

@@ -163,7 +163,7 @@ def run_by_name(name: str, entidad: Entity, almacen: Store) -> list:
     return run(t, entidad, almacen)
 
 
-def run_batch(tareas, almacen: Store, max_workers: int = 8, lock=None,
+def run_batch(tasks, almacen: Store, max_workers: int = 8, lock=None,
                   on_progreso=None) -> list:
     """Runs several transforms IN PARALLEL (step 102). Transforms are I/O-bound
     (network), so they are launched concurrently -- each in an ISOLATED Store, no
@@ -173,13 +173,13 @@ def run_batch(tareas, almacen: Store, max_workers: int = 8, lock=None,
     on_progreso(name, n, hechas, total): optional callback called as EACH
     transform finishes (step 37, for progress streaming).
 
-    tareas: iterable of (type, value, transform_name).
+    tasks: iterable of (type, value, transform_name).
     Returns [(name, n_produced), ...]."""
     import contextlib
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    tareas = list(tareas)
-    if not tareas:
+    tasks = list(tasks)
+    if not tasks:
         return []
 
     def _uno(t):
@@ -193,9 +193,9 @@ def run_batch(tareas, almacen: Store, max_workers: int = 8, lock=None,
             pass
         return name, n, local
 
-    results, locales, total = [], [], len(tareas)
+    results, locales, total = [], [], len(tasks)
     with ThreadPoolExecutor(max_workers=min(max_workers, total)) as ex:
-        futs = [ex.submit(_uno, t) for t in tareas]
+        futs = [ex.submit(_uno, t) for t in tasks]
         for i, fut in enumerate(as_completed(futs), 1):
             name, n, local = fut.result()
             results.append((name, n))

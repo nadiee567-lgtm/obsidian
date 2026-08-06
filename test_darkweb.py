@@ -28,7 +28,7 @@ def test_onion_fetch(monkeypatch):
     prod, e = _run_one('onion_fetch', 'url', 'http://xxxxabcdefgh2345.onion/')
     assert 'contacto@vendor.com' in {x.value for x in prod if x.type == 'email'}
     assert any('.onion' in x.value for x in prod if x.type == 'url')
-    assert e.properties.get('onion_titulo') == 'Dark Market'
+    assert e.properties.get('onion_title') == 'Dark Market'
     assert 'onion-live' in e.tags
 
 
@@ -80,7 +80,7 @@ def test_canal_leaks(monkeypatch):
     textos = ['combolist fresca de acme.com', 'admin@acme.com filtrado en breach', 'gatitos']
     monkeypatch.setattr(ob, '_tg_mensajes', lambda u, limite=100: (True, (123, textos)))
     prod, e = _run_one('canal_leaks', 'user', 'canal_ru')
-    assert 'leaks-channel' in e.tags and e.properties.get('leaks_menciones') == 2
+    assert 'leaks-channel' in e.tags and e.properties.get('leaks_mentions') == 2
     assert 'acme.com' in {x.value for x in prod if x.type == 'domain'}
     assert 'admin@acme.com' in {x.value for x in prod if x.type == 'email'}
 
@@ -104,7 +104,7 @@ def test_stealer_domain(monkeypatch):
                         lambda *a, **k: _RjD({'data': {'employees': 12, 'users': 340}}))
     _, e = _run_one('stealer_domain', 'domain', 'acme.com')
     assert 'stealer-exposed' in e.tags
-    assert e.properties.get('stealer_empleados') == 12 and e.properties.get('stealer_usuarios') == 340
+    assert e.properties.get('stealer_employees') == 12 and e.properties.get('stealer_users') == 340
 
 
 def test_stealer_domain_clean(monkeypatch):

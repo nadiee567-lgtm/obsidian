@@ -162,7 +162,7 @@ def test_favicon_pivote(monkeypatch):
         return FakeResp({'matches': [{'ip_str': '7.7.7.7'}, {'ip_str': '9.9.9.9'}]})
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
     alm = Store()
-    h = alm.create('hash', '123456', properties={'tipo_hash': 'favicon'})
+    h = alm.create('hash', '123456', properties={'hash_type': 'favicon'})
     prod = run_by_name('favicon_pivote', h, alm)
     ips = {e.value for e in prod if e.type == 'ip'}
     assert ips == {'9.9.9.9', '8.8.8.8', '7.7.7.7'}   # cross-engine dedup of 9.9.9.9
@@ -171,7 +171,7 @@ def test_favicon_pivote(monkeypatch):
 def test_favicon_pivote_ignora_hash_no_favicon(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'a@b.com:k')
     alm = Store()
-    h = alm.create('hash', 'abc', properties={'tipo_hash': 'sha1'})
+    h = alm.create('hash', 'abc', properties={'hash_type': 'sha1'})
     assert run_by_name('favicon_pivote', h, alm) == []
 
 

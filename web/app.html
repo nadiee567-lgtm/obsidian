@@ -685,7 +685,7 @@ async function ejecutarKali() {
         if (!line.startsWith('data:')) continue;
         try {
           const d = JSON.parse(line.slice(5));
-          if (d.status === 'completado') {
+          if (d.status === 'completed') {
             const res = d.resultado;
             if (res.error) {
               append(out, '❌ ' + res.error + '\n', 'error');
@@ -768,7 +768,7 @@ async function ejecutarParrot() {
         if (!line.startsWith('data:')) continue;
         try {
           const d = JSON.parse(line.slice(5));
-          if (d.status === 'completado') {
+          if (d.status === 'completed') {
             const res = d.resultado;
             if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
             else append(out, res.output + '\n');
@@ -848,7 +848,7 @@ async function ejecutarRemnux() {
         if (!line.startsWith('data:')) continue;
         try {
           const d = JSON.parse(line.slice(5));
-          if (d.status === 'completado') {
+          if (d.status === 'completed') {
             const res = d.resultado;
             if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
             else append(out, res.output + '\n');
@@ -928,7 +928,7 @@ async function ejecutarBlackarch() {
         if (!line.startsWith('data:')) continue;
         try {
           const d = JSON.parse(line.slice(5));
-          if (d.status === 'completado') {
+          if (d.status === 'completed') {
             const res = d.resultado;
             if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
             else append(out, res.output + '\n');
@@ -963,7 +963,7 @@ async function checkURL() {
       for(const line of lines) {
         if(!line.startsWith('data:')) continue;
         const d = JSON.parse(line.slice(5));
-        if(d.status === 'completado') {
+        if(d.status === 'completed') {
           const res = d.resultado?.results || {};
           out.innerHTML = '';
           const score = res.score_phishing || 0;
@@ -1005,7 +1005,7 @@ async function checkPassword() {
       for(const line of lines) {
         if(!line.startsWith('data:')) continue;
         const d = JSON.parse(line.slice(5));
-        if(d.status === 'completado') {
+        if(d.status === 'completed') {
           const res = d.resultado?.results || {};
           out.innerHTML = '';
           const color = res.score >= 75 ? '#6fae7c' : res.score >= 55 ? '#cc9a3c' : '#d9564b';
@@ -1062,8 +1062,8 @@ async function cargarTimeline() {
 // ── Monitor ───────────────────────────────────────────────────────────────────
 async function iniciarMonitor() {
   const obj = document.getElementById('mon-obj').value.trim() || '';
-  const intervalo = parseInt(document.getElementById('mon-interval').value);
-  const r = await fetch('/api/monitor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:obj,intervalo})});
+  const interval = parseInt(document.getElementById('mon-interval').value);
+  const r = await fetch('/api/monitor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:obj,interval})});
   const d = await r.json();
   toast(d.ok ? 'Monitor started ✓' : 'Already active');
   refreshMonitor();
@@ -1080,13 +1080,13 @@ async function refreshMonitor() {
     const r = await fetch('/api/monitor');
     const d = await r.json();
     const st = document.getElementById('mon-status');
-    st.innerHTML = d.activo
-      ? `<span style="color:#6fae7c">● ACTIVE</span> — target: <b>${d.target||'active case'}</b> · interval: ${d.intervalo/60}min`
+    st.innerHTML = d.active
+      ? `<span style="color:#6fae7c">● ACTIVE</span> — target: <b>${d.target||'active case'}</b> · interval: ${d.interval/60}min`
       : '<span style="color:#55555f">● INACTIVE</span>';
     const out = document.getElementById('output-monitor');
-    if (d.alertas && d.alertas.length) {
+    if (d.alerts && d.alerts.length) {
       out.innerHTML = '';
-      d.alertas.forEach(a => {
+      d.alerts.forEach(a => {
         append(out, `[${a.ts}] `, 'info');
         append(out, a.message + '\n', 'warn');
       });
@@ -1235,8 +1235,8 @@ async function ejecutar() {
         if (!line.startsWith('data:')) continue;
         try {
           const d = JSON.parse(line.slice(5));
-          if (d.status === 'iniciando') { append(out, '⚡ Processing...\n', 'info'); }
-          else if (d.status === 'completado') {
+          if (d.status === 'starting') { append(out, '⚡ Processing...\n', 'info'); }
+          else if (d.status === 'completed') {
             const res = d.resultado;
             const tipo = res?.tipo || '';
             const results = res?.results || {};
@@ -1295,7 +1295,7 @@ async function runSim(mod) {
         if (!line.startsWith('data:')) continue;
         try {
           const d = JSON.parse(line.slice(5));
-          if (d.status === 'completado') {
+          if (d.status === 'completed') {
             const analisis = d.resultado?.results?.analisis || JSON.stringify(d.resultado,null,2);
             append(out, '\n' + analisis + '\n');
           }

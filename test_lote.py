@@ -51,8 +51,8 @@ def test_batch_missing_transform_ok():
 def test_batch_no_data_loss_parallel():
     """Many concurrent tasks: no output is lost in the merge."""
     alm = Store()
-    tareas = [('domain', f'sitio{i}.com', '_test_lote_a') for i in range(20)]
-    run_batch(tareas, alm, max_workers=8)
+    tasks = [('domain', f'sitio{i}.com', '_test_lote_a') for i in range(20)]
+    run_batch(tasks, alm, max_workers=8)
     # 20 distinct seeds + 2 shared ips (10.0.0.1/2) = 22
     assert len(alm.of_type('domain')) == 20
     assert len(alm.of_type('ip')) == 2

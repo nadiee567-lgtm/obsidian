@@ -93,10 +93,10 @@ def test_workspaces_flujo(tmp_path):
         c = _client()
         # create -> becomes active
         r = c.post('/api/v2/workspaces', json={'name': 'caso demo'})
-        assert r.status_code == 200 and r.get_json()['activo'] == 'caso demo'
+        assert r.status_code == 200 and r.get_json()['active'] == 'caso demo'
         # list
         j = c.get('/api/v2/workspaces').get_json()
-        assert 'caso demo' in j['workspaces'] and j['activo'] == 'caso demo'
+        assert 'caso demo' in j['workspaces'] and j['active'] == 'caso demo'
         # simulate saved data and open fresh
         ob._store.create('ip', '8.8.8.8')
         ob._gestor.save('caso demo', ob._store)
@@ -105,7 +105,7 @@ def test_workspaces_flujo(tmp_path):
         assert r.status_code == 200 and r.get_json()['total_entities'] == 1
         # delete -> no active
         r = c.delete('/api/v2/workspaces', json={'name': 'caso demo'})
-        assert r.status_code == 200 and r.get_json()['activo'] is None
+        assert r.status_code == 200 and r.get_json()['active'] is None
         assert c.get('/api/v2/workspaces').get_json()['workspaces'] == []
     finally:
         ob._gestor, ob._ws_activo, ob._store = prev_g, prev_ws, prev_a
