@@ -80,7 +80,7 @@ MOTORES = {
 CAMPOS = ('ip', 'domain', 'favicon', 'cert', 'port', 'producto', 'org', 'country', 'titulo', 'asn')
 
 
-def motores_disponibles(cn=None) -> list:
+def available_engines(cn=None) -> list:
     """Engine names. cn=True only Chinese, cn=False only Western, None all."""
     return [m for m, info in MOTORES.items() if cn is None or info['cn'] == cn]
 
@@ -106,7 +106,7 @@ def traducir(motor: str, campos: dict) -> str:
 def traducir_todos(campos: dict, cn=None) -> dict:
     """The same query translated to EACH engine. {engine: query} (non-empty only)."""
     out = {}
-    for motor in motores_disponibles(cn):
+    for motor in available_engines(cn):
         q = traducir(motor, campos)
         if q:
             out[motor] = q

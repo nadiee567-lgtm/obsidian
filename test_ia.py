@@ -102,7 +102,7 @@ def test_deteccion_ia(monkeypatch):
 
 
 # ── 170: chat about the case ────────────────────────────────────────────────
-def test_chat_caso(monkeypatch):
+def test_chat_case(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'IP 1.2.3.4 hosts the domain.')

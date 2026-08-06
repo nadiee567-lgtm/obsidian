@@ -52,7 +52,7 @@ _SUPRIMIR = {'discarded', 'false-positive'}
 _REGLAS_YAML = []
 
 
-def _coincide_yaml(ent, when) -> bool:
+def _yaml_matches(ent, when) -> bool:
     if 'tag' in when and when['tag'] not in ent.tags:
         return False
     if 'value_contains' in when and str(when['value_contains']) not in ent.value:
@@ -82,14 +82,14 @@ def load_yaml_rules(texto: str) -> int:
     return len(specs)
 
 
-def _evaluar_yaml(almacen) -> list:
+def _evaluate_yaml(almacen) -> list:
     out = []
     for spec in _REGLAS_YAML:
         when = spec.get('when', {}) or {}
         type = when.get('type')
         ents = almacen.of_type(type) if type else almacen.entities
         for e in ents:
-            if _coincide_yaml(e, when):
+            if _yaml_matches(e, when):
                 msg = str(spec.get('message', spec['name'])).replace('{value}', e.value)
                 out.append(Finding(spec['name'], spec.get('severity', 'medium'), msg, [e.id]))
     return out
@@ -107,7 +107,7 @@ def correlate(almacen) -> list:
         except Exception:
             pass   # a broken rule does not take down correlation
     try:
-        out.extend(_evaluar_yaml(almacen))
+        out.extend(_evaluate_yaml(almacen))
     except Exception:
         pass
     idx = {e.id: e for e in almacen.entities}

@@ -23,7 +23,7 @@ def _e(v) -> str:
     return html.escape(str(v), quote=True)
 
 
-def _resumen_severidad(hallazgos) -> dict:
+def _severity_summary(hallazgos) -> dict:
     conteo = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
     for h in hallazgos:
         sev = getattr(h, 'severity', None)
@@ -59,7 +59,7 @@ def generate_report(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
     generado = meta.get('generado') or datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
     ws = meta.get('workspace') or 'ephemeral'
     target = meta.get('target') or '—'
-    conteo = _resumen_severidad(hallazgos)
+    conteo = _severity_summary(hallazgos)
 
     # ── score bar colored by level ──
     if score >= 70:   score_col = _SEV_COLOR['critical']

@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 from core.config import CASES_DIR
 
-# Shell metacharacters -- used by the generic _objetivo_seguro check.
+# Shell metacharacters -- used by the generic _safe_target check.
 _SHELL_PELIGROSOS = set(' \t\n\r;&|`$<>(){}[]!*?~"\'\\')
 
 # A module -> which target type it expects (to validate with the right pattern).
@@ -23,7 +23,7 @@ _RE_USUARIO = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,38}$')
 _RE_EMAIL   = re.compile(r'^[A-Za-z0-9._%+-]{1,64}@(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})+$')
 
 
-def _es_ip(v):
+def _is_ip(v):
     try:
         ipaddress.ip_address(v)
         return True
@@ -31,21 +31,21 @@ def _es_ip(v):
         return False
 
 
-def _validar(arg, type):
+def _validate(arg, type):
     """True only if `arg` matches EXACTLY the expected shape of `type`.
     Allowlist: closes command injection AND argument injection at once."""
     arg = (arg or '').strip()
     if not arg or len(arg) > 253:
         return False
     if type == 'domain':  return bool(_RE_DOMINIO.match(arg))
-    if type == 'ip':       return _es_ip(arg)
+    if type == 'ip':       return _is_ip(arg)
     if type == 'user':  return bool(_RE_USUARIO.match(arg))
     if type == 'email':    return bool(_RE_EMAIL.match(arg))
     # unknown type -> generic check
-    return _objetivo_seguro(arg)
+    return _safe_target(arg)
 
 
-def _objetivo_seguro(arg):
+def _safe_target(arg):
     """Generic check for targets with no fixed type (distrobox, shodan).
     Rejects empty, leading '-' (argument injection) and shell metacharacters."""
     arg = (arg or '').strip()
@@ -54,7 +54,7 @@ def _objetivo_seguro(arg):
     return not any(c in _SHELL_PELIGROSOS for c in arg)
 
 
-def _slug_caso(name):
+def _case_slug(name):
     """Case name sanitized for use as a filename. Keeps only [A-Za-z0-9 _.-],
     no path separators or '..'. Returns '' if it ends up invalid -- so a name
     like '../../.bashrc' does not write/read outside CASES_DIR."""
@@ -68,10 +68,10 @@ def _slug_caso(name):
     return limpio
 
 
-def _ruta_caso_segura(name, sufijo='.json'):
+def _safe_case_path(name, sufijo='.json'):
     """Path inside CASES_DIR for a sanitized case, or None if invalid or it would
     try to escape the directory (defense in depth with realpath)."""
-    slug = _slug_caso(name)
+    slug = _case_slug(name)
     if not slug:
         return None
     path = os.path.join(CASES_DIR, slug + sufijo)
@@ -80,7 +80,7 @@ def _ruta_caso_segura(name, sufijo='.json'):
     return path
 
 
-def _url_publica(url):
+def _public_url(url):
     """True only if `url` is http/https to a host that resolves to PUBLIC IP(s).
     Blocks SSRF: localhost, LAN (10/172.16/192.168), link-local (169.254.x,
     including cloud metadata), reserved and multicast."""

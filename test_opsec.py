@@ -34,7 +34,7 @@ def test_rotacion_proxies():
     try:
         ob._PROXIES['pool'] = ['http://p1:8080', 'http://p2:8080']
         ob._PROXIES['i'] = 0
-        p1, p2, p3 = ob._rotar_proxy(), ob._rotar_proxy(), ob._rotar_proxy()
+        p1, p2, p3 = ob._rotate_proxy(), ob._rotate_proxy(), ob._rotate_proxy()
         assert (p1, p2, p3) == ('http://p1:8080', 'http://p2:8080', 'http://p1:8080')  # round-robin
         assert ob.SESSION.proxies['https'] == 'http://p1:8080'
     finally:
@@ -48,7 +48,7 @@ def test_higiene_request():
     prev = ob.SESSION.headers.get('User-Agent')
     try:
         ob._OPSEC_HIGIENE['on'] = True
-        ob._higiene_request()
+        ob._request_hygiene()
         assert ob.SESSION.headers['User-Agent'] in ob._USER_AGENTS
     finally:
         ob._OPSEC_HIGIENE['on'] = False
@@ -79,7 +79,7 @@ def test_perfil_opsec_por_workspace(tmp_path, monkeypatch):
                                         'jitter_max': 0.02, 'proxies': ['http://p:8080']}}))
     monkeypatch.setattr(ob, '_OPSEC_PROFILES', str(pf))
     try:
-        ob._aplicar_perfil_opsec('caso1')
+        ob._apply_opsec_profile('caso1')
         assert ob._OPSEC_HIGIENE['on'] is True
         assert ob._OPSEC_JITTER['max'] == 0.02
         assert ob._PROXIES['pool'] == ['http://p:8080']
@@ -93,9 +93,9 @@ def test_perfil_opsec_por_workspace(tmp_path, monkeypatch):
 # ── 158: leak detection ─────────────────────────────────────────────────────
 def test_evaluar_fuga():
     import obsidian_web as ob
-    assert ob._evaluar_fuga(True, '1.2.3.4', '1.2.3.4') is True     # anonymous but same IP = LEAK
-    assert ob._evaluar_fuga(True, '9.9.9.9', '1.2.3.4') is False    # different IP = ok
-    assert ob._evaluar_fuga(False, '1.2.3.4', '1.2.3.4') is False   # not anonymous = not applicable
+    assert ob._evaluate_leak(True, '1.2.3.4', '1.2.3.4') is True     # anonymous but same IP = LEAK
+    assert ob._evaluate_leak(True, '9.9.9.9', '1.2.3.4') is False    # different IP = ok
+    assert ob._evaluate_leak(False, '1.2.3.4', '1.2.3.4') is False   # not anonymous = not applicable
 
 
 # ── 159: API key rotation ───────────────────────────────────────────────────
@@ -103,11 +103,11 @@ def test_key_rotativa(monkeypatch):
     import obsidian_web as ob
     ob._KEY_ROT.clear()
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'k1|k2|k3')
-    assert [ob._key_rotativa('shodan') for _ in range(4)] == ['k1', 'k2', 'k3', 'k1']  # round-robin
+    assert [ob._rotating_key('shodan') for _ in range(4)] == ['k1', 'k2', 'k3', 'k1']  # round-robin
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'solo')
-    assert ob._key_rotativa('x') == 'solo'                # a single one: as-is
+    assert ob._rotating_key('x') == 'solo'                # a single one: as-is
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
-    assert ob._key_rotativa('x') is None
+    assert ob._rotating_key('x') is None
 
 
 # ── 160: logging your own footprint ─────────────────────────────────────────

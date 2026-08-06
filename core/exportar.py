@@ -19,7 +19,7 @@ import datetime
 _PELIGRO = ('=', '+', '-', '@')   # starts Excel/Sheets treat as a formula
 
 
-def _celda(v) -> str:
+def _cell(v) -> str:
     """Neutralizes formula injection in a CSV cell."""
     s = '' if v is None else str(v)
     if s and (s[0] in _PELIGRO or s[0] in ('\t', '\r')):
@@ -45,7 +45,7 @@ def exportar_csv(almacen) -> str:
     w.writerow(['type', 'value', 'tags', 'sources', 'confidence', 'properties'])
     for e in sorted(almacen.entities, key=lambda x: (x.type, x.value)):
         props = '; '.join(f'{k}={v}' for k, v in (e.properties or {}).items())
-        w.writerow([_celda(e.type), _celda(e.value), _celda(' '.join(sorted(e.tags))),
-                    _celda(' '.join(sorted(e.sources))),
-                    _celda(getattr(e, 'confidence', 1.0)), _celda(props)])
+        w.writerow([_cell(e.type), _cell(e.value), _cell(' '.join(sorted(e.tags))),
+                    _cell(' '.join(sorted(e.sources))),
+                    _cell(getattr(e, 'confidence', 1.0)), _cell(props)])
     return buf.getvalue()

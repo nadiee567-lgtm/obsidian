@@ -11,7 +11,7 @@ def _e(v) -> str:
     return html.escape(str(v), quote=True)
 
 
-def _punto(ok: bool) -> str:
+def _dot(ok: bool) -> str:
     col = '#a6e3a1' if ok else '#6c7086'
     txt = 'yes' if ok else 'no'
     return f'<span class="dot" style="background:{col}"></span>{txt}'
@@ -25,7 +25,7 @@ def render_estado(data: dict) -> str:
 
     herr = data.get('herramientas', {})
     herr_html = ''.join(
-        f'<tr><td>{_e(name)}</td><td>{_punto(ok)}</td></tr>' for name, ok in herr.items())
+        f'<tr><td>{_e(name)}</td><td>{_dot(ok)}</td></tr>' for name, ok in herr.items())
 
     keys = data.get('keys', [])
     keys_html = (', '.join(_e(k) for k in keys)) if keys else '<span class="muted">none</span>'
@@ -75,9 +75,9 @@ def render_estado(data: dict) -> str:
   <table>{herr_html}</table>
 
   <h2>Local AI (Ollama)</h2>
-  <p>{_punto(bool(ia_ok))} — model: <code>{_e(ia.get('modelo', '?'))}</code></p>
+  <p>{_dot(bool(ia_ok))} — model: <code>{_e(ia.get('modelo', '?'))}</code></p>
 
   <h2>Integrations</h2>
   <p>Configured API keys: {keys_html}</p>
-  <p>ntfy notifications: {_punto(bool(data.get('ntfy')))}</p>
+  <p>ntfy notifications: {_dot(bool(data.get('ntfy')))}</p>
 </body></html>'''

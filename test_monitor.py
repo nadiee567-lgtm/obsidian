@@ -17,7 +17,7 @@ def test_diff_detecta_entidad_nueva():
     assert cambios.nuevas_entidades[0]['value'] == 'nuevo.target.com'
 
 
-def test_diff_detecta_relacion_nueva():
+def test_diff_detects_new_relation():
     alm = Store()
     d = alm.create('domain', 'target.com')
     ip = alm.create('ip', '1.2.3.4')

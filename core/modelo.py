@@ -15,7 +15,7 @@ import ipaddress
 import datetime
 from dataclasses import dataclass, field, asdict
 
-from core.validacion import _validar   # step 25: a single source of truth
+from core.validacion import _validate   # step 25: a single source of truth
 
 # Entity type -> core.validacion validation type (the ones with a strict shape).
 # The rest (persona, org, hash...) are not validated by shape.
@@ -137,7 +137,7 @@ class Entity:
         return True. Not enforced at construction: it's an optional check so
         transforms can filter junk before adding."""
         tv = _TIPO_VALIDACION.get(self.type)
-        return True if tv is None else _validar(self.value, tv)
+        return True if tv is None else _validate(self.value, tv)
 
     def merge(self, otra: 'Entity') -> None:
         """Absorbs another entity of the same id (step 17): merges origins and

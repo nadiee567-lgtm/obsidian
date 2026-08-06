@@ -11,7 +11,7 @@ _PAIS_PREFIJO = {'MX': '52', 'US': '1', 'RU': '7', 'CN': '86', 'ES': '34',
                  'AR': '54', 'CO': '57', 'BR': '55', 'PE': '51', 'CL': '56'}
 
 
-def normalizar_telefono(numero: str, pais: str = 'US') -> str:
+def normalize_phone(numero: str, pais: str = 'US') -> str:
     """Normalizes a phone to +E.164 format based on the country (step 177)."""
     d = re.sub(r'\D', '', numero or '')
     if not d:
@@ -31,7 +31,7 @@ _PAIS_TZ = {
 }
 
 
-def zona_horaria(pais: str) -> dict:
+def time_zone(pais: str) -> dict:
     """Country time zone and local time, for chrono-location (step 178)."""
     import datetime
     tz = _PAIS_TZ.get((pais or '').upper(), 'UTC')
@@ -44,7 +44,7 @@ def zona_horaria(pais: str) -> dict:
     return {'tz': tz, 'hora_local': hora}
 
 
-def perfiles_regionales(usuario: str) -> dict:
+def regional_profiles(usuario: str) -> dict:
     """User profiles/searches on regional platforms (step 171)."""
     u = quote(usuario)
     return {
@@ -71,11 +71,11 @@ _LAT_CIR1 = {'a': 'а', 'b': 'б', 'v': 'в', 'g': 'г', 'd': 'д', 'e': 'е', '
              'p': 'п', 'r': 'р', 's': 'с', 't': 'т', 'u': 'у', 'f': 'ф'}
 
 
-def cirilico_a_latino(texto: str) -> str:
+def cyrillic_to_latin(texto: str) -> str:
     return ''.join(_CIR_LAT.get(c, _CIR_LAT.get(c.lower(), c)) for c in texto)
 
 
-def latino_a_cirilico(texto: str) -> str:
+def latin_to_cyrillic(texto: str) -> str:
     t = texto.lower()
     out, i = [], 0
     while i < len(t):
@@ -90,9 +90,9 @@ def latino_a_cirilico(texto: str) -> str:
     return ''.join(out)
 
 
-def transliterar(name: str) -> dict:
+def transliterate(name: str) -> dict:
     """Name variants in each alphabet to find the same person (step 172)."""
-    return {'latino': cirilico_a_latino(name), 'cirilico': latino_a_cirilico(name)}
+    return {'latino': cyrillic_to_latin(name), 'cirilico': latin_to_cyrillic(name)}
 
 
 # ── Language detection by alphabet (step 175) ────────────────────────────────
@@ -103,7 +103,7 @@ _DORK_TERMS = {
 }
 
 
-def dorks_por_idioma(target: str, idioma: str = 'es_en') -> list:
+def dorks_by_language(target: str, idioma: str = 'es_en') -> list:
     """Dorks adapted to the language/region (step 176)."""
     t = _DORK_TERMS.get(idioma, _DORK_TERMS['es_en'])
     dorks = [f'"{target}" {t["contacto"]}', f'"{target}" {t["email"]}', f'"{target}" {t["phone"]}']
@@ -111,7 +111,7 @@ def dorks_por_idioma(target: str, idioma: str = 'es_en') -> list:
     return dorks
 
 
-def registros_regionales(org: str) -> dict:
+def regional_registries(org: str) -> dict:
     """Company/person registries by region (step 173)."""
     q = quote(org)
     return {
@@ -121,7 +121,7 @@ def registros_regionales(org: str) -> dict:
     }
 
 
-def motores_locales(consulta: str) -> dict:
+def local_engines(consulta: str) -> dict:
     """Local search engines (step 174): they see a different internet than Google."""
     q = quote(consulta)
     return {'yandex': f'https://yandex.com/search/?text={q}',
@@ -129,7 +129,7 @@ def motores_locales(consulta: str) -> dict:
             'sogou': f'https://www.sogou.com/web?query={q}'}
 
 
-def detectar_idioma(texto: str) -> str:
+def detect_language(texto: str) -> str:
     """Likely language by the dominant Unicode range. Keyless, no libraries."""
     conteo = {'ru': 0, 'zh': 0, 'ar': 0, 'ja': 0, 'ko': 0, 'es_en': 0}
     for c in texto or '':

@@ -257,7 +257,7 @@ def test_task_manager_error_no_hang():
     assert g.estado(tid)['estado'] == 'error'
 
 
-def test_ejecutar_lote_progreso():
+def test_batch_progress():
     from core.transforms import run_batch
     vistos = []
     run_batch([('url', 'https://a.com/x.jpg', 'reverse_image'),
@@ -294,7 +294,7 @@ def test_url_check_urlhaus(monkeypatch):
 
 
 def test_render_js_bloquea_ssrf(monkeypatch):
-    monkeypatch.setattr(ob, '_url_publica', lambda u: False)   # internal host
+    monkeypatch.setattr(ob, '_public_url', lambda u: False)   # internal host
     prod, _, _ = _run_one('render_js', 'url', 'http://169.254.169.254/')
     assert prod == []                              # does not render internal hosts
 
@@ -312,7 +312,7 @@ def test_wordlist_ia(monkeypatch):
     assert 'juan2024' in palabras and 'abc' not in palabras   # filters <6 chars
 
 
-def test_ia_caso_endpoint(monkeypatch):
+def test_ai_case_endpoint(monkeypatch):
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'T1566 Phishing. Kill chain...')
     c = ob.app.test_client()

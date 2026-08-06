@@ -7,8 +7,8 @@ from flask import Flask, request, jsonify, Response, stream_with_context, send_f
 from werkzeug.exceptions import HTTPException
 
 from core.config import HOME, HOME_INIT, CASES_DIR, STATIC_DIR, CASES_DB, PORT, WORKSPACES_DIR, VIS_FILE as _VIS
-from core.validacion import (_SHELL_PELIGROSOS, _MODULO_TIPO, _es_ip, _validar,
-                             _objetivo_seguro, _slug_caso, _ruta_caso_segura, _url_publica)
+from core.validacion import (_SHELL_PELIGROSOS, _MODULO_TIPO, _is_ip, _validate,
+                             _safe_target, _case_slug, _safe_case_path, _public_url)
 from core.registro import get_logger
 from core.modelo import Store, Entity, valid_type, TIPOS
 from core.transforms import transform, REGISTRO, run_by_name, run_batch
@@ -250,7 +250,7 @@ def run_tool(argv, timeout=25, stdin=None):
     """Runs a tool WITHOUT a shell: argv is a list, not a string. Closes
     metacharacter injection (;, |, `, $()...) because it never passes through a
     shell interpreter. To ALSO close argument injection (a value starting with
-    '-' is read as a flag), validate the target by type with _validar() BEFORE
+    '-' is read as a flag), validate the target by type with _validate() BEFORE
     calling here. Prefer this function over _cmd for anything that interpolates
     user data. _cmd is left only for internal pipelines with already-validated
     values."""
@@ -265,7 +265,7 @@ def run_tool(argv, timeout=25, stdin=None):
     except Exception as e:
         return f'[Error: {e}]'
 
-# ── Security: anti-SSRF fetch (uses _url_publica from core.validacion + SESSION) ─
+# ── Security: anti-SSRF fetch (uses _public_url from core.validacion + SESSION) ─
 def _fetch_seguro(url, timeout=10, stream=False, max_redirs=3):
     """GET that closes SSRF: validates that EVERY hop points to a public IP. It
     follows redirects manually and revalidates each one (a public site can
@@ -274,7 +274,7 @@ def _fetch_seguro(url, timeout=10, stream=False, max_redirs=3):
     if '://' not in url:
         url = 'https://' + url
     for _ in range(max_redirs + 1):
-        if not _url_publica(url):
+        if not _public_url(url):
             raise ValueError('URL blocked (SSRF): internal/private network or disallowed scheme')
         r = SESSION.get(url, timeout=timeout, stream=stream, allow_redirects=False)
         if r.status_code in (301, 302, 303, 307, 308) and r.headers.get('Location'):
@@ -1139,7 +1139,7 @@ def _distrobox_run(distro, tool_dict, tool_id, arg):
                 break
     if not tool:
         return {'error': f'Unknown tool: {tool_id}'}
-    if not _objetivo_seguro(arg):
+    if not _safe_target(arg):
         return {'error': 'Invalid argument: contains disallowed characters'}
     cmd = tool['cmd'].replace('{arg}', arg.strip())
     resultado = _cmd(f'distrobox enter {distro} -- bash -c "{cmd}"', timeout=90)
@@ -1158,7 +1158,7 @@ def _kali_run(tool_id, arg):
         return {'error': f'Unknown tool: {tool_id}'}
 
     cmd_template = tool['cmd']
-    if not _objetivo_seguro(arg):
+    if not _safe_target(arg):
         return {'error': 'Invalid argument: contains disallowed characters'}
     cmd = cmd_template.replace('{arg}', arg.strip())
 
@@ -1792,7 +1792,7 @@ def _monitor_stop():
 
 def _generate_html_report():
     name = case['name'] or f'reporte_{int(time.time())}'
-    path = _ruta_caso_segura(name, '_reporte.html') or os.path.join(CASES_DIR, f'reporte_{int(time.time())}_reporte.html')
+    path = _safe_case_path(name, '_reporte.html') or os.path.join(CASES_DIR, f'reporte_{int(time.time())}_reporte.html')
     ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
     secciones = ''
     for key, value in case['data'].items():
@@ -1880,13 +1880,13 @@ def api_status():
                        'modulos': len(case['data']), 'ok': True})
 
 @app.route('/api/case', methods=['GET','POST','DELETE'])
-def api_caso():
+def api_case():
     if request.method == 'GET':
         archivos = [f[:-5] for f in os.listdir(CASES_DIR) if f.endswith('.json')]
         return jsonify({'casos': archivos, 'actual': case['name']})
     d = request.json or {}
     if request.method == 'POST':
-        slug = _slug_caso(d.get('name','caso1'))
+        slug = _case_slug(d.get('name','caso1'))
         if not slug:
             return jsonify({'error':'Invalid case name'}), 400
         with case_lock:
@@ -1901,7 +1901,7 @@ def api_caso():
 @app.route('/api/case/save', methods=['POST'])
 def api_save():
     if not case['name']: return jsonify({'error':'No active case'}), 400
-    path = _ruta_caso_segura(case['name'])
+    path = _safe_case_path(case['name'])
     if not path: return jsonify({'error':'Invalid case name'}), 400
     with open(path,'w') as f: json.dump(case, f, ensure_ascii=False, indent=2, default=str)
     _db_save_case(case)
@@ -1916,15 +1916,15 @@ def api_find():
 @app.route('/api/case/load', methods=['POST'])
 def api_load():
     name = (request.json or {}).get('name','')
-    path = _ruta_caso_segura(name)
+    path = _safe_case_path(name)
     if not path: return jsonify({'error':'Invalid case name'}), 400
     if not os.path.exists(path): return jsonify({'error':'Not found'}), 404
     with open(path) as f: data = json.load(f)
     with case_lock: case.update(data)
     return jsonify({'ok':True, 'modulos':len(case['data'])})
 
-# The security validators (_validar, _objetivo_seguro, _slug_caso,
-# _ruta_caso_segura, _url_publica...) now live in core/validacion.py and are
+# The security validators (_validate, _safe_target, _case_slug,
+# _safe_case_path, _public_url...) now live in core/validacion.py and are
 # imported above. Only the business logic remains here.
 
 
@@ -1968,7 +1968,7 @@ def api_run():
         return jsonify({'error': f'Unknown module: {mod}'}), 400
     if not arg and mod not in ('wordlist','escenario','superficie','analizar'):
         return jsonify({'error': 'Argument required'}), 400
-    if mod in _MODULO_TIPO and not _validar(arg, _MODULO_TIPO[mod]):
+    if mod in _MODULO_TIPO and not _validate(arg, _MODULO_TIPO[mod]):
         return jsonify({'error': f'Invalid target: not shaped like {_MODULO_TIPO[mod]}'}), 400
 
     def _run_stream():
@@ -2109,7 +2109,7 @@ def _pivote_ips(campos):
     """Searches FOFA + Shodan by unified `campos` and returns the set of matching
     IPs. Basis of the pivots (favicon, cert). Free cross-engine dedup (set)."""
     ips = set()
-    cred = _key_rotativa('fofa') or os.environ.get('FOFA_KEY', '')
+    cred = _rotating_key('fofa') or os.environ.get('FOFA_KEY', '')
     if cred and ':' in cred:
         email, key = cred.split(':', 1)
         try:
@@ -2123,7 +2123,7 @@ def _pivote_ips(campos):
                     ips.add(row[0] if isinstance(row, list) else row)
         except Exception as _e:
             log.debug("pivote fofa: %s", _e)
-    skey = _key_rotativa('shodan') or os.environ.get('SHODAN_API_KEY', '')
+    skey = _rotating_key('shodan') or os.environ.get('SHODAN_API_KEY', '')
     if skey:
         try:
             r = SESSION.get('https://api.shodan.io/shodan/host/search',
@@ -2316,7 +2316,7 @@ def _t_dns_ns(entidad, ctx):
            description='Breaches the email appeared in (HIBP; requires a real HIBP_API_KEY)')
 def _t_email_breaches(entidad, ctx):
     try:
-        hibp_key = _key_rotativa('hibp') or os.environ.get('HIBP_API_KEY', '')
+        hibp_key = _rotating_key('hibp') or os.environ.get('HIBP_API_KEY', '')
         r = SESSION.get(
             f'https://haveibeenpwned.com/api/v3/breachedaccount/{requests.utils.quote(entidad.value)}',
             timeout=8,
@@ -2334,7 +2334,7 @@ def _pastes_github(entidad):
     """Target mentions + secret indicators in public GitHub code (where credentials
     really leak). psbdmp is dead; this is the real path, but it needs a free
     GitHub token (in the vault)."""
-    token = _key_rotativa('github') or os.environ.get('GITHUB_TOKEN', '')
+    token = _rotating_key('github') or os.environ.get('GITHUB_TOKEN', '')
     if not token:
         return
     try:
@@ -2411,7 +2411,7 @@ def _t_breaches(entidad, ctx):
                     fuentes.add(name)
     except Exception as _e:
         log.debug("breaches leakcheck: %s", _e)
-    hibp = _key_rotativa('hibp') or os.environ.get('HIBP_API_KEY', '')
+    hibp = _rotating_key('hibp') or os.environ.get('HIBP_API_KEY', '')
     if hibp:                                          # HIBP (paid, optional)
         try:
             r = SESSION.get(f'https://haveibeenpwned.com/api/v3/breachedaccount/{email}',
@@ -2429,7 +2429,7 @@ def _t_breaches(entidad, ctx):
 @transform(input='email', outputs=('url',), name='intelx', requires_key=True,
            description='Historical leak search by selector (Intelligence X, key in vault) (F10 step 134)')
 def _t_intelx(entidad, ctx):
-    key = _key_rotativa('intelx') or os.environ.get('INTELX_KEY', '')
+    key = _rotating_key('intelx') or os.environ.get('INTELX_KEY', '')
     if not key:
         return
     try:
@@ -2501,8 +2501,8 @@ def _t_email_spoofable(entidad, ctx):
 
 def _screenshot(entidad):
     """Web capture with a headless browser (step 68). Does not capture internal
-    hosts (_url_publica). Saves the PNG in static and leaves the URL as a prop."""
-    if not _url_publica('https://' + entidad.value):
+    hosts (_public_url). Saves the PNG in static and leaves the URL as a prop."""
+    if not _public_url('https://' + entidad.value):
         return
     try:
         from playwright.sync_api import sync_playwright
@@ -2537,7 +2537,7 @@ def _t_screenshot_sub(entidad, ctx):
 def _nuclei(entidad):
     """Vulnerability scan with nuclei templates (step 69). Public hosts only.
     Runs via run_tool (argv, no shell); medium+ severity so it does not drag on."""
-    if not _which('nuclei') or not _url_publica('https://' + entidad.value):
+    if not _which('nuclei') or not _public_url('https://' + entidad.value):
         return
     out = run_tool(['nuclei', '-u', 'https://' + entidad.value, '-jsonl', '-silent',
                     '-severity', 'medium,high,critical', '-timeout', '5'], timeout=150)
@@ -2668,7 +2668,7 @@ def _t_http_probe_sub(entidad, ctx):
 @transform(input='domain', outputs=('domain',), name='reverse_whois',
            description='Other domains of the same registrant (ViewDNS, free key in the vault). The only F5 one without a keyless option.')
 def _t_reverse_whois(entidad, ctx):
-    key = _key_rotativa('viewdns') or os.environ.get('VIEWDNS_KEY', '')
+    key = _rotating_key('viewdns') or os.environ.get('VIEWDNS_KEY', '')
     if not key:
         return
     try:
@@ -2734,7 +2734,7 @@ def _t_reputacion_ip(entidad, ctx):
 @transform(input='ip', outputs=(), name='abuseipdb',
            description='Abuse score of the IP (AbuseIPDB, free key in the vault)')
 def _t_abuseipdb(entidad, ctx):
-    key = _key_rotativa('abuseipdb') or os.environ.get('ABUSEIPDB_KEY', '')
+    key = _rotating_key('abuseipdb') or os.environ.get('ABUSEIPDB_KEY', '')
     if not key:
         return
     try:
@@ -2754,7 +2754,7 @@ def _t_abuseipdb(entidad, ctx):
            requires_key=True,
            description='Ports/services/org of the IP (Shodan, key in the vault)')
 def _t_shodan(entidad, ctx):
-    key = _key_rotativa('shodan') or os.environ.get('SHODAN_API_KEY', '')
+    key = _rotating_key('shodan') or os.environ.get('SHODAN_API_KEY', '')
     if not key:
         return
     try:
@@ -2780,7 +2780,7 @@ def _t_shodan(entidad, ctx):
            requires_key=True,
            description='Services of the IP (Censys, key "id:secret" in the vault)')
 def _t_censys(entidad, ctx):
-    cred = _key_rotativa('censys') or os.environ.get('CENSYS_API', '')
+    cred = _rotating_key('censys') or os.environ.get('CENSYS_API', '')
     if not cred or ':' not in cred:
         return
     cid, secret = cred.split(':', 1)
@@ -2810,7 +2810,7 @@ def _t_censys(entidad, ctx):
            requires_key=True,
            description='Services of the IP in ZoomEye (CN engine, key in the vault)')
 def _t_zoomeye(entidad, ctx):
-    key = _key_rotativa('zoomeye') or os.environ.get('ZOOMEYE_KEY', '')
+    key = _rotating_key('zoomeye') or os.environ.get('ZOOMEYE_KEY', '')
     if not key:
         return
     try:
@@ -2833,7 +2833,7 @@ def _t_zoomeye(entidad, ctx):
            requires_key=True,
            description='Hosts/domains in FOFA (CN engine, key "email:key" in the vault)')
 def _t_fofa(entidad, ctx):
-    cred = _key_rotativa('fofa') or os.environ.get('FOFA_KEY', '')
+    cred = _rotating_key('fofa') or os.environ.get('FOFA_KEY', '')
     if not cred or ':' not in cred:
         return
     email, key = cred.split(':', 1)
@@ -2860,7 +2860,7 @@ def _t_fofa(entidad, ctx):
            requires_key=True,
            description='Services of the IP in Quake/360 (CN engine, key in the vault)')
 def _t_quake(entidad, ctx):
-    key = _key_rotativa('quake') or os.environ.get('QUAKE_KEY', '')
+    key = _rotating_key('quake') or os.environ.get('QUAKE_KEY', '')
     if not key:
         return
     try:
@@ -2882,7 +2882,7 @@ def _t_quake(entidad, ctx):
            requires_key=True,
            description='Hosts/domains in Hunter.how (CN engine, key in the vault)')
 def _t_hunter(entidad, ctx):
-    key = _key_rotativa('hunter') or os.environ.get('HUNTER_KEY', '')
+    key = _rotating_key('hunter') or os.environ.get('HUNTER_KEY', '')
     if not key:
         return
     q = base64.urlsafe_b64encode(_motor_query('hunter', {'ip': entidad.value}).encode()).decode()
@@ -2902,7 +2902,7 @@ def _t_hunter(entidad, ctx):
            requires_key=True,
            description='Responses of the IP in Netlas (key in the vault)')
 def _t_netlas(entidad, ctx):
-    key = _key_rotativa('netlas') or os.environ.get('NETLAS_KEY', '')
+    key = _rotating_key('netlas') or os.environ.get('NETLAS_KEY', '')
     if not key:
         return
     try:
@@ -2920,7 +2920,7 @@ def _t_netlas(entidad, ctx):
            requires_key=True,
            description='Ports/exposure of the IP (Criminal IP, key in the vault)')
 def _t_criminalip(entidad, ctx):
-    key = _key_rotativa('criminalip') or os.environ.get('CRIMINALIP_KEY', '')
+    key = _rotating_key('criminalip') or os.environ.get('CRIMINALIP_KEY', '')
     if not key:
         return
     try:
@@ -2938,7 +2938,7 @@ def _t_criminalip(entidad, ctx):
            requires_key=True,
            description='Exposed ports of the IP (BinaryEdge, key in the vault)')
 def _t_binaryedge(entidad, ctx):
-    key = _key_rotativa('binaryedge') or os.environ.get('BINARYEDGE_KEY', '')
+    key = _rotating_key('binaryedge') or os.environ.get('BINARYEDGE_KEY', '')
     if not key:
         return
     try:
@@ -2965,7 +2965,7 @@ def _t_busqueda_facial(entidad, ctx):
 
 @transform(input='phone', outputs=('url', 'country'), name='telefono_dorks',
            description='Phone search dorks (Truecaller/messaging) + carrier if key (F2 step 33)')
-def _t_telefono_dorks(entidad, ctx):
+def _t_phone_dorks(entidad, ctx):
     from urllib.parse import quote as _q
     num = entidad.value
     limpio = re.sub(r'[^\d+]', '', num)
@@ -2977,7 +2977,7 @@ def _t_telefono_dorks(entidad, ctx):
     }
     for name, q in dorks.items():
         ctx.emit('url', f'https://www.google.com/search?q={_q(q)}', label=f'dork:{name}', dork=name)
-    key = _key_rotativa('numverify') or os.environ.get('NUMVERIFY_KEY', '')
+    key = _rotating_key('numverify') or os.environ.get('NUMVERIFY_KEY', '')
     if key:
         try:
             r = SESSION.get('http://apilayer.net/api/validate',
@@ -3108,7 +3108,7 @@ def _t_takeover(entidad, ctx):
 @transform(input='domain', outputs=('ip',), name='passivedns', requires_key=True,
            description='IP history of the domain (Passive DNS via VirusTotal, key in the vault) (F2 step 34)')
 def _t_passivedns(entidad, ctx):
-    key = _key_rotativa('virustotal') or os.environ.get('VT_API_KEY', '')
+    key = _rotating_key('virustotal') or os.environ.get('VT_API_KEY', '')
     if not key:
         return
     try:
@@ -3138,7 +3138,7 @@ _SECRET_PATTERNS = [
            description='Hardcoded secrets in commits of the user public repos (F4 step 60)')
 def _t_github_sec(entidad, ctx):
     user = entidad.value
-    tok = _key_rotativa('github') or os.environ.get('GITHUB_TOKEN', '')
+    tok = _rotating_key('github') or os.environ.get('GITHUB_TOKEN', '')
     hdr = {'Authorization': f'token {tok}'} if tok else {}
     try:
         rr = SESSION.get(f'https://api.github.com/users/{user}/repos?per_page=20', headers=hdr, timeout=8)
@@ -3225,7 +3225,7 @@ def _t_render_js(entidad, ctx):
     url = entidad.value
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
-    if not _url_publica(url):                    # anti-SSRF: do not render internal hosts
+    if not _public_url(url):                    # anti-SSRF: do not render internal hosts
         return
     try:
         from playwright.sync_api import sync_playwright
@@ -3296,7 +3296,7 @@ def _t_wordlist(entidad, ctx):
     entidad.properties['wordlist'] = palabras
     entidad.properties['wordlist_total'] = len(palabras)
     try:
-        slug = _slug_caso(entidad.value.lower()) or 'target'
+        slug = _case_slug(entidad.value.lower()) or 'target'
         ruta = os.path.join(CASES_DIR, f'wordlist_{slug}.txt')
         with open(ruta, 'w', encoding='utf-8') as f:
             f.write('\n'.join(palabras))
@@ -3669,35 +3669,35 @@ def _t_extraer_wallets(entidad, ctx):
 
 @transform(input='person', outputs=('url',), name='language_dorks',
            description='Dorks adapted to the name language (Cyrillic/Chinese/Latin) (F15 step 176)')
-def _t_dorks_idioma(entidad, ctx):
+def _t_language_dorks(entidad, ctx):
     from urllib.parse import quote as _q
-    idioma = _ml.detectar_idioma(entidad.value)
-    for d in _ml.dorks_por_idioma(entidad.value, idioma):
+    idioma = _ml.detect_language(entidad.value)
+    for d in _ml.dorks_by_language(entidad.value, idioma):
         ctx.emit('url', f'https://www.google.com/search?q={_q(d)}', label=f'dork:{idioma}', language=idioma)
 
 @transform(input='person', outputs=('url',), name='local_engines',
            description='Search in local engines: Yandex, Baidu, Sogou (they index another internet) (F15 step 174)')
-def _t_motores_locales(entidad, ctx):
-    for motor, url in _ml.motores_locales(entidad.value).items():
+def _t_local_engines(entidad, ctx):
+    for motor, url in _ml.local_engines(entidad.value).items():
         ctx.emit('url', url, label=f'motor:{motor}', engine=motor)
 
 @transform(input='org', outputs=('url',), name='regional_registries',
            description='Company registries by region: QCC (China), RusProfile (Russia), OpenCorporates (F15 step 173)')
-def _t_registros_regionales(entidad, ctx):
-    for reg, url in _ml.registros_regionales(entidad.value).items():
+def _t_regional_registries(entidad, ctx):
+    for reg, url in _ml.regional_registries(entidad.value).items():
         ctx.emit('url', url, label=f'registro:{reg}', registry=reg)
 
-@transform(input='person', outputs=('person',), name='transliterar',
+@transform(input='person', outputs=('person',), name='transliterate',
            description='Name variants in Cyrillic/Latin to search in each alphabet (F15 step 172)')
-def _t_transliterar(entidad, ctx):
-    for alfabeto, variante in _ml.transliterar(entidad.value).items():
+def _t_transliterate(entidad, ctx):
+    for alfabeto, variante in _ml.transliterate(entidad.value).items():
         if variante and variante.lower() != entidad.value.lower():
             ctx.emit('person', variante, label=f'translit:{alfabeto}')
 
 @transform(input='user', outputs=('url',), name='regional_platforms',
            description='Profiles on regional platforms: VK, Weibo, Douyin, OK, Telegram (F15 step 171)')
 def _t_plataformas_regionales(entidad, ctx):
-    for plat, url in _ml.perfiles_regionales(entidad.value).items():
+    for plat, url in _ml.regional_profiles(entidad.value).items():
         ctx.emit('url', url, label=f'plataforma:{plat}', platform=plat)
 
 _BLOCKLIST = {'nets': None, 'ts': 0}   # in-memory cache (refreshes every 6h)
@@ -3833,8 +3833,8 @@ def _run_transform_internal(type, value, name):
     if not semilla.well_formed():
         raise ValueError(f'malformed value for {type}')
     if _PROXIES['pool']:
-        _rotar_proxy()                                      # OPSEC: rotate proxy per transform (154)
-    _higiene_request()                                      # OPSEC: randomize UA (155)
+        _rotate_proxy()                                      # OPSEC: rotate proxy per transform (154)
+    _request_hygiene()                                      # OPSEC: randomize UA (155)
     _jitter()                                               # OPSEC: spacing between requests (156)
     _record_footprint(name, type, value)                  # OPSEC: log your footprint (160)
     with _almacen_lock:
@@ -4089,11 +4089,11 @@ def api_v2_workspaces():
             _store = _gestor.create(name)
         except ValueError as e:
             return _error(str(e), 400)
-        _ws_activo = _slug_caso(name)
+        _ws_activo = _case_slug(name)
         return jsonify({'ok': True, 'activo': _ws_activo})
     if request.method == 'DELETE':
         _gestor.delete(name)
-        if _ws_activo == _slug_caso(name):
+        if _ws_activo == _case_slug(name):
             _store, _ws_activo = Store(), None
         return jsonify({'ok': True, 'activo': _ws_activo})
 
@@ -4106,8 +4106,8 @@ def api_v2_workspace_abrir():
         _store = _gestor.load(name)
     except KeyError:
         return _error('workspace not found', 404)
-    _ws_activo = _slug_caso(name)
-    _aplicar_perfil_opsec(_ws_activo)                # non-attribution mode (157)
+    _ws_activo = _case_slug(name)
+    _apply_opsec_profile(_ws_activo)                # non-attribution mode (157)
     return jsonify({'ok': True, 'activo': _ws_activo, 'total_entities': len(_store)})
 
 @app.route('/api/v2/workspaces/history')
@@ -4153,7 +4153,7 @@ def api_v2_opsec_footprint():
 
 _KEY_ROT = {}
 
-def _key_rotativa(service):
+def _rotating_key(service):
     """A service's key, rotating across several accounts if 'k1|k2|k3' was saved
     (spreads load across accounts of the same service). Step 159. Backward-compatible:
     a single key is returned as-is."""
@@ -4176,18 +4176,18 @@ _USER_AGENTS = [
 ]
 _OPSEC_HIGIENE = {'on': False}
 
-def _higiene_request():
+def _request_hygiene():
     """Randomizes the User-Agent so it does not look like a bot (F13 step 155)."""
     if _OPSEC_HIGIENE['on']:
         SESSION.headers['User-Agent'] = secrets.choice(_USER_AGENTS)
 
 @app.route('/api/v2/opsec/hygiene', methods=['GET', 'POST'])
-def api_v2_opsec_higiene():
+def api_v2_opsec_hygiene():
     if request.method == 'POST':
         _OPSEC_HIGIENE['on'] = bool((request.json or {}).get('on'))
     return jsonify({'higiene': _OPSEC_HIGIENE['on']})
 
-def _evaluar_fuga(anon, ip_session, ip_real):
+def _evaluate_leak(anon, ip_session, ip_real):
     """LEAK if anonymous mode is on but the IP seen by Obsidian == the real IP
     (i.e. traffic does NOT go out via Tor/proxy). Pure/testable. Step 158."""
     return bool(anon and ip_session and ip_real and ip_session == ip_real)
@@ -4206,7 +4206,7 @@ def api_v2_opsec_fuga():
         ip_real = requests.get('https://api.ipify.org', timeout=8).text.strip()     # direct, no proxy
     except Exception:
         pass
-    fuga = _evaluar_fuga(anon, ip_session, ip_real)
+    fuga = _evaluate_leak(anon, ip_session, ip_real)
     return jsonify({'anonimo': anon, 'ip_via_obsidian': ip_session, 'ip_real': ip_real, 'fuga': fuga,
                     'nota': '⚠ LEAK: your real IP is exposed despite anonymous mode' if fuga
                     else ('ok -- traffic anonymized' if anon else 'anonymous mode off')})
@@ -4232,7 +4232,7 @@ def api_v2_opsec_jitter():
 
 _PROXIES = {'pool': [], 'i': 0}
 
-def _rotar_proxy():
+def _rotate_proxy():
     """Sets the next proxy from the pool on the SESSION (round-robin). Step 154."""
     pool = _PROXIES['pool']
     if not pool:
@@ -4268,17 +4268,17 @@ def api_v2_opsec_anonimo():
 # ── Non-attribution mode: per-workspace OPSEC profile (F13 step 157) ─────────
 _OPSEC_PROFILES = os.path.join(HOME, '.obsidian', 'opsec_profiles.json')
 
-def _leer_perfiles():
+def _read_profiles():
     try:
         with open(_OPSEC_PROFILES, encoding='utf-8') as f:
             return json.load(f)
     except Exception:
         return {}
 
-def _aplicar_perfil_opsec(ws):
+def _apply_opsec_profile(ws):
     """Isolates the case with its own network identity: applies the workspace's
     OPSEC profile (persona, proxies, anonymous, hygiene, jitter)."""
-    p = _leer_perfiles().get(ws, {})
+    p = _read_profiles().get(ws, {})
     _OPSEC_HIGIENE['on'] = bool(p.get('higiene'))
     _OPSEC_JITTER['min'] = float(p.get('jitter_min', 0) or 0)
     _OPSEC_JITTER['max'] = float(p.get('jitter_max', 0) or 0)
@@ -4293,10 +4293,10 @@ def api_v2_opsec_perfil():
     """OPSEC profile (network identity) associated with a workspace (F13 step 157)."""
     if request.method == 'POST':
         d = request.json or {}
-        ws = _slug_caso(d.get('workspace', '') or '')
+        ws = _case_slug(d.get('workspace', '') or '')
         if not ws:
             return _error('missing workspace', 400)
-        perfiles = _leer_perfiles()
+        perfiles = _read_profiles()
         perfiles[ws] = d.get('perfil', {}) or {}
         try:
             os.makedirs(os.path.dirname(_OPSEC_PROFILES), exist_ok=True)
@@ -4305,9 +4305,9 @@ def api_v2_opsec_perfil():
         except Exception as e:
             return _error(f'could not save: {e}', 500)
         if ws == _ws_activo:
-            _aplicar_perfil_opsec(ws)
+            _apply_opsec_profile(ws)
         return jsonify({'ok': True})
-    return jsonify({'perfil': _leer_perfiles().get(_ws_activo, {}), 'activo': _ws_activo,
+    return jsonify({'perfil': _read_profiles().get(_ws_activo, {}), 'activo': _ws_activo,
                     'estado': {'anonimo': _OPSEC['anonimo'], 'higiene': _OPSEC_HIGIENE['on'],
                                'proxies': len(_PROXIES['pool']), 'person': _OPSEC.get('person')}})
 
@@ -4472,7 +4472,7 @@ def api_v2_report():
     return Response(html_doc, mimetype='text/html')
 
 def _export_name():
-    base = _slug_caso(_ws_activo) if _ws_activo else 'caso'
+    base = _case_slug(_ws_activo) if _ws_activo else 'caso'
     return f'obsidian-{base}-{datetime.datetime.now():%Y%m%d}'
 
 @app.route('/api/v2/export/json')
@@ -4618,20 +4618,20 @@ _FUENTE_POR_IDIOMA = {'ru': 'Yandex / VK', 'zh': 'Baidu / Weibo', 'ar': 'Google 
                       'ja': 'Yahoo Japan', 'ko': 'Naver', 'es_en': 'Google'}
 
 @app.route('/api/v2/time_zone', methods=['POST'])
-def api_v2_zona_horaria():
+def api_v2_time_zone():
     """Time zone and local time of a country, for chrono-location (F15 step 178)."""
-    return jsonify(_ml.zona_horaria((request.json or {}).get('country', '')))
+    return jsonify(_ml.time_zone((request.json or {}).get('country', '')))
 
 @app.route('/api/v2/normalize_phone', methods=['POST'])
-def api_v2_normalizar_telefono():
+def api_v2_normalize_phone():
     """Normalizes a phone to +E.164 based on the country (F15 step 177)."""
     d = request.json or {}
-    return jsonify({'e164': _ml.normalizar_telefono(d.get('numero', ''), d.get('country', 'US'))})
+    return jsonify({'e164': _ml.normalize_phone(d.get('numero', ''), d.get('country', 'US'))})
 
 @app.route('/api/v2/language', methods=['POST'])
-def api_v2_idioma():
+def api_v2_language():
     """Detects the text language and suggests the right source/engine (F15 step 175)."""
-    idioma = _ml.detectar_idioma((request.json or {}).get('texto', ''))
+    idioma = _ml.detect_language((request.json or {}).get('texto', ''))
     return jsonify({'idioma': idioma, 'fuente_sugerida': _FUENTE_POR_IDIOMA.get(idioma, 'Google')})
 
 @app.route('/api/v2/extract_text', methods=['POST'])
@@ -4827,7 +4827,7 @@ def api_darkweb():
 def api_shodan():
     d = request.json or {}
     if d.get('ip'):
-        if not _objetivo_seguro(d['ip']):
+        if not _safe_target(d['ip']):
             return jsonify({'error': 'Invalid IP: disallowed characters'}), 400
         return jsonify(_shodan_ip(d['ip']))
     q = d.get('query','')

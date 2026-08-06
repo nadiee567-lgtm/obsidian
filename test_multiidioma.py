@@ -22,13 +22,13 @@ def test_plataformas_regionales():
 
 # ── 172: name transliteration ───────────────────────────────────────────────
 def test_transliterar_funciones():
-    from core.multiidioma import cirilico_a_latino, latino_a_cirilico
-    assert cirilico_a_latino('Иван') == 'ivan'
-    assert latino_a_cirilico('ivan') == 'иван'
+    from core.multiidioma import cyrillic_to_latin, latin_to_cyrillic
+    assert cyrillic_to_latin('Иван') == 'ivan'
+    assert latin_to_cyrillic('ivan') == 'иван'
 
 
 def test_transliterar_transform():
-    prod, _ = _run_one('transliterar', 'person', 'Иван')
+    prod, _ = _run_one('transliterate', 'person', 'Иван')
     variantes = {p.value for p in prod if p.type == 'person'}
     assert 'ivan' in variantes                    # latin variant
 
@@ -49,10 +49,10 @@ def test_motores_locales():
 
 # ── 175: language detection and routing ─────────────────────────────────────
 def test_detectar_idioma():
-    from core.multiidioma import detectar_idioma
-    assert detectar_idioma('Привет мир') == 'ru'
-    assert detectar_idioma('你好世界') == 'zh'
-    assert detectar_idioma('hola mundo') == 'es_en'
+    from core.multiidioma import detect_language
+    assert detect_language('Привет мир') == 'ru'
+    assert detect_language('你好世界') == 'zh'
+    assert detect_language('hola mundo') == 'es_en'
 
 
 def test_idioma_endpoint(monkeypatch):
@@ -65,8 +65,8 @@ def test_idioma_endpoint(monkeypatch):
 
 # ── 176: dorks by language/region ───────────────────────────────────────────
 def test_dorks_por_idioma():
-    from core.multiidioma import dorks_por_idioma
-    ru = dorks_por_idioma('Ivan', 'ru')
+    from core.multiidioma import dorks_by_language
+    ru = dorks_by_language('Ivan', 'ru')
     assert any('почта' in d for d in ru) and any('vk.com' in d for d in ru)
 
 
@@ -78,16 +78,16 @@ def test_dorks_idioma_transform():
 
 # ── 177: normalization by country ───────────────────────────────────────────
 def test_normalizar_telefono():
-    from core.multiidioma import normalizar_telefono
-    assert normalizar_telefono('55 1234 5678', 'MX') == '+525512345678'
-    assert normalizar_telefono('(415) 555-2671', 'US') == '+14155552671'
-    assert normalizar_telefono('') == ''
+    from core.multiidioma import normalize_phone
+    assert normalize_phone('55 1234 5678', 'MX') == '+525512345678'
+    assert normalize_phone('(415) 555-2671', 'US') == '+14155552671'
+    assert normalize_phone('') == ''
 
 
 # ── 178: local time zone (chrono-location) ──────────────────────────────────
 def test_zona_horaria():
-    from core.multiidioma import zona_horaria
-    assert zona_horaria('MX')['tz'] == 'America/Mexico_City'
-    assert zona_horaria('RU')['tz'] == 'Europe/Moscow'
-    assert zona_horaria('XX')['tz'] == 'UTC'          # unknown country
-    assert zona_horaria('CN')['hora_local'] is not None
+    from core.multiidioma import time_zone
+    assert time_zone('MX')['tz'] == 'America/Mexico_City'
+    assert time_zone('RU')['tz'] == 'Europe/Moscow'
+    assert time_zone('XX')['tz'] == 'UTC'          # unknown country
+    assert time_zone('CN')['hora_local'] is not None

@@ -19,7 +19,7 @@ def _fake_b(entidad, ctx):
     ctx.emit('subdomain', 'x.' + entidad.value)
 
 
-def test_lote_fusiona_resultados():
+def test_batch_merges_results():
     alm = Store()
     res = run_batch([('domain', 'ejemplo.com', '_test_lote_a'),
                          ('domain', 'ejemplo.com', '_test_lote_b')], alm)
@@ -31,17 +31,17 @@ def test_lote_fusiona_resultados():
     assert len(alm.relations) == 3
 
 
-def test_lote_con_lock():
+def test_batch_with_lock():
     alm = Store()
     run_batch([('domain', 'a.com', '_test_lote_a')], alm, lock=threading.RLock())
     assert len(alm.of_type('ip')) == 2
 
 
-def test_lote_vacio():
+def test_batch_empty():
     assert run_batch([], Store()) == []
 
 
-def test_lote_transform_inexistente_no_rompe():
+def test_batch_missing_transform_ok():
     alm = Store()
     res = run_batch([('domain', 'a.com', 'no_existe_zzz')], alm)
     assert res == [('no_existe_zzz', 0)]

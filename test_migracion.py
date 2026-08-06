@@ -71,6 +71,6 @@ def test_migracion_no_truena_con_modulo_roto():
     assert len(alm) > 0
 
 
-def test_migracion_caso_vacio():
+def test_migration_empty_case():
     alm = migrate_case({'target': None, 'data': {}})
     assert len(alm) == 0

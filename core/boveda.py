@@ -27,7 +27,7 @@ class Vault:
         with open(self.key_file, 'rb') as f:
             return Fernet(f.read())
 
-    def _leer(self):
+    def _read(self):
         if not os.path.exists(self.enc_file):
             return {}
         try:
@@ -44,19 +44,19 @@ class Vault:
 
     # -- public API --
     def save(self, service, value):
-        d = self._leer()
+        d = self._read()
         d[service] = value
         self._escribir(d)
 
     def get(self, service):
-        return self._leer().get(service)
+        return self._read().get(service)
 
     def servicios(self):
         """Only the configured service NAMES -- never the values."""
-        return sorted(self._leer().keys())
+        return sorted(self._read().keys())
 
     def delete(self, service):
-        d = self._leer()
+        d = self._read()
         if service in d:
             del d[service]
             self._escribir(d)

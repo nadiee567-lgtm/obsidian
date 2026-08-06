@@ -16,7 +16,7 @@ class PersonaManager:
     def __init__(self, ruta: str):
         self.ruta = ruta
 
-    def _leer(self) -> dict:
+    def _read(self) -> dict:
         try:
             with open(self.ruta, encoding='utf-8') as f:
                 return json.load(f)
@@ -29,20 +29,20 @@ class PersonaManager:
             json.dump(d, f, indent=2, ensure_ascii=False)
 
     def create(self, name: str, data: dict) -> str:
-        d = self._leer()
+        d = self._read()
         d[name] = {**(data or {}),
                      'created': datetime.datetime.now().isoformat(timespec='seconds')}
         self._escribir(d)
         return name
 
     def list_ws(self) -> list:
-        return sorted(self._leer().keys())
+        return sorted(self._read().keys())
 
     def get(self, name: str):
-        return self._leer().get(name)
+        return self._read().get(name)
 
     def delete(self, name: str) -> bool:
-        d = self._leer()
+        d = self._read()
         if name in d:
             del d[name]
             self._escribir(d)

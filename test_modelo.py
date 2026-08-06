@@ -72,7 +72,7 @@ def test_store_of_type_and_find():
 
 
 # ── relations: deterministic and non-duplicated (step 15) ───────────────────
-def test_relaciones_dedup():
+def test_relations_dedup():
     alm = Store()
     d = alm.create('domain', 'example.com')
     i = alm.create('ip', '93.184.216.34')
@@ -149,7 +149,7 @@ def test_bus_publica_entidad_nueva_y_actualizada():
     assert len(nuevas) == 1
     assert len(actualizadas) == 1
 
-def test_bus_publica_relacion_nueva():
+def test_bus_publishes_new_relation():
     bus = Bus()
     rels = []
     bus.suscribir(RELACION_NUEVA, lambda r: rels.append(r))

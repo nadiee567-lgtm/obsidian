@@ -4,7 +4,7 @@ Correr:  ../.venv/bin/python -m pytest test_motores.py -q
 """
 import pytest
 
-from core.motores import traducir, traducir_todos, motores_disponibles, MOTORES
+from core.motores import traducir, traducir_todos, available_engines, MOTORES
 
 
 def test_traducir_ip_por_motor():
@@ -45,10 +45,10 @@ def test_traducir_todos():
 
 
 def test_motores_chinos():
-    cn = set(motores_disponibles(cn=True))
+    cn = set(available_engines(cn=True))
     assert {'fofa', 'zoomeye', 'quake'} <= cn
     assert 'shodan' not in cn
-    assert 'shodan' in motores_disponibles(cn=False)
+    assert 'shodan' in available_engines(cn=False)
 
 
 def test_motor_desconocido():
