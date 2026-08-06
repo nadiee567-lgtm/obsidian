@@ -98,7 +98,7 @@ def test_workspaces_flujo(tmp_path):
         j = c.get('/api/v2/workspaces').get_json()
         assert 'caso demo' in j['workspaces'] and j['activo'] == 'caso demo'
         # simulate saved data and open fresh
-        ob._almacen.crear('ip', '8.8.8.8')
+        ob._almacen.create('ip', '8.8.8.8')
         ob._gestor.guardar('caso demo', ob._almacen)
         ob._almacen = ob.Store()
         r = c.post('/api/v2/workspaces/abrir', json={'nombre': 'caso demo'})

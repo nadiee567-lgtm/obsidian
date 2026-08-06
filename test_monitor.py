@@ -8,9 +8,9 @@ from core.monitor import snapshot, diff, Monitor
 
 def test_diff_detecta_entidad_nueva():
     alm = Store()
-    alm.crear('dominio', 'objetivo.com')
+    alm.create('dominio', 'objetivo.com')
     antes = snapshot(alm)
-    alm.crear('subdominio', 'nuevo.objetivo.com')      # a subdomain appeared
+    alm.create('subdominio', 'nuevo.objetivo.com')      # a subdomain appeared
     cambios = diff(antes, snapshot(alm))
     assert cambios.hay()
     assert len(cambios.nuevas_entidades) == 1
@@ -19,17 +19,17 @@ def test_diff_detecta_entidad_nueva():
 
 def test_diff_detecta_relacion_nueva():
     alm = Store()
-    d = alm.crear('dominio', 'objetivo.com')
-    ip = alm.crear('ip', '1.2.3.4')
+    d = alm.create('dominio', 'objetivo.com')
+    ip = alm.create('ip', '1.2.3.4')
     antes = snapshot(alm)
-    alm.relacionar(d.id, ip.id, 'resuelve')
+    alm.relate(d.id, ip.id, 'resuelve')
     cambios = diff(antes, snapshot(alm))
     assert len(cambios.nuevas_relaciones) == 1
 
 
 def test_diff_detecta_cambio_de_propiedad():
     alm = Store()
-    d = alm.crear('dominio', 'objetivo.com', propiedades={'cert_expira': '2027'})
+    d = alm.create('dominio', 'objetivo.com', propiedades={'cert_expira': '2027'})
     antes = snapshot(alm)
     d.propiedades['cert_expira'] = '2020'              # the cert changed (expired)
     cambios = diff(antes, snapshot(alm))
@@ -40,26 +40,26 @@ def test_diff_detecta_cambio_de_propiedad():
 
 def test_diff_detecta_tag_nuevo():
     alm = Store()
-    s = alm.crear('subdominio', 's.objetivo.com')
+    s = alm.create('subdominio', 's.objetivo.com')
     antes = snapshot(alm)
-    s.etiquetar('takeover')                            # became vulnerable
+    s.tag('takeover')                            # became vulnerable
     cambios = diff(antes, snapshot(alm))
     assert any(c['campo'] == 'tag' and c['ahora'] == 'takeover' for c in cambios.cambios_prop)
 
 
 def test_diff_sin_cambios():
     alm = Store()
-    alm.crear('dominio', 'objetivo.com')
+    alm.create('dominio', 'objetivo.com')
     snap = snapshot(alm)
     assert not diff(snap, snapshot(alm)).hay()
 
 
 def test_monitor_ciclo_alerta_en_cambio():
     alm = Store()
-    alm.crear('dominio', 'objetivo.com')
+    alm.create('dominio', 'objetivo.com')
     disparos = []
     def refrescar():                                   # simulates a re-scan with news
-        alm.crear('subdominio', 'nuevo.objetivo.com')
+        alm.create('subdominio', 'nuevo.objetivo.com')
     m = Monitor(lambda: snapshot(alm), refrescar,
                 on_alerta=lambda c: disparos.append(c), intervalo=999)
     cambios = m.ciclo()
@@ -71,7 +71,7 @@ def test_monitor_ciclo_alerta_en_cambio():
 
 def test_monitor_ciclo_sin_cambios_no_alerta():
     alm = Store()
-    alm.crear('dominio', 'objetivo.com')
+    alm.create('dominio', 'objetivo.com')
     m = Monitor(lambda: snapshot(alm), lambda: None, intervalo=999)
     m.ciclo()
     assert m.alertas == []
@@ -79,7 +79,7 @@ def test_monitor_ciclo_sin_cambios_no_alerta():
 
 def test_monitor_refrescar_que_falla_no_tumba_el_ciclo():
     alm = Store()
-    alm.crear('dominio', 'objetivo.com')
+    alm.create('dominio', 'objetivo.com')
     def refrescar():
         raise RuntimeError('network down')
     m = Monitor(lambda: snapshot(alm), refrescar, intervalo=999)

@@ -4,7 +4,7 @@ Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_cripto.py -q
 """
 import obsidian_web as ob
 from core.modelo import Store
-from core.transforms import ejecutar_por_nombre
+from core.transforms import run_by_name
 
 
 class _R:
@@ -17,8 +17,8 @@ class _R:
 
 def _correr(nombre, tipo, valor):
     alm = Store()
-    e = alm.crear(tipo, valor)
-    return ejecutar_por_nombre(nombre, e, alm), e, alm
+    e = alm.create(tipo, valor)
+    return run_by_name(nombre, e, alm), e, alm
 
 
 # ── 137: wallet extraction ──────────────────────────────────────────────────
@@ -70,11 +70,11 @@ def test_exchange_attrib():
 
 # ── 141: risk scoring (ransomware) + rule ───────────────────────────────────
 def test_riesgo_wallet_y_regla(monkeypatch):
-    from core.correlacion import correlacionar
+    from core.correlacion import correlate
     monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
     prod, e, alm = _correr('riesgo_wallet', 'wallet', '1BadRansomAddr')
     assert 'ransomware' in e.tags
-    h = correlacionar(alm)
+    h = correlate(alm)
     assert any(x.regla == 'wallet-ransomware' and x.severidad == 'critico' for x in h)
 
 
@@ -102,7 +102,7 @@ def test_monitor_detecta_movimiento_wallet():
     """Watching a wallet = the monitor diffs its balance; a movement => alert."""
     from core.monitor import snapshot, diff
     alm = Store()
-    w = alm.crear('wallet', _GENESIS, propiedades={'btc_balance': 1.5, 'btc_tx': 10})
+    w = alm.create('wallet', _GENESIS, propiedades={'btc_balance': 1.5, 'btc_tx': 10})
     antes = snapshot(alm)
     w.propiedades['btc_balance'] = 3.0                 # money moved in/out
     w.propiedades['btc_tx'] = 11

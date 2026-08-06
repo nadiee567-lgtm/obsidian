@@ -22,9 +22,9 @@ import os
 import sys
 
 import obsidian_web as _ob   # registers the transforms (does not start Flask)
-from core.modelo import Store, tipo_valido
-from core.transforms import REGISTRO, ejecutar_por_nombre, ejecutar_lote
-from core.correlacion import correlacionar, score_riesgo
+from core.modelo import Store, valid_type
+from core.transforms import REGISTRO, run_by_name, run_batch
+from core.correlacion import correlate, risk_score
 from core.reporte import generar_reporte
 from core.exportar import exportar_json, exportar_csv
 from core.workspaces import Manager
@@ -42,7 +42,7 @@ def _almacen(ws):
 def _guardar(ws, alm):
     if ws:
         if not _gestor.existe(ws):
-            _gestor.crear(ws)
+            _gestor.create(ws)
         _gestor.guardar(ws, alm)
 
 
@@ -63,12 +63,12 @@ def cmd_transforms(a):
 
 
 def cmd_run(a):
-    if not tipo_valido(a.tipo):
+    if not valid_type(a.tipo):
         return _err(f"invalid type: {a.tipo}")
     alm = _almacen(a.workspace)
     try:
-        semilla = alm.crear(a.tipo, a.valor)
-        producidas = ejecutar_por_nombre(a.transform, semilla, alm)
+        semilla = alm.create(a.tipo, a.valor)
+        producidas = run_by_name(a.transform, semilla, alm)
     except (KeyError, ValueError) as e:
         return _err(str(e))
     _guardar(a.workspace, alm)
@@ -81,20 +81,20 @@ def cmd_run(a):
 def cmd_recon(a):
     """Runs ALL applicable transforms IN PARALLEL (keyless, unless --with-keys)."""
     import time
-    if not tipo_valido(a.tipo):
+    if not valid_type(a.tipo):
         return _err(f"invalid type: {a.tipo}")
     alm = _almacen(a.workspace)
-    alm.crear(a.tipo, a.valor)
+    alm.create(a.tipo, a.valor)
     ts = [t for t in REGISTRO.aplicables(a.tipo) if a.with_keys or not t.requiere_key]
     tareas = [(a.tipo, a.valor, t.nombre) for t in ts]
     print(f"recon on {a.tipo} {a.valor} -- {len(tareas)} transform(s) in parallel")
     t0 = time.time()
-    for nombre, n in sorted(ejecutar_lote(tareas, alm)):
+    for nombre, n in sorted(run_batch(tareas, alm)):
         print(f"  {nombre:22} +{n}")
     _guardar(a.workspace, alm)
-    h = correlacionar(alm)
+    h = correlate(alm)
     print(f"total: {len(alm)} entities · {len(h)} finding(s) · "
-          f"risk {score_riesgo(h)}/100 · {time.time() - t0:.1f}s")
+          f"risk {risk_score(h)}/100 · {time.time() - t0:.1f}s")
     return 0
 
 
@@ -110,8 +110,8 @@ def cmd_report(a):
     alm = _almacen(a.workspace)
     if not len(alm):
         return _err("empty or nonexistent workspace")
-    h = correlacionar(alm)
-    html = generar_reporte(alm, h, score_riesgo(h),
+    h = correlate(alm)
+    html = generar_reporte(alm, h, risk_score(h),
                            meta={'workspace': a.workspace},
                            vis_js=None if a.no_graph else _vis_js())
     if a.output:
@@ -128,8 +128,8 @@ def cmd_export(a):
     if not len(alm):
         return _err("empty or nonexistent workspace")
     if a.formato == 'json':
-        h = correlacionar(alm)
-        data = exportar_json(alm, h, score_riesgo(h), {'workspace': a.workspace})
+        h = correlate(alm)
+        data = exportar_json(alm, h, risk_score(h), {'workspace': a.workspace})
     else:
         data = exportar_csv(alm)
     if a.output:

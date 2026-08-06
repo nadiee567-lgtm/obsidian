@@ -3,7 +3,7 @@
 When the monitor detects a change, it pings the user's phone (ntfy). With no topic
 configured it does nothing (degrades silently).
 
-`construir_ntfy` is PURE (builds url/headers/body), hence testable; `enviar_ntfy`
+`build_ntfy` is PURE (builds url/headers/body), hence testable; `send_ntfy`
 just sends it with requests, isolating any network failure."""
 from __future__ import annotations
 import requests
@@ -11,7 +11,7 @@ import requests
 DEFAULT_SERVER = 'https://ntfy.sh'
 
 
-def construir_ntfy(topic: str, mensaje: str, titulo: str = 'OBSIDIAN',
+def build_ntfy(topic: str, mensaje: str, titulo: str = 'OBSIDIAN',
                    server: str = DEFAULT_SERVER, prioridad: str = 'default',
                    tags: str = 'satellite') -> tuple:
     """Returns (url, headers, body_bytes) for the ntfy POST. Sends nothing."""
@@ -20,13 +20,13 @@ def construir_ntfy(topic: str, mensaje: str, titulo: str = 'OBSIDIAN',
     return url, headers, mensaje.encode('utf-8')
 
 
-def enviar_ntfy(topic: str, mensaje: str, titulo: str = 'OBSIDIAN',
+def send_ntfy(topic: str, mensaje: str, titulo: str = 'OBSIDIAN',
                 server: str = DEFAULT_SERVER, prioridad: str = 'default',
                 tags: str = 'satellite', timeout: int = 6) -> bool:
     """Sends the notification. Returns True if it went out, False otherwise (no raise)."""
     if not topic:
         return False
-    url, headers, cuerpo = construir_ntfy(topic, mensaje, titulo, server, prioridad, tags)
+    url, headers, cuerpo = build_ntfy(topic, mensaje, titulo, server, prioridad, tags)
     try:
         r = requests.post(url, data=cuerpo, headers=headers, timeout=timeout)
         return r.ok

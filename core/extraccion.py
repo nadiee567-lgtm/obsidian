@@ -21,7 +21,7 @@ _RX = [
 ]
 
 
-def extraer_entidades(texto: str) -> list:
+def extract_entities(texto: str) -> list:
     """Returns [(type, value), ...] without duplicates. Domains that are clearly
     file names (known extension) are discarded."""
     texto = texto or ''

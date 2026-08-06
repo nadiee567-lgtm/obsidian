@@ -48,8 +48,8 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
     """Returns the full report HTML.
 
     almacen   -- typed Store (source of entities/relations)
-    hallazgos -- list of Finding from correlacion.correlacionar() (or None)
-    score     -- risk score 0-100 (correlacion.score_riesgo)
+    hallazgos -- list of Finding from correlacion.correlate() (or None)
+    score     -- risk score 0-100 (correlacion.risk_score)
     meta      -- {'workspace','objetivo','generado'} optional
     vis_js    -- vis-network.min.js content to embed (or None: no graph)
     """
@@ -89,7 +89,7 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
     # ── entity inventory by type ──
     bloques = []
     for tipo, info in TIPOS.items():
-        ents = almacen.de_tipo(tipo)
+        ents = almacen.of_type(tipo)
         if not ents:
             continue
         color = info['color']

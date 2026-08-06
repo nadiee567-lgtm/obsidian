@@ -55,12 +55,12 @@ TIPOS = {
 }
 
 
-def tipo_valido(tipo: str) -> bool:
+def valid_type(tipo: str) -> bool:
     return tipo in TIPOS
 
 
 # ── Step 22: per-type normalizers (for stable dedup) ─────────────────────────
-def normalizar(tipo: str, valor: str) -> str:
+def normalize(tipo: str, valor: str) -> str:
     """Canonical form of a value, so two writes of the same datum yield the same
     id. E.g.: 'WWW.Example.COM.' and 'example.com' -> 'example.com'."""
     v = (valor or '').strip()
@@ -101,37 +101,37 @@ class Entity:
     id: str = field(default='', init=False)
 
     def __post_init__(self):
-        if not tipo_valido(self.tipo):
+        if not valid_type(self.tipo):
             raise ValueError(f"unknown entity type: {self.tipo!r}")
-        self.valor = normalizar(self.tipo, self.valor)
+        self.valor = normalize(self.tipo, self.valor)
         if not self.valor:
             raise ValueError("empty entity value")
         if isinstance(self.origenes, (list, tuple)):
             self.origenes = set(self.origenes)
         if isinstance(self.tags, (list, tuple)):
             self.tags = set(self.tags)
-        self.id = self._calcular_id()
+        self.id = self._compute_id()
 
     # ── Step 23: analyst tags ──
-    def etiquetar(self, *tags) -> None:
+    def tag(self, *tags) -> None:
         self.tags.update(tags)
 
-    def quitar_etiqueta(self, tag) -> None:
+    def untag(self, tag) -> None:
         self.tags.discard(tag)
 
     # ── Step 18: detailed traceability ──
-    def anotar_procedencia(self, transform, input_id=None) -> None:
+    def note_provenance(self, transform, input_id=None) -> None:
         """Records which transform (and on which input entity) created it."""
         self.origenes.add(transform)
         entrada = {'transform': transform, 'input': input_id}
         if entrada not in self.procedencia:
             self.procedencia.append(entrada)
 
-    def _calcular_id(self) -> str:
+    def _compute_id(self) -> str:
         base = f"{self.tipo}:{self.valor}".encode('utf-8')
         return hashlib.sha1(base).hexdigest()[:16]
 
-    def valor_bien_formado(self) -> bool:
+    def well_formed(self) -> bool:
         """True if the value is well-formed for its type, using the SAME security
         validators (step 25). Types without a strict shape (persona, org, hash...)
         return True. Not enforced at construction: it's an optional check so
@@ -139,7 +139,7 @@ class Entity:
         tv = _TIPO_VALIDACION.get(self.tipo)
         return True if tv is None else _validar(self.valor, tv)
 
-    def fusionar(self, otra: 'Entity') -> None:
+    def merge(self, otra: 'Entity') -> None:
         """Absorbs another entity of the same id (step 17): merges origins and
         properties, raises confidence, keeps the oldest date."""
         if otra.id != self.id:
@@ -207,47 +207,47 @@ class Store:
         self._por_tipo: dict[str, set] = {}     # type -> {id, ...}
         self._bus = bus
 
-    def _publicar(self, evento, *args):
+    def _publish(self, evento, *args):
         if self._bus is not None:
-            self._bus.publicar(evento, *args)
+            self._bus.publish(evento, *args)
 
     # -- entities --
-    def agregar(self, ent: Entity) -> Entity:
+    def add(self, ent: Entity) -> Entity:
         """Adds or merges. Returns the live entity in the store (step 17)."""
         existente = self._entidades.get(ent.id)
         if existente:
-            existente.fusionar(ent)
-            self._publicar('entidad_actualizada', existente)
+            existente.merge(ent)
+            self._publish('entidad_actualizada', existente)
             return existente
         self._entidades[ent.id] = ent
         self._por_tipo.setdefault(ent.tipo, set()).add(ent.id)
-        self._publicar('entidad_nueva', ent)
+        self._publish('entidad_nueva', ent)
         return ent
 
-    def crear(self, tipo, valor, **kw) -> Entity:
+    def create(self, tipo, valor, **kw) -> Entity:
         """Shortcut: builds an Entity and adds it (deduplicating)."""
-        return self.agregar(Entity(tipo=tipo, valor=valor, **kw))
+        return self.add(Entity(tipo=tipo, valor=valor, **kw))
 
     def obtener(self, id_: str) -> Entity | None:
         return self._entidades.get(id_)
 
     def buscar(self, tipo, valor) -> Entity | None:
         """Looks up by (type, value) without adding -- respects normalization."""
-        eid = hashlib.sha1(f"{tipo}:{normalizar(tipo, valor)}".encode()).hexdigest()[:16]
+        eid = hashlib.sha1(f"{tipo}:{normalize(tipo, valor)}".encode()).hexdigest()[:16]
         return self._entidades.get(eid)
 
-    def de_tipo(self, tipo) -> list:
+    def of_type(self, tipo) -> list:
         return [self._entidades[i] for i in self._por_tipo.get(tipo, ())]
 
     # -- relations --
-    def relacionar(self, origen, destino, etiqueta='') -> Relation:
+    def relate(self, origen, destino, etiqueta='') -> Relation:
         """Connects two entities (by id or Entity object). Deduplicates."""
         oid = origen.id if isinstance(origen, Entity) else origen
         did = destino.id if isinstance(destino, Entity) else destino
         rel = Relation(origen=oid, destino=did, etiqueta=etiqueta)
         if rel.id not in self._relaciones:
             self._relaciones[rel.id] = rel
-            self._publicar('relacion_nueva', rel)
+            self._publish('relacion_nueva', rel)
         return self._relaciones[rel.id]
 
     # -- views --
@@ -273,7 +273,7 @@ class Store:
     def from_dict(cls, d: dict) -> 'Store':
         alm = cls()
         for ed in d.get('entidades', []):
-            alm.agregar(Entity.from_dict(ed))
+            alm.add(Entity.from_dict(ed))
         for rd in d.get('relaciones', []):
             r = Relation.from_dict(rd)
             alm._relaciones[r.id] = r

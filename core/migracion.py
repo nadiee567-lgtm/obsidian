@@ -12,11 +12,11 @@ from core.modelo import Store
 _RE_IP = re.compile(r'\d+\.\d+\.\d+\.\d+')
 
 
-def migrar_caso(case: dict) -> Store:
+def migrate_case(case: dict) -> Store:
     """case (dict with 'objetivo' and 'datos') -> typed Store."""
     alm = Store()
     objetivo = case.get('objetivo')
-    raiz = alm.crear('objetivo', objetivo, origenes={'caso'}) if objetivo else None
+    raiz = alm.create('objetivo', objetivo, origenes={'caso'}) if objetivo else None
 
     for clave, valor in (case.get('datos') or {}).items():
         if not isinstance(valor, dict):
@@ -32,59 +32,59 @@ def migrar_caso(case: dict) -> Store:
 
 def _rel(alm, a, b, etiqueta):
     if a is not None and b is not None:
-        alm.relacionar(a, b, etiqueta)
+        alm.relate(a, b, etiqueta)
 
 
 def _mig_dominio(alm, raiz, valor, res, origen):
     dom = valor.get('objetivo', '')
     if not dom:
         return
-    d = alm.crear('dominio', dom, origenes={origen})
+    d = alm.create('dominio', dom, origenes={origen})
     _rel(alm, raiz, d, 'dominio')
     for ip in _RE_IP.findall(str(res.get('dns', {}).get('A', ''))):
-        _rel(alm, d, alm.crear('ip', ip, origenes={origen}), 'A')
+        _rel(alm, d, alm.create('ip', ip, origenes={origen}), 'A')
     for sub in res.get('subdominios', [])[:50]:
-        _rel(alm, d, alm.crear('subdominio', sub, origenes={origen}), 'subdominio')
+        _rel(alm, d, alm.create('subdominio', sub, origenes={origen}), 'subdominio')
     for email in res.get('emails', [])[:30]:
-        _rel(alm, d, alm.crear('email', email, origenes={origen}), 'email')
+        _rel(alm, d, alm.create('email', email, origenes={origen}), 'email')
     for h, v in (res.get('tecnologias', {}) or {}).items():
         if v:
-            _rel(alm, d, alm.crear('tech', str(v), origenes={origen}), h.lower())
+            _rel(alm, d, alm.create('tech', str(v), origenes={origen}), h.lower())
 
 
 def _mig_ip(alm, raiz, valor, res, origen):
     ip = valor.get('objetivo', '')
     if not ip:
         return
-    i = alm.crear('ip', ip, origenes={origen})
+    i = alm.create('ip', ip, origenes={origen})
     _rel(alm, raiz, i, 'ip')
     geo = res.get('geo', {}) or {}
     if geo.get('country'):
-        _rel(alm, i, alm.crear('pais', geo['country'], origenes={origen}), 'location')
+        _rel(alm, i, alm.create('pais', geo['country'], origenes={origen}), 'location')
     if geo.get('org'):
-        _rel(alm, i, alm.crear('org', geo['org'], origenes={origen}), 'org')
+        _rel(alm, i, alm.create('org', geo['org'], origenes={origen}), 'org')
     if res.get('ptr'):
-        _rel(alm, i, alm.crear('dominio', res['ptr'], origenes={origen}), 'PTR')
+        _rel(alm, i, alm.create('dominio', res['ptr'], origenes={origen}), 'PTR')
 
 
 def _mig_usuario(alm, raiz, valor, res, origen):
     user = valor.get('objetivo', '')
     if not user:
         return
-    u = alm.crear('usuario', user, origenes={origen})
+    u = alm.create('usuario', user, origenes={origen})
     _rel(alm, raiz, u, 'usuario')
     for p in (res.get('plataformas', []) or []) + (res.get('maigret', []) or []):
         plat = p.get('plataforma')
         if plat:
-            e = alm.crear('plataforma', plat, origenes={origen},
+            e = alm.create('plataforma', plat, origenes={origen},
                           propiedades={'url': p.get('url', '')})
             _rel(alm, u, e, 'profile')
     gh = res.get('github', {}) or {}
     if gh.get('email') and gh['email'] != 'oculto':
-        _rel(alm, u, alm.crear('email', gh['email'], origenes={origen}), 'email')
+        _rel(alm, u, alm.create('email', gh['email'], origenes={origen}), 'email')
     for repo in res.get('github_repos', [])[:10]:
         if repo.get('nombre'):
-            _rel(alm, u, alm.crear('repo', repo['nombre'], origenes={origen}), 'repo')
+            _rel(alm, u, alm.create('repo', repo['nombre'], origenes={origen}), 'repo')
 
 
 def _mig_email(alm, raiz, valor, res, origen):
@@ -98,11 +98,11 @@ def _mig_email(alm, raiz, valor, res, origen):
     breaches = res.get('hibp_breaches', []) or []
     if breaches:
         props['hibp_breaches'] = breaches
-    e = alm.crear('email', email, origenes={origen}, propiedades=props)
+    e = alm.create('email', email, origenes={origen}, propiedades=props)
     if sec.get('spoofable'):
-        e.etiquetar('spoofable')
+        e.tag('spoofable')
     if breaches:
-        e.etiquetar('filtrado')
+        e.tag('filtrado')
     _rel(alm, raiz, e, 'email')
 
 
@@ -110,10 +110,10 @@ def _mig_buckets(alm, raiz, valor, res, origen):
     for b in res.get('buckets', []) or []:
         if not b.get('bucket'):
             continue
-        e = alm.crear('bucket', b['bucket'], origenes={origen},
+        e = alm.create('bucket', b['bucket'], origenes={origen},
                       propiedades={'url': b.get('url', ''), 'publico': b.get('publico', False)})
         if b.get('publico'):
-            e.etiquetar('publico')
+            e.tag('publico')
         _rel(alm, raiz, e, 'bucket')
 
 
@@ -121,9 +121,9 @@ def _mig_takeover(alm, raiz, valor, res, origen):
     for v in res.get('vulnerables', []) or []:
         if not v.get('subdominio'):
             continue
-        e = alm.crear('subdominio', v['subdominio'], origenes={origen},
+        e = alm.create('subdominio', v['subdominio'], origenes={origen},
                       propiedades={'servicio': v.get('servicio'), 'status': v.get('status')})
-        e.etiquetar('takeover', 'vulnerable')
+        e.tag('takeover', 'vulnerable')
         _rel(alm, raiz, e, 'takeover')
 
 
@@ -131,9 +131,9 @@ def _mig_typo(alm, raiz, valor, res, origen):
     for d in res.get('registrados', []) or []:
         if not d.get('dominio'):
             continue
-        e = alm.crear('dominio', d['dominio'], origenes={origen},
+        e = alm.create('dominio', d['dominio'], origenes={origen},
                       propiedades={'ip': d.get('ip')})
-        e.etiquetar('typosquat')
+        e.tag('typosquat')
         _rel(alm, raiz, e, 'typosquat')
 
 
@@ -141,28 +141,28 @@ def _mig_github_secrets(alm, raiz, valor, res, origen):
     for h in res.get('hallazgos', []) or []:
         if not h.get('valor'):
             continue
-        e = alm.crear('credencial', h['valor'], origenes={origen},
+        e = alm.create('credencial', h['valor'], origenes={origen},
                       propiedades={'tipo_secreto': h.get('tipo'), 'repo': h.get('repo'),
                                    'commit': h.get('commit')})
-        e.etiquetar('expuesto')
+        e.tag('expuesto')
         _rel(alm, raiz, e, 'exposed secret')
 
 
 def _mig_passivedns(alm, raiz, valor, res, origen):
     dom = valor.get('objetivo', '')
-    d = alm.crear('dominio', dom, origenes={origen}) if dom else raiz
+    d = alm.create('dominio', dom, origenes={origen}) if dom else raiz
     for h in res.get('historial', [])[:30]:
         if h.get('ip'):
-            _rel(alm, d, alm.crear('ip', h['ip'], origenes={origen}),
+            _rel(alm, d, alm.create('ip', h['ip'], origenes={origen}),
                  f"resolved {h.get('fecha', '?')}")
 
 
 def _mig_favicon(alm, raiz, valor, res, origen):
     for m in res.get('relacionados', [])[:30]:
         if m.get('ip'):
-            e = alm.crear('ip', m['ip'], origenes={origen},
+            e = alm.create('ip', m['ip'], origenes={origen},
                           propiedades={'org': m.get('org')})
-            e.etiquetar('favicon-compartido')
+            e.tag('favicon-compartido')
             _rel(alm, raiz, e, 'shared favicon')
 
 

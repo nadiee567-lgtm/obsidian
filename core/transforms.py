@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
-from core.modelo import Store, Entity, tipo_valido
+from core.modelo import Store, Entity, valid_type
 
 
 @dataclass
@@ -33,10 +33,10 @@ class Transform:
     descripcion: str = ''
 
     def __post_init__(self):
-        if not tipo_valido(self.entrada):
+        if not valid_type(self.entrada):
             raise ValueError(f"unknown input type: {self.entrada!r}")
         for s in self.salidas:
-            if not tipo_valido(s):
+            if not valid_type(s):
                 raise ValueError(f"unknown output type: {s!r}")
 
 
@@ -104,9 +104,9 @@ class Context:
             ent = Entity(tipo=tipo, valor=valor, propiedades=propiedades)
         except ValueError:
             return None   # garbage value: ignored, does not break the transform
-        viva = self.almacen.agregar(ent)
-        viva.anotar_procedencia(self._nombre, input_id=self.entrada.id)
-        self.almacen.relacionar(self.entrada, viva, etiqueta)
+        viva = self.almacen.add(ent)
+        viva.note_provenance(self._nombre, input_id=self.entrada.id)
+        self.almacen.relate(self.entrada, viva, etiqueta)
         self.emitidas.append(viva)
         return viva
 
@@ -156,14 +156,14 @@ def ejecutar(t: Transform, entidad: Entity, almacen: Store) -> list:
     return ctx.emitidas
 
 
-def ejecutar_por_nombre(nombre: str, entidad: Entity, almacen: Store) -> list:
+def run_by_name(nombre: str, entidad: Entity, almacen: Store) -> list:
     t = REGISTRO.por_nombre(nombre)
     if t is None:
         raise KeyError(f"transform not registered: {nombre}")
     return ejecutar(t, entidad, almacen)
 
 
-def ejecutar_lote(tareas, almacen: Store, max_workers: int = 8, lock=None,
+def run_batch(tareas, almacen: Store, max_workers: int = 8, lock=None,
                   on_progreso=None) -> list:
     """Runs several transforms IN PARALLEL (step 102). Transforms are I/O-bound
     (network), so they are launched concurrently -- each in an ISOLATED Store, no
@@ -187,8 +187,8 @@ def ejecutar_lote(tareas, almacen: Store, max_workers: int = 8, lock=None,
         local = Store()
         n = 0
         try:
-            semilla = local.crear(tipo, valor)
-            n = len(ejecutar_por_nombre(nombre, semilla, local))
+            semilla = local.create(tipo, valor)
+            n = len(run_by_name(nombre, semilla, local))
         except Exception:
             pass
         return nombre, n, local
@@ -210,9 +210,9 @@ def ejecutar_lote(tareas, almacen: Store, max_workers: int = 8, lock=None,
     with ctx:                                    # serialized merge (consistent dedup)
         for local in locales:
             for e in local.entidades:
-                almacen.agregar(e)
+                almacen.add(e)
             for r in local.relaciones:
-                almacen.relacionar(r.origen, r.destino, r.etiqueta)
+                almacen.relate(r.origen, r.destino, r.etiqueta)
     return resultados
 
 
@@ -239,9 +239,9 @@ class Runner:
         if clave in self._hechos:
             return []               # cache: already ran on this entity
         self._hechos.add(clave)
-        return ejecutar_por_nombre(nombre, entidad, self.almacen)
+        return run_by_name(nombre, entidad, self.almacen)
 
-    def ejecutar_machine(self, machine: Machine, semilla: Entity) -> list:
+    def run_machine(self, machine: Machine, semilla: Entity) -> list:
         """Runs the recipe: each step runs on the entities of the type it
         expects (seed + what was produced before). The cache avoids re-running."""
         pool = {semilla.id: semilla}
@@ -259,7 +259,7 @@ class Runner:
 
 
 # ── Step 42: load transforms from plugins (without touching the core) ────────
-def cargar_plugins(directorio: str) -> list:
+def load_plugins(directorio: str) -> list:
     """Imports each .py in `directorio` (which self-registers via @transform).
     Extensible like Maltego's Transform Hub. Returns the loaded names."""
     import importlib.util

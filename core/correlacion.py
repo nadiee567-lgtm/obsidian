@@ -64,7 +64,7 @@ def _coincide_yaml(ent, cuando) -> bool:
     return True
 
 
-def cargar_reglas_yaml(texto: str) -> int:
+def load_yaml_rules(texto: str) -> int:
     """Parses YAML rules (text) and activates them. Returns how many loaded.
     Ignores invalid entries (does not break correlation)."""
     import yaml
@@ -87,7 +87,7 @@ def _evaluar_yaml(almacen) -> list:
     for spec in _REGLAS_YAML:
         cuando = spec.get('cuando', {}) or {}
         tipo = cuando.get('tipo')
-        ents = almacen.de_tipo(tipo) if tipo else almacen.entidades
+        ents = almacen.of_type(tipo) if tipo else almacen.entidades
         for e in ents:
             if _coincide_yaml(e, cuando):
                 msg = str(spec.get('mensaje', spec['nombre'])).replace('{valor}', e.valor)
@@ -95,7 +95,7 @@ def _evaluar_yaml(almacen) -> list:
     return out
 
 
-def correlacionar(almacen) -> list:
+def correlate(almacen) -> list:
     """Runs all rules (built-in + user YAML) and returns the findings ordered by
     severity. Honors analyst feedback: if ALL entities of a finding are tagged
     'descartado'/'falso-positivo', the finding is suppressed (feedback loop --
@@ -119,12 +119,12 @@ def correlacionar(almacen) -> list:
     return out
 
 
-def score_riesgo(hallazgos) -> int:
+def risk_score(hallazgos) -> int:
     """Score 0-100 aggregating severities (step 64)."""
     return min(100, sum(_PESO.get(h.severidad, 0) for h in hallazgos))
 
 
-def score_exposicion(conteos: dict, riesgo: int) -> int:
+def exposure_score(conteos: dict, riesgo: int) -> int:
     """Exposure score 0-100 (step 149): combines the SIZE of the surface (how many
     internet-facing assets) with the RISK (findings). More surface + more risk =
     more exposed."""
@@ -146,7 +146,7 @@ _PUERTOS_SENSIBLES = {
 @regla
 def r_puerto_sensible(alm):
     """Administrative/database port exposed to the internet (step 58)."""
-    for p in alm.de_tipo('puerto'):
+    for p in alm.of_type('puerto'):
         num = p.valor.split(':')[-1]
         if num in _PUERTOS_SENSIBLES:
             yield Finding('puerto-sensible', 'alto',
@@ -156,7 +156,7 @@ def r_puerto_sensible(alm):
 def r_cert_vencido(alm):
     """Expired TLS certificate on a domain (step 61)."""
     ahora = datetime.datetime.now()
-    for d in alm.de_tipo('dominio'):
+    for d in alm.of_type('dominio'):
         exp = d.propiedades.get('cert_expira')
         if not exp:
             continue
@@ -171,7 +171,7 @@ def r_cert_vencido(alm):
 @regla
 def r_ip_maliciosa(alm):
     """IP classified malicious by real threat intel (GreyNoise). Step 57."""
-    for ip in alm.de_tipo('ip'):
+    for ip in alm.of_type('ip'):
         if 'malicioso' in ip.tags:
             yield Finding('ip-maliciosa', 'critico',
                            f'IP {ip.valor} classified as malicious (GreyNoise)', [ip.id])
@@ -180,7 +180,7 @@ def r_ip_maliciosa(alm):
 def r_ip_listada(alm):
     """IP present in a threat feed. A SIGNAL with source, to verify -- not a
     verdict (feeds have false positives)."""
-    for ip in alm.de_tipo('ip'):
+    for ip in alm.of_type('ip'):
         if 'listado-amenaza' in ip.tags:
             fuente = ip.propiedades.get('amenaza_fuente', 'threat feed')
             yield Finding('ip-listada', 'alto',
@@ -189,7 +189,7 @@ def r_ip_listada(alm):
 @regla
 def r_email_filtrado(alm):
     """Email that appeared in data breaches (part of 56)."""
-    for e in alm.de_tipo('email'):
+    for e in alm.of_type('email'):
         if 'filtrado' in e.tags:
             yield Finding('email-filtrado', 'alto',
                            f'{e.valor} appeared in data breaches', [e.id])
@@ -197,7 +197,7 @@ def r_email_filtrado(alm):
 @regla
 def r_stealer(alm):
     """Email coming from an infostealer-infected machine = compromised credentials."""
-    for e in alm.de_tipo('email'):
+    for e in alm.of_type('email'):
         if 'stealer-infectado' in e.tags:
             yield Finding('stealer-infectado', 'critico',
                            f'{e.valor} came from an infostealer machine: compromised credentials', [e.id])
@@ -205,7 +205,7 @@ def r_stealer(alm):
 @regla
 def r_email_spoofable(alm):
     """Email domain without SPF -> spoofing possible."""
-    for e in alm.de_tipo('email'):
+    for e in alm.of_type('email'):
         if 'spoofable' in e.tags:
             yield Finding('email-spoofable', 'medio',
                            f'The domain of {e.valor} has no SPF: spoofing possible', [e.id])
@@ -213,7 +213,7 @@ def r_email_spoofable(alm):
 @regla
 def r_takeover(alm):
     """Subdomain marked as vulnerable to takeover (step 55)."""
-    for s in alm.de_tipo('subdominio'):
+    for s in alm.of_type('subdominio'):
         if 'takeover' in s.tags:
             yield Finding('subdominio-takeover', 'alto',
                            f'Subdomain vulnerable to takeover: {s.valor}', [s.id])
@@ -222,11 +222,11 @@ def r_takeover(alm):
 def r_shadow_it(alm):
     """Shadow IT / forgotten assets (step 150): public buckets (exposed storage)
     and broken subdomains (HTTP 5xx = forgotten/badly maintained)."""
-    for b in alm.de_tipo('bucket'):
+    for b in alm.of_type('bucket'):
         if 'publico' in b.tags:
             yield Finding('shadow-it', 'alto',
                            f'Public bucket -- exposed storage: {b.valor}', [b.id])
-    for s in alm.de_tipo('subdominio'):
+    for s in alm.of_type('subdominio'):
         st = s.propiedades.get('http_status')
         if isinstance(st, int) and st >= 500:
             yield Finding('shadow-it', 'medio',
@@ -240,7 +240,7 @@ def r_infra_compartida(alm):
     for campo, etiqueta in (('favicon_hash', 'favicon'), ('cert_cn', 'cert')):
         grupos = defaultdict(list)
         for tipo in ('dominio', 'subdominio', 'ip'):
-            for e in alm.de_tipo(tipo):
+            for e in alm.of_type(tipo):
                 v = e.propiedades.get(campo)
                 if v:
                     grupos[str(v)].append(e)
@@ -254,7 +254,7 @@ def r_infra_compartida(alm):
 @regla
 def r_wallet_ransomware(alm):
     """Wallet linked to ransomware (step 141)."""
-    for w in alm.de_tipo('wallet'):
+    for w in alm.of_type('wallet'):
         if 'ransomware' in w.tags:
             yield Finding('wallet-ransomware', 'critico',
                            f'Wallet linked to ransomware: {w.valor}', [w.id])
@@ -264,11 +264,11 @@ def r_leak_login(alm):
     """Leaked credential + exposed login panel = probable access path (step 136).
     Explicitly pairs each 'filtrado' email with each 'panel-login' in the case,
     naming both -- the concrete attack vector."""
-    filtrados = [e for e in alm.de_tipo('email') if 'filtrado' in e.tags]
+    filtrados = [e for e in alm.of_type('email') if 'filtrado' in e.tags]
     if not filtrados:
         return
     paneles = [e for tipo in ('dominio', 'subdominio')
-               for e in alm.de_tipo(tipo) if 'panel-login' in e.tags]
+               for e in alm.of_type(tipo) if 'panel-login' in e.tags]
     for panel in paneles:
         for cred in filtrados[:3]:
             yield Finding('leak-login', 'critico',
@@ -279,8 +279,8 @@ def r_leak_login(alm):
 def r_pivote_plataformas(alm):
     """A user present on many platforms = strong pivot to cross identity (step 59).
     Counts the platforms linked to each user."""
-    usuarios = {e.id: e for e in alm.de_tipo('usuario')}
-    ids_plat = {e.id for e in alm.de_tipo('plataforma')}
+    usuarios = {e.id: e for e in alm.of_type('usuario')}
+    ids_plat = {e.id for e in alm.of_type('plataforma')}
     conteo = {}
     for r in alm.relaciones:
         if r.origen in usuarios and r.destino in ids_plat:
@@ -296,10 +296,10 @@ def r_login_expuesto(alm):
     """Accessible login/admin panel (step 56). High on its own; CRITICAL if there are
     also leaked credentials in the case -- login + credential = probable access."""
     hay_cred = (any('filtrado' in e.tags or 'stealer-infectado' in e.tags
-                    for e in alm.de_tipo('email'))
-                or bool(alm.de_tipo('credencial')))
+                    for e in alm.of_type('email'))
+                or bool(alm.of_type('credencial')))
     for tipo in ('dominio', 'subdominio'):
-        for e in alm.de_tipo(tipo):
+        for e in alm.of_type(tipo):
             if 'panel-login' in e.tags:
                 sev = 'critico' if hay_cred else 'alto'
                 extra = ' + there are leaked credentials in the case' if hay_cred else ''
@@ -309,7 +309,7 @@ def r_login_expuesto(alm):
 @regla
 def r_secreto_github(alm):
     """Hardcoded credential/secret found in a GitHub commit (step 60)."""
-    for c in alm.de_tipo('credencial'):
+    for c in alm.of_type('credencial'):
         if 'secreto-github' in c.tags:
             tipo = c.propiedades.get('tipo_secreto', 'secret')
             repo = c.propiedades.get('repo', '?')
@@ -320,7 +320,7 @@ def r_secreto_github(alm):
 def r_nuclei_vuln(alm):
     """Host with high+ severity nuclei findings."""
     for tipo in ('dominio', 'subdominio'):
-        for e in alm.de_tipo(tipo):
+        for e in alm.of_type(tipo):
             if 'vulnerable' in e.tags:
                 n = len(e.propiedades.get('nuclei', []))
                 yield Finding('vuln-nuclei', 'alto',

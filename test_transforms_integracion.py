@@ -5,7 +5,7 @@ Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_transforms_integrac
 """
 import obsidian_web as ob
 from core.modelo import Store
-from core.transforms import ejecutar_por_nombre
+from core.transforms import run_by_name
 
 
 class FakeResp:
@@ -17,8 +17,8 @@ class FakeResp:
 
 def _correr(nombre, tipo, valor):
     alm = Store()
-    e = alm.crear(tipo, valor)
-    return ejecutar_por_nombre(nombre, e, alm)
+    e = alm.create(tipo, valor)
+    return run_by_name(nombre, e, alm)
 
 
 def test_dns_a(monkeypatch):

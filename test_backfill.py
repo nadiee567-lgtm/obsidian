@@ -4,13 +4,13 @@ Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_backfill.py -q
 """
 import obsidian_web as ob
 from core.modelo import Store
-from core.transforms import ejecutar_por_nombre
+from core.transforms import run_by_name
 
 
 def _correr(nombre, tipo, valor):
     alm = Store()
-    e = alm.crear(tipo, valor)
-    return ejecutar_por_nombre(nombre, e, alm), e, alm
+    e = alm.create(tipo, valor)
+    return run_by_name(nombre, e, alm), e, alm
 
 
 # ── 33: phone ───────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ class _Rj:
 
 
 def test_github_sec_y_regla(monkeypatch):
-    from core.correlacion import correlacionar
+    from core.correlacion import correlate
     def fake_get(url, *a, **k):
         if '/commits/' in url:
             return _Rj({'files': [{'filename': 'cfg.py',
@@ -92,19 +92,19 @@ def test_github_sec_y_regla(monkeypatch):
     prod, _, alm = _correr('github_sec', 'usuario', 'user')
     creds = [p for p in prod if p.tipo == 'credencial']
     assert creds and 'secreto-github' in creds[0].tags
-    h = correlacionar(alm)
+    h = correlate(alm)
     assert any(x.regla == 'secreto-github' and x.severidad == 'critico' for x in h)
 
 
 # ── 56: exposed login/panel + credential ────────────────────────────────────
 def test_login_expuesto_regla():
-    from core.correlacion import correlacionar
+    from core.correlacion import correlate
     alm = Store()
-    alm.crear('dominio', 'admin.x.com').etiquetar('panel-login')
-    r = [x for x in correlacionar(alm) if x.regla == 'login-expuesto']
+    alm.create('dominio', 'admin.x.com').tag('panel-login')
+    r = [x for x in correlate(alm) if x.regla == 'login-expuesto']
     assert r and r[0].severidad == 'alto'
-    alm.crear('email', 'a@x.com').etiquetar('filtrado')     # login + credential
-    r2 = [x for x in correlacionar(alm) if x.regla == 'login-expuesto']
+    alm.create('email', 'a@x.com').tag('filtrado')     # login + credential
+    r2 = [x for x in correlate(alm) if x.regla == 'login-expuesto']
     assert r2 and r2[0].severidad == 'critico'
 
 
@@ -121,46 +121,46 @@ def test_http_probe_detecta_panel_login(monkeypatch):
 
 # ── 136: leak -> login correlation ──────────────────────────────────────────
 def test_leak_login():
-    from core.correlacion import correlacionar
+    from core.correlacion import correlate
     alm = Store()
-    e = alm.crear('email', 'admin@acme.com'); e.etiquetar('filtrado')
-    p = alm.crear('subdominio', 'panel.acme.com'); p.etiquetar('panel-login')
-    r = [x for x in correlacionar(alm) if x.regla == 'leak-login']
+    e = alm.create('email', 'admin@acme.com'); e.tag('filtrado')
+    p = alm.create('subdominio', 'panel.acme.com'); p.tag('panel-login')
+    r = [x for x in correlate(alm) if x.regla == 'leak-login']
     assert r and r[0].severidad == 'critico'
     assert e.id in r[0].entidades and p.id in r[0].entidades   # names both
 
 
 def test_leak_login_sin_filtrado():
-    from core.correlacion import correlacionar
+    from core.correlacion import correlate
     alm = Store()
-    alm.crear('subdominio', 'panel.acme.com').etiquetar('panel-login')   # panel but no credential
-    assert not [x for x in correlacionar(alm) if x.regla == 'leak-login']
+    alm.create('subdominio', 'panel.acme.com').tag('panel-login')   # panel but no credential
+    assert not [x for x in correlate(alm) if x.regla == 'leak-login']
 
 
 # ── 59: platform pivot ──────────────────────────────────────────────────────
 def test_pivote_plataformas():
-    from core.correlacion import correlacionar
+    from core.correlacion import correlate
     alm = Store()
-    u = alm.crear('usuario', 'nadiee')
+    u = alm.create('usuario', 'nadiee')
     for i in range(6):
-        p = alm.crear('plataforma', f'plat{i}')
-        alm.relacionar(u.id, p.id, 'presente')
-    r = [x for x in correlacionar(alm) if x.regla == 'pivote-plataformas']
+        p = alm.create('plataforma', f'plat{i}')
+        alm.relate(u.id, p.id, 'presente')
+    r = [x for x in correlate(alm) if x.regla == 'pivote-plataformas']
     assert r and '6 platforms' in r[0].mensaje
 
 
 def test_pivote_plataformas_pocas_no_dispara():
-    from core.correlacion import correlacionar
+    from core.correlacion import correlate
     alm = Store()
-    u = alm.crear('usuario', 'x')
+    u = alm.create('usuario', 'x')
     for i in range(3):                                   # <5 → no finding
-        alm.relacionar(u.id, alm.crear('plataforma', f'p{i}').id, 'presente')
-    assert not [x for x in correlacionar(alm) if x.regla == 'pivote-plataformas']
+        alm.relate(u.id, alm.create('plataforma', f'p{i}').id, 'presente')
+    assert not [x for x in correlate(alm) if x.regla == 'pivote-plataformas']
 
 
 # ── 63: user YAML rule loader ───────────────────────────────────────────────
 def test_reglas_yaml():
-    from core.correlacion import cargar_reglas_yaml, correlacionar
+    from core.correlacion import load_yaml_rules, correlate
     yaml_txt = """
 - nombre: puerto-ftp
   severidad: alto
@@ -170,35 +170,35 @@ def test_reglas_yaml():
     valor_contiene: ":21"
 """
     try:
-        assert cargar_reglas_yaml(yaml_txt) == 1
+        assert load_yaml_rules(yaml_txt) == 1
         alm = Store()
-        alm.crear('puerto', '1.2.3.4:21')
-        alm.crear('puerto', '1.2.3.4:443')              # does not match
-        r = [x for x in correlacionar(alm) if x.regla == 'puerto-ftp']
+        alm.create('puerto', '1.2.3.4:21')
+        alm.create('puerto', '1.2.3.4:443')              # does not match
+        r = [x for x in correlate(alm) if x.regla == 'puerto-ftp']
         assert len(r) == 1 and r[0].severidad == 'alto' and r[0].mensaje == 'FTP en 1.2.3.4:21'
     finally:
-        cargar_reglas_yaml('')                          # clears the global
+        load_yaml_rules('')                          # clears the global
 
 
 def test_reglas_yaml_severidad_invalida_se_normaliza():
-    from core.correlacion import cargar_reglas_yaml, _REGLAS_YAML
+    from core.correlacion import load_yaml_rules, _REGLAS_YAML
     try:
-        cargar_reglas_yaml("- nombre: x\n  severidad: URGENTISIMO\n  cuando: {tag: y}\n")
+        load_yaml_rules("- nombre: x\n  severidad: URGENTISIMO\n  cuando: {tag: y}\n")
         assert _REGLAS_YAML[0]['severidad'] == 'medio'  # invalid severity → medio
     finally:
-        cargar_reglas_yaml('')
+        load_yaml_rules('')
 
 
 def test_reglas_yaml_basura_no_rompe():
-    from core.correlacion import cargar_reglas_yaml
-    assert cargar_reglas_yaml('no: [es: :valido') == 0   # broken YAML → 0, no exception
+    from core.correlacion import load_yaml_rules
+    assert load_yaml_rules('no: [es: :valido') == 0   # broken YAML → 0, no exception
 
 
 # ── 40: per-transform rate limiting ─────────────────────────────────────────
 def test_rate_limit_concurrencia():
     import threading
     import time
-    from core.transforms import transform, ejecutar_por_nombre, set_limite
+    from core.transforms import transform, run_by_name, set_limite
 
     estado, lock = {'activos': 0, 'max': 0}, threading.Lock()
 
@@ -215,7 +215,7 @@ def test_rate_limit_concurrencia():
     try:
         def run():
             alm = Store()
-            ejecutar_por_nombre('_test_rl', alm.crear('dominio', 'x.com'), alm)
+            run_by_name('_test_rl', alm.create('dominio', 'x.com'), alm)
         ths = [threading.Thread(target=run) for _ in range(4)]
         for t in ths:
             t.start()
@@ -236,7 +236,7 @@ def test_gestor_tareas():
         emit({'tipo': 'progreso', 'hechas': 1})
         return {'ok': True}
 
-    tid = g.crear(trabajo)
+    tid = g.create(trabajo)
     eventos = list(g.stream(tid))                # blocks until 'fin'
     tipos = [e['tipo'] for e in eventos]
     assert tipos[0] == 'inicio' and tipos[-1] == 'fin'
@@ -251,16 +251,16 @@ def test_gestor_tareas_error_no_cuelga():
     def trabajo(emit):
         raise RuntimeError('boom')
 
-    tid = g.crear(trabajo)
+    tid = g.create(trabajo)
     eventos = list(g.stream(tid))                # must close with 'fin' even on failure
     assert eventos[-1]['tipo'] == 'fin'
     assert g.estado(tid)['estado'] == 'error'
 
 
 def test_ejecutar_lote_progreso():
-    from core.transforms import ejecutar_lote
+    from core.transforms import run_batch
     vistos = []
-    ejecutar_lote([('url', 'https://a.com/x.jpg', 'reverse_image'),
+    run_batch([('url', 'https://a.com/x.jpg', 'reverse_image'),
                    ('url', 'https://b.com/y.jpg', 'reverse_image')],
                   Store(), on_progreso=lambda *a: vistos.append(a))
     assert len(vistos) == 2                       # one callback per finished transform

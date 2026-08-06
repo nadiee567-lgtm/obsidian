@@ -6,7 +6,7 @@ from urllib.parse import quote
 
 import obsidian_web as ob
 from core.modelo import Store
-from core.transforms import ejecutar_por_nombre
+from core.transforms import run_by_name
 from core.imagen import enlaces_reverse, enlaces_facial
 
 
@@ -25,8 +25,8 @@ def test_enlaces_reverse_urlencode():
 
 def test_reverse_image_transform():
     alm = Store()
-    e = alm.crear('url', 'https://x.com/a.jpg')
-    prod = ejecutar_por_nombre('reverse_image', e, alm)
+    e = alm.create('url', 'https://x.com/a.jpg')
+    prod = run_by_name('reverse_image', e, alm)
     assert {p.propiedades.get('motor') for p in prod} == {'yandex', 'google', 'tineye', 'bing'}
     assert all(p.tipo == 'url' for p in prod)
 
@@ -41,8 +41,8 @@ def test_enlaces_facial():
 
 def test_busqueda_facial_transform():
     alm = Store()
-    e = alm.crear('url', 'https://x.com/cara.jpg')
-    prod = ejecutar_por_nombre('busqueda_facial', e, alm)
+    e = alm.create('url', 'https://x.com/cara.jpg')
+    prod = run_by_name('busqueda_facial', e, alm)
     motores = {p.propiedades.get('motor'): p.propiedades.get('modo') for p in prod}
     assert motores == {'yandex': 'url', 'facecheck': 'upload', 'pimeyes': 'upload'}
 
@@ -63,8 +63,8 @@ def test_metadata_exif_como_entidades(monkeypatch):
               "GPS Position             : 40 deg 26' N, 79 deg 58' W\n")
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: salida)
     alm = Store()
-    e = alm.crear('url', 'https://x.com/foto.jpg')
-    prod = ejecutar_por_nombre('metadata', e, alm)
+    e = alm.create('url', 'https://x.com/foto.jpg')
+    prod = run_by_name('metadata', e, alm)
     techs = {p.valor for p in prod if p.tipo == 'tech'}
     personas = {p.valor for p in prod if p.tipo == 'persona'}
     urls = [p for p in prod if p.tipo == 'url']
@@ -83,35 +83,35 @@ def test_parse_gps():
 
 
 def test_cronolocalizacion(monkeypatch):
-    from core.transforms import ejecutar_por_nombre
+    from core.transforms import run_by_name
     alm = Store()
-    u = alm.crear('url', 'https://x.com/f.jpg', propiedades={'gps': "40 deg 26' N, 79 deg 58' W"})
-    prod = ejecutar_por_nombre('cronolocalizacion', u, alm)
+    u = alm.create('url', 'https://x.com/f.jpg', propiedades={'gps': "40 deg 26' N, 79 deg 58' W"})
+    prod = run_by_name('cronolocalizacion', u, alm)
     assert {p.propiedades.get('herramienta') for p in prod} == {'suncalc', 'shadowmap'}
     assert any('40' in p.valor for p in prod)         # coords en el link
 
 
 def test_satelital_requiere_gps():
-    from core.transforms import ejecutar_por_nombre
+    from core.transforms import run_by_name
     alm = Store()
-    u = alm.crear('url', 'https://x.com/f.jpg')       # sin GPS
-    assert ejecutar_por_nombre('satelital', u, alm) == []
+    u = alm.create('url', 'https://x.com/f.jpg')       # sin GPS
+    assert run_by_name('satelital', u, alm) == []
 
 
 def test_landmarks():
-    from core.transforms import ejecutar_por_nombre
+    from core.transforms import run_by_name
     alm = Store()
-    u = alm.crear('url', 'https://x.com/f.jpg')
-    prod = ejecutar_por_nombre('landmarks', u, alm)
+    u = alm.create('url', 'https://x.com/f.jpg')
+    prod = run_by_name('landmarks', u, alm)
     assert {p.propiedades.get('herramienta') for p in prod} == {'google_lens', 'mapillary', 'wikimapia'}
 
 
 def test_ocr_sin_tesseract(monkeypatch):
-    from core.transforms import ejecutar_por_nombre
+    from core.transforms import run_by_name
     monkeypatch.setattr(ob, '_which', lambda x: False)
     alm = Store()
-    u = alm.crear('url', 'https://x.com/f.jpg')
-    assert ejecutar_por_nombre('ocr', u, alm) == []   # degrada sin tesseract
+    u = alm.create('url', 'https://x.com/f.jpg')
+    assert run_by_name('ocr', u, alm) == []   # degrada sin tesseract
 
 
 def test_geoloc_es_modo_ia():
@@ -149,20 +149,20 @@ def test_ela_genera_imagen():
 
 
 def test_phash_transform(monkeypatch):
-    from core.transforms import ejecutar_por_nombre
+    from core.transforms import run_by_name
     monkeypatch.setattr(ob, '_descargar_imagen', lambda url: _img_grad())
     alm = Store()
-    u = alm.crear('url', 'https://x.com/a.jpg')
-    prod = ejecutar_por_nombre('phash', u, alm)
+    u = alm.create('url', 'https://x.com/a.jpg')
+    prod = run_by_name('phash', u, alm)
     hs = [e for e in prod if e.tipo == 'hash']
     assert hs and hs[0].propiedades.get('tipo_hash') == 'phash'
     assert u.propiedades.get('phash')
 
 
 def test_ela_transform(monkeypatch):
-    from core.transforms import ejecutar_por_nombre
+    from core.transforms import run_by_name
     monkeypatch.setattr(ob, '_descargar_imagen', lambda url: _img_grad())
     alm = Store()
-    u = alm.crear('url', 'https://x.com/a.jpg')
-    ejecutar_por_nombre('ela', u, alm)
+    u = alm.create('url', 'https://x.com/a.jpg')
+    run_by_name('ela', u, alm)
     assert 'ela-generado' in u.tags and u.propiedades.get('ela_img')

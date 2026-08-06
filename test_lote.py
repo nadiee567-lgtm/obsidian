@@ -5,7 +5,7 @@ Run:  ../.venv/bin/python -m pytest test_lote.py -q
 import threading
 
 from core.modelo import Store
-from core.transforms import transform, ejecutar_lote
+from core.transforms import transform, run_batch
 
 
 @transform(entrada='dominio', salidas=('ip',), nombre='_test_lote_a')
@@ -21,7 +21,7 @@ def _fake_b(entidad, ctx):
 
 def test_lote_fusiona_resultados():
     alm = Store()
-    res = ejecutar_lote([('dominio', 'ejemplo.com', '_test_lote_a'),
+    res = run_batch([('dominio', 'ejemplo.com', '_test_lote_a'),
                          ('dominio', 'ejemplo.com', '_test_lote_b')], alm)
     assert dict(res) == {'_test_lote_a': 2, '_test_lote_b': 1}
     # shared seed (dedup) + 2 ip + 1 subdomain = 4
@@ -33,17 +33,17 @@ def test_lote_fusiona_resultados():
 
 def test_lote_con_lock():
     alm = Store()
-    ejecutar_lote([('dominio', 'a.com', '_test_lote_a')], alm, lock=threading.RLock())
-    assert len(alm.de_tipo('ip')) == 2
+    run_batch([('dominio', 'a.com', '_test_lote_a')], alm, lock=threading.RLock())
+    assert len(alm.of_type('ip')) == 2
 
 
 def test_lote_vacio():
-    assert ejecutar_lote([], Store()) == []
+    assert run_batch([], Store()) == []
 
 
 def test_lote_transform_inexistente_no_rompe():
     alm = Store()
-    res = ejecutar_lote([('dominio', 'a.com', 'no_existe_zzz')], alm)
+    res = run_batch([('dominio', 'a.com', 'no_existe_zzz')], alm)
     assert res == [('no_existe_zzz', 0)]
     assert len(alm) == 1          # only the seed
 
@@ -52,7 +52,7 @@ def test_lote_no_pierde_datos_en_paralelo():
     """Many concurrent tasks: no output is lost in the merge."""
     alm = Store()
     tareas = [('dominio', f'sitio{i}.com', '_test_lote_a') for i in range(20)]
-    ejecutar_lote(tareas, alm, max_workers=8)
+    run_batch(tareas, alm, max_workers=8)
     # 20 distinct seeds + 2 shared ips (10.0.0.1/2) = 22
-    assert len(alm.de_tipo('dominio')) == 20
-    assert len(alm.de_tipo('ip')) == 2
+    assert len(alm.of_type('dominio')) == 20
+    assert len(alm.of_type('ip')) == 2

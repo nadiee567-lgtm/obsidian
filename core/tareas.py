@@ -18,7 +18,7 @@ class TaskManager:
         self._tareas: dict = {}
         self._lock = threading.Lock()
 
-    def crear(self, trabajo) -> str:
+    def create(self, trabajo) -> str:
         """Launches `trabajo(emit)` in a thread. Returns the task id."""
         tid = uuid.uuid4().hex[:12]
         est = {'id': tid, 'estado': 'corriendo', 'eventos': queue.Queue(), 'resultado': None}

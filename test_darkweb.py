@@ -4,13 +4,13 @@ Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_darkweb.py -q
 """
 import obsidian_web as ob
 from core.modelo import Store
-from core.transforms import ejecutar_por_nombre
+from core.transforms import run_by_name
 
 
 def _correr(nombre, tipo, valor):
     alm = Store()
-    e = alm.crear(tipo, valor)
-    return ejecutar_por_nombre(nombre, e, alm), e
+    e = alm.create(tipo, valor)
+    return run_by_name(nombre, e, alm), e
 
 
 # ── 128: .onion routing over Tor ────────────────────────────────────────────

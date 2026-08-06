@@ -6,10 +6,10 @@ Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_ia.py -q
 
 # ── 161: entity extraction from text ────────────────────────────────────────
 def test_extraer_entidades():
-    from core.extraccion import extraer_entidades
+    from core.extraccion import extract_entities
     txt = ('Contact admin@acme.com via https://acme.com from 8.8.8.8. '
            'Attached reporte.pdf and foto.jpg. Bad IP 999.1.1.1.')
-    vals = {v for _, v in extraer_entidades(txt)}
+    vals = {v for _, v in extract_entities(txt)}
     assert 'admin@acme.com' in vals
     assert '8.8.8.8' in vals
     assert 'https://acme.com' in vals
@@ -20,9 +20,9 @@ def test_extraer_entidades():
 
 
 def test_extraer_wallets_de_texto():
-    from core.extraccion import extraer_entidades
+    from core.extraccion import extract_entities
     txt = 'pay to 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
-    tipos = {t for t, _ in extraer_entidades(txt)}
+    tipos = {t for t, _ in extract_entities(txt)}
     assert 'wallet' in tipos
 
 
@@ -82,11 +82,11 @@ def test_consulta_nl(monkeypatch):
 
 # ── 168: connect with NEXO (per-task model routing) ─────────────────────────
 def test_elegir_modelo_nexo():
-    from core.ia import elegir_modelo
-    assert elegir_modelo('find an exploit for this vuln') == 'dolphin-llama3'     # security
-    assert elegir_modelo('recon of the domain and its subdomains') == 'qwen2.5:3b'   # osint
-    assert elegir_modelo('scan of 8.8.8.8') == 'dolphin-llama3'                   # IP -> security
-    assert elegir_modelo('hello how are you') == 'qwen2.5:1.5b'                   # no signal -> fast
+    from core.ia import pick_model
+    assert pick_model('find an exploit for this vuln') == 'dolphin-llama3'     # security
+    assert pick_model('recon of the domain and its subdomains') == 'qwen2.5:3b'   # osint
+    assert pick_model('scan of 8.8.8.8') == 'dolphin-llama3'                   # IP -> security
+    assert pick_model('hello how are you') == 'qwen2.5:1.5b'                   # no signal -> fast
 
 
 # ── 169: AI detection (a hint, not proof) ───────────────────────────────────

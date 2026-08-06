@@ -28,7 +28,7 @@ _RUTEO = {
 }
 
 
-def elegir_modelo(texto):
+def pick_model(texto):
     """Picks the local model based on the task (NEXO-style router). An explicit IP
     leans toward security; with no signals, a fast model by default."""
     t = (texto or '').lower()
@@ -53,7 +53,7 @@ def consultar(prompt, sistema=None, max_tokens=300, temp=0.4, modelo=None):
 
     If OBSIDIAN_NEXO is active (and `modelo` is not forced), it routes to the best
     local model for the task (step 168), without touching the callers."""
-    m = modelo or (elegir_modelo(f'{sistema or ""} {prompt}') if NEXO else MODELO)
+    m = modelo or (pick_model(f'{sistema or ""} {prompt}') if NEXO else MODELO)
     mensajes = ([{'role': 'system', 'content': sistema}] if sistema else [])
     mensajes.append({'role': 'user', 'content': prompt})
     r = _S.post(f'{OLLAMA}/api/chat', json={

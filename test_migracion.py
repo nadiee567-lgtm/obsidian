@@ -2,7 +2,7 @@
 
 Run:  ../.venv/bin/python -m pytest test_migracion.py -q
 """
-from core.migracion import migrar_caso
+from core.migracion import migrate_case
 
 
 # a realistic old case, as the OSINT modules used to leave it
@@ -38,7 +38,7 @@ CASE_VIEJO = {
 
 
 def test_migracion_crea_entidades_tipadas():
-    alm = migrar_caso(CASE_VIEJO)
+    alm = migrate_case(CASE_VIEJO)
     # target + domain + ip + subdomains + email + country + org + ptr + takeover...
     assert alm.buscar('objetivo', 'example.com') is not None
     assert alm.buscar('dominio', 'example.com') is not None
@@ -51,13 +51,13 @@ def test_migracion_crea_entidades_tipadas():
 def test_migracion_dedup_email_entre_modulos():
     # the email appears in the 'dominio' module (emails) and the 'email' module:
     # it must be ONE single entity with both sources
-    alm = migrar_caso(CASE_VIEJO)
+    alm = migrate_case(CASE_VIEJO)
     e = alm.buscar('email', 'admin@example.com')
     assert 'dominio' in e.origenes and 'email' in e.origenes
 
 
 def test_migracion_tags_y_props():
-    alm = migrar_caso(CASE_VIEJO)
+    alm = migrate_case(CASE_VIEJO)
     e = alm.buscar('email', 'admin@example.com')
     assert 'spoofable' in e.tags and 'filtrado' in e.tags
     assert e.propiedades.get('hibp_breaches') == ['LinkedIn']
@@ -67,10 +67,10 @@ def test_migracion_tags_y_props():
 
 def test_migracion_no_truena_con_modulo_roto():
     # the 'roto' module has no 'objetivo'; the migration skips it without error
-    alm = migrar_caso(CASE_VIEJO)
+    alm = migrate_case(CASE_VIEJO)
     assert len(alm) > 0
 
 
 def test_migracion_caso_vacio():
-    alm = migrar_caso({'objetivo': None, 'datos': {}})
+    alm = migrate_case({'objetivo': None, 'datos': {}})
     assert len(alm) == 0

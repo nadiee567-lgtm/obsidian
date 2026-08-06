@@ -52,8 +52,8 @@ def test_ejecutar_emite_relaciona_y_anota_procedencia():
         ctx.emitir('subdominio', 'www.' + entidad.valor, etiqueta='subdominio')
 
     alm = Store()
-    dom = alm.crear('dominio', 'example.com')
-    producidas = tr.ejecutar_por_nombre('dns', dom, alm)
+    dom = alm.create('dominio', 'example.com')
+    producidas = tr.run_by_name('dns', dom, alm)
 
     assert len(producidas) == 2
     ip = alm.buscar('ip', '93.184.216.34')
@@ -67,9 +67,9 @@ def test_ejecutar_valida_tipo_de_entrada():
     @tr.transform(entrada='dominio', nombre='solo_dominio')
     def _f(entidad, ctx): pass
     alm = Store()
-    ip = alm.crear('ip', '8.8.8.8')
+    ip = alm.create('ip', '8.8.8.8')
     with pytest.raises(ValueError):
-        tr.ejecutar_por_nombre('solo_dominio', ip, alm)
+        tr.run_by_name('solo_dominio', ip, alm)
 
 
 # ── failure isolation (step 38) ─────────────────────────────────────────────
@@ -80,8 +80,8 @@ def test_transform_que_revienta_no_propaga():
         raise RuntimeError("boom")         # crashes afterwards
 
     alm = Store()
-    dom = alm.crear('dominio', 'example.com')
-    producidas = tr.ejecutar_por_nombre('medio_roto', dom, alm)   # does NOT raise
+    dom = alm.create('dominio', 'example.com')
+    producidas = tr.run_by_name('medio_roto', dom, alm)   # does NOT raise
     assert len(producidas) == 1
     assert alm.buscar('ip', '1.1.1.1') is not None
 
@@ -92,8 +92,8 @@ def test_emitir_valor_basura_se_ignora():
         ctx.emitir('ip', '8.8.8.8')
 
     alm = Store()
-    dom = alm.crear('dominio', 'example.com')
-    producidas = tr.ejecutar_por_nombre('sucio', dom, alm)
+    dom = alm.create('dominio', 'example.com')
+    producidas = tr.run_by_name('sucio', dom, alm)
     assert len(producidas) == 1
 
 
@@ -108,8 +108,8 @@ def test_transform_dispara_eventos_del_bus():
         ctx.emitir('ip', '9.9.9.9')
 
     alm = Store(bus=bus)
-    dom = alm.crear('dominio', 'example.com')   # 1 event
-    tr.ejecutar_por_nombre('dns', dom, alm)     # +1 event (the ip)
+    dom = alm.create('dominio', 'example.com')   # 1 event
+    tr.run_by_name('dns', dom, alm)     # +1 event (the ip)
     assert len(nuevas) == 2
 
 
@@ -122,7 +122,7 @@ def test_corredor_cachea():
         ctx.emitir('ip', '8.8.8.8')
 
     alm = Store()
-    dom = alm.crear('dominio', 'example.com')
+    dom = alm.create('dominio', 'example.com')
     corr = tr.Runner(alm)
     corr.ejecutar('dns', dom)
     corr.ejecutar('dns', dom)      # second time: cache, does not re-run
@@ -140,9 +140,9 @@ def test_machine_cascada():
         ctx.emitir('puerto', '443', etiqueta='open')
 
     alm = Store()
-    dom = alm.crear('dominio', 'example.com')
+    dom = alm.create('dominio', 'example.com')
     receta = tr.Machine(nombre='recon', pasos=('dns', 'ports'))
-    producidas = tr.Runner(alm).ejecutar_machine(receta, dom)
+    producidas = tr.Runner(alm).run_machine(receta, dom)
 
     tipos = sorted(e.tipo for e in producidas)
     assert tipos == ['ip', 'puerto']              # cascade: domain→ip→port
@@ -158,6 +158,6 @@ def test_cargar_plugins(tmp_path):
         "def f(entidad, ctx):\n"
         "    ctx.emitir('ip', '1.2.3.4')\n"
     )
-    cargados = tr.cargar_plugins(str(tmp_path))
+    cargados = tr.load_plugins(str(tmp_path))
     assert 'mi_transform' in cargados
     assert tr.REGISTRO.por_nombre('plugin_dns') is not None

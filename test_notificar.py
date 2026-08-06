@@ -2,11 +2,11 @@
 
 Run:  ../.venv/bin/python -m pytest test_notificar.py -q
 """
-from core.notificar import construir_ntfy, enviar_ntfy
+from core.notificar import build_ntfy, send_ntfy
 
 
 def test_construir_url_y_headers():
-    url, headers, cuerpo = construir_ntfy('my-topic', 'São Paulo alert',
+    url, headers, cuerpo = build_ntfy('my-topic', 'São Paulo alert',
                                           titulo='OBSIDIAN', prioridad='high', tags='warning')
     assert url == 'https://ntfy.sh/my-topic'
     assert headers['Title'] == 'OBSIDIAN'
@@ -16,12 +16,12 @@ def test_construir_url_y_headers():
 
 
 def test_construir_respeta_server_propio():
-    url, _, _ = construir_ntfy('t', 'x', server='https://ntfy.mydomain.com/')
+    url, _, _ = build_ntfy('t', 'x', server='https://ntfy.mydomain.com/')
     assert url == 'https://ntfy.mydomain.com/t'
 
 
 def test_enviar_sin_topic_no_hace_nada():
-    assert enviar_ntfy('', 'x') is False
+    assert send_ntfy('', 'x') is False
 
 
 def test_enviar_con_fallo_de_red_no_lanza(monkeypatch):
@@ -29,4 +29,4 @@ def test_enviar_con_fallo_de_red_no_lanza(monkeypatch):
     def boom(*a, **k):
         raise RuntimeError('no network')
     monkeypatch.setattr(n.requests, 'post', boom)
-    assert enviar_ntfy('topic', 'x') is False        # does not raise, returns False
+    assert send_ntfy('topic', 'x') is False        # does not raise, returns False

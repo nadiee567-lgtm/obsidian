@@ -48,7 +48,7 @@ def _conectar(db_path):
     return con
 
 
-def guardar_almacen(almacen: Store, db_path: str) -> None:
+def save_store(almacen: Store, db_path: str) -> None:
     """Dumps the full store to the DB (upsert by id)."""
     con = _conectar(db_path)
     with con:
@@ -72,11 +72,11 @@ def guardar_almacen(almacen: Store, db_path: str) -> None:
     con.close()
 
 
-def cargar_almacen(db_path: str) -> Store:
+def load_store(db_path: str) -> Store:
     """Rebuilds a Store from the DB. SILENT load (no bus): does not fire events,
     because loading from disk is not 'discovering' new data."""
     con = _conectar(db_path)
-    alm = Store()   # no bus -> agregar() does not publish
+    alm = Store()   # no bus -> add() does not publish
     for row in con.execute(
         "SELECT tipo,valor,propiedades,origenes,tags,procedencia,confianza,creada FROM entidades"
     ):
@@ -90,15 +90,15 @@ def cargar_almacen(db_path: str) -> Store:
             confianza=conf if conf is not None else 1.0,
         )
         e.creada = creada or e.creada
-        alm.agregar(e)
+        alm.add(e)
     for row in con.execute("SELECT origen,destino,etiqueta FROM relaciones"):
-        alm.relacionar(row[0], row[1], row[2] or '')
+        alm.relate(row[0], row[1], row[2] or '')
     con.close()
     return alm
 
 
 # ── Per-case history / audit (F3 step 48) ────────────────────────────────────
-def registrar_evento(db_path: str, transform: str, entrada: str, salidas: int) -> None:
+def record_event(db_path: str, transform: str, entrada: str, salidas: int) -> None:
     """Records that a transform ran (what, when, how many results)."""
     con = _conectar(db_path)
     with con:
@@ -109,7 +109,7 @@ def registrar_evento(db_path: str, transform: str, entrada: str, salidas: int) -
     con.close()
 
 
-def leer_historial(db_path: str, limite: int = 100) -> list:
+def read_history(db_path: str, limite: int = 100) -> list:
     """Case history, most recent first."""
     con = _conectar(db_path)
     con.row_factory = sqlite3.Row

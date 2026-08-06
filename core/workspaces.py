@@ -12,7 +12,7 @@ import shutil
 import datetime
 
 from core.modelo import Store
-from core.persistencia import guardar_almacen, cargar_almacen, registrar_evento, leer_historial
+from core.persistencia import save_store, load_store, record_event, read_history
 from core.validacion import _slug_caso
 
 
@@ -41,7 +41,7 @@ class Manager:
         r = self._ruta(nombre)
         return bool(r and os.path.exists(r))
 
-    def crear(self, nombre):
+    def create(self, nombre):
         """Creates an empty workspace (with its schema). Returns its Store."""
         r = self._ruta(nombre)
         if not r:
@@ -49,20 +49,20 @@ class Manager:
         if os.path.exists(r):
             raise ValueError('a workspace with that name already exists')
         alm = Store()
-        guardar_almacen(alm, r)   # creates the file + schema
+        save_store(alm, r)   # creates the file + schema
         return alm
 
     def cargar(self, nombre):
         r = self._ruta(nombre)
         if not r or not os.path.exists(r):
             raise KeyError('workspace not found')
-        return cargar_almacen(r)
+        return load_store(r)
 
     def guardar(self, nombre, almacen):
         r = self._ruta(nombre)
         if not r:
             raise ValueError('invalid workspace name')
-        guardar_almacen(almacen, r)
+        save_store(almacen, r)
 
     def borrar(self, nombre):
         r = self._ruta(nombre)
@@ -85,11 +85,11 @@ class Manager:
     def registrar(self, nombre, transform, entrada, salidas):
         r = self._ruta(nombre)
         if r and os.path.exists(r):
-            registrar_evento(r, transform, entrada, salidas)
+            record_event(r, transform, entrada, salidas)
 
     def historial(self, nombre):
         r = self._ruta(nombre)
-        return leer_historial(r) if (r and os.path.exists(r)) else []
+        return read_history(r) if (r and os.path.exists(r)) else []
 
     # ── Snapshots / versions (step 49) ──
     def _dir_snaps(self, nombre):
@@ -123,7 +123,7 @@ class Manager:
         ruta = os.path.join(d, sid + '.db') if (d and sid) else None
         if not ruta or not os.path.exists(ruta):
             raise KeyError('snapshot not found')
-        return cargar_almacen(ruta)
+        return load_store(ruta)
 
     def restaurar(self, nombre, snap_id):
         """Reverts the case to an earlier snapshot (snapshots the current one first)."""

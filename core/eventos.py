@@ -14,7 +14,7 @@ RELACION_NUEVA       = 'relacion_nueva'
 
 
 class Bus:
-    """Minimal pub/sub. suscribir(event, callback) / publicar(event, *args)."""
+    """Minimal pub/sub. suscribir(event, callback) / publish(event, *args)."""
 
     def __init__(self):
         self._subs: dict[str, list] = {}
@@ -22,7 +22,7 @@ class Bus:
     def suscribir(self, evento: str, callback) -> None:
         self._subs.setdefault(evento, []).append(callback)
 
-    def publicar(self, evento: str, *args, **kwargs) -> list:
+    def publish(self, evento: str, *args, **kwargs) -> list:
         """Calls each subscriber. Isolates failures: if a callback raises, it's
         caught and we continue with the rest. Returns the list of exceptions that
         occurred (empty if all fine) so the caller can log them."""

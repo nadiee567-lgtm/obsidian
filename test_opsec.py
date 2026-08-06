@@ -8,7 +8,7 @@ Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_opsec.py -q
 def test_gestor_personas(tmp_path):
     from core.personas import PersonaManager
     g = PersonaManager(str(tmp_path / 'p.json'))
-    g.crear('juan_investigador', {'email': 'juan@proton.me', 'usuario': 'juanx'})
+    g.create('juan_investigador', {'email': 'juan@proton.me', 'usuario': 'juanx'})
     assert 'juan_investigador' in g.listar()
     p = g.obtener('juan_investigador')
     assert p['email'] == 'juan@proton.me' and 'creada' in p

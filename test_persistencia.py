@@ -3,26 +3,26 @@
 Correr:  ../.venv/bin/python -m pytest test_persistencia.py -q
 """
 from core.modelo import Store
-from core.persistencia import guardar_almacen, cargar_almacen
+from core.persistencia import save_store, load_store
 
 
 def _almacen_ejemplo():
     alm = Store()
-    d = alm.crear('dominio', 'example.com', origenes={'whois'},
+    d = alm.create('dominio', 'example.com', origenes={'whois'},
                   propiedades={'registrar': 'GoDaddy'})
-    d.etiquetar('interesante')
-    i = alm.crear('ip', '93.184.216.34', origenes={'dns'})
-    i.anotar_procedencia('transform_dns', input_id=d.id)
-    alm.relacionar(d, i, 'resuelve_a')
+    d.tag('interesante')
+    i = alm.create('ip', '93.184.216.34', origenes={'dns'})
+    i.note_provenance('transform_dns', input_id=d.id)
+    alm.relate(d, i, 'resuelve_a')
     return alm
 
 
 def test_guardar_y_cargar_roundtrip(tmp_path):
     db = str(tmp_path / 'caso.db')
     original = _almacen_ejemplo()
-    guardar_almacen(original, db)
+    save_store(original, db)
 
-    cargado = cargar_almacen(db)
+    cargado = load_store(db)
     assert len(cargado) == 2
     assert len(cargado.relaciones) == 1
 
@@ -38,9 +38,9 @@ def test_guardar_y_cargar_roundtrip(tmp_path):
 def test_guardar_es_idempotente(tmp_path):
     db = str(tmp_path / 'caso.db')
     alm = _almacen_ejemplo()
-    guardar_almacen(alm, db)
-    guardar_almacen(alm, db)   # segunda vez: upsert, no duplica
-    cargado = cargar_almacen(db)
+    save_store(alm, db)
+    save_store(alm, db)   # segunda vez: upsert, no duplica
+    cargado = load_store(db)
     assert len(cargado) == 2
     assert len(cargado.relaciones) == 1
 
@@ -49,7 +49,7 @@ def test_ids_estables_tras_recarga(tmp_path):
     db = str(tmp_path / 'caso.db')
     alm = _almacen_ejemplo()
     ids_antes = {e.id for e in alm.entidades}
-    guardar_almacen(alm, db)
-    cargado = cargar_almacen(db)
+    save_store(alm, db)
+    cargado = load_store(db)
     ids_despues = {e.id for e in cargado.entidades}
     assert ids_antes == ids_despues, "los ids deben sobrevivir el guardado/carga"

@@ -10,21 +10,21 @@ from core.config import HOME, HOME_INIT, CASES_DIR, STATIC_DIR, CASES_DB, PORT, 
 from core.validacion import (_SHELL_PELIGROSOS, _MODULO_TIPO, _es_ip, _validar,
                              _objetivo_seguro, _slug_caso, _ruta_caso_segura, _url_publica)
 from core.registro import get_logger
-from core.modelo import Store, Entity, tipo_valido, TIPOS
-from core.transforms import transform, REGISTRO, ejecutar_por_nombre, ejecutar_lote
-from core.migracion import migrar_caso
+from core.modelo import Store, Entity, valid_type, TIPOS
+from core.transforms import transform, REGISTRO, run_by_name, run_batch
+from core.migracion import migrate_case
 from core.workspaces import Manager
 from core.boveda import Vault
-from core.correlacion import correlacionar, score_riesgo, cargar_reglas_yaml, score_exposicion
+from core.correlacion import correlate, risk_score, load_yaml_rules, exposure_score
 from core.reporte import generar_reporte
 from core.exportar import exportar_json, exportar_csv
 from core.monitor import Monitor, snapshot as _snap_estado
-from core.notificar import enviar_ntfy, construir_ntfy
+from core.notificar import send_ntfy, build_ntfy
 from core.estado import render_estado
 from core.motores import traducir as _motor_query, traducir_todos, MOTORES
 from core.tareas import TaskManager
 from core.personas import PersonaManager
-from core.extraccion import extraer_entidades
+from core.extraccion import extract_entities
 from core import multiidioma as _ml
 from core.imagen import (enlaces_reverse, enlaces_facial, parse_gps,
                          enlaces_cronolocalizacion, enlaces_satelital, enlaces_landmark,
@@ -2045,7 +2045,7 @@ def _t_metadata(entidad, ctx):
                     ctx.emitir('persona', interesantes[kk], etiqueta=kk.lower())
             gps = interesantes.get('GPS Position') or interesantes.get('GPS Latitude')
             if gps:
-                entidad.etiquetar('tiene-gps')
+                entidad.tag('tiene-gps')
                 ctx.emitir('url', f'https://www.google.com/maps/search/?api=1&query={_q(gps)}',
                            etiqueta='gps', gps=gps)
     finally:
@@ -2082,7 +2082,7 @@ def _t_wallet_balance(entidad, ctx):
         entidad.propiedades['btc_tx'] = d.get('n_tx', 0)
         entidad.propiedades['btc_recibido'] = round(d.get('total_received', 0) / 1e8, 8)
         if d.get('n_tx'):
-            entidad.etiquetar('wallet-activa')
+            entidad.tag('wallet-activa')
     except Exception as _e:
         log.debug("wallet_balance unavailable: %s", _e)
 
@@ -2153,7 +2153,7 @@ def _t_wayback(entidad, ctx):
         if snap.get('available'):
             entidad.propiedades['wayback_desde'] = (snap.get('timestamp', '') or '')[:8]
             entidad.propiedades['wayback_url'] = snap.get('url')
-            entidad.etiquetar('archivado')
+            entidad.tag('archivado')
     except Exception as _e:
         log.debug("wayback available: %s", _e)
     # 2. historical subdomains (CDX; may be blocked in some environments)
@@ -2185,9 +2185,9 @@ def _t_subdominios_ht(entidad, ctx):
                 continue
             sub_ent = ctx.emitir('subdominio', sub, etiqueta='subdominio')
             if sub_ent and re.fullmatch(r'\d+\.\d+\.\d+\.\d+', ip):
-                ip_ent = ctx.almacen.crear('ip', ip, origenes={'subdominios_ht'})
-                ip_ent.anotar_procedencia('subdominios_ht', input_id=sub_ent.id)
-                ctx.almacen.relacionar(sub_ent, ip_ent, 'A')
+                ip_ent = ctx.almacen.create('ip', ip, origenes={'subdominios_ht'})
+                ip_ent.note_provenance('subdominios_ht', input_id=sub_ent.id)
+                ctx.almacen.relate(sub_ent, ip_ent, 'A')
     except Exception as _e:
         log.debug("subdominios_ht unavailable: %s", _e)
 
@@ -2326,7 +2326,7 @@ def _t_email_breaches(entidad, ctx):
                 nombre = b.get('Name')
                 if nombre:
                     ctx.emitir('org', nombre, etiqueta='leaked in')
-            entidad.etiquetar('filtrado')
+            entidad.tag('filtrado')
     except Exception as _e:
         log.debug("hibp unavailable: %s", _e)
 
@@ -2345,7 +2345,7 @@ def _pastes_github(entidad):
         n = d.get('total_count')
         if n:
             entidad.propiedades['github_menciones'] = n
-            entidad.etiquetar('mencionado-github')
+            entidad.tag('mencionado-github')
     except Exception as _e:
         log.debug("pastes_github unavailable: %s", _e)
 
@@ -2373,7 +2373,7 @@ def _t_breaches_xon(entidad, ctx):
             if nombre:
                 ctx.emitir('org', str(nombre), etiqueta='leaked in')
         if lista:
-            entidad.etiquetar('filtrado')
+            entidad.tag('filtrado')
     except Exception as _e:
         log.debug("xposedornot unavailable: %s", _e)
 
@@ -2385,7 +2385,7 @@ def _t_stealer(entidad, ctx):
                         params={'email': entidad.valor}, timeout=10)
         msg = (r.json() or {}).get('message', '')
         if 'infected by an info-stealer' in msg:
-            entidad.etiquetar('stealer-infectado')
+            entidad.tag('stealer-infectado')
             entidad.propiedades['stealer'] = 'yes (HudsonRock)'
     except Exception as _e:
         log.debug("hudsonrock unavailable: %s", _e)
@@ -2421,7 +2421,7 @@ def _t_breaches(entidad, ctx):
         except Exception as _e:
             log.debug("breaches hibp: %s", _e)
     if fuentes:
-        entidad.etiquetar('filtrado')
+        entidad.tag('filtrado')
         entidad.propiedades['brechas'] = sorted(fuentes)
         for f in sorted(fuentes)[:30]:
             ctx.emitir('org', f, etiqueta='breach')
@@ -2483,7 +2483,7 @@ def _t_stealer_dominio(entidad, ctx):
         if emp or usr:
             entidad.propiedades['stealer_empleados'] = emp
             entidad.propiedades['stealer_usuarios'] = usr
-            entidad.etiquetar('stealer-expuesto')
+            entidad.tag('stealer-expuesto')
     except Exception as _e:
         log.debug("stealer_dominio unavailable: %s", _e)
 
@@ -2497,7 +2497,7 @@ def _t_email_spoofable(entidad, ctx):
     tiene_spf = 'v=spf1' in txt.lower()
     entidad.propiedades['spf'] = 'configured' if tiene_spf else 'NOT CONFIGURED'
     if not tiene_spf:
-        entidad.etiquetar('spoofable')
+        entidad.tag('spoofable')
 
 def _screenshot(entidad):
     """Web capture with a headless browser (step 68). Does not capture internal
@@ -2520,7 +2520,7 @@ def _screenshot(entidad):
             pagina.screenshot(path=os.path.join(shots, archivo))
             navegador.close()
         entidad.propiedades['screenshot'] = '/static/screenshots/' + archivo
-        entidad.etiquetar('con-screenshot')
+        entidad.tag('con-screenshot')
     except Exception as _e:
         log.debug("screenshot failed: %s", _e)
 
@@ -2550,7 +2550,7 @@ def _nuclei(entidad):
         info = j.get('info', {}) or {}
         hallados.append({'id': j.get('template-id'), 'sev': info.get('severity'), 'nombre': info.get('name')})
         if info.get('severity') in ('high', 'critical'):
-            entidad.etiquetar('vulnerable')
+            entidad.tag('vulnerable')
     if hallados:
         entidad.propiedades['nuclei'] = hallados[:20]
 
@@ -2584,7 +2584,7 @@ def _http_probe(entidad):
         pass
     if str(r.url).rstrip('/') not in (f'https://{entidad.valor}', f'http://{entidad.valor}'):
         entidad.propiedades['http_redirect'] = str(r.url)
-    entidad.etiquetar('http-vivo')
+    entidad.tag('http-vivo')
     # login/admin panel detection (step 56)
     cuerpo = (r.text[:8000] or '').lower()
     titulo = (entidad.propiedades.get('http_title', '') or '').lower()
@@ -2592,7 +2592,7 @@ def _http_probe(entidad):
                'wp-admin', 'phpmyadmin', 'authentication', 'panel')
     if (any(s in titulo for s in señales)
             or 'type="password"' in cuerpo or "type='password'" in cuerpo):
-        entidad.etiquetar('panel-login')
+        entidad.tag('panel-login')
 
 def _tech_detect(entidad):
     """Lightweight technology fingerprint from the HTTP response (server,
@@ -2653,7 +2653,7 @@ def _t_cve_lookup(entidad, ctx):
         if f':{kw.lower()}:' in cpes:
             e = ctx.emitir('cve', cid, etiqueta='critical CVE')
             if e:
-                e.etiquetar('sin-verificar-version')
+                e.tag('sin-verificar-version')
 
 @transform(entrada='dominio', salidas=(), nombre='http_probe',
            descripcion='HTTP probe: status, title, server, redirect (httpx-style)')
@@ -2721,11 +2721,11 @@ def _t_reputacion_ip(entidad, ctx):
         if d.get('status') != 'success':
             return
         if d.get('proxy'):
-            entidad.etiquetar('proxy-vpn')
+            entidad.tag('proxy-vpn')
         if d.get('hosting'):
-            entidad.etiquetar('hosting')
+            entidad.tag('hosting')
         if d.get('mobile'):
-            entidad.etiquetar('movil')
+            entidad.tag('movil')
         entidad.propiedades['proxy'] = bool(d.get('proxy'))
         entidad.propiedades['hosting'] = bool(d.get('hosting'))
     except Exception as _e:
@@ -2746,7 +2746,7 @@ def _t_abuseipdb(entidad, ctx):
         if score is not None:
             entidad.propiedades['abuse_score'] = score
             if score >= 50:
-                entidad.etiquetar('abusiva')
+                entidad.tag('abusiva')
     except Exception as _e:
         log.debug("abuseipdb unavailable: %s", _e)
 
@@ -3026,7 +3026,7 @@ def _t_typosquatting(entidad, ctx):
     for v, ip in registrados.items():
         d = ctx.emitir('dominio', v, etiqueta='typosquat', resuelve=ip)
         if d:
-            d.etiquetar('typosquat')
+            d.tag('typosquat')
 
 @transform(entrada='org', salidas=('bucket',), nombre='buckets',
            descripcion='Public S3/GCS/Azure buckets by organization name (F2 step 34)')
@@ -3057,7 +3057,7 @@ def _t_buckets(entidad, ctx):
     for bucket, info in hallados.items():
         b = ctx.emitir('bucket', bucket, etiqueta='bucket', url=info['url'], publico=info['publico'])
         if b and info['publico']:
-            b.etiquetar('publico')
+            b.tag('publico')
 
 _TAKEOVER_FP = {
     'github.io': "There isn't a GitHub Pages site here", 'herokuapp.com': 'No such app',
@@ -3103,7 +3103,7 @@ def _t_takeover(entidad, ctx):
         s = ctx.emitir('subdominio', sub, etiqueta='takeover',
                        servicio=info['servicio'], cname=info['cname'], estado=info['estado'])
         if s:
-            s.etiquetar('takeover')          # triggers the r_takeover rule (F4/55)
+            s.tag('takeover')          # triggers the r_takeover rule (F4/55)
 
 @transform(entrada='dominio', salidas=('ip',), nombre='passivedns', requiere_key=True,
            descripcion='IP history of the domain (Passive DNS via VirusTotal, key in the vault) (F2 step 34)')
@@ -3168,7 +3168,7 @@ def _t_github_sec(entidad, ctx):
                                            tipo_secreto=nombre_pat, repo=full,
                                            commit=sha[:8], archivo=f.get('filename', '?'))
                             if c:
-                                c.etiquetar('secreto-github')
+                                c.tag('secreto-github')
     except Exception as _e:
         log.debug("github_sec unavailable: %s", _e)
 
@@ -3215,7 +3215,7 @@ def _t_url_check(entidad, ctx):
                          data={'url': entidad.valor}, timeout=8).json() or {}
         if d.get('query_status') == 'ok':
             entidad.propiedades['urlhaus'] = d.get('threat', 'listed')
-            entidad.etiquetar('url-maliciosa')
+            entidad.tag('url-maliciosa')
     except Exception as _e:
         log.debug("url_check urlhaus: %s", _e)
 
@@ -3273,7 +3273,7 @@ def _t_yara_bulk(entidad, ctx):
                 break
     if hallazgos:
         entidad.propiedades['yara_hallazgos'] = hallazgos[:20]
-        entidad.etiquetar('yara-match')
+        entidad.tag('yara-match')
 
 @transform(entrada='persona', salidas=(), nombre='wordlist',
            descripcion='Likely password wordlist from the case via AI (Ollama)')
@@ -3349,7 +3349,7 @@ def _t_ocr(entidad, ctx):
             texto = (run_tool(['tesseract', fn, 'stdout'], timeout=25) or '').strip()
         if texto:
             entidad.propiedades['ocr'] = texto[:1000]
-            entidad.etiquetar('tiene-texto')
+            entidad.tag('tiene-texto')
     finally:
         try:
             os.unlink(fn)
@@ -3394,7 +3394,7 @@ def _t_onion_fetch(entidad, ctx):
         ctx.emitir('email', em, etiqueta='in-onion')
     for on in list(set(re.findall(r'[a-z2-7]{16,56}\.onion', r.text)))[:15]:
         ctx.emitir('url', 'http://' + on, etiqueta='onion-link')
-    entidad.etiquetar('onion-vivo')
+    entidad.tag('onion-vivo')
 
 _TG_SESION = os.path.join(HOME, '.obsidian', 'telegram.session')
 
@@ -3471,7 +3471,7 @@ def _t_canal_leaks(entidad, ctx):
     hits = coincidencias_leak(textos)
     if not hits:
         return
-    entidad.etiquetar('canal-leaks')
+    entidad.tag('canal-leaks')
     entidad.propiedades['leaks_menciones'] = len(hits)
     entidad.propiedades['leaks_muestra'] = [h['texto'] for h in hits[:5]]
     unido = '\n'.join(h['texto'] for h in hits)
@@ -3524,9 +3524,9 @@ def _t_ela(entidad, ctx):
         if max_diff is not None:
             entidad.propiedades['ela_img'] = f'/static/ela/{nombre_img}'
             entidad.propiedades['ela_max_diff'] = max_diff
-            entidad.etiquetar('ela-generado')
+            entidad.tag('ela-generado')
             if max_diff >= 50:                       # heuristic: review visually
-                entidad.etiquetar('revisar-edicion')
+                entidad.tag('revisar-edicion')
     finally:
         try:
             os.unlink(fn)
@@ -3617,7 +3617,7 @@ def _ransom_addrs():
            descripcion='Address risk: linked to ransomware? (Ransomwhere, CC0, keyless) (F11 step 141)')
 def _t_riesgo_wallet(entidad, ctx):
     if entidad.valor in _ransom_addrs():
-        entidad.etiquetar('ransomware')
+        entidad.tag('ransomware')
         entidad.propiedades['riesgo'] = 'linked to ransomware (Ransomwhere)'
 
 @transform(entrada='wallet', salidas=('url',), nombre='exchange_attrib',
@@ -3653,7 +3653,7 @@ def _t_cluster_wallets(entidad, ctx):
     for a in list(mismo)[:30]:
         w = ctx.emitir('wallet', a, etiqueta='mismo-dueño', cadena='btc')
         if w:
-            w.etiquetar('mismo-dueño')
+            w.tag('mismo-dueño')
 
 @transform(entrada='url', salidas=('wallet',), nombre='extraer_wallets',
            descripcion='Extracts BTC/ETH addresses from a page (F11 step 137)')
@@ -3739,7 +3739,7 @@ def _t_ip_blocklist(entidad, ctx):
         return
     for red, fuente in _cargar_blocklist():
         if ip in red:
-            entidad.etiquetar('listado-amenaza')   # signal, NOT a 'malicious' verdict
+            entidad.tag('listado-amenaza')   # signal, NOT a 'malicious' verdict
             entidad.propiedades['amenaza_fuente'] = fuente
             return
 
@@ -3752,16 +3752,16 @@ def _t_greynoise(entidad, ctx):
             return
         d = r.json()
         if d.get('noise'):
-            entidad.etiquetar('escaneando-internet')
+            entidad.tag('escaneando-internet')
         if d.get('riot'):
-            entidad.etiquetar('servicio-conocido')
+            entidad.tag('servicio-conocido')
             if d.get('name'):
                 ctx.emitir('org', d['name'], etiqueta='greynoise')
         clasif = d.get('classification')
         if clasif:
             entidad.propiedades['greynoise'] = clasif
             if clasif == 'malicious':
-                entidad.etiquetar('malicioso')
+                entidad.tag('malicioso')
     except Exception as _e:
         log.debug("greynoise unavailable: %s", _e)
 
@@ -3827,10 +3827,10 @@ _almacen_lock = threading.RLock()
 def _correr_transform_interno(tipo, valor, nombre):
     """Runs a transform and persists (autosave). Shared by /run and the monitor.
     Raises ValueError/KeyError; the caller decides what to do with the error."""
-    if not tipo_valido(tipo):
+    if not valid_type(tipo):
         raise ValueError('invalid entity type')
     semilla = Entity(tipo, (valor or '').strip())          # may raise ValueError
-    if not semilla.valor_bien_formado():
+    if not semilla.well_formed():
         raise ValueError(f'malformed value for {tipo}')
     if _PROXIES['pool']:
         _rotar_proxy()                                      # OPSEC: rotate proxy per transform (154)
@@ -3838,8 +3838,8 @@ def _correr_transform_interno(tipo, valor, nombre):
     _jitter()                                               # OPSEC: spacing between requests (156)
     _registrar_huella(nombre, tipo, valor)                  # OPSEC: log your footprint (160)
     with _almacen_lock:
-        semilla = _almacen.agregar(semilla)
-        producidas = ejecutar_por_nombre(nombre, semilla, _almacen)
+        semilla = _almacen.add(semilla)
+        producidas = run_by_name(nombre, semilla, _almacen)
         if _ws_activo:                          # autosave (46) + audit (48)
             try:
                 _gestor.guardar(_ws_activo, _almacen)
@@ -3903,7 +3903,7 @@ def _cargar_reglas_usuario():
     try:
         if os.path.exists(_REGLAS_FILE):
             with open(_REGLAS_FILE, encoding='utf-8') as f:
-                n = cargar_reglas_yaml(f.read())
+                n = load_yaml_rules(f.read())
                 log.info("user YAML rules loaded: %d", n)
     except Exception as _e:
         log.warning("could not load YAML rules: %s", _e)
@@ -3914,7 +3914,7 @@ def api_v2_reglas():
     GET returns the active ones."""
     if request.method == 'POST':
         texto = (request.json or {}).get('yaml', '')
-        n = cargar_reglas_yaml(texto)
+        n = load_yaml_rules(texto)
         try:
             os.makedirs(os.path.dirname(_REGLAS_FILE), exist_ok=True)
             with open(_REGLAS_FILE, 'w', encoding='utf-8') as f:
@@ -3949,14 +3949,14 @@ def api_v2_recon():
     d = request.json or {}
     tipo = d.get('tipo', '')
     valor = (d.get('valor', '') or '').strip()
-    if not tipo_valido(tipo):
+    if not valid_type(tipo):
         return _error('invalid entity type', 400)
     con_keys = bool(d.get('con_keys'))
     with _almacen_lock:
-        _almacen.crear(tipo, valor)
+        _almacen.create(tipo, valor)
     ts = [t for t in REGISTRO.aplicables(tipo) if con_keys or not t.requiere_key]
     tareas = [(tipo, valor, t.nombre) for t in ts]
-    res = ejecutar_lote(tareas, _almacen, lock=_almacen_lock)
+    res = run_batch(tareas, _almacen, lock=_almacen_lock)
     if _ws_activo:
         with _almacen_lock:
             try:
@@ -3974,13 +3974,13 @@ def api_v2_recon_async():
     d = request.json or {}
     tipo = d.get('tipo', '')
     valor = (d.get('valor', '') or '').strip()
-    if not tipo_valido(tipo):
+    if not valid_type(tipo):
         return _error('invalid entity type', 400)
     con_keys = bool(d.get('con_keys'))
 
     def trabajo(emit):
         with _almacen_lock:
-            _almacen.crear(tipo, valor)
+            _almacen.create(tipo, valor)
         ts = [t for t in REGISTRO.aplicables(tipo) if con_keys or not t.requiere_key]
         tareas = [(tipo, valor, t.nombre) for t in ts]
         emit({'tipo': 'inicio', 'total': len(tareas)})
@@ -3988,7 +3988,7 @@ def api_v2_recon_async():
         def prog(nombre, n, hechas, total):
             emit({'tipo': 'progreso', 'transform': nombre, 'nuevas': n,
                   'hechas': hechas, 'total': total, 'entidades': len(_almacen)})
-        res = ejecutar_lote(tareas, _almacen, lock=_almacen_lock, on_progreso=prog)
+        res = run_batch(tareas, _almacen, lock=_almacen_lock, on_progreso=prog)
         if _ws_activo:
             with _almacen_lock:
                 try:
@@ -3997,7 +3997,7 @@ def api_v2_recon_async():
                     log.warning("autosave recon_async: %s", _e)
         return {'resultados': res, 'total_entidades': len(_almacen)}
 
-    return jsonify({'job_id': _tareas.crear(trabajo)})
+    return jsonify({'job_id': _tareas.create(trabajo)})
 
 @app.route('/api/v2/tarea/<tid>')
 def api_v2_tarea(tid):
@@ -4022,15 +4022,15 @@ def api_v2_entidad():
     d = request.json or {}
     tipo = d.get('tipo', '')
     valor = (d.get('valor', '') or '').strip()
-    if not tipo_valido(tipo):
+    if not valid_type(tipo):
         return _error('invalid entity type', 400)
     try:
         ent = Entity(tipo, valor)
     except ValueError as e:
         return _error(str(e), 400)
-    if not ent.valor_bien_formado():
+    if not ent.well_formed():
         return _error(f'malformed value for {tipo}', 400)
-    ent = _almacen.agregar(ent)
+    ent = _almacen.add(ent)
     if _ws_activo:
         try:
             _gestor.guardar(_ws_activo, _almacen)
@@ -4074,7 +4074,7 @@ def api_v2_tag():
 def api_v2_grafo():
     """Typed graph. ?migrar=1 converts the old case['datos'] to the new model."""
     if request.args.get('migrar') == '1':
-        return jsonify(migrar_caso(case).to_dict())
+        return jsonify(migrate_case(case).to_dict())
     return jsonify(_almacen.to_dict())
 
 @app.route('/api/v2/workspaces', methods=['GET', 'POST', 'DELETE'])
@@ -4086,7 +4086,7 @@ def api_v2_workspaces():
     nombre = (request.json or {}).get('nombre', '')
     if request.method == 'POST':
         try:
-            _almacen = _gestor.crear(nombre)
+            _almacen = _gestor.create(nombre)
         except ValueError as e:
             return _error(str(e), 400)
         _ws_activo = _slug_caso(nombre)
@@ -4326,7 +4326,7 @@ def api_v2_personas():
     if not nombre:
         return _error('missing persona name', 400)
     if request.method == 'POST':
-        _personas.crear(nombre, d.get('datos', {}))
+        _personas.create(nombre, d.get('datos', {}))
         return jsonify({'ok': True, 'personas': _personas.listar()})
     _personas.borrar(nombre)   # DELETE
     return jsonify({'ok': True, 'personas': _personas.listar()})
@@ -4376,7 +4376,7 @@ def api_v2_keys_probar():
     tiene = bool(_boveda.obtener(servicio))
     alm = Store()
     try:
-        n = len(ejecutar_por_nombre(nombre, alm.crear(tipo, valor), alm))
+        n = len(run_by_name(nombre, alm.create(tipo, valor), alm))
     except Exception as e:
         return jsonify({'servicio': servicio, 'ok': False, 'nota': f'error: {e}'})
     if n > 0:
@@ -4394,7 +4394,7 @@ def api_v2_inventario():
     """Inventory of the target's internet-facing assets, in one place (F12 step 144)."""
     inv = {}
     for t in _TIPOS_ACTIVO:
-        ents = _almacen.de_tipo(t)
+        ents = _almacen.of_type(t)
         if ents:
             inv[t] = [{'valor': e.valor, 'tags': sorted(e.tags),
                        'props': {k: e.propiedades[k] for k in list(e.propiedades)[:4]}}
@@ -4426,17 +4426,17 @@ def api_v2_diff_historico():
 @app.route('/api/v2/exposicion')
 def api_v2_exposicion():
     """Target exposure score: surface size + risk (F12 step 149)."""
-    conteos = {t: len(_almacen.de_tipo(t)) for t in _TIPOS_ACTIVO}
-    h = correlacionar(_almacen)
-    riesgo = score_riesgo(h)
-    return jsonify({'exposicion': score_exposicion(conteos, riesgo), 'riesgo': riesgo,
+    conteos = {t: len(_almacen.of_type(t)) for t in _TIPOS_ACTIVO}
+    h = correlate(_almacen)
+    riesgo = risk_score(h)
+    return jsonify({'exposicion': exposure_score(conteos, riesgo), 'riesgo': riesgo,
                     'superficie': conteos, 'hallazgos': len(h)})
 
 @app.route('/api/v2/hallazgos')
 def api_v2_hallazgos():
     """Runs the correlation engine on the active case (F4 steps 62, 64)."""
-    h = correlacionar(_almacen)
-    return jsonify({'hallazgos': [x.to_dict() for x in h], 'score': score_riesgo(h)})
+    h = correlate(_almacen)
+    return jsonify({'hallazgos': [x.to_dict() for x in h], 'score': risk_score(h)})
 
 def _objetivo_del_almacen():
     """Best 'objetivo' candidate of the case for the report header. Prefers the SEED
@@ -4445,7 +4445,7 @@ def _objetivo_del_almacen():
     ents = _almacen.entidades
     if not ents:
         return None
-    obj = _almacen.de_tipo('objetivo')
+    obj = _almacen.of_type('objetivo')
     if obj:
         return sorted(obj, key=lambda e: e.valor)[0].valor
     orden = {'dominio': 0, 'ip': 1, 'email': 2, 'usuario': 3, 'url': 4, 'wallet': 5}
@@ -4458,7 +4458,7 @@ def _objetivo_del_almacen():
 def api_v2_reporte():
     """Self-contained HTML report of the active case (F7 step 93): risk summary,
     findings, entity inventory and embedded graph. ?grafo=0 omits it (lighter)."""
-    h = correlacionar(_almacen)
+    h = correlate(_almacen)
     vis_js = None
     if request.args.get('grafo', '1') != '0':
         ruta_vis = os.path.join(STATIC_DIR, _VIS)
@@ -4466,7 +4466,7 @@ def api_v2_reporte():
             with open(ruta_vis, encoding='utf-8') as f:
                 vis_js = f.read()
     html_doc = generar_reporte(
-        _almacen, hallazgos=h, score=score_riesgo(h),
+        _almacen, hallazgos=h, score=risk_score(h),
         meta={'workspace': _ws_activo, 'objetivo': _objetivo_del_almacen()},
         vis_js=vis_js)
     return Response(html_doc, mimetype='text/html')
@@ -4478,8 +4478,8 @@ def _nombre_export():
 @app.route('/api/v2/export/json')
 def api_v2_export_json():
     """Full case in JSON, re-importable (F7 step 94)."""
-    h = correlacionar(_almacen)
-    data = exportar_json(_almacen, h, score_riesgo(h),
+    h = correlate(_almacen)
+    data = exportar_json(_almacen, h, risk_score(h),
                          {'workspace': _ws_activo, 'objetivo': _objetivo_del_almacen()})
     return Response(data, mimetype='application/json',
                     headers={'Content-Disposition': f'attachment; filename="{_nombre_export()}.json"'})
@@ -4521,7 +4521,7 @@ def _monitor_alerta(cambios):
     log.info("MONITOR: %s", cambios.resumen())
     topic = _ntfy_topic()
     if topic:
-        enviar_ntfy(topic, cambios.resumen(), titulo='OBSIDIAN · change detected',
+        send_ntfy(topic, cambios.resumen(), titulo='OBSIDIAN · change detected',
                     prioridad='high', tags='satellite,warning')
 
 def _tareas_monitor_default():
@@ -4561,7 +4561,7 @@ def api_v2_monitor_ntfy():
         _boveda.guardar('ntfy_topic', topic)
     except Exception as e:
         return _error(f'could not save: {e}', 500)
-    ok = enviar_ntfy(topic, 'OBSIDIAN notifications enabled ✓',
+    ok = send_ntfy(topic, 'OBSIDIAN notifications enabled ✓',
                      titulo='OBSIDIAN', prioridad='default')
     return jsonify({'ok': True, 'prueba_enviada': ok})
 
@@ -4640,9 +4640,9 @@ def api_v2_extraer_texto():
     texto = (request.json or {}).get('texto', '')
     agregadas = []
     with _almacen_lock:
-        for tipo, valor in extraer_entidades(texto):
+        for tipo, valor in extract_entities(texto):
             try:
-                e = _almacen.crear(tipo, valor)
+                e = _almacen.create(tipo, valor)
                 agregadas.append({'tipo': e.tipo, 'valor': e.valor})
             except Exception:
                 pass
@@ -4742,7 +4742,7 @@ def api_v2_ia_modo(modo):
 def api_v2_hallazgos_ia():
     """AI-assisted correlation (F4 step 65): Ollama summarizes the risk and
     suggests the next step from the case findings."""
-    h = correlacionar(_almacen)
+    h = correlate(_almacen)
     if not h:
         return jsonify({'resumen': 'No findings to analyze yet. Run more transforms.'})
     conteo = {}
@@ -4753,7 +4753,7 @@ def api_v2_hallazgos_ia():
     prompt = (
         f"You are a cybersecurity analyst. In an OSINT investigation on a target "
         f"(entities: {ents}) these findings were detected:\n\n{lista}\n\n"
-        f"Risk score: {score_riesgo(h)}/100.\n\n"
+        f"Risk score: {risk_score(h)}/100.\n\n"
         f"In 3-4 sentences: summarize the main risk and suggest the next concrete "
         f"investigation step. Direct, no filler.")
     try:
@@ -4768,7 +4768,7 @@ def api_v2_verificar():
     """SECOND SHIELD: the AI reviews each finding with the real EVIDENCE, explains
     why it is (or is not) dangerous and flags likely false positives. It SUGGESTS,
     it does not delete -- the human confirms (LLM-as-verifier)."""
-    h = correlacionar(_almacen)
+    h = correlate(_almacen)
     if not h:
         return jsonify({'revisiones': []})
     idmap = {e.id: e for e in _almacen.entidades}
