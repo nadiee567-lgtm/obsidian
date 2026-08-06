@@ -1634,7 +1634,7 @@ SHODAN_KEY = os.environ.get('SHODAN_API_KEY', '')
 def _shodan_search(query):
     datos = {'tipo': 'shodan', 'objetivo': query, 'resultados': {}}
     if not SHODAN_KEY:
-        # Sin API key — usar Censys como alternativa gratuita
+        # No API key -- use Censys as a free alternative
         try:
             r = SESSION.get(f'https://search.censys.io/api/v1/search/ipv4?q={requests.utils.quote(query)}&fields=ip,ports,autonomous_system.name,location.country',
                           timeout=10)
@@ -1642,7 +1642,7 @@ def _shodan_search(query):
                 d = r.json()
                 datos['resultados']['censys'] = d.get('results', [])[:10]
             else:
-                # Fallback: búsqueda en Shodan web pública (limitada)
+                # Fallback: public Shodan web search (limited)
                 r2 = SESSION.get(f'https://internetdb.shodan.io/{query}', timeout=8)
                 if r2.status_code == 200:
                     datos['resultados']['internetdb'] = r2.json()
@@ -1657,7 +1657,7 @@ def _shodan_search(query):
                     datos['resultados']['nota'] = 'Add Shodan API key for full search results'
             except Exception as e2:
                 datos['resultados']['error'] = f'Shodan unavailable: {e2}. (With a free API key at shodan.io you get full search.)'
-        # Banner grab manual de IPs encontradas
+        # Manual banner grab of the IPs found
         ips = []
         for modulo in case['datos'].values():
             if isinstance(modulo, dict):
@@ -1736,7 +1736,7 @@ def _build_timeline():
                         'descripcion': f'{tipo}: {objetivo or clave}'
                     })
                 except Exception as _e: log.debug("source unavailable: %s", _e)
-    # Agregar historial de módulos ejecutados
+    # Add the history of executed modules
     for h in case.get('historial', []):
         ts = h.get('ts', 0)
         eventos.append({
@@ -1753,7 +1753,7 @@ def _build_timeline():
             unicos.append(e)
     return sorted(unicos, key=lambda x: x['timestamp'])
 
-# ── Monitor continuo ──────────────────────────────────────────────────────────
+# ── Continuous monitor ────────────────────────────────────────────────────────
 
 monitor_state = {'activo': False, 'thread': None, 'alertas': [], 'objetivo': None, 'intervalo': 3600}
 
@@ -1762,7 +1762,7 @@ def _monitor_loop():
         objetivo = monitor_state['objetivo']
         if not objetivo:
             time.sleep(60); continue
-        # Re-escanear dominio y usuario
+        # Re-scan domain and user
         try:
             tipo = 'dominio' if re.match(r'^[\w\.-]+\.[a-z]{2,}$', objetivo) else 'persona'
             if tipo == 'dominio':
@@ -1772,7 +1772,7 @@ def _monitor_loop():
                     monitor_state['alertas'].append({
                         'ts': datetime.datetime.now().isoformat(),
                         'tipo': 'cambio_dominio',
-                        'mensaje': f'Cambio detectado en {objetivo}',
+                        'mensaje': f'Change detected on {objetivo}',
                         'nuevo': nuevo
                     })
         except Exception as _e: log.debug("source unavailable: %s", _e)
@@ -1798,7 +1798,7 @@ def _generar_reporte_html():
     for clave, valor in case['datos'].items():
         v = json.dumps(valor, ensure_ascii=False, indent=2, default=str) if isinstance(valor,(dict,list)) else str(valor)
         secciones += f'<div class="section"><h2>{html.escape(clave.replace("_"," ").upper())}</h2><pre>{html.escape(v[:3000])}</pre></div>'
-    contenido = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    contenido = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <title>OBSIDIAN — {html.escape(str(case.get('objetivo','?')))}</title>
 <style>body{{background:#0d0d1a;color:#cdd6f4;font-family:monospace;padding:40px}}
 h1{{color:#cba6f7;letter-spacing:.2em;border-bottom:2px solid #313244;padding-bottom:12px}}
@@ -1806,8 +1806,8 @@ h2{{color:#89b4fa;font-size:.9rem;margin:20px 0 6px}}.meta{{color:#6c7086;margin
 .section{{background:#1e1e2e;border:1px solid #313244;border-radius:8px;padding:14px;margin:10px 0}}
 pre{{color:#a6e3a1;font-size:.78rem;white-space:pre-wrap;word-break:break-all}}
 .badge{{background:#f38ba822;color:#f38ba8;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700}}</style>
-</head><body><h1>⬛ OBSIDIAN REPORT <span class="badge">CONFIDENCIAL</span></h1>
-<div class="meta"><b>Target:</b> {html.escape(str(case.get('objetivo','?')))} | <b>Case:</b> {html.escape(nombre)} | <b>Generado:</b> {ts}</div>
+</head><body><h1>⬛ OBSIDIAN REPORT <span class="badge">CONFIDENTIAL</span></h1>
+<div class="meta"><b>Target:</b> {html.escape(str(case.get('objetivo','?')))} | <b>Case:</b> {html.escape(nombre)} | <b>Generated:</b> {ts}</div>
 {secciones}</body></html>"""
     with open(path,'w') as f: f.write(contenido)
     return path
@@ -1918,14 +1918,14 @@ def api_cargar():
     nombre = (request.json or {}).get('nombre','')
     path = _ruta_caso_segura(nombre)
     if not path: return jsonify({'error':'Invalid case name'}), 400
-    if not os.path.exists(path): return jsonify({'error':'No encontrado'}), 404
+    if not os.path.exists(path): return jsonify({'error':'Not found'}), 404
     with open(path) as f: data = json.load(f)
     with case_lock: case.update(data)
     return jsonify({'ok':True, 'modulos':len(case['datos'])})
 
-# Los validadores de seguridad (_validar, _objetivo_seguro, _slug_caso,
-# _ruta_caso_segura, _url_publica...) viven ahora en core/validacion.py y se
-# importan arriba. Aquí solo queda la lógica de negocio.
+# The security validators (_validar, _objetivo_seguro, _slug_caso,
+# _ruta_caso_segura, _url_publica...) now live in core/validacion.py and are
+# imported above. Only the business logic remains here.
 
 
 @app.route('/api/run', methods=['POST'])
@@ -1984,7 +1984,7 @@ def api_run():
                    headers={'Cache-Control':'no-cache','X-Accel-Buffering':'no'})
 
 # ════════════════════════════════════════════════════════════════════════════
-# F2 — Motor de transforms integrado (endpoints /api/v2/*, aditivo)
+# F2 -- Integrated transform engine (endpoints /api/v2/*, additive)
 # ════════════════════════════════════════════════════════════════════════════
 
 @transform(entrada='dominio', salidas=('ip',), nombre='dns_a',
@@ -2032,12 +2032,12 @@ def _t_metadata(entidad, ctx):
                 interesantes[k] = v[:100]
         if interesantes:
             entidad.propiedades['metadata'] = interesantes
-            # ── EXIF como entidades pivotables (paso 120) ──
+            # ── EXIF as pivotable entities (step 120) ──
             from urllib.parse import quote as _q
             disp = (f"{interesantes.get('Make', '')} "
                     f"{interesantes.get('Camera Model Name') or interesantes.get('Model', '')}").strip()
             if disp:
-                ctx.emitir('tech', disp, etiqueta='dispositivo')
+                ctx.emitir('tech', disp, etiqueta='device')
             if interesantes.get('Software'):
                 ctx.emitir('tech', interesantes['Software'], etiqueta='software')
             for kk in ('Author', 'Creator', 'Artist'):
@@ -2060,12 +2060,12 @@ def _t_dorks(entidad, ctx):
     from urllib.parse import quote_plus
     d = entidad.valor
     plantillas = [
-        ('Archivos expuestos', f'site:{d} (filetype:pdf OR filetype:xls OR filetype:doc)'),
-        ('Índices de directorios', f'site:{d} intitle:"index of"'),
-        ('Paneles de login/admin', f'site:{d} (inurl:login OR inurl:admin)'),
-        ('Config/backups/secretos', f'site:{d} (ext:env OR ext:sql OR ext:bak OR ext:log)'),
-        ('Subdominios', f'site:*.{d}'),
-        ('Mensajes de error', f'site:{d} ("stack trace" OR "sql syntax" OR "warning")'),
+        ('Exposed files', f'site:{d} (filetype:pdf OR filetype:xls OR filetype:doc)'),
+        ('Directory indexes', f'site:{d} intitle:"index of"'),
+        ('Login/admin panels', f'site:{d} (inurl:login OR inurl:admin)'),
+        ('Config/backups/secrets', f'site:{d} (ext:env OR ext:sql OR ext:bak OR ext:log)'),
+        ('Subdomains', f'site:*.{d}'),
+        ('Error messages', f'site:{d} ("stack trace" OR "sql syntax" OR "warning")'),
     ]
     entidad.propiedades['dorks'] = [
         {'que': q, 'url': f'https://www.google.com/search?q={quote_plus(query)}'}
@@ -2074,7 +2074,7 @@ def _t_dorks(entidad, ctx):
 @transform(entrada='wallet', salidas=(), nombre='wallet_balance',
            descripcion='Balance and activity of a BTC wallet (blockchain.info, keyless)')
 def _t_wallet_balance(entidad, ctx):
-    if not re.fullmatch(r'[a-zA-Z0-9]{20,90}', entidad.valor):   # forma BTC, no basura en la URL
+    if not re.fullmatch(r'[a-zA-Z0-9]{20,90}', entidad.valor):   # BTC shape, no junk in the URL
         return
     try:
         d = SESSION.get(f'https://blockchain.info/rawaddr/{entidad.valor}?limit=0', timeout=10).json()
@@ -2084,7 +2084,7 @@ def _t_wallet_balance(entidad, ctx):
         if d.get('n_tx'):
             entidad.etiquetar('wallet-activa')
     except Exception as _e:
-        log.debug("wallet_balance no disponible: %s", _e)
+        log.debug("wallet_balance unavailable: %s", _e)
 
 @transform(entrada='dominio', salidas=('hash',), nombre='favicon_hash',
            descripcion='mmh3 hash of the favicon -- pivotable node for Shodan/FOFA (F8)')
@@ -2098,16 +2098,16 @@ def _t_favicon_hash(entidad, ctx):
         r = _fetch_seguro(f'https://{entidad.valor}/favicon.ico', timeout=8, stream=False)
         if r.status_code != 200 or not r.content:
             return
-        # método estándar de Shodan/FOFA: base64 (con saltos de línea) + mmh3
+        # standard Shodan/FOFA method: base64 (with line breaks) + mmh3
         h = mmh3.hash(codecs.encode(r.content, 'base64'))
         entidad.propiedades['favicon_hash'] = h
-        ctx.emitir('hash', str(h), etiqueta='favicon', tipo_hash='favicon')   # nodo pivotable
+        ctx.emitir('hash', str(h), etiqueta='favicon', tipo_hash='favicon')   # pivotable node
     except Exception as _e:
-        log.debug("favicon_hash no disponible: %s", _e)
+        log.debug("favicon_hash unavailable: %s", _e)
 
 def _pivote_ips(campos):
-    """Busca en FOFA + Shodan por `campos` unificados y devuelve el set de IPs que
-    coinciden. Base de los pivotes (favicon, cert). Dedup cross-motor gratis (set)."""
+    """Searches FOFA + Shodan by unified `campos` and returns the set of matching
+    IPs. Basis of the pivots (favicon, cert). Free cross-engine dedup (set)."""
     ips = set()
     cred = _key_rotativa('fofa') or os.environ.get('FOFA_KEY', '')
     if cred and ':' in cred:
@@ -2146,7 +2146,7 @@ def _t_favicon_pivote(entidad, ctx):
 @transform(entrada='dominio', salidas=('subdominio',), nombre='wayback',
            descripcion='Historical snapshot + old subdomains of the domain (Wayback Machine)')
 def _t_wayback(entidad, ctx):
-    # 1. ¿hay snapshot? (endpoint 'available', confiable)
+    # 1. is there a snapshot? ('available' endpoint, reliable)
     try:
         snap = ((SESSION.get(f'http://archive.org/wayback/available?url={entidad.valor}', timeout=8).json()
                  .get('archived_snapshots', {}) or {}).get('closest', {}))
@@ -2156,7 +2156,7 @@ def _t_wayback(entidad, ctx):
             entidad.etiquetar('archivado')
     except Exception as _e:
         log.debug("wayback available: %s", _e)
-    # 2. subdominios históricos (CDX; puede estar bloqueado en algunos entornos)
+    # 2. historical subdomains (CDX; may be blocked in some environments)
     try:
         filas = SESSION.get('http://web.archive.org/cdx/search/cdx',
                             params={'url': f'*.{entidad.valor}', 'output': 'json', 'limit': 300,
@@ -2189,7 +2189,7 @@ def _t_subdominios_ht(entidad, ctx):
                 ip_ent.anotar_procedencia('subdominios_ht', input_id=sub_ent.id)
                 ctx.almacen.relacionar(sub_ent, ip_ent, 'A')
     except Exception as _e:
-        log.debug("subdominios_ht no disponible: %s", _e)
+        log.debug("subdominios_ht unavailable: %s", _e)
 
 @transform(entrada='dominio', salidas=('subdominio',), nombre='crtsh',
            descripcion='Subdomains from crt.sh (Certificate Transparency)')
@@ -2204,7 +2204,7 @@ def _t_crtsh(entidad, ctx):
                     vistos.add(s)
                     ctx.emitir('subdominio', s, etiqueta='subdominio')
     except Exception as _e:
-        log.debug("crtsh no disponible: %s", _e)
+        log.debug("crtsh unavailable: %s", _e)
 
 @transform(entrada='dominio', salidas=('subdominio',), nombre='ct_certspotter',
            descripcion='Subdomains from Certificate Transparency (certspotter, keyless)')
@@ -2223,7 +2223,7 @@ def _t_ct_certspotter(entidad, ctx):
                     vistos.add(nombre)
                     ctx.emitir('subdominio', nombre, etiqueta='subdominio')
     except Exception as _e:
-        log.debug("certspotter no disponible: %s", _e)
+        log.debug("certspotter unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=('pais', 'org', 'asn'), nombre='geo_ip',
            descripcion='Geolocation and network info of the IP (ip-api.com)')
@@ -2242,7 +2242,7 @@ def _t_geo_ip(entidad, ctx):
         if d.get('as'):
             ctx.emitir('asn', d['as'], etiqueta='asn')
     except Exception as _e:
-        log.debug("geo_ip no disponible: %s", _e)
+        log.debug("geo_ip unavailable: %s", _e)
 
 @transform(entrada='usuario', salidas=('plataforma',), nombre='sherlock',
            descripcion='User accounts across 400+ platforms (Sherlock)')
@@ -2253,7 +2253,7 @@ def _t_sherlock(entidad, ctx):
     for linea in out.splitlines():
         m = re.match(r'\[\+\]\s*(.+?):\s*(https?://\S+)', linea.strip())
         if m:
-            ctx.emitir('plataforma', m.group(1).strip(), etiqueta='perfil', url=m.group(2).strip())
+            ctx.emitir('plataforma', m.group(1).strip(), etiqueta='profile', url=m.group(2).strip())
 
 @transform(entrada='usuario', salidas=('email', 'repo'), nombre='github_usuario',
            descripcion='User email and public repos on GitHub')
@@ -2272,7 +2272,7 @@ def _t_github(entidad, ctx):
                     ctx.emitir('repo', repo['name'], etiqueta='repo',
                                lenguaje=repo.get('language'), stars=repo.get('stargazers_count'))
     except Exception as _e:
-        log.debug("github_usuario no disponible: %s", _e)
+        log.debug("github_usuario unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=('puerto',), nombre='puertos',
            descripcion='Open ports and services (nmap top-20)')
@@ -2328,7 +2328,7 @@ def _t_email_breaches(entidad, ctx):
                     ctx.emitir('org', nombre, etiqueta='filtrado en')
             entidad.etiquetar('filtrado')
     except Exception as _e:
-        log.debug("hibp no disponible: %s", _e)
+        log.debug("hibp unavailable: %s", _e)
 
 def _pastes_github(entidad):
     """Menciones del objetivo + indicadores de secreto en código público de
@@ -2347,7 +2347,7 @@ def _pastes_github(entidad):
             entidad.propiedades['github_menciones'] = n
             entidad.etiquetar('mencionado-github')
     except Exception as _e:
-        log.debug("pastes_github no disponible: %s", _e)
+        log.debug("pastes_github unavailable: %s", _e)
 
 @transform(entrada='dominio', salidas=(), nombre='pastes_github',
            descripcion='Domain mentions + secrets on GitHub (free token in the vault)')
@@ -2375,7 +2375,7 @@ def _t_breaches_xon(entidad, ctx):
         if lista:
             entidad.etiquetar('filtrado')
     except Exception as _e:
-        log.debug("xposedornot no disponible: %s", _e)
+        log.debug("xposedornot unavailable: %s", _e)
 
 @transform(entrada='email', salidas=(), nombre='stealer_hudsonrock',
            descripcion='Did the email come from an infostealer-infected machine? (HudsonRock, keyless)')
@@ -2388,7 +2388,7 @@ def _t_stealer(entidad, ctx):
             entidad.etiquetar('stealer-infectado')
             entidad.propiedades['stealer'] = 'yes (HudsonRock)'
     except Exception as _e:
-        log.debug("hudsonrock no disponible: %s", _e)
+        log.debug("hudsonrock unavailable: %s", _e)
 
 @transform(entrada='email', salidas=('org',), nombre='breaches',
            descripcion='Breach aggregator: XposedOrNot + LeakCheck (keyless) + HIBP (if key), unified (F10 step 135)')
@@ -2448,7 +2448,7 @@ def _t_intelx(entidad, ctx):
                 ctx.emitir('url', f'https://intelx.io/?did={sysid}', etiqueta='intelx',
                            nombre=(rec.get('name') or '')[:120], bucket=rec.get('bucket', ''))
     except Exception as _e:
-        log.debug("intelx no disponible: %s", _e)
+        log.debug("intelx unavailable: %s", _e)
 
 @transform(entrada='email', salidas=('url',), nombre='pastes',
            descripcion='Paste monitoring: psbdmp + dorks to Pastebin/Ghostbin/etc (keyless) (F10 step 133)')
@@ -2462,7 +2462,7 @@ def _t_pastes(entidad, ctx):
             if pid:
                 ctx.emitir('url', f'https://pastebin.com/{pid}', etiqueta='paste', fuente='psbdmp')
     except Exception as _e:
-        log.debug("psbdmp no disponible: %s", _e)
+        log.debug("psbdmp unavailable: %s", _e)
     for sitio in ('pastebin.com', 'ghostbin.com', 'rentry.co', 'justpaste.it'):
         ctx.emitir('url', f'https://www.google.com/search?q={_q(f"{q} site:{sitio}")}',
                    etiqueta=f'paste-dork:{sitio}', sitio=sitio)
@@ -2485,7 +2485,7 @@ def _t_stealer_dominio(entidad, ctx):
             entidad.propiedades['stealer_usuarios'] = usr
             entidad.etiquetar('stealer-expuesto')
     except Exception as _e:
-        log.debug("stealer_dominio no disponible: %s", _e)
+        log.debug("stealer_dominio unavailable: %s", _e)
 
 @transform(entrada='email', salidas=(), nombre='email_spoofable',
            descripcion='Checks the SPF of the email domain (spoofing risk)')
@@ -2640,7 +2640,7 @@ def _t_cve_lookup(entidad, ctx):
                         params={'keywordSearch': kw, 'cvssV3Severity': 'CRITICAL', 'resultsPerPage': 8},
                         timeout=15).json()
     except Exception as _e:
-        log.debug("nvd no disponible: %s", _e)
+        log.debug("nvd unavailable: %s", _e)
         return
     for v in d.get('vulnerabilities', [])[:15]:
         cve = v.get('cve', {}) or {}
@@ -2679,7 +2679,7 @@ def _t_reverse_whois(entidad, ctx):
             if dom and dom != entidad.valor:
                 ctx.emitir('dominio', dom, etiqueta='mismo registrante')
     except Exception as _e:
-        log.debug("reverse_whois no disponible: %s", _e)
+        log.debug("reverse_whois unavailable: %s", _e)
 
 @transform(entrada='dominio', salidas=('dominio', 'org'), nombre='rdap',
            descripcion='Modern WHOIS (RDAP, no key): registrar, name servers, dates')
@@ -2710,7 +2710,7 @@ def _t_rdap(entidad, ctx):
         if d.get('status'):
             entidad.propiedades['status'] = d['status']
     except Exception as _e:
-        log.debug("rdap no disponible: %s", _e)
+        log.debug("rdap unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=(), nombre='reputacion_ip',
            descripcion='IP reputation: proxy/VPN, hosting/datacenter, mobile (ip-api, keyless)')
@@ -2729,7 +2729,7 @@ def _t_reputacion_ip(entidad, ctx):
         entidad.propiedades['proxy'] = bool(d.get('proxy'))
         entidad.propiedades['hosting'] = bool(d.get('hosting'))
     except Exception as _e:
-        log.debug("reputacion_ip no disponible: %s", _e)
+        log.debug("reputacion_ip unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=(), nombre='abuseipdb',
            descripcion='Abuse score of the IP (AbuseIPDB, free key in the vault)')
@@ -2748,7 +2748,7 @@ def _t_abuseipdb(entidad, ctx):
             if score >= 50:
                 entidad.etiquetar('abusiva')
     except Exception as _e:
-        log.debug("abuseipdb no disponible: %s", _e)
+        log.debug("abuseipdb unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=('puerto', 'org', 'tech'), nombre='shodan',
            requiere_key=True,
@@ -2774,7 +2774,7 @@ def _t_shodan(entidad, ctx):
                 vistos_prod.add(prod)
                 ctx.emitir('tech', prod, etiqueta='shodan')
     except Exception as _e:
-        log.debug("shodan no disponible: %s", _e)
+        log.debug("shodan unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=('puerto', 'org', 'tech', 'asn'), nombre='censys',
            requiere_key=True,
@@ -2804,7 +2804,7 @@ def _t_censys(entidad, ctx):
                 vistos.add(prod)
                 ctx.emitir('tech', prod, etiqueta='censys')
     except Exception as _e:
-        log.debug("censys no disponible: %s", _e)
+        log.debug("censys unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=('puerto', 'tech'), nombre='zoomeye',
            requiere_key=True,
@@ -2827,7 +2827,7 @@ def _t_zoomeye(entidad, ctx):
             if app:
                 ctx.emitir('tech', app, etiqueta='zoomeye')
     except Exception as _e:
-        log.debug("zoomeye no disponible: %s", _e)
+        log.debug("zoomeye unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=('puerto', 'dominio'), nombre='fofa',
            requiere_key=True,
@@ -2854,7 +2854,7 @@ def _t_fofa(entidad, ctx):
             if dom:
                 ctx.emitir('dominio', dom, etiqueta='fofa')
     except Exception as _e:
-        log.debug("fofa no disponible: %s", _e)
+        log.debug("fofa unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=('puerto', 'tech'), nombre='quake',
            requiere_key=True,
@@ -2876,7 +2876,7 @@ def _t_quake(entidad, ctx):
             if nombre:
                 ctx.emitir('tech', nombre, etiqueta='quake')
     except Exception as _e:
-        log.debug("quake no disponible: %s", _e)
+        log.debug("quake unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=('puerto', 'dominio'), nombre='hunter',
            requiere_key=True,
@@ -2896,7 +2896,7 @@ def _t_hunter(entidad, ctx):
             if dom:
                 ctx.emitir('dominio', dom, etiqueta='hunter')
     except Exception as _e:
-        log.debug("hunter no disponible: %s", _e)
+        log.debug("hunter unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=('puerto',), nombre='netlas',
            requiere_key=True,
@@ -2914,7 +2914,7 @@ def _t_netlas(entidad, ctx):
             if p:
                 ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='netlas')
     except Exception as _e:
-        log.debug("netlas no disponible: %s", _e)
+        log.debug("netlas unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=('puerto',), nombre='criminalip',
            requiere_key=True,
@@ -2932,7 +2932,7 @@ def _t_criminalip(entidad, ctx):
                 ctx.emitir('puerto', f"{entidad.valor}:{num}", etiqueta='criminalip',
                            servicio=p.get('app_name', ''))
     except Exception as _e:
-        log.debug("criminalip no disponible: %s", _e)
+        log.debug("criminalip unavailable: %s", _e)
 
 @transform(entrada='ip', salidas=('puerto',), nombre='binaryedge',
            requiere_key=True,
@@ -2949,7 +2949,7 @@ def _t_binaryedge(entidad, ctx):
             if p:
                 ctx.emitir('puerto', f"{entidad.valor}:{p}", etiqueta='binaryedge')
     except Exception as _e:
-        log.debug("binaryedge no disponible: %s", _e)
+        log.debug("binaryedge unavailable: %s", _e)
 
 @transform(entrada='url', salidas=('url',), nombre='reverse_image',
            descripcion='Reverse image search in Yandex/Google/TinEye/Bing (F9, keyless)')
@@ -2989,7 +2989,7 @@ def _t_telefono_dorks(entidad, ctx):
                 if d.get('country_name'):
                     ctx.emitir('pais', d['country_name'], etiqueta='country')
         except Exception as _e:
-            log.debug("numverify no disponible: %s", _e)
+            log.debug("numverify unavailable: %s", _e)
 
 @transform(entrada='dominio', salidas=('dominio',), nombre='typosquatting',
            descripcion='Typosquat variants of the domain that ARE registered (F2 step 34)')
@@ -3123,7 +3123,7 @@ def _t_passivedns(entidad, ctx):
                          .strftime('%Y-%m-%d')) if fecha else ''
                 ctx.emitir('ip', ip, etiqueta='pdns-historical', visto=visto)
     except Exception as _e:
-        log.debug("passivedns no disponible: %s", _e)
+        log.debug("passivedns unavailable: %s", _e)
 
 _SECRET_PATTERNS = [
     ('API Key', r'api[_-]?key\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{20,})'),
@@ -3170,7 +3170,7 @@ def _t_github_sec(entidad, ctx):
                             if c:
                                 c.etiquetar('secreto-github')
     except Exception as _e:
-        log.debug("github_sec no disponible: %s", _e)
+        log.debug("github_sec unavailable: %s", _e)
 
 @transform(entrada='persona', salidas=('url',), nombre='persona',
            descripcion='OSINT on a person: summary (DuckDuckGo) + dorks (LinkedIn/X/GitHub...) (keyless)')
@@ -3567,7 +3567,7 @@ def _t_tx_grafo(entidad, ctx):
         d = SESSION.get(f'https://blockchain.info/rawaddr/{addr}',
                         params={'limit': 5}, timeout=12).json() or {}
     except Exception as _e:
-        log.debug("tx_grafo no disponible: %s", _e)
+        log.debug("tx_grafo unavailable: %s", _e)
         return
     contrapartes = set()
     for tx in d.get('txs', [])[:5]:
@@ -3597,7 +3597,7 @@ def _t_eth_balance(entidad, ctx):
         entidad.propiedades['eth_balance'] = wei / 1e18
         entidad.propiedades['cadena'] = 'eth'
     except Exception as _e:
-        log.debug("eth_balance no disponible: %s", _e)
+        log.debug("eth_balance unavailable: %s", _e)
 
 _RANSOM = {'addrs': None, 'ts': 0}
 
@@ -3610,7 +3610,7 @@ def _ransom_addrs():
         _RANSOM['addrs'] = {x.get('address') for x in d.get('result', []) if x.get('address')}
         _RANSOM['ts'] = time.time()
     except Exception as _e:
-        log.debug("ransomwhere no disponible: %s", _e)
+        log.debug("ransomwhere unavailable: %s", _e)
     return _RANSOM['addrs'] or set()
 
 @transform(entrada='wallet', salidas=(), nombre='riesgo_wallet',
@@ -3642,7 +3642,7 @@ def _t_cluster_wallets(entidad, ctx):
         d = SESSION.get(f'https://blockchain.info/rawaddr/{addr}',
                         params={'limit': 20}, timeout=12).json() or {}
     except Exception as _e:
-        log.debug("cluster_wallets no disponible: %s", _e)
+        log.debug("cluster_wallets unavailable: %s", _e)
         return
     mismo = set()
     for tx in d.get('txs', [])[:20]:
@@ -3725,7 +3725,7 @@ def _cargar_blocklist():
                 except ValueError:
                     pass
         except Exception as _e:
-            log.debug("feed %s no disponible: %s", url, _e)
+            log.debug("feed %s unavailable: %s", url, _e)
     _BLOCKLIST['nets'] = nets
     _BLOCKLIST['ts'] = time.time()
     return nets
@@ -3763,7 +3763,7 @@ def _t_greynoise(entidad, ctx):
             if clasif == 'malicious':
                 entidad.etiquetar('malicioso')
     except Exception as _e:
-        log.debug("greynoise no disponible: %s", _e)
+        log.debug("greynoise unavailable: %s", _e)
 
 @transform(entrada='dominio', salidas=(), nombre='dns_txt',
            descripcion='TXT records of the domain (SPF, verifications, etc.)')
@@ -3791,7 +3791,7 @@ def _t_ssl(entidad, ctx):
         entidad.propiedades['cert_desde'] = cert.get('notBefore')
         entidad.propiedades['cert_expira'] = cert.get('notAfter')
     except Exception as _e:
-        log.debug("ssl no disponible: %s", _e)
+        log.debug("ssl unavailable: %s", _e)
 
 @transform(entrada='dominio', salidas=('ip',), nombre='cert_pivote', requiere_key=True,
            descripcion='IPs with the same TLS cert (CN) across FOFA/Shodan -- same infra (F8)')
