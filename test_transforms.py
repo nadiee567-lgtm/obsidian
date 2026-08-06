@@ -48,8 +48,8 @@ def test_no_duplicar_nombre():
 def test_ejecutar_emite_relaciona_y_anota_procedencia():
     @tr.transform(entrada='domain', salidas=('ip', 'subdomain'), nombre='dns')
     def _dns(entidad, ctx):
-        ctx.emitir('ip', '93.184.216.34', label='A')
-        ctx.emitir('subdomain', 'www.' + entidad.value, label='subdomain')
+        ctx.emit('ip', '93.184.216.34', label='A')
+        ctx.emit('subdomain', 'www.' + entidad.value, label='subdomain')
 
     alm = Store()
     dom = alm.create('domain', 'example.com')
@@ -76,7 +76,7 @@ def test_ejecutar_valida_tipo_de_entrada():
 def test_transform_que_revienta_no_propaga():
     @tr.transform(entrada='domain', salidas=('ip',), nombre='medio_roto')
     def _f(entidad, ctx):
-        ctx.emitir('ip', '1.1.1.1')       # this does get through
+        ctx.emit('ip', '1.1.1.1')       # this does get through
         raise RuntimeError("boom")         # crashes afterwards
 
     alm = Store()
@@ -88,8 +88,8 @@ def test_transform_que_revienta_no_propaga():
 def test_emitir_valor_basura_se_ignora():
     @tr.transform(entrada='domain', salidas=('ip',), nombre='sucio')
     def _f(entidad, ctx):
-        assert ctx.emitir('ip', '   ') is None   # empty value -> None, no crash
-        ctx.emitir('ip', '8.8.8.8')
+        assert ctx.emit('ip', '   ') is None   # empty value -> None, no crash
+        ctx.emit('ip', '8.8.8.8')
 
     alm = Store()
     dom = alm.create('domain', 'example.com')
@@ -105,7 +105,7 @@ def test_transform_dispara_eventos_del_bus():
 
     @tr.transform(entrada='domain', salidas=('ip',), nombre='dns')
     def _f(entidad, ctx):
-        ctx.emitir('ip', '9.9.9.9')
+        ctx.emit('ip', '9.9.9.9')
 
     alm = Store(bus=bus)
     dom = alm.create('domain', 'example.com')   # 1 event
@@ -119,7 +119,7 @@ def test_corredor_cachea():
     @tr.transform(entrada='domain', salidas=('ip',), nombre='dns')
     def _f(entidad, ctx):
         corridas.append(1)
-        ctx.emitir('ip', '8.8.8.8')
+        ctx.emit('ip', '8.8.8.8')
 
     alm = Store()
     dom = alm.create('domain', 'example.com')
@@ -133,11 +133,11 @@ def test_corredor_cachea():
 def test_machine_cascada():
     @tr.transform(entrada='domain', salidas=('ip',), nombre='dns')
     def _dns(entidad, ctx):
-        ctx.emitir('ip', '93.184.216.34', label='A')
+        ctx.emit('ip', '93.184.216.34', label='A')
 
     @tr.transform(entrada='ip', salidas=('port',), nombre='ports')
     def _ports(entidad, ctx):
-        ctx.emitir('port', '443', label='open')
+        ctx.emit('port', '443', label='open')
 
     alm = Store()
     dom = alm.create('domain', 'example.com')
@@ -156,7 +156,7 @@ def test_cargar_plugins(tmp_path):
         "import core.transforms as tr\n"
         "@tr.transform(entrada='domain', salidas=('ip',), nombre='plugin_dns')\n"
         "def f(entidad, ctx):\n"
-        "    ctx.emitir('ip', '1.2.3.4')\n"
+        "    ctx.emit('ip', '1.2.3.4')\n"
     )
     cargados = tr.load_plugins(str(tmp_path))
     assert 'mi_transform' in cargados

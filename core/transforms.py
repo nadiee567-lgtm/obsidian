@@ -78,7 +78,7 @@ def transform(entrada: str, salidas=(), nombre=None, requiere_key=False, descrip
 
     @transform(entrada='domain', salidas=('ip','subdomain'))
     def resolver(entidad, ctx):
-        ctx.emitir('ip', '1.2.3.4', label='A')
+        ctx.emit('ip', '1.2.3.4', label='A')
     """
     def deco(fn):
         t = Transform(nombre=nombre or fn.__name__, entrada=entrada,
@@ -90,7 +90,7 @@ def transform(entrada: str, salidas=(), nombre=None, requiere_key=False, descrip
 
 
 class Context:
-    """API the transform author receives. `emitir` creates an output entity, adds
+    """API the transform author receives. `emit` creates an output entity, adds
     it to the store (dedup + events), relates it to the input and sets its
     provenance -- all automatic."""
     def __init__(self, almacen: Store, entrada: Entity, nombre_transform: str):
@@ -99,7 +99,7 @@ class Context:
         self._nombre = nombre_transform
         self.emitidas: list = []
 
-    def emitir(self, type, value, label='', **properties) -> Entity | None:
+    def emit(self, type, value, label='', **properties) -> Entity | None:
         try:
             ent = Entity(type=type, value=value, properties=properties)
         except ValueError:

@@ -1994,7 +1994,7 @@ def _t_dns_a(entidad, ctx):
     for linea in out.splitlines():
         linea = linea.strip()
         if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', linea):
-            ctx.emitir('ip', linea, label='A')
+            ctx.emit('ip', linea, label='A')
 
 @transform(entrada='ip', salidas=('domain',), nombre='ptr',
            descripcion='PTR / reverse DNS (dig -x)')
@@ -2003,7 +2003,7 @@ def _t_ptr(entidad, ctx):
     for linea in out.splitlines():
         linea = linea.strip().rstrip('.')
         if linea and not linea.startswith(';'):
-            ctx.emitir('domain', linea, label='PTR')
+            ctx.emit('domain', linea, label='PTR')
 
 @transform(entrada='url', salidas=('tech', 'person', 'url'), nombre='metadata',
            descripcion='EXIF metadata as pivotable entities: GPS, device, software, author (F9)')
@@ -2037,16 +2037,16 @@ def _t_metadata(entidad, ctx):
             disp = (f"{interesantes.get('Make', '')} "
                     f"{interesantes.get('Camera Model Name') or interesantes.get('Model', '')}").strip()
             if disp:
-                ctx.emitir('tech', disp, label='device')
+                ctx.emit('tech', disp, label='device')
             if interesantes.get('Software'):
-                ctx.emitir('tech', interesantes['Software'], label='software')
+                ctx.emit('tech', interesantes['Software'], label='software')
             for kk in ('Author', 'Creator', 'Artist'):
                 if interesantes.get(kk):
-                    ctx.emitir('person', interesantes[kk], label=kk.lower())
+                    ctx.emit('person', interesantes[kk], label=kk.lower())
             gps = interesantes.get('GPS Position') or interesantes.get('GPS Latitude')
             if gps:
                 entidad.tag('has-gps')
-                ctx.emitir('url', f'https://www.google.com/maps/search/?api=1&query={_q(gps)}',
+                ctx.emit('url', f'https://www.google.com/maps/search/?api=1&query={_q(gps)}',
                            label='gps', gps=gps)
     finally:
         try:
@@ -2101,7 +2101,7 @@ def _t_favicon_hash(entidad, ctx):
         # standard Shodan/FOFA method: base64 (with line breaks) + mmh3
         h = mmh3.hash(codecs.encode(r.content, 'base64'))
         entidad.properties['favicon_hash'] = h
-        ctx.emitir('hash', str(h), label='favicon', tipo_hash='favicon')   # pivotable node
+        ctx.emit('hash', str(h), label='favicon', tipo_hash='favicon')   # pivotable node
     except Exception as _e:
         log.debug("favicon_hash unavailable: %s", _e)
 
@@ -2141,7 +2141,7 @@ def _t_favicon_pivote(entidad, ctx):
     if entidad.properties.get('tipo_hash') != 'favicon':
         return
     for ip in _pivote_ips({'favicon': entidad.value}):
-        ctx.emitir('ip', ip, label='same-favicon')
+        ctx.emit('ip', ip, label='same-favicon')
 
 @transform(entrada='domain', salidas=('subdomain',), nombre='wayback',
            descripcion='Historical snapshot + old subdomains of the domain (Wayback Machine)')
@@ -2166,7 +2166,7 @@ def _t_wayback(entidad, ctx):
             host = (urlparse(fila[0] if isinstance(fila, list) else fila).hostname or '').lstrip('*.')
             if host.endswith(entidad.value) and host != entidad.value and host not in vistos:
                 vistos.add(host)
-                ctx.emitir('subdomain', host, label='historical (wayback)')
+                ctx.emit('subdomain', host, label='historical (wayback)')
     except Exception as _e:
         log.debug("wayback cdx: %s", _e)
 
@@ -2183,7 +2183,7 @@ def _t_subdominios_ht(entidad, ctx):
             sub, ip = (x.strip() for x in linea.split(',', 1))
             if not sub.endswith(entidad.value) or sub == entidad.value:
                 continue
-            sub_ent = ctx.emitir('subdomain', sub, label='subdomain')
+            sub_ent = ctx.emit('subdomain', sub, label='subdomain')
             if sub_ent and re.fullmatch(r'\d+\.\d+\.\d+\.\d+', ip):
                 ip_ent = ctx.almacen.create('ip', ip, sources={'subdominios_ht'})
                 ip_ent.note_provenance('subdominios_ht', input_id=sub_ent.id)
@@ -2202,7 +2202,7 @@ def _t_crtsh(entidad, ctx):
                 s = s.strip().lstrip('*.')
                 if s.endswith(entidad.value) and s != entidad.value and s not in vistos:
                     vistos.add(s)
-                    ctx.emitir('subdomain', s, label='subdomain')
+                    ctx.emit('subdomain', s, label='subdomain')
     except Exception as _e:
         log.debug("crtsh unavailable: %s", _e)
 
@@ -2221,7 +2221,7 @@ def _t_ct_certspotter(entidad, ctx):
                 nombre = nombre.lstrip('*.')
                 if nombre.endswith(entidad.value) and nombre != entidad.value and nombre not in vistos:
                     vistos.add(nombre)
-                    ctx.emitir('subdomain', nombre, label='subdomain')
+                    ctx.emit('subdomain', nombre, label='subdomain')
     except Exception as _e:
         log.debug("certspotter unavailable: %s", _e)
 
@@ -2235,12 +2235,12 @@ def _t_geo_ip(entidad, ctx):
         if d.get('status') != 'success':
             return
         if d.get('country'):
-            ctx.emitir('country', d['country'], label='location')
+            ctx.emit('country', d['country'], label='location')
         org = d.get('org') or d.get('isp')
         if org:
-            ctx.emitir('org', org, label='org')
+            ctx.emit('org', org, label='org')
         if d.get('as'):
-            ctx.emitir('asn', d['as'], label='asn')
+            ctx.emit('asn', d['as'], label='asn')
     except Exception as _e:
         log.debug("geo_ip unavailable: %s", _e)
 
@@ -2253,7 +2253,7 @@ def _t_sherlock(entidad, ctx):
     for linea in out.splitlines():
         m = re.match(r'\[\+\]\s*(.+?):\s*(https?://\S+)', linea.strip())
         if m:
-            ctx.emitir('platform', m.group(1).strip(), label='profile', url=m.group(2).strip())
+            ctx.emit('platform', m.group(1).strip(), label='profile', url=m.group(2).strip())
 
 @transform(entrada='user', salidas=('email', 'repo'), nombre='github_usuario',
            descripcion='User email and public repos on GitHub')
@@ -2263,13 +2263,13 @@ def _t_github(entidad, ctx):
         if not gh.get('login'):
             return
         if gh.get('email') and gh['email'] != 'hidden':
-            ctx.emitir('email', gh['email'], label='github email')
+            ctx.emit('email', gh['email'], label='github email')
         repos = SESSION.get(f'https://api.github.com/users/{entidad.value}/repos'
                             '?per_page=10&sort=updated', timeout=8)
         if repos.status_code == 200:
             for repo in repos.json():
                 if repo.get('name'):
-                    ctx.emitir('repo', repo['name'], label='repo',
+                    ctx.emit('repo', repo['name'], label='repo',
                                lenguaje=repo.get('language'), stars=repo.get('stargazers_count'))
     except Exception as _e:
         log.debug("github_usuario unavailable: %s", _e)
@@ -2289,7 +2289,7 @@ def _t_puertos(entidad, ctx):
             continue
         servicio = parts[2] if len(parts) > 2 else '?'
         # the value carries the IP: port 80 of two hosts != the same node
-        ctx.emitir('port', f'{entidad.value}:{num}', label='open', servicio=servicio)
+        ctx.emit('port', f'{entidad.value}:{num}', label='open', servicio=servicio)
 
 @transform(entrada='domain', salidas=('domain',), nombre='dns_mx',
            descripcion='Mail servers of the domain (MX)')
@@ -2301,7 +2301,7 @@ def _t_dns_mx(entidad, ctx):
             continue
         host = linea.split()[-1]   # "10 mail.example.com" -> "mail.example.com"
         if host:
-            ctx.emitir('domain', host, label='MX')
+            ctx.emit('domain', host, label='MX')
 
 @transform(entrada='domain', salidas=('domain',), nombre='dns_ns',
            descripcion='Name servers of the domain (NS)')
@@ -2310,7 +2310,7 @@ def _t_dns_ns(entidad, ctx):
     for linea in out.splitlines():
         host = linea.strip().rstrip('.')
         if host:
-            ctx.emitir('domain', host, label='NS')
+            ctx.emit('domain', host, label='NS')
 
 @transform(entrada='email', salidas=('org',), nombre='email_breaches',
            descripcion='Breaches the email appeared in (HIBP; requires a real HIBP_API_KEY)')
@@ -2325,7 +2325,7 @@ def _t_email_breaches(entidad, ctx):
             for b in r.json():
                 nombre = b.get('Name')
                 if nombre:
-                    ctx.emitir('org', nombre, label='leaked in')
+                    ctx.emit('org', nombre, label='leaked in')
             entidad.tag('leaked')
     except Exception as _e:
         log.debug("hibp unavailable: %s", _e)
@@ -2371,7 +2371,7 @@ def _t_breaches_xon(entidad, ctx):
         lista = breaches[0] if breaches and isinstance(breaches[0], list) else breaches
         for nombre in (lista or [])[:30]:
             if nombre:
-                ctx.emitir('org', str(nombre), label='leaked in')
+                ctx.emit('org', str(nombre), label='leaked in')
         if lista:
             entidad.tag('leaked')
     except Exception as _e:
@@ -2424,7 +2424,7 @@ def _t_breaches(entidad, ctx):
         entidad.tag('leaked')
         entidad.properties['brechas'] = sorted(fuentes)
         for f in sorted(fuentes)[:30]:
-            ctx.emitir('org', f, label='breach')
+            ctx.emit('org', f, label='breach')
 
 @transform(entrada='email', salidas=('url',), nombre='intelx', requiere_key=True,
            descripcion='Historical leak search by selector (Intelligence X, key in vault) (F10 step 134)')
@@ -2445,7 +2445,7 @@ def _t_intelx(entidad, ctx):
         for rec in recs[:20]:
             sysid = rec.get('systemid')
             if sysid:
-                ctx.emitir('url', f'https://intelx.io/?did={sysid}', label='intelx',
+                ctx.emit('url', f'https://intelx.io/?did={sysid}', label='intelx',
                            nombre=(rec.get('name') or '')[:120], bucket=rec.get('bucket', ''))
     except Exception as _e:
         log.debug("intelx unavailable: %s", _e)
@@ -2460,11 +2460,11 @@ def _t_pastes(entidad, ctx):
         for p in (d.get('data') or [])[:10]:
             pid = p.get('id')
             if pid:
-                ctx.emitir('url', f'https://pastebin.com/{pid}', label='paste', fuente='psbdmp')
+                ctx.emit('url', f'https://pastebin.com/{pid}', label='paste', fuente='psbdmp')
     except Exception as _e:
         log.debug("psbdmp unavailable: %s", _e)
     for sitio in ('pastebin.com', 'ghostbin.com', 'rentry.co', 'justpaste.it'):
-        ctx.emitir('url', f'https://www.google.com/search?q={_q(f"{q} site:{sitio}")}',
+        ctx.emit('url', f'https://www.google.com/search?q={_q(f"{q} site:{sitio}")}',
                    label=f'paste-dork:{sitio}', sitio=sitio)
 
 @transform(entrada='domain', salidas=(), nombre='stealer_dominio',
@@ -2588,9 +2588,9 @@ def _http_probe(entidad):
     # login/admin panel detection (step 56)
     cuerpo = (r.text[:8000] or '').lower()
     titulo = (entidad.properties.get('http_title', '') or '').lower()
-    señales = ('login', 'log in', 'sign in', 'iniciar sesión', 'admin', 'dashboard',
+    signals = ('login', 'log in', 'sign in', 'iniciar sesión', 'admin', 'dashboard',
                'wp-admin', 'phpmyadmin', 'authentication', 'panel')
-    if (any(s in titulo for s in señales)
+    if (any(s in titulo for s in signals)
             or 'type="password"' in cuerpo or "type='password'" in cuerpo):
         entidad.tag('login-panel')
 
@@ -2623,13 +2623,13 @@ def _tech_detect(entidad):
            descripcion='Technologies the site uses (HTTP fingerprint)')
 def _t_tech_dom(entidad, ctx):
     for t in _tech_detect(entidad):
-        ctx.emitir('tech', t, label='uses')
+        ctx.emit('tech', t, label='uses')
 
 @transform(entrada='subdomain', salidas=('tech',), nombre='tech_sub',
            descripcion='Subdomain technologies (HTTP fingerprint)')
 def _t_tech_sub(entidad, ctx):
     for t in _tech_detect(entidad):
-        ctx.emitir('tech', t, label='uses')
+        ctx.emit('tech', t, label='uses')
 
 @transform(entrada='tech', salidas=('cve',), nombre='cve_lookup',
            descripcion='Critical CVEs associated with the technology (NVD). NO version -> verify applicability')
@@ -2651,7 +2651,7 @@ def _t_cve_lookup(entidad, ctx):
         # product), not just mentioned in passing in the description.
         cpes = json.dumps(cve.get('configurations', [])).lower()
         if f':{kw.lower()}:' in cpes:
-            e = ctx.emitir('cve', cid, label='critical CVE')
+            e = ctx.emit('cve', cid, label='critical CVE')
             if e:
                 e.tag('version-unverified')
 
@@ -2677,7 +2677,7 @@ def _t_reverse_whois(entidad, ctx):
         for reg in (d.get('response', {}) or {}).get('matches', [])[:50]:
             dom = reg.get('domain')
             if dom and dom != entidad.value:
-                ctx.emitir('domain', dom, label='same registrant')
+                ctx.emit('domain', dom, label='same registrant')
     except Exception as _e:
         log.debug("reverse_whois unavailable: %s", _e)
 
@@ -2698,10 +2698,10 @@ def _t_rdap(entidad, ctx):
                         if campo and campo[0] == 'fn':
                             nombre = campo[3]
                 if nombre:
-                    ctx.emitir('org', nombre, label='registrar')
+                    ctx.emit('org', nombre, label='registrar')
         for ns in d.get('nameservers', []):
             if ns.get('ldhName'):
-                ctx.emitir('domain', ns['ldhName'], label='NS')
+                ctx.emit('domain', ns['ldhName'], label='NS')
         fechas = {e.get('eventAction'): (e.get('eventDate') or '')[:10] for e in d.get('events', [])}
         if fechas.get('registration'):
             entidad.properties['creado'] = fechas['registration']
@@ -2762,17 +2762,17 @@ def _t_shodan(entidad, ctx):
                         params={'key': key}, timeout=12)
         d = r.json() or {}
         if d.get('org'):
-            ctx.emitir('org', d['org'], label='org')
+            ctx.emit('org', d['org'], label='org')
         vistos_prod = set()
         for serv in d.get('data', []):
             port = serv.get('port')
             if port:
-                ctx.emitir('port', f'{entidad.value}:{port}', label='shodan',
+                ctx.emit('port', f'{entidad.value}:{port}', label='shodan',
                            servicio=serv.get('_shodan', {}).get('module') or serv.get('product', ''))
             prod = serv.get('product')
             if prod and prod not in vistos_prod:
                 vistos_prod.add(prod)
-                ctx.emitir('tech', prod, label='shodan')
+                ctx.emit('tech', prod, label='shodan')
     except Exception as _e:
         log.debug("shodan unavailable: %s", _e)
 
@@ -2790,19 +2790,19 @@ def _t_censys(entidad, ctx):
         res = (r.json() or {}).get('result', {}) or {}
         aut = res.get('autonomous_system', {}) or {}
         if aut.get('name'):
-            ctx.emitir('org', aut['name'], label='censys')
+            ctx.emit('org', aut['name'], label='censys')
         if aut.get('asn'):
-            ctx.emitir('asn', f"AS{aut['asn']}", label='censys')
+            ctx.emit('asn', f"AS{aut['asn']}", label='censys')
         vistos = set()
         for s in res.get('services', []):
             p = s.get('port')
             if p:
-                ctx.emitir('port', f"{entidad.value}:{p}", label='censys',
+                ctx.emit('port', f"{entidad.value}:{p}", label='censys',
                            servicio=s.get('service_name', ''))
             prod = s.get('service_name')
             if prod and prod not in vistos:
                 vistos.add(prod)
-                ctx.emitir('tech', prod, label='censys')
+                ctx.emit('tech', prod, label='censys')
     except Exception as _e:
         log.debug("censys unavailable: %s", _e)
 
@@ -2821,11 +2821,11 @@ def _t_zoomeye(entidad, ctx):
             pi = m.get('portinfo', {}) or {}
             p = pi.get('port') or m.get('port')
             if p:
-                ctx.emitir('port', f"{entidad.value}:{p}", label='zoomeye',
+                ctx.emit('port', f"{entidad.value}:{p}", label='zoomeye',
                            servicio=pi.get('service', ''))
             app = pi.get('app')
             if app:
-                ctx.emitir('tech', app, label='zoomeye')
+                ctx.emit('tech', app, label='zoomeye')
     except Exception as _e:
         log.debug("zoomeye unavailable: %s", _e)
 
@@ -2850,9 +2850,9 @@ def _t_fofa(entidad, ctx):
             port = row[1] if len(row) > 1 else None
             dom = row[2] if len(row) > 2 else None
             if port:
-                ctx.emitir('port', f"{entidad.value}:{port}", label='fofa')
+                ctx.emit('port', f"{entidad.value}:{port}", label='fofa')
             if dom:
-                ctx.emitir('domain', dom, label='fofa')
+                ctx.emit('domain', dom, label='fofa')
     except Exception as _e:
         log.debug("fofa unavailable: %s", _e)
 
@@ -2872,9 +2872,9 @@ def _t_quake(entidad, ctx):
             p = m.get('port')
             nombre = (m.get('service', {}) or {}).get('name')
             if p:
-                ctx.emitir('port', f"{entidad.value}:{p}", label='quake', servicio=nombre or '')
+                ctx.emit('port', f"{entidad.value}:{p}", label='quake', servicio=nombre or '')
             if nombre:
-                ctx.emitir('tech', nombre, label='quake')
+                ctx.emit('tech', nombre, label='quake')
     except Exception as _e:
         log.debug("quake unavailable: %s", _e)
 
@@ -2892,9 +2892,9 @@ def _t_hunter(entidad, ctx):
         for m in ((r.json() or {}).get('data', {}) or {}).get('list', []):
             p, dom = m.get('port'), m.get('domain')
             if p:
-                ctx.emitir('port', f"{entidad.value}:{p}", label='hunter')
+                ctx.emit('port', f"{entidad.value}:{p}", label='hunter')
             if dom:
-                ctx.emitir('domain', dom, label='hunter')
+                ctx.emit('domain', dom, label='hunter')
     except Exception as _e:
         log.debug("hunter unavailable: %s", _e)
 
@@ -2912,7 +2912,7 @@ def _t_netlas(entidad, ctx):
         for it in (r.json() or {}).get('items', []):
             p = (it.get('data', {}) or {}).get('port')
             if p:
-                ctx.emitir('port', f"{entidad.value}:{p}", label='netlas')
+                ctx.emit('port', f"{entidad.value}:{p}", label='netlas')
     except Exception as _e:
         log.debug("netlas unavailable: %s", _e)
 
@@ -2929,7 +2929,7 @@ def _t_criminalip(entidad, ctx):
         for p in ((r.json() or {}).get('port', {}) or {}).get('data', []) or []:
             num = p.get('open_port_no') or p.get('port')
             if num:
-                ctx.emitir('port', f"{entidad.value}:{num}", label='criminalip',
+                ctx.emit('port', f"{entidad.value}:{num}", label='criminalip',
                            servicio=p.get('app_name', ''))
     except Exception as _e:
         log.debug("criminalip unavailable: %s", _e)
@@ -2947,7 +2947,7 @@ def _t_binaryedge(entidad, ctx):
         for ev in (r.json() or {}).get('events', []):
             p = ev.get('port')
             if p:
-                ctx.emitir('port', f"{entidad.value}:{p}", label='binaryedge')
+                ctx.emit('port', f"{entidad.value}:{p}", label='binaryedge')
     except Exception as _e:
         log.debug("binaryedge unavailable: %s", _e)
 
@@ -2955,13 +2955,13 @@ def _t_binaryedge(entidad, ctx):
            descripcion='Reverse image search in Yandex/Google/TinEye/Bing (F9, keyless)')
 def _t_reverse_image(entidad, ctx):
     for motor, enlace in enlaces_reverse(entidad.value).items():
-        ctx.emitir('url', enlace, label=f'reverse:{motor}', motor=motor)
+        ctx.emit('url', enlace, label=f'reverse:{motor}', motor=motor)
 
 @transform(entrada='url', salidas=('url',), nombre='busqueda_facial',
            descripcion='Facial recognition: Yandex (by URL) + FaceCheck/PimEyes (manual upload) (F9)')
 def _t_busqueda_facial(entidad, ctx):
     for motor, info in enlaces_facial(entidad.value).items():
-        ctx.emitir('url', info['url'], label=f'facial:{motor}', motor=motor, modo=info['modo'])
+        ctx.emit('url', info['url'], label=f'facial:{motor}', motor=motor, modo=info['modo'])
 
 @transform(entrada='phone', salidas=('url', 'country'), nombre='telefono_dorks',
            descripcion='Phone search dorks (Truecaller/messaging) + carrier if key (F2 step 33)')
@@ -2976,7 +2976,7 @@ def _t_telefono_dorks(entidad, ctx):
         'general': limpio,
     }
     for nombre, q in dorks.items():
-        ctx.emitir('url', f'https://www.google.com/search?q={_q(q)}', label=f'dork:{nombre}', dork=nombre)
+        ctx.emit('url', f'https://www.google.com/search?q={_q(q)}', label=f'dork:{nombre}', dork=nombre)
     key = _key_rotativa('numverify') or os.environ.get('NUMVERIFY_KEY', '')
     if key:
         try:
@@ -2987,7 +2987,7 @@ def _t_telefono_dorks(entidad, ctx):
                 entidad.properties['carrier'] = d.get('carrier', '')
                 entidad.properties['tipo_linea'] = d.get('line_type', '')
                 if d.get('country_name'):
-                    ctx.emitir('country', d['country_name'], label='country')
+                    ctx.emit('country', d['country_name'], label='country')
         except Exception as _e:
             log.debug("numverify unavailable: %s", _e)
 
@@ -3024,7 +3024,7 @@ def _t_typosquatting(entidad, ctx):
     for t in ths:
         t.join(timeout=12)
     for v, ip in registrados.items():
-        d = ctx.emitir('domain', v, label='typosquat', resuelve=ip)
+        d = ctx.emit('domain', v, label='typosquat', resuelve=ip)
         if d:
             d.tag('typosquat')
 
@@ -3055,7 +3055,7 @@ def _t_buckets(entidad, ctx):
     for t in ths:
         t.join(timeout=15)
     for bucket, info in hallados.items():
-        b = ctx.emitir('bucket', bucket, label='bucket', url=info['url'], publico=info['public'])
+        b = ctx.emit('bucket', bucket, label='bucket', url=info['url'], publico=info['public'])
         if b and info['public']:
             b.tag('public')
 
@@ -3100,7 +3100,7 @@ def _t_takeover(entidad, ctx):
     for t in ths:
         t.join(timeout=20)
     for sub, info in vulnerables.items():
-        s = ctx.emitir('subdomain', sub, label='takeover',
+        s = ctx.emit('subdomain', sub, label='takeover',
                        servicio=info['servicio'], cname=info['cname'], estado=info['estado'])
         if s:
             s.tag('takeover')          # triggers the r_takeover rule (F4/55)
@@ -3121,7 +3121,7 @@ def _t_passivedns(entidad, ctx):
                 fecha = attr.get('date')
                 visto = (datetime.datetime.fromtimestamp(fecha, datetime.timezone.utc)
                          .strftime('%Y-%m-%d')) if fecha else ''
-                ctx.emitir('ip', ip, label='pdns-historical', visto=visto)
+                ctx.emit('ip', ip, label='pdns-historical', visto=visto)
     except Exception as _e:
         log.debug("passivedns unavailable: %s", _e)
 
@@ -3150,7 +3150,7 @@ def _t_github_sec(entidad, ctx):
         for repo in repos[:10]:
             full = repo.get('full_name', '')
             if full:
-                ctx.emitir('repo', full, label='repo')
+                ctx.emit('repo', full, label='repo')
             cr = SESSION.get(f'https://api.github.com/repos/{full}/commits?per_page=5', headers=hdr, timeout=8)
             if cr.status_code != 200:
                 continue
@@ -3164,7 +3164,7 @@ def _t_github_sec(entidad, ctx):
                     for nombre_pat, patron in _SECRET_PATTERNS:
                         for m in re.findall(patron, patch, re.IGNORECASE):
                             val = (m if isinstance(m, str) else ':'.join(x for x in m if x)) or nombre_pat
-                            c = ctx.emitir('credential', val[:60], label='secret',
+                            c = ctx.emit('credential', val[:60], label='secret',
                                            tipo_secreto=nombre_pat, repo=full,
                                            commit=sha[:8], archivo=f.get('filename', '?'))
                             if c:
@@ -3190,7 +3190,7 @@ def _t_persona(entidad, ctx):
              'github': f'"{nombre}" site:github.com',
              'facebook': f'"{nombre}" site:facebook.com'}
     for k, q in dorks.items():
-        ctx.emitir('url', f'https://www.google.com/search?q={_q(q)}', label=f'dork:{k}', dork=k)
+        ctx.emit('url', f'https://www.google.com/search?q={_q(q)}', label=f'dork:{k}', dork=k)
 
 @transform(entrada='person', salidas=('url',), nombre='darkweb',
            descripcion='Dark web search (Ahmia, clearnet .onion index, no Tor) (keyless)')
@@ -3200,7 +3200,7 @@ def _t_darkweb(entidad, ctx):
         r = SESSION.get(f'https://ahmia.fi/search/?q={_q(entidad.value)}', timeout=12)
         n = 0
         for m in re.finditer(r'<h4[^>]*><a href="([^"]+)"[^>]*>([^<]+)</a>', r.text, re.DOTALL):
-            ctx.emitir('url', m.group(1), label='onion', titulo=m.group(2).strip()[:80])
+            ctx.emit('url', m.group(1), label='onion', titulo=m.group(2).strip()[:80])
             n += 1
             if n >= 15:
                 break
@@ -3241,7 +3241,7 @@ def _t_render_js(entidad, ctx):
             browser.close()
         for em in list(set(re.findall(
                 r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', html_render)))[:15]:
-            ctx.emitir('email', em, label='in-render')
+            ctx.emit('email', em, label='in-render')
     except Exception as _e:
         log.debug("render_js: %s", _e)
 
@@ -3310,7 +3310,7 @@ def _t_cronolocalizacion(entidad, ctx):
     coords = parse_gps(entidad.properties.get('gps', ''))
     enlaces = enlaces_cronolocalizacion(*(coords if coords else (None, None)))
     for herr, url in enlaces.items():
-        ctx.emitir('url', url, label=f'sun:{herr}', herramienta=herr)
+        ctx.emit('url', url, label=f'sun:{herr}', herramienta=herr)
 
 @transform(entrada='url', salidas=('url',), nombre='satelital',
            descripcion='Satellite cross-check of the location (Google Earth/Sentinel/Bing) -- requires GPS (F9 step 122)')
@@ -3319,13 +3319,13 @@ def _t_satelital(entidad, ctx):
     if not coords:
         return
     for herr, url in enlaces_satelital(*coords).items():
-        ctx.emitir('url', url, label=f'satellite:{herr}', herramienta=herr)
+        ctx.emit('url', url, label=f'satellite:{herr}', herramienta=herr)
 
 @transform(entrada='url', salidas=('url',), nombre='landmarks',
            descripcion='Landmark matching by image (Google Lens/Mapillary/Wikimapia) (F9 step 123)')
 def _t_landmarks(entidad, ctx):
     for herr, url in enlaces_landmark(entidad.value).items():
-        ctx.emitir('url', url, label=f'landmark:{herr}', herramienta=herr)
+        ctx.emit('url', url, label=f'landmark:{herr}', herramienta=herr)
 
 @transform(entrada='url', salidas=(), nombre='ocr',
            descripcion='Cyrillic/Chinese/Latin OCR of the image (tesseract, langs rus+chi_sim+eng) (F9 step 125)')
@@ -3391,9 +3391,9 @@ def _t_onion_fetch(entidad, ctx):
     if m:
         entidad.properties['onion_titulo'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
     for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', r.text)))[:15]:
-        ctx.emitir('email', em, label='in-onion')
+        ctx.emit('email', em, label='in-onion')
     for on in list(set(re.findall(r'[a-z2-7]{16,56}\.onion', r.text)))[:15]:
-        ctx.emitir('url', 'http://' + on, label='onion-link')
+        ctx.emit('url', 'http://' + on, label='onion-link')
     entidad.tag('onion-live')
 
 _TG_SESION = os.path.join(HOME, '.obsidian', 'telegram.session')
@@ -3441,9 +3441,9 @@ def _t_telegram(entidad, ctx):
     entidad.properties['telegram_id'] = tid
     texto = '\n'.join(textos)
     for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', texto)))[:15]:
-        ctx.emitir('email', em, label='in-telegram')
+        ctx.emit('email', em, label='in-telegram')
     for u in list(set(re.findall(r'https?://[^\s"\'<>]+', texto)))[:15]:
-        ctx.emitir('url', u[:200], label='in-telegram')
+        ctx.emit('url', u[:200], label='in-telegram')
 
 _LEAK_KW = ['leak', 'breach', 'database', 'combolist', 'stealer', 'ransomware',
             'dump', 'fullz', 'rdp access', 'initial access', 'base de datos', 'filtracion']
@@ -3476,9 +3476,9 @@ def _t_canal_leaks(entidad, ctx):
     entidad.properties['leaks_muestra'] = [h['texto'] for h in hits[:5]]
     unido = '\n'.join(h['texto'] for h in hits)
     for dom in list(set(re.findall(r'\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b', unido.lower())))[:15]:
-        ctx.emitir('domain', dom, label='mentioned-in-leaks')
+        ctx.emit('domain', dom, label='mentioned-in-leaks')
     for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', unido)))[:15]:
-        ctx.emitir('email', em, label='mentioned-in-leaks')
+        ctx.emit('email', em, label='mentioned-in-leaks')
 
 _HAYSTAK_ONION = ('http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion')
 
@@ -3495,7 +3495,7 @@ def _t_haystak(entidad, ctx):
         log.debug("haystak: %s", _e)
         return
     for on in list(set(re.findall(r'[a-z2-7]{16,56}\.onion', r.text)))[:15]:
-        ctx.emitir('url', 'http://' + on, label='haystak')
+        ctx.emit('url', 'http://' + on, label='haystak')
 
 def _descargar_imagen(url):
     """Downloads an image to a temp file (anti-SSRF). Returns the path or None."""
@@ -3543,7 +3543,7 @@ def _t_phash(entidad, ctx):
         h = _phash(fn)
         if h:
             entidad.properties['phash'] = h
-            ctx.emitir('hash', h, label='phash', tipo_hash='phash')
+            ctx.emit('hash', h, label='phash', tipo_hash='phash')
     finally:
         try:
             os.unlink(fn)
@@ -3580,7 +3580,7 @@ def _t_tx_grafo(entidad, ctx):
             if a and a != addr:
                 contrapartes.add(a)
     for c in list(contrapartes)[:30]:
-        ctx.emitir('wallet', c, label='tx', cadena='btc')
+        ctx.emit('wallet', c, label='tx', cadena='btc')
 
 _ES_ETH = re.compile(r'0x[a-fA-F0-9]{40}\Z')
 
@@ -3630,7 +3630,7 @@ def _t_exchange_attrib(entidad, ctx):
                'arkham': f'https://intel.arkm.com/explorer/address/{a}',
                'oxt': f'https://oxt.me/address/{a}'}
     for herr, url in enlaces.items():
-        ctx.emitir('url', url, label=f'attrib:{herr}', herramienta=herr)
+        ctx.emit('url', url, label=f'attrib:{herr}', herramienta=herr)
 
 @transform(entrada='wallet', salidas=('wallet',), nombre='cluster_wallets',
            descripcion='Clustering by co-inputs: addresses of the same owner (heuristic, blockchain.info) (F11 step 139)')
@@ -3651,7 +3651,7 @@ def _t_cluster_wallets(entidad, ctx):
         if addr in inputs:                           # the seed spent alongside these -> same owner
             mismo.update(a for a in inputs if a != addr)
     for a in list(mismo)[:30]:
-        w = ctx.emitir('wallet', a, label='same-owner', cadena='btc')
+        w = ctx.emit('wallet', a, label='same-owner', cadena='btc')
         if w:
             w.tag('same-owner')
 
@@ -3665,7 +3665,7 @@ def _t_extraer_wallets(entidad, ctx):
     texto = r.text[:200000]
     for cadena, rx in _WALLET_RE.items():
         for addr in list(set(rx.findall(texto)))[:30]:
-            ctx.emitir('wallet', addr, label=cadena, cadena=cadena)
+            ctx.emit('wallet', addr, label=cadena, cadena=cadena)
 
 @transform(entrada='person', salidas=('url',), nombre='dorks_idioma',
            descripcion='Dorks adapted to the name language (Cyrillic/Chinese/Latin) (F15 step 176)')
@@ -3673,32 +3673,32 @@ def _t_dorks_idioma(entidad, ctx):
     from urllib.parse import quote as _q
     idioma = _ml.detectar_idioma(entidad.value)
     for d in _ml.dorks_por_idioma(entidad.value, idioma):
-        ctx.emitir('url', f'https://www.google.com/search?q={_q(d)}', label=f'dork:{idioma}', idioma=idioma)
+        ctx.emit('url', f'https://www.google.com/search?q={_q(d)}', label=f'dork:{idioma}', idioma=idioma)
 
 @transform(entrada='person', salidas=('url',), nombre='motores_locales',
            descripcion='Search in local engines: Yandex, Baidu, Sogou (they index another internet) (F15 step 174)')
 def _t_motores_locales(entidad, ctx):
     for motor, url in _ml.motores_locales(entidad.value).items():
-        ctx.emitir('url', url, label=f'motor:{motor}', motor=motor)
+        ctx.emit('url', url, label=f'motor:{motor}', motor=motor)
 
 @transform(entrada='org', salidas=('url',), nombre='registros_regionales',
            descripcion='Company registries by region: QCC (China), RusProfile (Russia), OpenCorporates (F15 step 173)')
 def _t_registros_regionales(entidad, ctx):
     for reg, url in _ml.registros_regionales(entidad.value).items():
-        ctx.emitir('url', url, label=f'registro:{reg}', registro=reg)
+        ctx.emit('url', url, label=f'registro:{reg}', registro=reg)
 
 @transform(entrada='person', salidas=('person',), nombre='transliterar',
            descripcion='Name variants in Cyrillic/Latin to search in each alphabet (F15 step 172)')
 def _t_transliterar(entidad, ctx):
     for alfabeto, variante in _ml.transliterar(entidad.value).items():
         if variante and variante.lower() != entidad.value.lower():
-            ctx.emitir('person', variante, label=f'translit:{alfabeto}')
+            ctx.emit('person', variante, label=f'translit:{alfabeto}')
 
 @transform(entrada='user', salidas=('url',), nombre='plataformas_regionales',
            descripcion='Profiles on regional platforms: VK, Weibo, Douyin, OK, Telegram (F15 step 171)')
 def _t_plataformas_regionales(entidad, ctx):
     for plat, url in _ml.perfiles_regionales(entidad.value).items():
-        ctx.emitir('url', url, label=f'plataforma:{plat}', platform=plat)
+        ctx.emit('url', url, label=f'plataforma:{plat}', platform=plat)
 
 _BLOCKLIST = {'nets': None, 'ts': 0}   # in-memory cache (refreshes every 6h)
 
@@ -3756,7 +3756,7 @@ def _t_greynoise(entidad, ctx):
         if d.get('riot'):
             entidad.tag('known-service')
             if d.get('name'):
-                ctx.emitir('org', d['name'], label='greynoise')
+                ctx.emit('org', d['name'], label='greynoise')
         clasif = d.get('classification')
         if clasif:
             entidad.properties['greynoise'] = clasif
@@ -3784,7 +3784,7 @@ def _t_ssl(entidad, ctx):
         issuer = dict(x[0] for x in cert.get('issuer', []))
         org = issuer.get('organizationName')
         if org:
-            ctx.emitir('org', org, label='cert issuer')
+            ctx.emit('org', org, label='cert issuer')
         cn = dict(x[0] for x in cert.get('subject', [])).get('commonName')
         if cn:
             entidad.properties['cert_cn'] = cn          # to pivot (step 115)
@@ -3809,7 +3809,7 @@ def _t_cert_pivote(entidad, ctx):
     if not cn:
         return
     for ip in _pivote_ips({'cert': cn}):
-        ctx.emitir('ip', ip, label='same-cert')
+        ctx.emit('ip', ip, label='same-cert')
 
 
 @app.route('/api/v2/transforms/<type>')

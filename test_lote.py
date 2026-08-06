@@ -10,13 +10,13 @@ from core.transforms import transform, run_batch
 
 @transform(entrada='domain', salidas=('ip',), nombre='_test_lote_a')
 def _fake_a(entidad, ctx):
-    ctx.emitir('ip', '10.0.0.1')
-    ctx.emitir('ip', '10.0.0.2')
+    ctx.emit('ip', '10.0.0.1')
+    ctx.emit('ip', '10.0.0.2')
 
 
 @transform(entrada='domain', salidas=('subdomain',), nombre='_test_lote_b')
 def _fake_b(entidad, ctx):
-    ctx.emitir('subdomain', 'x.' + entidad.value)
+    ctx.emit('subdomain', 'x.' + entidad.value)
 
 
 def test_lote_fusiona_resultados():
