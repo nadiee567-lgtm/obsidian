@@ -141,7 +141,7 @@ def test_leak_login_sin_filtrado():
 def test_pivote_plataformas():
     from core.correlacion import correlacionar
     alm = Almacen()
-    u = alm.crear('usuario', 'johndoe')
+    u = alm.crear('usuario', 'nadiee')
     for i in range(6):
         p = alm.crear('plataforma', f'plat{i}')
         alm.relacionar(u.id, p.id, 'presente')

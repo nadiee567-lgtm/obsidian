@@ -15,7 +15,7 @@ def _correr(nombre, tipo, valor):
 
 # ── 171: regional social platforms ──────────────────────────────────────────
 def test_plataformas_regionales():
-    prod, _ = _correr('plataformas_regionales', 'usuario', 'johndoe')
+    prod, _ = _correr('plataformas_regionales', 'usuario', 'nadiee')
     plats = {p.propiedades.get('plataforma') for p in prod if p.tipo == 'url'}
     assert {'vk', 'ok', 'weibo', 'douyin', 'telegram'} == plats
 
