@@ -109,7 +109,7 @@
 <body>
 <div class="wrap">
   <h1><span class="sq">⬛</span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnKeys">🔑 API keys</a> · <a href="/v2/estado">system status</a> · <a href="/">← classic interface</a></div>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnKeys">🔑 API keys</a> · <a href="/v2/status">system status</a> · <a href="/">← classic interface</a></div>
   <div id="keys"></div>
 
   <div class="wsbar">
@@ -332,11 +332,11 @@ function cadenaIds(id){   // walk backward through provenance to the seed
   return chain;
 }
 async function toggleTag(id,tag){
-  await fetch('/api/v2/entidad/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,tag})});
+  await fetch('/api/v2/entity/tag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,tag})});
   await pintarGrafo(); mostrarDetalle(id);
 }
 async function guardarNota(id,nota){
-  await fetch('/api/v2/entidad/nota',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,nota})});
+  await fetch('/api/v2/entity/note',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,nota})});
   await pintarGrafo(); setStatus('note saved');
 }
 
@@ -388,7 +388,7 @@ async function correr(type,value,nombre,requiereKey){
 async function agregar(){
   const type=$('#type').value, value=$('#value').value.trim();
   if(!value){ setStatus('type a target first.','err'); return; }
-  const r=await fetch('/api/v2/entidad',{method:'POST',headers:{'Content-Type':'application/json'},
+  const r=await fetch('/api/v2/entity',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({type,value})});
   const d=await r.json();
   if(!r.ok){ setStatus('error: '+(d.error||r.status),'err'); return; }
@@ -398,7 +398,7 @@ async function agregar(){
 
 // ── hallazgos + IA (paneles) ──
 async function pintarHallazgos(){
-  const d=await(await fetch('/api/v2/hallazgos')).json();
+  const d=await(await fetch('/api/v2/findings')).json();
   $('#nHall').textContent=d.hallazgos.length;
   const b=$('#scoreBadge'); b.textContent='risk '+d.score+'/100';
   b.style.background=d.score>=60?'#f7768e':d.score>=25?'#e0af68':'#232735';
@@ -415,7 +415,7 @@ async function pintarHallazgos(){
 async function analizarIA(){
   const btn=$('#btnIA'),out=$('#iaResumen'); btn.disabled=true; btn.textContent='…';
   out.innerHTML='<div class="iaresumen">Ollama analyzing…</div>';
-  try{ const d=await(await fetch('/api/v2/hallazgos/ia',{method:'POST'})).json();
+  try{ const d=await(await fetch('/api/v2/findings/ia',{method:'POST'})).json();
     out.innerHTML='<div class="iaresumen">'+(d.resumen||d.error||'')+'</div>'; }
   catch(e){ out.textContent='Error: '+e.message; }
   btn.disabled=false; btn.textContent='🧠 IA';
@@ -423,7 +423,7 @@ async function analizarIA(){
 async function segundoEscudo(){
   const btn=$('#btnEscudo'),out=$('#iaResumen'); btn.disabled=true; btn.textContent='…';
   out.innerHTML='<div class="iaresumen">2nd shield reviewing…</div>';
-  try{ const d=await(await fetch('/api/v2/hallazgos/verificar',{method:'POST'})).json();
+  try{ const d=await(await fetch('/api/v2/findings/verify',{method:'POST'})).json();
     out.textContent=''; (d.revisiones||[]).forEach(r=>{
       const x=el('div','iaresumen'); x.innerHTML='<b style="color:var(--cyan)">🛡️ '+r.hallazgo+'</b>\n'+r.razon; out.appendChild(x); }); }
   catch(e){ out.textContent='Error: '+e.message; }
@@ -438,7 +438,7 @@ async function cargarWorkspaces(){
   $('#wsActivo').textContent=d.activo||'none (ephemeral)'; if(d.activo)sel.value=d.activo;
 }
 async function abrirWs(){ const n=$('#wsSel').value; if(!n)return;
-  await fetch('/api/v2/workspaces/abrir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
+  await fetch('/api/v2/workspaces/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
   setStatus('workspace abierto: '+n); await cargarWorkspaces(); await pintarGrafo(); }
 async function crearWs(){ const n=$('#wsNuevo').value.trim(); if(!n){setStatus('escribe un nombre','err');return;}
   const r=await fetch('/api/v2/workspaces',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
@@ -472,7 +472,7 @@ function timeline(){
   $('#tlCerrar').onclick=()=>ov.style.display='none';
 }
 $('#btnTimeline').onclick=timeline;
-$('#btnReporte').onclick=()=>window.open('/v2/reporte','_blank');
+$('#btnReporte').onclick=()=>window.open('/v2/report','_blank');
 const SERVICIOS_KEY=[
   ['shodan','Shodan key'],['censys','id:secret'],['zoomeye','API-KEY'],['fofa','email:key'],
   ['quake','token'],['hunter','api-key'],['netlas','api-key'],['criminalip','api-key'],

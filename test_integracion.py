@@ -101,7 +101,7 @@ def test_workspaces_flujo(tmp_path):
         ob._almacen.create('ip', '8.8.8.8')
         ob._gestor.save('caso demo', ob._almacen)
         ob._almacen = ob.Store()
-        r = c.post('/api/v2/workspaces/abrir', json={'nombre': 'caso demo'})
+        r = c.post('/api/v2/workspaces/open', json={'nombre': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['total_entities'] == 1
         # delete -> no active
         r = c.delete('/api/v2/workspaces', json={'nombre': 'caso demo'})

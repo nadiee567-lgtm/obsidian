@@ -30,7 +30,7 @@ def test_inventario(monkeypatch):
     alm.create('port', '1.2.3.4:443')
     alm.create('email', 'a@x.com')                # NOT an internet-facing asset
     c = _cliente_con(alm, monkeypatch)
-    d = c.get('/api/v2/inventario').get_json()
+    d = c.get('/api/v2/inventory').get_json()
     assert d['total_activos'] == 3               # domain+ip+port, not the email
     assert set(d['inventario']) == {'domain', 'ip', 'port'}
 
@@ -97,7 +97,7 @@ def test_exposicion_endpoint(monkeypatch):
     for i in range(5):
         alm.create('subdomain', f's{i}.x.com')
     c = _cliente_con(alm, monkeypatch)
-    d = c.get('/api/v2/exposicion').get_json()
+    d = c.get('/api/v2/exposure').get_json()
     assert d['superficie']['subdomain'] == 5 and 0 <= d['exposicion'] <= 100
 
 

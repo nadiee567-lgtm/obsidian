@@ -34,9 +34,9 @@ def test_traducir(monkeypatch):
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    d = c.post('/api/v2/traducir', json={'texto': '你好世界'}).get_json()
+    d = c.post('/api/v2/translate', json={'texto': '你好世界'}).get_json()
     assert d['traduccion'] == 'Hello world'
-    assert c.post('/api/v2/traducir', json={'texto': ''}).status_code == 400
+    assert c.post('/api/v2/translate', json={'texto': ''}).status_code == 400
 
 
 def test_traducir_sin_ia(monkeypatch):
@@ -45,7 +45,7 @@ def test_traducir_sin_ia(monkeypatch):
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    assert c.post('/api/v2/traducir', json={'texto': 'x'}).status_code == 503
+    assert c.post('/api/v2/translate', json={'texto': 'x'}).status_code == 503
 
 
 # ── 163: natural-language case summary (AI mode) ────────────────────────────
@@ -75,9 +75,9 @@ def test_consulta_nl(monkeypatch):
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    d = c.post('/api/v2/consulta', json={'pregunta': 'find everything about acme.com'}).get_json()
+    d = c.post('/api/v2/query', json={'pregunta': 'find everything about acme.com'}).get_json()
     assert 'plan' in d and 'dns_a' in d['plan']
-    assert c.post('/api/v2/consulta', json={'pregunta': ''}).status_code == 400
+    assert c.post('/api/v2/query', json={'pregunta': ''}).status_code == 400
 
 
 # ── 168: connect with NEXO (per-task model routing) ─────────────────────────
@@ -97,7 +97,7 @@ def test_deteccion_ia(monkeypatch):
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    d = c.post('/api/v2/deteccion_ia', json={'texto': 'lorem ipsum...'}).get_json()
+    d = c.post('/api/v2/ai_detection', json={'texto': 'lorem ipsum...'}).get_json()
     assert 'evaluacion' in d and 'A HINT' in d['aviso']   # honesty: gives no certainty
 
 

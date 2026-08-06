@@ -59,7 +59,7 @@ def test_idioma_endpoint(monkeypatch):
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    d = c.post('/api/v2/idioma', json={'texto': 'Привет'}).get_json()
+    d = c.post('/api/v2/language', json={'texto': 'Привет'}).get_json()
     assert d['idioma'] == 'ru' and 'Yandex' in d['fuente_sugerida']
 
 

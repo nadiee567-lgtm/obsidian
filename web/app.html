@@ -1096,10 +1096,10 @@ async function refreshMonitor() {
 
 // ── PDF Export ────────────────────────────────────────────────────────────────
 async function exportarPDF() {
-  const r = await fetch('/api/reporte',{method:'POST'});
+  const r = await fetch('/api/report',{method:'POST'});
   const d = await r.json();
   if (d.ok) {
-    window.open('/reporte_pdf?t='+Date.now(),'_blank');
+    window.open('/report_pdf?t='+Date.now(),'_blank');
   }
 }
 
@@ -1309,27 +1309,27 @@ async function nuevoCaso() {
   const nombre = document.getElementById('caso-nombre').value.trim() || 'case1';
   const target = document.getElementById('caso-obj').value.trim();
   if (!target) { toast('Enter the target'); return; }
-  await fetch('/api/caso', {method:'POST', headers:{'Content-Type':'application/json'},
+  await fetch('/api/case', {method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({nombre, target})});
   await refreshStatus();
   toast('Case started: ' + nombre);
 }
 
 async function guardarCaso() {
-  const r = await fetch('/api/caso/save', {method:'POST'});
+  const r = await fetch('/api/case/save', {method:'POST'});
   const d = await r.json();
   if (d.ok) toast('Case saved ✓');
   else toast('Error: ' + d.error);
 }
 
 async function limpiarCaso() {
-  await fetch('/api/caso', {method:'DELETE'});
+  await fetch('/api/case', {method:'DELETE'});
   await refreshStatus();
   toast('Case cleared');
 }
 
 async function generarReporte() {
-  const r = await fetch('/api/reporte', {method:'POST'});
+  const r = await fetch('/api/report', {method:'POST'});
   const d = await r.json();
   if (d.ok) toast('Report generated: ' + d.path);
   else toast('Error: ' + d.error);
@@ -1339,7 +1339,7 @@ async function cargarDatos() {
   const out = document.getElementById('output4');
   out.innerHTML = '';
   try {
-    const r = await fetch('/api/datos');
+    const r = await fetch('/api/data');
     const d = await r.json();
     if (!Object.keys(d.datos).length) { append(out,'No data collected yet.','info'); return; }
     append(out, JSON.stringify(d.datos, null, 2));

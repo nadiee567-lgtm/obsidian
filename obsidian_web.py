@@ -1879,7 +1879,7 @@ def api_status():
         return jsonify({'caso': case['nombre'], 'target': case['target'],
                        'modulos': len(case['datos']), 'ok': True})
 
-@app.route('/api/caso', methods=['GET','POST','DELETE'])
+@app.route('/api/case', methods=['GET','POST','DELETE'])
 def api_caso():
     if request.method == 'GET':
         archivos = [f[:-5] for f in os.listdir(CASES_DIR) if f.endswith('.json')]
@@ -1898,7 +1898,7 @@ def api_caso():
             case.update({'nombre':None,'target':None,'datos':{},'history':[]})
         return jsonify({'ok':True})
 
-@app.route('/api/caso/save', methods=['POST'])
+@app.route('/api/case/save', methods=['POST'])
 def api_guardar():
     if not case['nombre']: return jsonify({'error':'No active case'}), 400
     path = _ruta_caso_segura(case['nombre'])
@@ -1913,7 +1913,7 @@ def api_buscar():
     if not termino: return jsonify({'error':'No search term'}), 400
     return jsonify({'resultados': _db_buscar(termino)})
 
-@app.route('/api/caso/load', methods=['POST'])
+@app.route('/api/case/load', methods=['POST'])
 def api_cargar():
     nombre = (request.json or {}).get('nombre','')
     path = _ruta_caso_segura(nombre)
@@ -3908,7 +3908,7 @@ def _cargar_reglas_usuario():
     except Exception as _e:
         log.warning("could not load YAML rules: %s", _e)
 
-@app.route('/api/v2/reglas', methods=['GET', 'POST'])
+@app.route('/api/v2/rules', methods=['GET', 'POST'])
 def api_v2_reglas():
     """User YAML correlation rules (step 63). POST {yaml} loads and persists them;
     GET returns the active ones."""
@@ -3925,7 +3925,7 @@ def api_v2_reglas():
     from core.correlacion import _REGLAS_YAML
     return jsonify({'reglas': _REGLAS_YAML})
 
-@app.route('/api/v2/find/traducir', methods=['POST'])
+@app.route('/api/v2/find/translate', methods=['POST'])
 def api_v2_buscar_traducir():
     """Translates a unified query to EACH engine's dialect (F8 step 117).
     Body: {campos:{ip,dominio,favicon,cert,puerto,...}, cn:true|false|null}."""
@@ -3933,12 +3933,12 @@ def api_v2_buscar_traducir():
     campos = {k: v for k, v in (d.get('campos') or {}).items() if v}
     return jsonify({'campos': campos, 'queries': traducir_todos(campos, d.get('cn'))})
 
-@app.route('/api/v2/estado')
+@app.route('/api/v2/status')
 def api_v2_estado():
     """System health in JSON (step 105)."""
     return jsonify(_estado_datos())
 
-@app.route('/v2/estado')
+@app.route('/v2/status')
 def v2_estado():
     """System status page (step 105)."""
     return Response(render_estado(_estado_datos()), mimetype='text/html')
@@ -3970,7 +3970,7 @@ _tareas = TaskManager()
 @app.route('/api/v2/recon_async', methods=['POST'])
 def api_v2_recon_async():
     """Launches the recon in the background (step 37) and returns a job_id. Progress
-    is listened to on /api/v2/tarea/<id>/stream (SSE). Does not block the request."""
+    is listened to on /api/v2/task/<id>/stream (SSE). Does not block the request."""
     d = request.json or {}
     type = d.get('type', '')
     value = (d.get('value', '') or '').strip()
@@ -3999,14 +3999,14 @@ def api_v2_recon_async():
 
     return jsonify({'job_id': _tareas.create(trabajo)})
 
-@app.route('/api/v2/tarea/<tid>')
+@app.route('/api/v2/task/<tid>')
 def api_v2_tarea(tid):
     est = _tareas.estado(tid)
     if not est:
         return _error('task not found', 404)
     return jsonify({'id': est['id'], 'estado': est['estado'], 'resultado': est['resultado']})
 
-@app.route('/api/v2/tarea/<tid>/stream')
+@app.route('/api/v2/task/<tid>/stream')
 def api_v2_tarea_stream(tid):
     if not _tareas.estado(tid):
         return _error('task not found', 404)
@@ -4015,7 +4015,7 @@ def api_v2_tarea_stream(tid):
             yield f'data: {json.dumps(ev)}\n\n'
     return Response(stream_with_context(gen()), mimetype='text/event-stream')
 
-@app.route('/api/v2/entidad', methods=['POST'])
+@app.route('/api/v2/entity', methods=['POST'])
 def api_v2_entidad():
     """Adds a seed entity to the graph WITHOUT running transforms (Maltego-style:
     you add the node, then right-click -> transform). F6."""
@@ -4045,7 +4045,7 @@ def _autosave():
         except Exception as _e:
             log.warning("autosave failed: %s", _e)
 
-@app.route('/api/v2/entidad/nota', methods=['POST'])
+@app.route('/api/v2/entity/note', methods=['POST'])
 def api_v2_nota():
     """Analyst note on an entity (F6 step 88)."""
     d = request.json or {}
@@ -4056,7 +4056,7 @@ def api_v2_nota():
     _autosave()
     return jsonify({'ok': True})
 
-@app.route('/api/v2/entidad/tag', methods=['POST'])
+@app.route('/api/v2/entity/tag', methods=['POST'])
 def api_v2_tag():
     """Toggle an analyst tag (interesante/descartado/falso-positivo)."""
     d = request.json or {}
@@ -4097,7 +4097,7 @@ def api_v2_workspaces():
             _almacen, _ws_activo = Store(), None
         return jsonify({'ok': True, 'activo': _ws_activo})
 
-@app.route('/api/v2/workspaces/abrir', methods=['POST'])
+@app.route('/api/v2/workspaces/open', methods=['POST'])
 def api_v2_workspace_abrir():
     """Loads a workspace into memory and makes it the active one (F3 step 45)."""
     global _almacen, _ws_activo
@@ -4145,7 +4145,7 @@ def _registrar_huella(nombre, type, value):
                        'anonimo': _OPSEC['anonimo'] or bool(_PROXIES['pool'])})
     del _HUELLA[500:]
 
-@app.route('/api/v2/opsec/huella')
+@app.route('/api/v2/opsec/footprint')
 def api_v2_opsec_huella():
     """Your footprint: what you touched and how much was un-anonymized (exposure). Step 160."""
     expuestos = sum(1 for h in _HUELLA if not h['anonimo'])
@@ -4181,7 +4181,7 @@ def _higiene_request():
     if _OPSEC_HIGIENE['on']:
         SESSION.headers['User-Agent'] = secrets.choice(_USER_AGENTS)
 
-@app.route('/api/v2/opsec/higiene', methods=['GET', 'POST'])
+@app.route('/api/v2/opsec/hygiene', methods=['GET', 'POST'])
 def api_v2_opsec_higiene():
     if request.method == 'POST':
         _OPSEC_HIGIENE['on'] = bool((request.json or {}).get('on'))
@@ -4192,7 +4192,7 @@ def _evaluar_fuga(anon, ip_session, ip_real):
     (i.e. traffic does NOT go out via Tor/proxy). Pure/testable. Step 158."""
     return bool(anon and ip_session and ip_real and ip_session == ip_real)
 
-@app.route('/api/v2/opsec/fuga')
+@app.route('/api/v2/opsec/leak')
 def api_v2_opsec_fuga():
     """IP/DNS leak detection before a sensitive transform (F13 step 158).
     (WebRTC only applies in a browser -- here the server's IP leak is covered.)"""
@@ -4255,7 +4255,7 @@ def api_v2_opsec_proxies():
         return jsonify({'pool_size': 0})
     return jsonify({'pool_size': len(_PROXIES['pool']), 'actual': SESSION.proxies.get('https')})
 
-@app.route('/api/v2/opsec/anonimo', methods=['GET', 'POST'])
+@app.route('/api/v2/opsec/anonymous', methods=['GET', 'POST'])
 def api_v2_opsec_anonimo():
     """Routes ALL of Obsidian's traffic over Tor so your IP is not exposed (F13 step 153)."""
     if request.method == 'POST':
@@ -4288,7 +4288,7 @@ def _aplicar_perfil_opsec(ws):
     _OPSEC['person'] = p.get('person')
     return p
 
-@app.route('/api/v2/opsec/perfil', methods=['GET', 'POST'])
+@app.route('/api/v2/opsec/profile', methods=['GET', 'POST'])
 def api_v2_opsec_perfil():
     """OPSEC profile (network identity) associated with a workspace (F13 step 157)."""
     if request.method == 'POST':
@@ -4313,7 +4313,7 @@ def api_v2_opsec_perfil():
 
 _personas = PersonaManager(os.path.join(HOME, '.obsidian', 'personas.json'))
 
-@app.route('/api/v2/personas', methods=['GET', 'POST', 'DELETE'])
+@app.route('/api/v2/persons', methods=['GET', 'POST', 'DELETE'])
 def api_v2_personas():
     """Sock-puppet vault: non-attributable investigation identities (F13 step 152)."""
     if request.method == 'GET':
@@ -4389,7 +4389,7 @@ def api_v2_keys_probar():
 
 _TIPOS_ACTIVO = ('domain', 'subdomain', 'ip', 'port', 'tech', 'url', 'cve', 'bucket', 'org')
 
-@app.route('/api/v2/inventario')
+@app.route('/api/v2/inventory')
 def api_v2_inventario():
     """Inventory of the target's internet-facing assets, in one place (F12 step 144)."""
     inv = {}
@@ -4403,7 +4403,7 @@ def api_v2_inventario():
                     'total_activos': sum(len(v) for v in inv.values()),
                     'inventario': inv})
 
-@app.route('/api/v2/diff_historico')
+@app.route('/api/v2/diff_history')
 def api_v2_diff_historico():
     """How the target's surface changed vs an earlier snapshot (F12 step 151).
     Without ?snapshot it returns the list of available snapshots."""
@@ -4423,7 +4423,7 @@ def api_v2_diff_historico():
     return jsonify({'snapshot': sid, 'agregados': agregados, 'removidos': removidos,
                     'total_antes': len(viejo), 'total_ahora': len(_almacen)})
 
-@app.route('/api/v2/exposicion')
+@app.route('/api/v2/exposure')
 def api_v2_exposicion():
     """Target exposure score: surface size + risk (F12 step 149)."""
     conteos = {t: len(_almacen.of_type(t)) for t in _TIPOS_ACTIVO}
@@ -4432,7 +4432,7 @@ def api_v2_exposicion():
     return jsonify({'exposicion': exposure_score(conteos, riesgo), 'riesgo': riesgo,
                     'superficie': conteos, 'hallazgos': len(h)})
 
-@app.route('/api/v2/hallazgos')
+@app.route('/api/v2/findings')
 def api_v2_hallazgos():
     """Runs the correlation engine on the active case (F4 steps 62, 64)."""
     h = correlate(_almacen)
@@ -4453,8 +4453,8 @@ def _objetivo_del_almacen():
     cand = [e for e in (semillas or ents) if e.type in orden] or (semillas or ents)
     return sorted(cand, key=lambda e: (orden.get(e.type, 9), e.value))[0].value
 
-@app.route('/api/v2/reporte')
-@app.route('/v2/reporte')
+@app.route('/api/v2/report')
+@app.route('/v2/report')
 def api_v2_reporte():
     """Self-contained HTML report of the active case (F7 step 93): risk summary,
     findings, entity inventory and embedded graph. ?grafo=0 omits it (lighter)."""
@@ -4617,24 +4617,24 @@ _PROMPTS_IA = {
 _FUENTE_POR_IDIOMA = {'ru': 'Yandex / VK', 'zh': 'Baidu / Weibo', 'ar': 'Google (Arabic)',
                       'ja': 'Yahoo Japan', 'ko': 'Naver', 'es_en': 'Google'}
 
-@app.route('/api/v2/zona_horaria', methods=['POST'])
+@app.route('/api/v2/time_zone', methods=['POST'])
 def api_v2_zona_horaria():
     """Time zone and local time of a country, for chrono-location (F15 step 178)."""
     return jsonify(_ml.zona_horaria((request.json or {}).get('country', '')))
 
-@app.route('/api/v2/normalizar_telefono', methods=['POST'])
+@app.route('/api/v2/normalize_phone', methods=['POST'])
 def api_v2_normalizar_telefono():
     """Normalizes a phone to +E.164 based on the country (F15 step 177)."""
     d = request.json or {}
     return jsonify({'e164': _ml.normalizar_telefono(d.get('numero', ''), d.get('country', 'US'))})
 
-@app.route('/api/v2/idioma', methods=['POST'])
+@app.route('/api/v2/language', methods=['POST'])
 def api_v2_idioma():
     """Detects the text language and suggests the right source/engine (F15 step 175)."""
     idioma = _ml.detectar_idioma((request.json or {}).get('texto', ''))
     return jsonify({'idioma': idioma, 'fuente_sugerida': _FUENTE_POR_IDIOMA.get(idioma, 'Google')})
 
-@app.route('/api/v2/extraer_texto', methods=['POST'])
+@app.route('/api/v2/extract_text', methods=['POST'])
 def api_v2_extraer_texto():
     """Paste text -> typed entities into the graph (F14 step 161, deterministic regex)."""
     texto = (request.json or {}).get('texto', '')
@@ -4671,7 +4671,7 @@ def api_v2_chat():
         return _error(f'AI failed: {e}', 500)
     return jsonify({'pregunta': pregunta, 'respuesta': resp})
 
-@app.route('/api/v2/deteccion_ia', methods=['POST'])
+@app.route('/api/v2/ai_detection', methods=['POST'])
 def api_v2_deteccion_ia():
     """A hint (NOT proof) of AI-generated text (F14 step 169). For images, use the
     'ela' transform (126). No reliable keyless method exists -- it is indicative only."""
@@ -4690,7 +4690,7 @@ def api_v2_deteccion_ia():
                     'aviso': 'A HINT, not proof. There is no reliable keyless AI/deepfake detection; '
                              'for images use the ela transform (Error Level Analysis).'})
 
-@app.route('/api/v2/consulta', methods=['POST'])
+@app.route('/api/v2/query', methods=['POST'])
 def api_v2_consulta():
     """Natural-language query -> transform plan (F14 step 165)."""
     if not ia.available():
@@ -4708,7 +4708,7 @@ def api_v2_consulta():
         return _error(f'AI failed: {e}', 500)
     return jsonify({'pregunta': pregunta, 'plan': resp})
 
-@app.route('/api/v2/traducir', methods=['POST'])
+@app.route('/api/v2/translate', methods=['POST'])
 def api_v2_traducir():
     """Translates foreign text (Chinese/Russian/Arabic...) to English with Ollama (F14 step 162)."""
     if not ia.available():
@@ -4738,7 +4738,7 @@ def api_v2_ia_modo(modo):
         return _error(f'AI failed: {e}', 500)
     return jsonify({'modo': modo, 'resultado': resp})
 
-@app.route('/api/v2/hallazgos/ia', methods=['POST'])
+@app.route('/api/v2/findings/ia', methods=['POST'])
 def api_v2_hallazgos_ia():
     """AI-assisted correlation (F4 step 65): Ollama summarizes the risk and
     suggests the next step from the case findings."""
@@ -4763,7 +4763,7 @@ def api_v2_hallazgos_ia():
         log.warning("AI correlation failed: %s", e)
         return _error('Ollama unavailable (is it running on :11434?)', 503)
 
-@app.route('/api/v2/hallazgos/verificar', methods=['POST'])
+@app.route('/api/v2/findings/verify', methods=['POST'])
 def api_v2_verificar():
     """SECOND SHIELD: the AI reviews each finding with the real EVIDENCE, explains
     why it is (or is not) dangerous and flags likely false positives. It SUGGESTS,
@@ -4802,13 +4802,13 @@ def v2_page():
     return _cargar_web('v2.html')
 
 
-@app.route('/api/reporte', methods=['POST'])
+@app.route('/api/report', methods=['POST'])
 def api_reporte():
     if not case['datos']: return jsonify({'error':'No data collected yet'}), 400
     path = _generar_reporte_html()
     return jsonify({'ok':True, 'path':path})
 
-@app.route('/reporte_pdf')
+@app.route('/report_pdf')
 def reporte_pdf():
     path = _generar_reporte_html()
     with open(path) as f: contenido = f.read()
@@ -4958,7 +4958,7 @@ def api_monitor():
 def api_grafo():
     return jsonify(_build_grafo())
 
-@app.route('/api/datos')
+@app.route('/api/data')
 def api_datos():
     with case_lock:
         return jsonify({'datos': case['datos'], 'history': case['history'][-20:]})
