@@ -1,41 +1,41 @@
-"""Tests de F14 — capa de IA.
+"""Tests for F14 -- the AI layer.
 
-Correr:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_ia.py -q
+Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_ia.py -q
 """
 
 
-# ── 161: extracción de entidades de texto ────────────────────────────────────
+# ── 161: entity extraction from text ────────────────────────────────────────
 def test_extraer_entidades():
     from core.extraccion import extraer_entidades
-    txt = ('Contacto admin@acme.com vía https://acme.com desde 8.8.8.8. '
-           'Adjunto reporte.pdf y foto.jpg. IP mala 999.1.1.1.')
+    txt = ('Contact admin@acme.com via https://acme.com from 8.8.8.8. '
+           'Attached reporte.pdf and foto.jpg. Bad IP 999.1.1.1.')
     vals = {v for _, v in extraer_entidades(txt)}
     assert 'admin@acme.com' in vals
     assert '8.8.8.8' in vals
     assert 'https://acme.com' in vals
-    assert 'acme.com' in vals                    # dominio extraído
-    assert 'reporte.pdf' not in vals             # anti-FP: archivo, no dominio
+    assert 'acme.com' in vals                    # extracted domain
+    assert 'reporte.pdf' not in vals             # anti-FP: file, not a domain
     assert 'foto.jpg' not in vals
-    assert '999.1.1.1' not in vals               # octeto inválido descartado
+    assert '999.1.1.1' not in vals               # invalid octet discarded
 
 
 def test_extraer_wallets_de_texto():
     from core.extraccion import extraer_entidades
-    txt = 'paga a 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
+    txt = 'pay to 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
     tipos = {t for t, _ in extraer_entidades(txt)}
     assert 'wallet' in tipos
 
 
-# ── 162: traducción de fuentes extranjeras ───────────────────────────────────
+# ── 162: translation of foreign sources ─────────────────────────────────────
 def test_traducir(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
-    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'Hola mundo')
+    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'Hello world')
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
     d = c.post('/api/v2/traducir', json={'texto': '你好世界'}).get_json()
-    assert d['traduccion'] == 'Hola mundo'
+    assert d['traduccion'] == 'Hello world'
     assert c.post('/api/v2/traducir', json={'texto': ''}).status_code == 400
 
 
@@ -48,67 +48,67 @@ def test_traducir_sin_ia(monkeypatch):
     assert c.post('/api/v2/traducir', json={'texto': 'x'}).status_code == 503
 
 
-# ── 163: resumen del caso en lenguaje natural (modo IA) ───────────────────────
+# ── 163: natural-language case summary (AI mode) ────────────────────────────
 def test_resumen_modo_ia(monkeypatch):
     import obsidian_web as ob
     assert 'resumen' in ob._PROMPTS_IA
     monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
-    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'El objetivo tiene 3 subdominios expuestos.')
+    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'The target has 3 exposed subdomains.')
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
     d = c.post('/api/v2/ia/resumen').get_json()
-    assert d['modo'] == 'resumen' and 'subdominios' in d['resultado']
+    assert d['modo'] == 'resumen' and 'subdomains' in d['resultado']
 
 
-# ── 164/166/167: modos IA (siguiente paso, narrativa, clasificación) ─────────
+# ── 164/166/167: AI modes (next step, narrative, classification) ────────────
 def test_modos_ia_extra():
     import obsidian_web as ob
     assert {'siguiente', 'narrativa', 'clasificar'} <= set(ob._PROMPTS_IA)
 
 
-# ── 165: consulta en lenguaje natural -> plan ─────────────────────────────────
+# ── 165: natural-language query -> plan ─────────────────────────────────────
 def test_consulta_nl(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
-    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: '1. dns_a sobre el dominio\n2. crtsh')
+    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: '1. dns_a on the domain\n2. crtsh')
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    d = c.post('/api/v2/consulta', json={'pregunta': 'encuentra todo sobre acme.com'}).get_json()
+    d = c.post('/api/v2/consulta', json={'pregunta': 'find everything about acme.com'}).get_json()
     assert 'plan' in d and 'dns_a' in d['plan']
     assert c.post('/api/v2/consulta', json={'pregunta': ''}).status_code == 400
 
 
-# ── 168: conectar con NEXO (ruteo de modelo por tarea) ────────────────────────
+# ── 168: connect with NEXO (per-task model routing) ─────────────────────────
 def test_elegir_modelo_nexo():
     from core.ia import elegir_modelo
-    assert elegir_modelo('busca un exploit para esta vuln') == 'dolphin-llama3'   # seguridad
-    assert elegir_modelo('recon del dominio y sus subdominios') == 'qwen2.5:3b'   # osint
-    assert elegir_modelo('scan de 8.8.8.8') == 'dolphin-llama3'                   # IP -> seguridad
-    assert elegir_modelo('hola qué tal') == 'qwen2.5:1.5b'                        # sin señal -> rápido
+    assert elegir_modelo('find an exploit for this vuln') == 'dolphin-llama3'     # security
+    assert elegir_modelo('recon of the domain and its subdomains') == 'qwen2.5:3b'   # osint
+    assert elegir_modelo('scan of 8.8.8.8') == 'dolphin-llama3'                   # IP -> security
+    assert elegir_modelo('hello how are you') == 'qwen2.5:1.5b'                   # no signal -> fast
 
 
-# ── 169: detección de IA (indicio, no prueba) ─────────────────────────────────
+# ── 169: AI detection (a hint, not proof) ───────────────────────────────────
 def test_deteccion_ia(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
-    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'Texto muy uniforme, posible IA.')
+    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'Very uniform text, possibly AI.')
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
     d = c.post('/api/v2/deteccion_ia', json={'texto': 'lorem ipsum...'}).get_json()
-    assert 'evaluacion' in d and 'A HINT' in d['aviso']   # honestidad: no da certeza
+    assert 'evaluacion' in d and 'A HINT' in d['aviso']   # honesty: gives no certainty
 
 
-# ── 170: chat sobre el caso ───────────────────────────────────────────────────
+# ── 170: chat about the case ────────────────────────────────────────────────
 def test_chat_caso(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
-    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'La IP 1.2.3.4 aloja el dominio.')
+    monkeypatch.setattr(ob.ia, 'consultar', lambda *a, **k: 'IP 1.2.3.4 hosts the domain.')
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    d = c.post('/api/v2/chat', json={'pregunta': '¿relación entre la ip y el dominio?'}).get_json()
+    d = c.post('/api/v2/chat', json={'pregunta': 'relation between the ip and the domain?'}).get_json()
     assert 'respuesta' in d and '1.2.3.4' in d['respuesta']
     assert c.post('/api/v2/chat', json={'pregunta': ''}).status_code == 400
