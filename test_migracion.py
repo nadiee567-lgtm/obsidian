@@ -1,11 +1,11 @@
-"""Tests del adaptador de migración viejo→tipado (F1 paso 24).
+"""Tests for the old->typed migration adapter (F1 step 24).
 
-Correr:  ../.venv/bin/python -m pytest test_migracion.py -q
+Run:  ../.venv/bin/python -m pytest test_migracion.py -q
 """
 from core.migracion import migrar_caso
 
 
-# un case viejo realista, como lo dejaban los módulos OSINT
+# a realistic old case, as the OSINT modules used to leave it
 CASE_VIEJO = {
     'nombre': 'caso1',
     'objetivo': 'example.com',
@@ -32,14 +32,14 @@ CASE_VIEJO = {
             'resultados': {'vulnerables': [{'subdominio': 'old.example.com',
                                             'servicio': 'GitHub Pages', 'status': '404'}]},
         },
-        'roto': {'tipo': 'ip'},   # módulo malformado: no debe tumbar nada
+        'roto': {'tipo': 'ip'},   # malformed module: must not break anything
     },
 }
 
 
 def test_migracion_crea_entidades_tipadas():
     alm = migrar_caso(CASE_VIEJO)
-    # objetivo + dominio + ip + subdominios + email + pais + org + ptr + takeover...
+    # target + domain + ip + subdomains + email + country + org + ptr + takeover...
     assert alm.buscar('objetivo', 'example.com') is not None
     assert alm.buscar('dominio', 'example.com') is not None
     assert alm.buscar('ip', '93.184.216.34') is not None
@@ -49,8 +49,8 @@ def test_migracion_crea_entidades_tipadas():
 
 
 def test_migracion_dedup_email_entre_modulos():
-    # el email aparece en el módulo 'dominio' (emails) y en el módulo 'email':
-    # debe ser UNA sola entidad con ambos orígenes
+    # the email appears in the 'dominio' module (emails) and the 'email' module:
+    # it must be ONE single entity with both sources
     alm = migrar_caso(CASE_VIEJO)
     e = alm.buscar('email', 'admin@example.com')
     assert 'dominio' in e.origenes and 'email' in e.origenes
@@ -66,7 +66,7 @@ def test_migracion_tags_y_props():
 
 
 def test_migracion_no_truena_con_modulo_roto():
-    # el módulo 'roto' no tiene 'objetivo'; la migración lo salta sin error
+    # the 'roto' module has no 'objetivo'; the migration skips it without error
     alm = migrar_caso(CASE_VIEJO)
     assert len(alm) > 0
 

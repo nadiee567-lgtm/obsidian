@@ -1,9 +1,9 @@
-"""Tests de integración: el modelo/motor DENTRO de la app real (F2).
+"""Integration tests: the model/engine INSIDE the real app (F2).
 
-Verifican que la integración no rompió nada y que los endpoints /api/v2/*
-funcionan. No dependen de la red (no ejecutan dns_a/crtsh de verdad).
+They verify the integration broke nothing and that the /api/v2/* endpoints work.
+They don't depend on the network (they don't really run dns_a/crtsh).
 
-Correr:  ../.venv/bin/python -m pytest test_integracion.py -q
+Run:  ../.venv/bin/python -m pytest test_integracion.py -q
 """
 import obsidian_web as ob
 from core.transforms import REGISTRO
@@ -46,7 +46,7 @@ def test_v2_transforms_aplicables():
     assert r.status_code == 200
     nombres = [t['nombre'] for t in r.get_json()['transforms']]
     assert 'dns_a' in nombres and 'crtsh' in nombres
-    # ptr aplica a ip, no a dominio
+    # ptr applies to ip, not to domain
     assert 'ptr' not in nombres
 
 
@@ -76,14 +76,14 @@ def test_v2_grafo_migrar_vacio():
 
 
 def test_auth_protege_v2():
-    # sin sesión, /api/v2 debe pedir auth (no filtrar)
+    # without a session, /api/v2 must require auth (no leaking)
     c = ob.app.test_client()
     r = c.get('/api/v2/transforms/dominio')
     assert r.status_code == 401
 
 
 def test_workspaces_flujo(tmp_path):
-    """CRUD + persistencia de workspaces vía endpoints (F3), aislado en tmp."""
+    """Workspace CRUD + persistence via endpoints (F3), isolated in tmp."""
     from core.workspaces import Gestor
     prev_g, prev_ws, prev_a = ob._gestor, ob._ws_activo, ob._almacen
     ob._gestor = Gestor(str(tmp_path))
@@ -91,19 +91,19 @@ def test_workspaces_flujo(tmp_path):
     ob._almacen = ob.Almacen()
     try:
         c = _client()
-        # crear -> queda activo
+        # create -> becomes active
         r = c.post('/api/v2/workspaces', json={'nombre': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['activo'] == 'caso demo'
-        # listar
+        # list
         j = c.get('/api/v2/workspaces').get_json()
         assert 'caso demo' in j['workspaces'] and j['activo'] == 'caso demo'
-        # simular datos guardados y abrir en limpio
+        # simulate saved data and open fresh
         ob._almacen.crear('ip', '8.8.8.8')
         ob._gestor.guardar('caso demo', ob._almacen)
         ob._almacen = ob.Almacen()
         r = c.post('/api/v2/workspaces/abrir', json={'nombre': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['total_entidades'] == 1
-        # borrar -> sin activo
+        # delete -> no active
         r = c.delete('/api/v2/workspaces', json={'nombre': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['activo'] is None
         assert c.get('/api/v2/workspaces').get_json()['workspaces'] == []
@@ -112,8 +112,8 @@ def test_workspaces_flujo(tmp_path):
 
 
 def test_guard_recuerda_destino():
-    # sin sesión, ir a /v2 redirige a /login Y guarda el destino en la sesión,
-    # para volver ahí tras loguear (arregla el rebote a la página vieja)
+    # without a session, going to /v2 redirects to /login AND saves the destination
+    # in the session, to return there after login (fixes the bounce to the old page)
     c = ob.app.test_client()
     r = c.get('/v2')
     assert r.status_code == 302 and '/login' in r.headers.get('Location', '')
