@@ -3282,10 +3282,10 @@ def _t_wordlist(entidad, ctx):
     if not ia.disponible():
         return
     contexto = json.dumps(ctx.almacen.to_dict(), default=str)[:3000]
-    prompt = (f'A partir del OSINT del objetivo "{entidad.valor}", genera una wordlist de '
-              f'contraseñas probables: nombres, fechas, organización, combinaciones (nombre+año, '
-              f'nombre+123), leet speak. 30-50 entradas, una por línea, solo las contraseñas.\n\n'
-              f'Datos:\n{contexto}')
+    prompt = (f'From the OSINT of the target "{entidad.valor}", generate a wordlist of '
+              f'likely passwords: names, dates, organization, combinations (name+year, '
+              f'name+123), leet speak. 30-50 entries, one per line, passwords only.\n\n'
+              f'Data:\n{contexto}')
     try:
         resp = ia.consultar(prompt, max_tokens=600, temp=0.6) or ''
     except Exception as _e:
@@ -4656,16 +4656,16 @@ def api_v2_extraer_texto():
 
 @app.route('/api/v2/chat', methods=['POST'])
 def api_v2_chat():
-    """Chat sobre el caso: pregúntale a la IA usando los datos del grafo (F14 paso 170)."""
+    """Chat about the case: ask the AI using the graph data (F14 step 170)."""
     if not ia.disponible():
         return _error('AI (Ollama) unavailable', 503)
     pregunta = ((request.json or {}).get('pregunta', '') or '').strip()
     if not pregunta:
         return _error('empty question', 400)
     contexto = json.dumps(_almacen.to_dict(), default=str)[:3500]
-    prompt = (f'Eres un analista con acceso a este caso OSINT. Responde la pregunta usando SOLO estos '
-              f'datos; si la respuesta no está en ellos, dilo claramente.\n\nDatos:\n{contexto}\n\n'
-              f'Pregunta: {pregunta}')
+    prompt = (f'You are an analyst with access to this OSINT case. Answer the question using ONLY this '
+              f'data; if the answer is not in it, say so clearly.\n\nData:\n{contexto}\n\n'
+              f'Question: {pregunta}')
     try:
         resp = ia.consultar(prompt, max_tokens=500, temp=0.3)
     except Exception as e:
@@ -4674,35 +4674,35 @@ def api_v2_chat():
 
 @app.route('/api/v2/deteccion_ia', methods=['POST'])
 def api_v2_deteccion_ia():
-    """Indicio (NO prueba) de texto generado por IA (F14 paso 169). Para imágenes,
-    usa el transform 'ela' (126). No existe método keyless fiable — es orientativo."""
+    """A hint (NOT proof) of AI-generated text (F14 step 169). For images, use the
+    'ela' transform (126). No reliable keyless method exists -- it is indicative only."""
     if not ia.disponible():
         return _error('AI (Ollama) unavailable', 503)
     texto = ((request.json or {}).get('texto', '') or '')[:3000]
     if not texto.strip():
         return _error('empty text', 400)
     try:
-        resp = ia.consultar('¿Este texto parece generado por IA? Da SEÑALES concretas (uniformidad, '
-                            'frases genéricas, falta de detalle específico) y un veredicto tentativo. '
-                            f'No inventes certeza.\n\n{texto}', max_tokens=400, temp=0.3)
+        resp = ia.consultar('Does this text look AI-generated? Give concrete SIGNALS (uniformity, '
+                            'generic phrasing, lack of specific detail) and a tentative verdict. '
+                            f'Do not invent certainty.\n\n{texto}', max_tokens=400, temp=0.3)
     except Exception as e:
         return _error(f'AI failed: {e}', 500)
     return jsonify({'evaluacion': resp,
-                    'aviso': 'INDICIO, no prueba. No hay detección de IA/deepfake keyless fiable; '
-                             'para imágenes usa el transform ela (Error Level Analysis).'})
+                    'aviso': 'A HINT, not proof. There is no reliable keyless AI/deepfake detection; '
+                             'for images use the ela transform (Error Level Analysis).'})
 
 @app.route('/api/v2/consulta', methods=['POST'])
 def api_v2_consulta():
-    """Consulta en lenguaje natural → plan de transforms (F14 paso 165)."""
+    """Natural-language query -> transform plan (F14 step 165)."""
     if not ia.disponible():
         return _error('AI (Ollama) unavailable', 503)
     pregunta = ((request.json or {}).get('pregunta', '') or '').strip()
     if not pregunta:
         return _error('empty question', 400)
     disponibles = sorted({t.nombre for tp in TIPOS for t in REGISTRO.aplicables(tp)})
-    prompt = (f'Eres OBSIDIAN, un motor OSINT. Transforms disponibles: {", ".join(disponibles)}.\n'
-              f'El usuario pide: "{pregunta}". Devuelve un PLAN concreto: qué transforms correr, '
-              f'sobre qué entidad y en qué orden. Sé específico.')
+    prompt = (f'You are OBSIDIAN, an OSINT engine. Available transforms: {", ".join(disponibles)}.\n'
+              f'The user asks: "{pregunta}". Return a concrete PLAN: which transforms to run, '
+              f'on which entity and in what order. Be specific.')
     try:
         resp = ia.consultar(prompt, max_tokens=600, temp=0.3)
     except Exception as e:
@@ -4711,22 +4711,22 @@ def api_v2_consulta():
 
 @app.route('/api/v2/traducir', methods=['POST'])
 def api_v2_traducir():
-    """Traduce texto extranjero (chino/ruso/árabe…) al español con Ollama (F14 paso 162)."""
+    """Translates foreign text (Chinese/Russian/Arabic...) to English with Ollama (F14 step 162)."""
     if not ia.disponible():
         return _error('AI (Ollama) unavailable', 503)
     texto = ((request.json or {}).get('texto', '') or '')[:4000]
     if not texto.strip():
         return _error('empty text', 400)
     try:
-        resp = ia.consultar(f'Traduce al español. Devuelve SOLO la traducción, sin notas '
-                            f'ni comillas:\n\n{texto}', max_tokens=800, temp=0.2)
+        resp = ia.consultar(f'Translate to English. Return ONLY the translation, no notes '
+                            f'or quotes:\n\n{texto}', max_tokens=800, temp=0.2)
     except Exception as e:
         return _error(f'AI failed: {e}', 500)
     return jsonify({'traduccion': resp})
 
 @app.route('/api/v2/ia/<modo>', methods=['POST'])
 def api_v2_ia_modo(modo):
-    """IA a nivel de caso (paso 34 backfill): escenario MITRE / superficie / analizar."""
+    """Case-level AI (step 34 backfill): MITRE scenario / surface / analyze."""
     if modo not in _PROMPTS_IA:
         return _error('invalid mode', 404)
     if not ia.disponible():
@@ -4741,8 +4741,8 @@ def api_v2_ia_modo(modo):
 
 @app.route('/api/v2/hallazgos/ia', methods=['POST'])
 def api_v2_hallazgos_ia():
-    """Correlación asistida por IA (F4 paso 65): Ollama resume el riesgo y
-    sugiere el siguiente paso a partir de los hallazgos del caso."""
+    """AI-assisted correlation (F4 step 65): Ollama summarizes the risk and
+    suggests the next step from the case findings."""
     h = correlacionar(_almacen)
     if not h:
         return jsonify({'resumen': 'No findings to analyze yet. Run more transforms.'})
@@ -4752,47 +4752,47 @@ def api_v2_hallazgos_ia():
     ents = ', '.join(f'{n} {t}' for t, n in conteo.items())
     lista = '\n'.join(f'- [{x.severidad}] {x.mensaje}' for x in h)
     prompt = (
-        f"Eres un analista de ciberseguridad. En una investigación OSINT sobre un objetivo "
-        f"(entidades: {ents}) se detectaron estos hallazgos:\n\n{lista}\n\n"
-        f"Score de riesgo: {score_riesgo(h)}/100.\n\n"
-        f"En 3-4 frases en español: resume el riesgo principal y sugiere el siguiente paso "
-        f"concreto de investigación. Directo, sin relleno.")
+        f"You are a cybersecurity analyst. In an OSINT investigation on a target "
+        f"(entities: {ents}) these findings were detected:\n\n{lista}\n\n"
+        f"Risk score: {score_riesgo(h)}/100.\n\n"
+        f"In 3-4 sentences: summarize the main risk and suggest the next concrete "
+        f"investigation step. Direct, no filler.")
     try:
         texto = ia.consultar(prompt, max_tokens=300)
         return jsonify({'resumen': texto or 'The AI returned no text.'})
     except Exception as e:
-        log.warning("IA correlación falló: %s", e)
+        log.warning("AI correlation failed: %s", e)
         return _error('Ollama unavailable (is it running on :11434?)', 503)
 
 @app.route('/api/v2/hallazgos/verificar', methods=['POST'])
 def api_v2_verificar():
-    """SEGUNDO ESCUDO: la IA revisa cada hallazgo con la EVIDENCIA real, explica
-    por qué es (o no) peligroso y marca probables falsos positivos. SUGIERE, no
-    borra — el humano confirma. Idea de Sebastian (LLM-como-verificador)."""
+    """SECOND SHIELD: the AI reviews each finding with the real EVIDENCE, explains
+    why it is (or is not) dangerous and flags likely false positives. It SUGGESTS,
+    it does not delete -- the human confirms (LLM-as-verifier)."""
     h = correlacionar(_almacen)
     if not h:
         return jsonify({'revisiones': []})
     idmap = {e.id: e for e in _almacen.entidades}
     revisiones = []
-    for hall in h[:6]:   # límite para no eternizarse
+    for hall in h[:6]:   # cap so it does not run forever
         ev = []
         for eid in hall.entidades:
             e = idmap.get(eid)
             if e:
                 ev.append(f"{e.tipo} {e.valor} | props: {e.propiedades} | tags: {sorted(e.tags)} | fuentes: {sorted(e.origenes)}")
         prompt = (
-            "Eres un analista de seguridad revisando una alerta AUTOMÁTICA. Sé MUY escéptico "
-            "con señales de una sola fuente: pueden ser falsos positivos (CDNs como Cloudflare, "
-            "nodos TOR, hosting compartido no son maliciosos por sí solos).\n\n"
-            f"ALERTA [{hall.severidad}]: {hall.mensaje}\n"
-            "EVIDENCIA REAL recolectada:\n" + ("\n".join(ev) or "(sin evidencia extra)") + "\n\n"
-            "En español, 2-3 frases: ¿riesgo real o probable falso positivo? ¿POR QUÉ (basándote "
-            "en la evidencia)? ¿Qué debería verificar el usuario?")
+            "You are a security analyst reviewing an AUTOMATIC alert. Be VERY skeptical "
+            "of single-source signals: they can be false positives (CDNs like Cloudflare, "
+            "TOR nodes, shared hosting are not malicious on their own).\n\n"
+            f"ALERT [{hall.severidad}]: {hall.mensaje}\n"
+            "REAL EVIDENCE collected:\n" + ("\n".join(ev) or "(no extra evidence)") + "\n\n"
+            "In 2-3 sentences: real risk or likely false positive? WHY (based on the "
+            "evidence)? What should the user verify?")
         try:
             razon = ia.consultar(prompt, max_tokens=220, temp=0.3)
         except Exception as e:
-            log.warning("verificar IA falló: %s", e)
-            razon = 'IA no disponible (¿Ollama en :11434?)'
+            log.warning("verify AI failed: %s", e)
+            razon = 'AI unavailable (is Ollama on :11434?)'
         revisiones.append({'hallazgo': hall.mensaje, 'severidad': hall.severidad, 'razon': razon})
     return jsonify({'revisiones': revisiones})
 

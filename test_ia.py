@@ -98,7 +98,7 @@ def test_deteccion_ia(monkeypatch):
     with c.session_transaction() as s:
         s['auth'] = True
     d = c.post('/api/v2/deteccion_ia', json={'texto': 'lorem ipsum...'}).get_json()
-    assert 'evaluacion' in d and 'INDICIO' in d['aviso']   # honestidad: no da certeza
+    assert 'evaluacion' in d and 'A HINT' in d['aviso']   # honestidad: no da certeza
 
 
 # ── 170: chat sobre el caso ───────────────────────────────────────────────────
