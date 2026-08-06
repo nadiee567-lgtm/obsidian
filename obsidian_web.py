@@ -2972,7 +2972,7 @@ def _t_telefono_dorks(entidad, ctx):
     dorks = {
         'truecaller': f'{num} site:truecaller.com',
         'whitepages': f'{num} site:whitepages.com',
-        'mensajeria': f'{num} whatsapp OR telegram',
+        'messaging': f'{num} whatsapp OR telegram',
         'general': limpio,
     }
     for nombre, q in dorks.items():
@@ -3085,7 +3085,7 @@ def _t_takeover(entidad, ctx):
             return
         for servicio, fp in _TAKEOVER_FP.items():
             if servicio in cname:
-                estado = 'POSIBLE'
+                estado = 'POSSIBLE'
                 try:
                     if fp.lower() in SESSION.get(f'http://{sub}', timeout=5).text.lower():
                         estado = 'VULNERABLE'
@@ -3103,7 +3103,7 @@ def _t_takeover(entidad, ctx):
         s = ctx.emitir('subdominio', sub, etiqueta='takeover',
                        servicio=info['servicio'], cname=info['cname'], estado=info['estado'])
         if s:
-            s.etiquetar('takeover')          # dispara la regla r_takeover (F4/55)
+            s.etiquetar('takeover')          # triggers the r_takeover rule (F4/55)
 
 @transform(entrada='dominio', salidas=('ip',), nombre='passivedns', requiere_key=True,
            descripcion='IP history of the domain (Passive DNS via VirusTotal, key in the vault) (F2 step 34)')
@@ -3164,7 +3164,7 @@ def _t_github_sec(entidad, ctx):
                     for nombre_pat, patron in _SECRET_PATTERNS:
                         for m in re.findall(patron, patch, re.IGNORECASE):
                             val = (m if isinstance(m, str) else ':'.join(x for x in m if x)) or nombre_pat
-                            c = ctx.emitir('credencial', val[:60], etiqueta='secreto',
+                            c = ctx.emitir('credencial', val[:60], etiqueta='secret',
                                            tipo_secreto=nombre_pat, repo=full,
                                            commit=sha[:8], archivo=f.get('filename', '?'))
                             if c:
@@ -3185,7 +3185,7 @@ def _t_persona(entidad, ctx):
         log.debug("persona ddg: %s", _e)
     dorks = {'linkedin': f'"{nombre}" site:linkedin.com',
              'x': f'"{nombre}" site:twitter.com OR site:x.com',
-             'contacto': f'"{nombre}" email OR phone OR address',
+             'contact': f'"{nombre}" email OR phone OR address',
              'pdf': f'"{nombre}" filetype:pdf',
              'github': f'"{nombre}" site:github.com',
              'facebook': f'"{nombre}" site:facebook.com'}
@@ -3214,7 +3214,7 @@ def _t_url_check(entidad, ctx):
         d = SESSION.post('https://urlhaus-api.abuse.ch/v1/url/',
                          data={'url': entidad.valor}, timeout=8).json() or {}
         if d.get('query_status') == 'ok':
-            entidad.propiedades['urlhaus'] = d.get('threat', 'listada')
+            entidad.propiedades['urlhaus'] = d.get('threat', 'listed')
             entidad.etiquetar('url-maliciosa')
     except Exception as _e:
         log.debug("url_check urlhaus: %s", _e)
@@ -3225,7 +3225,7 @@ def _t_render_js(entidad, ctx):
     url = entidad.valor
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
-    if not _url_publica(url):                    # anti-SSRF: no renderizar hosts internos
+    if not _url_publica(url):                    # anti-SSRF: do not render internal hosts
         return
     try:
         from playwright.sync_api import sync_playwright
@@ -3241,7 +3241,7 @@ def _t_render_js(entidad, ctx):
             browser.close()
         for em in list(set(re.findall(
                 r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', html_render)))[:15]:
-            ctx.emitir('email', em, etiqueta='en-render')
+            ctx.emitir('email', em, etiqueta='in-render')
     except Exception as _e:
         log.debug("render_js: %s", _e)
 

@@ -17,7 +17,7 @@ def _correr(nombre, tipo, valor):
 def test_telefono_dorks_keyless():
     prod, _, _ = _correr('telefono_dorks', 'telefono', '+14155552671')
     dorks = {p.propiedades.get('dork') for p in prod if p.tipo == 'url'}
-    assert dorks == {'truecaller', 'whitepages', 'mensajeria', 'general'}
+    assert dorks == {'truecaller', 'whitepages', 'messaging', 'general'}
     assert all(p.tipo == 'url' for p in prod)      # sin key: solo dorks, sin país
 
 
@@ -272,7 +272,7 @@ def test_persona(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _Rj({'AbstractText': 'Bio de la persona.'}))
     prod, e, _ = _correr('persona', 'persona', 'Juan Perez')
-    assert {p.propiedades.get('dork') for p in prod} == {'linkedin', 'x', 'contacto', 'pdf', 'github', 'facebook'}
+    assert {p.propiedades.get('dork') for p in prod} == {'linkedin', 'x', 'contact', 'pdf', 'github', 'facebook'}
     assert e.propiedades.get('resumen') == 'Bio de la persona.'
 
 
