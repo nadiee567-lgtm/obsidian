@@ -305,7 +305,7 @@ def test_yara_bulk_carpeta_invalida():
 
 
 def test_wordlist_ia(monkeypatch):
-    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'juan2024\npassword123\nperez.juan\nabc')
     _, e, _ = _correr('wordlist', 'person', 'Juan')
     palabras = e.properties.get('wordlist')
@@ -313,7 +313,7 @@ def test_wordlist_ia(monkeypatch):
 
 
 def test_ia_caso_endpoint(monkeypatch):
-    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'T1566 Phishing. Kill chain...')
     c = ob.app.test_client()
     with c.session_transaction() as s:

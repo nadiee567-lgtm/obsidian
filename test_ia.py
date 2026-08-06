@@ -29,7 +29,7 @@ def test_extraer_wallets_de_texto():
 # ── 162: translation of foreign sources ─────────────────────────────────────
 def test_traducir(monkeypatch):
     import obsidian_web as ob
-    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'Hello world')
     c = ob.app.test_client()
     with c.session_transaction() as s:
@@ -41,7 +41,7 @@ def test_traducir(monkeypatch):
 
 def test_traducir_sin_ia(monkeypatch):
     import obsidian_web as ob
-    monkeypatch.setattr(ob.ia, 'disponible', lambda: False)
+    monkeypatch.setattr(ob.ia, 'available', lambda: False)
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
@@ -52,7 +52,7 @@ def test_traducir_sin_ia(monkeypatch):
 def test_resumen_modo_ia(monkeypatch):
     import obsidian_web as ob
     assert 'resumen' in ob._PROMPTS_IA
-    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'The target has 3 exposed subdomains.')
     c = ob.app.test_client()
     with c.session_transaction() as s:
@@ -70,7 +70,7 @@ def test_modos_ia_extra():
 # ── 165: natural-language query -> plan ─────────────────────────────────────
 def test_consulta_nl(monkeypatch):
     import obsidian_web as ob
-    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: '1. dns_a on the domain\n2. crtsh')
     c = ob.app.test_client()
     with c.session_transaction() as s:
@@ -92,7 +92,7 @@ def test_elegir_modelo_nexo():
 # ── 169: AI detection (a hint, not proof) ───────────────────────────────────
 def test_deteccion_ia(monkeypatch):
     import obsidian_web as ob
-    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'Very uniform text, possibly AI.')
     c = ob.app.test_client()
     with c.session_transaction() as s:
@@ -104,7 +104,7 @@ def test_deteccion_ia(monkeypatch):
 # ── 170: chat about the case ────────────────────────────────────────────────
 def test_chat_caso(monkeypatch):
     import obsidian_web as ob
-    monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
+    monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'IP 1.2.3.4 hosts the domain.')
     c = ob.app.test_client()
     with c.session_transaction() as s:

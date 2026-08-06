@@ -43,7 +43,7 @@ class Vault:
         os.chmod(self.enc_file, 0o600)
 
     # -- public API --
-    def guardar(self, servicio, value):
+    def save(self, servicio, value):
         d = self._leer()
         d[servicio] = value
         self._escribir(d)

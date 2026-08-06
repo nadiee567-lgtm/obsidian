@@ -11,7 +11,7 @@ def _crear_db_vieja(path):
             propiedades TEXT, origenes TEXT, tags TEXT, procedencia TEXT,
             confianza REAL, creada TEXT);
         CREATE TABLE relaciones (id TEXT PRIMARY KEY, origen TEXT, destino TEXT, etiqueta TEXT);
-        CREATE TABLE historial (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT,
+        CREATE TABLE history (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT,
             transform TEXT, entrada TEXT, salidas INTEGER);
     """)
     # old ids computed the old way: sha1("dominio:x.com") etc. -- but the migration
@@ -29,7 +29,7 @@ def test_migracion_completa(tmp_path):
     # entities survived, types are English now
     tipos = {e.type for e in alm.entities}
     assert tipos == {'domain', 'ip'}
-    dom = alm.buscar('domain', 'x.com')
+    dom = alm.find('domain', 'x.com')
     assert dom is not None and dom.value == 'x.com'
     # the relation still connects the same two entities (endpoints remapped)
     assert len(alm.relations) == 1

@@ -1316,7 +1316,7 @@ async function nuevoCaso() {
 }
 
 async function guardarCaso() {
-  const r = await fetch('/api/caso/guardar', {method:'POST'});
+  const r = await fetch('/api/caso/save', {method:'POST'});
   const d = await r.json();
   if (d.ok) toast('Case saved ✓');
   else toast('Error: ' + d.error);
@@ -1352,7 +1352,7 @@ async function buscarEnCasos() {
   const out = document.getElementById('output-buscar-casos');
   out.innerHTML = '<span class="info">Searching...</span>';
   try {
-    const r = await fetch('/api/buscar?q=' + encodeURIComponent(q));
+    const r = await fetch('/api/find?q=' + encodeURIComponent(q));
     const d = await r.json();
     out.innerHTML = '';
     const res = d.resultados || [];

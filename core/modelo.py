@@ -231,7 +231,7 @@ class Store:
     def get(self, id_: str) -> Entity | None:
         return self._entidades.get(id_)
 
-    def buscar(self, type, value) -> Entity | None:
+    def find(self, type, value) -> Entity | None:
         """Looks up by (type, value) without adding -- respects normalization."""
         eid = hashlib.sha1(f"{type}:{normalize(type, value)}".encode()).hexdigest()[:16]
         return self._entidades.get(eid)

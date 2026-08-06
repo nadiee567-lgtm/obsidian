@@ -40,28 +40,28 @@ CASE_VIEJO = {
 def test_migracion_crea_entidades_tipadas():
     alm = migrate_case(CASE_VIEJO)
     # target + domain + ip + subdomains + email + country + org + ptr + takeover...
-    assert alm.buscar('target', 'example.com') is not None
-    assert alm.buscar('domain', 'example.com') is not None
-    assert alm.buscar('ip', '93.184.216.34') is not None
-    assert alm.buscar('email', 'admin@example.com') is not None
-    assert alm.buscar('country', 'US') is not None
-    assert alm.buscar('tech', 'nginx') is not None
+    assert alm.find('target', 'example.com') is not None
+    assert alm.find('domain', 'example.com') is not None
+    assert alm.find('ip', '93.184.216.34') is not None
+    assert alm.find('email', 'admin@example.com') is not None
+    assert alm.find('country', 'US') is not None
+    assert alm.find('tech', 'nginx') is not None
 
 
 def test_migracion_dedup_email_entre_modulos():
     # the email appears in the 'domain' module (emails) and the 'email' module:
     # it must be ONE single entity with both sources
     alm = migrate_case(CASE_VIEJO)
-    e = alm.buscar('email', 'admin@example.com')
+    e = alm.find('email', 'admin@example.com')
     assert 'domain' in e.sources and 'email' in e.sources
 
 
 def test_migracion_tags_y_props():
     alm = migrate_case(CASE_VIEJO)
-    e = alm.buscar('email', 'admin@example.com')
+    e = alm.find('email', 'admin@example.com')
     assert 'spoofable' in e.tags and 'leaked' in e.tags
     assert e.properties.get('hibp_breaches') == ['LinkedIn']
-    sub = alm.buscar('subdomain', 'old.example.com')
+    sub = alm.find('subdomain', 'old.example.com')
     assert 'takeover' in sub.tags
 
 

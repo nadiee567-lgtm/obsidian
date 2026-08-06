@@ -27,19 +27,19 @@ def test_persistencia_aislada(tmp_path):
     g = Manager(str(tmp_path))
     a = g.create('caso_a')
     a.create('domain', 'example.com', sources={'whois'})
-    g.guardar('caso_a', a)
+    g.save('caso_a', a)
 
     b = g.create('caso_b')
     b.create('ip', '8.8.8.8')
-    g.guardar('caso_b', b)
+    g.save('caso_b', b)
 
     # reload each one: sees only its own
-    ra = g.cargar('caso_a')
-    rb = g.cargar('caso_b')
-    assert ra.buscar('domain', 'example.com') is not None
-    assert ra.buscar('ip', '8.8.8.8') is None       # isolated
-    assert rb.buscar('ip', '8.8.8.8') is not None
-    assert rb.buscar('domain', 'example.com') is None
+    ra = g.load('caso_a')
+    rb = g.load('caso_b')
+    assert ra.find('domain', 'example.com') is not None
+    assert ra.find('ip', '8.8.8.8') is None       # isolated
+    assert rb.find('ip', '8.8.8.8') is not None
+    assert rb.find('domain', 'example.com') is None
 
 
 def test_sobrevive_recarga(tmp_path):
@@ -47,11 +47,11 @@ def test_sobrevive_recarga(tmp_path):
     g1 = Manager(str(tmp_path))
     a = g1.create('caso1')
     a.create('email', 'a@b.com', tags={'interesting'})
-    g1.guardar('caso1', a)
+    g1.save('caso1', a)
     # new Manager (simulates a server restart)
     g2 = Manager(str(tmp_path))
-    r = g2.cargar('caso1')
-    e = r.buscar('email', 'a@b.com')
+    r = g2.load('caso1')
+    e = r.find('email', 'a@b.com')
     assert e is not None and 'interesting' in e.tags
 
 
@@ -78,7 +78,7 @@ def test_historial(tmp_path):
     g.create('caso')
     g.record('caso', 'dns_a', 'example.com', 3)
     g.record('caso', 'rdap', 'example.com', 5)
-    h = g.historial('caso')
+    h = g.history('caso')
     assert len(h) == 2
     assert h[0]['transform'] == 'rdap' and h[0]['outputs'] == 5   # most recent first
 
@@ -87,14 +87,14 @@ def test_snapshots(tmp_path):
     g = Manager(str(tmp_path))
     a = g.create('caso')
     a.create('ip', '8.8.8.8')
-    g.guardar('caso', a)
+    g.save('caso', a)
     sid = g.snapshot('caso')
     assert sid in g.list_snapshots('caso')
 
     # change the case, then restore the snapshot -> the old state returns
-    a2 = g.cargar('caso')
+    a2 = g.load('caso')
     a2.create('ip', '1.1.1.1')
-    g.guardar('caso', a2)
-    assert len(g.cargar('caso')) == 2
+    g.save('caso', a2)
+    assert len(g.load('caso')) == 2
     g.restore('caso', sid)
-    assert len(g.cargar('caso')) == 1   # reverted to the snapshot (only 8.8.8.8)
+    assert len(g.load('caso')) == 1   # reverted to the snapshot (only 8.8.8.8)

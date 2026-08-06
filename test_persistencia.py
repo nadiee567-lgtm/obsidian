@@ -26,12 +26,12 @@ def test_guardar_y_cargar_roundtrip(tmp_path):
     assert len(cargado) == 2
     assert len(cargado.relations) == 1
 
-    d = cargado.buscar('domain', 'example.com')
+    d = cargado.find('domain', 'example.com')
     assert d.sources == {'whois'}
     assert d.properties == {'registrar': 'GoDaddy'}
     assert d.tags == {'interesting'}
 
-    i = cargado.buscar('ip', '93.184.216.34')
+    i = cargado.find('ip', '93.184.216.34')
     assert {'transform': 'transform_dns', 'input': d.id} in i.provenance
 
 

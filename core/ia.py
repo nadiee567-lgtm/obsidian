@@ -39,7 +39,7 @@ def pick_model(texto):
     return _RUTEO[cat][1] if puntajes[cat] > 0 else 'qwen2.5:1.5b'
 
 
-def disponible():
+def available():
     """Is Ollama running? (to degrade gracefully if not)."""
     try:
         return _S.get(f'{OLLAMA}/api/tags', timeout=3).ok

@@ -99,7 +99,7 @@ def test_workspaces_flujo(tmp_path):
         assert 'caso demo' in j['workspaces'] and j['activo'] == 'caso demo'
         # simulate saved data and open fresh
         ob._almacen.create('ip', '8.8.8.8')
-        ob._gestor.guardar('caso demo', ob._almacen)
+        ob._gestor.save('caso demo', ob._almacen)
         ob._almacen = ob.Store()
         r = c.post('/api/v2/workspaces/abrir', json={'nombre': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['total_entities'] == 1

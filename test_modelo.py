@@ -59,7 +59,7 @@ def test_almacen_deduplica():
     alm.create('domain', 'example.com', sources={'whois'})
     alm.create('domain', 'WWW.example.com', sources={'crtsh'})   # same domain
     assert len(alm) == 1, "must collapse into a single entity"
-    ent = alm.buscar('domain', 'example.com')
+    ent = alm.find('domain', 'example.com')
     assert ent.sources == {'whois', 'crtsh'}, "merged sources"
 
 def test_almacen_de_tipo_y_buscar():
@@ -68,7 +68,7 @@ def test_almacen_de_tipo_y_buscar():
     alm.create('ip', '1.1.1.1')
     alm.create('email', 'a@b.com')
     assert len(alm.of_type('ip')) == 2
-    assert alm.buscar('email', 'A@B.com') is not None   # respects normalization
+    assert alm.find('email', 'A@B.com') is not None   # respects normalization
 
 
 # ── relations: deterministic and non-duplicated (step 15) ───────────────────
@@ -93,7 +93,7 @@ def test_roundtrip_almacen():
 
     assert len(alm2) == 2
     assert len(alm2.relations) == 1
-    ent = alm2.buscar('domain', 'example.com')
+    ent = alm2.find('domain', 'example.com')
     assert ent.sources == {'whois'}
     assert ent.properties == {'reg': 'GoDaddy'}
 

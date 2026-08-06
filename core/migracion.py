@@ -151,7 +151,7 @@ def _mig_github_secrets(alm, raiz, value, res, source):
 def _mig_passivedns(alm, raiz, value, res, source):
     dom = value.get('target', '')
     d = alm.create('domain', dom, sources={source}) if dom else raiz
-    for h in res.get('historial', [])[:30]:
+    for h in res.get('history', [])[:30]:
         if h.get('ip'):
             _rel(alm, d, alm.create('ip', h['ip'], sources={source}),
                  f"resolved {h.get('fecha', '?')}")

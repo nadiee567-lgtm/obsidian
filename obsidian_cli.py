@@ -35,7 +35,7 @@ _gestor = Manager(WORKSPACES_DIR)
 
 def _almacen(ws):
     if ws and _gestor.exists(ws):
-        return _gestor.cargar(ws)
+        return _gestor.load(ws)
     return Store()
 
 
@@ -43,7 +43,7 @@ def _guardar(ws, alm):
     if ws:
         if not _gestor.exists(ws):
             _gestor.create(ws)
-        _gestor.guardar(ws, alm)
+        _gestor.save(ws, alm)
 
 
 def _err(msg):
@@ -146,7 +146,7 @@ def cmd_workspaces(a):
     if not ws:
         print("(no workspaces)")
     for w in ws:
-        alm = _gestor.cargar(w)
+        alm = _gestor.load(w)
         print(f"  {w:24} {len(alm)} entity(ies)")
     return 0
 

@@ -31,7 +31,7 @@ def render_estado(data: dict) -> str:
     keys_html = (', '.join(_e(k) for k in keys)) if keys else '<span class="muted">none</span>'
 
     ia = data.get('ia', {})
-    ia_ok = ia.get('disponible')
+    ia_ok = ia.get('available')
 
     return f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8">

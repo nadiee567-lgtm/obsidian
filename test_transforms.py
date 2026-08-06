@@ -56,7 +56,7 @@ def test_ejecutar_emite_relaciona_y_anota_procedencia():
     producidas = tr.run_by_name('dns', dom, alm)
 
     assert len(producidas) == 2
-    ip = alm.buscar('ip', '93.184.216.34')
+    ip = alm.find('ip', '93.184.216.34')
     assert ip is not None
     # provenance recorded
     assert any(p['transform'] == 'dns' and p['input'] == dom.id for p in ip.provenance)
@@ -83,7 +83,7 @@ def test_transform_que_revienta_no_propaga():
     dom = alm.create('domain', 'example.com')
     producidas = tr.run_by_name('medio_roto', dom, alm)   # does NOT raise
     assert len(producidas) == 1
-    assert alm.buscar('ip', '1.1.1.1') is not None
+    assert alm.find('ip', '1.1.1.1') is not None
 
 def test_emitir_valor_basura_se_ignora():
     @tr.transform(entrada='domain', salidas=('ip',), nombre='sucio')
@@ -146,7 +146,7 @@ def test_machine_cascada():
 
     tipos = sorted(e.type for e in producidas)
     assert tipos == ['ip', 'port']              # cascade: domain→ip→port
-    assert alm.buscar('port', '443') is not None
+    assert alm.find('port', '443') is not None
 
 
 # ── plugins: load transforms from a directory -- step 42 ────────────────────

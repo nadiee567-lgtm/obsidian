@@ -52,13 +52,13 @@ class Manager:
         save_store(alm, r)   # creates the file + schema
         return alm
 
-    def cargar(self, nombre):
+    def load(self, nombre):
         r = self._ruta(nombre)
         if not r or not os.path.exists(r):
             raise KeyError('workspace not found')
         return load_store(r)
 
-    def guardar(self, nombre, almacen):
+    def save(self, nombre, almacen):
         r = self._ruta(nombre)
         if not r:
             raise ValueError('invalid workspace name')
@@ -87,7 +87,7 @@ class Manager:
         if r and os.path.exists(r):
             record_event(r, transform, entrada, salidas)
 
-    def historial(self, nombre):
+    def history(self, nombre):
         r = self._ruta(nombre)
         return read_history(r) if (r and os.path.exists(r)) else []
 

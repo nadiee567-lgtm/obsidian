@@ -11,7 +11,7 @@ def _datos():
         'transforms': {'total': 39, 'por_tipo': {'domain': 12, 'ip': 7}, 'con_key': ['abuseipdb']},
         'herramientas': {'dig': True, 'nuclei': False},
         'keys': ['github', 'abuseipdb'],
-        'ia': {'disponible': True, 'modelo': 'qwen2.5:3b'},
+        'ia': {'available': True, 'modelo': 'qwen2.5:3b'},
         'workspaces': 3,
         'monitor': True,
         'ntfy': False,
@@ -39,6 +39,6 @@ def test_render_escapa_xss():
 
 
 def test_render_ia_no_disponible():
-    d = _datos(); d['ia'] = {'disponible': False, 'modelo': '?'}
+    d = _datos(); d['ia'] = {'available': False, 'modelo': '?'}
     html = render_estado(d)
     assert 'system status' in html      # does not blow up with AI down

@@ -43,9 +43,9 @@ CREATE INDEX IF NOT EXISTS idx_rel_source ON relations(source);
 
 # ── Migration: Spanish schema (pre-English) -> English (F1/Phase B3) ─────────
 # Old cases created before the English rename have tables `entidades`/`relaciones`/
-# `historial` with Spanish columns. Rename them in place (data preserved) so any
+# `history` with Spanish columns. Rename them in place (data preserved) so any
 # existing .db keeps loading. Idempotent: skips whatever is already English.
-_TABLE_RENAME = {'entidades': 'entities', 'relaciones': 'relations', 'historial': 'history'}
+_TABLE_RENAME = {'entidades': 'entities', 'relaciones': 'relations', 'history': 'history'}
 _COLUMN_RENAME = {
     'entities': {'tipo': 'type', 'valor': 'value', 'propiedades': 'properties',
                  'origenes': 'sources', 'procedencia': 'provenance',

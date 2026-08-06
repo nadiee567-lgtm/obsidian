@@ -214,7 +214,7 @@ SESSION = requests.Session()
 SESSION.headers.update({'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0'})
 
 # Global investigation state
-case = {'nombre': None, 'target': None, 'datos': {}, 'historial': [], 'iniciado': None}
+case = {'nombre': None, 'target': None, 'datos': {}, 'history': [], 'iniciado': None}
 case_lock = threading.Lock()
 
 # Typed session model (F2, transform-engine integration).
@@ -289,7 +289,7 @@ def _which(cmd):
 def _guardar_dato(clave, value):
     with case_lock:
         case['datos'][clave] = value
-        case['historial'].append({'ts': time.time(), 'clave': clave, 'resumen': str(value)[:100]})
+        case['history'].append({'ts': time.time(), 'clave': clave, 'resumen': str(value)[:100]})
 
 def _ai_stream(prompt):
     try:
@@ -805,16 +805,16 @@ def _recon_passivedns(dominio):
         r = SESSION.get(f'https://www.virustotal.com/api/v3/domains/{dominio}/resolutions',
                        headers={'x-apikey': vt_key}, params={'limit': 20}, timeout=12)
         d = r.json()
-        historial = []
+        history = []
         for item in d.get('data', []):
             attr = item.get('attributes', {})
             fecha = attr.get('date')
-            historial.append({
+            history.append({
                 'ip': attr.get('ip_address', '?'),
                 'fecha': datetime.datetime.utcfromtimestamp(fecha).strftime('%Y-%m-%d') if fecha else '?'
             })
-        datos['resultados']['historial'] = historial
-        datos['resultados']['total'] = len(historial)
+        datos['resultados']['history'] = history
+        datos['resultados']['total'] = len(history)
     except Exception as e:
         datos['resultados']['error'] = str(e)
     _guardar_dato(f'passivedns_{dominio}', datos)
@@ -1440,7 +1440,7 @@ def _build_grafo():
             dom = value.get('target','')
             dom_id = nid('dom_'+dom)
             add_node(dom_id, dom, 'domain', f'Domain: {dom}', size=28)
-            for h in res.get('historial', [])[:15]:
+            for h in res.get('history', [])[:15]:
                 ip_h = h.get('ip')
                 if not ip_h: continue
                 iid3 = nid('ip_'+ip_h)
@@ -1737,7 +1737,7 @@ def _build_timeline():
                     })
                 except Exception as _e: log.debug("source unavailable: %s", _e)
     # Add the history of executed modules
-    for h in case.get('historial', []):
+    for h in case.get('history', []):
         ts = h.get('ts', 0)
         eventos.append({
             'fecha': datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M'),
@@ -1891,14 +1891,14 @@ def api_caso():
             return jsonify({'error':'Invalid case name'}), 400
         with case_lock:
             case.update({'nombre':slug, 'target':d.get('target',''),
-                         'datos':{}, 'historial':[], 'iniciado':datetime.datetime.now().isoformat()})
+                         'datos':{}, 'history':[], 'iniciado':datetime.datetime.now().isoformat()})
         return jsonify({'ok':True})
     if request.method == 'DELETE':
         with case_lock:
-            case.update({'nombre':None,'target':None,'datos':{},'historial':[]})
+            case.update({'nombre':None,'target':None,'datos':{},'history':[]})
         return jsonify({'ok':True})
 
-@app.route('/api/caso/guardar', methods=['POST'])
+@app.route('/api/caso/save', methods=['POST'])
 def api_guardar():
     if not case['nombre']: return jsonify({'error':'No active case'}), 400
     path = _ruta_caso_segura(case['nombre'])
@@ -1907,13 +1907,13 @@ def api_guardar():
     _db_guardar_caso(case)
     return jsonify({'ok':True, 'path':path})
 
-@app.route('/api/buscar')
+@app.route('/api/find')
 def api_buscar():
     termino = request.args.get('q','').strip()
     if not termino: return jsonify({'error':'No search term'}), 400
     return jsonify({'resultados': _db_buscar(termino)})
 
-@app.route('/api/caso/cargar', methods=['POST'])
+@app.route('/api/caso/load', methods=['POST'])
 def api_cargar():
     nombre = (request.json or {}).get('nombre','')
     path = _ruta_caso_segura(nombre)
@@ -3278,7 +3278,7 @@ def _t_yara_bulk(entidad, ctx):
 @transform(entrada='person', salidas=(), nombre='wordlist',
            descripcion='Likely password wordlist from the case via AI (Ollama)')
 def _t_wordlist(entidad, ctx):
-    if not ia.disponible():
+    if not ia.available():
         return
     contexto = json.dumps(ctx.almacen.to_dict(), default=str)[:3000]
     prompt = (f'From the OSINT of the target "{entidad.value}", generate a wordlist of '
@@ -3302,7 +3302,7 @@ def _t_wordlist(entidad, ctx):
             f.write('\n'.join(palabras))
         entidad.properties['wordlist_archivo'] = ruta
     except Exception as _e:
-        log.debug("wordlist guardar: %s", _e)
+        log.debug("wordlist save: %s", _e)
 
 @transform(entrada='url', salidas=('url',), nombre='cronolocalizacion',
            descripcion='Chronolocation by shadows: SunCalc/ShadowMap (Bellingcat technique) (F9 step 121)')
@@ -3842,7 +3842,7 @@ def _correr_transform_interno(type, value, nombre):
         producidas = run_by_name(nombre, semilla, _almacen)
         if _ws_activo:                          # autosave (46) + audit (48)
             try:
-                _gestor.guardar(_ws_activo, _almacen)
+                _gestor.save(_ws_activo, _almacen)
                 _gestor.record(_ws_activo, nombre, value, len(producidas))
             except Exception as _e:
                 log.warning("autosave failed: %s", _e)
@@ -3891,7 +3891,7 @@ def _estado_datos():
         'transforms': {'total': total, 'por_tipo': por_tipo, 'con_key': sorted(set(con_key))},
         'herramientas': herramientas,
         'keys': keys,
-        'ia': {'disponible': ia.disponible(), 'modelo': ia.MODELO},
+        'ia': {'available': ia.available(), 'modelo': ia.MODELO},
         'workspaces': len(_gestor.list_ws()),
         'monitor': bool(_monitor and _monitor.activo),
         'ntfy': bool(_ntfy_topic()),
@@ -3925,7 +3925,7 @@ def api_v2_reglas():
     from core.correlacion import _REGLAS_YAML
     return jsonify({'reglas': _REGLAS_YAML})
 
-@app.route('/api/v2/buscar/traducir', methods=['POST'])
+@app.route('/api/v2/find/traducir', methods=['POST'])
 def api_v2_buscar_traducir():
     """Translates a unified query to EACH engine's dialect (F8 step 117).
     Body: {campos:{ip,dominio,favicon,cert,puerto,...}, cn:true|false|null}."""
@@ -3960,7 +3960,7 @@ def api_v2_recon():
     if _ws_activo:
         with _almacen_lock:
             try:
-                _gestor.guardar(_ws_activo, _almacen)
+                _gestor.save(_ws_activo, _almacen)
             except Exception as _e:
                 log.warning("autosave recon failed: %s", _e)
     return jsonify({'resultados': res, 'total_entities': len(_almacen), 'workspace': _ws_activo})
@@ -3992,7 +3992,7 @@ def api_v2_recon_async():
         if _ws_activo:
             with _almacen_lock:
                 try:
-                    _gestor.guardar(_ws_activo, _almacen)
+                    _gestor.save(_ws_activo, _almacen)
                 except Exception as _e:
                     log.warning("autosave recon_async: %s", _e)
         return {'resultados': res, 'total_entities': len(_almacen)}
@@ -4033,7 +4033,7 @@ def api_v2_entidad():
     ent = _almacen.add(ent)
     if _ws_activo:
         try:
-            _gestor.guardar(_ws_activo, _almacen)
+            _gestor.save(_ws_activo, _almacen)
         except Exception as _e:
             log.warning("autosave failed: %s", _e)
     return jsonify({'ok': True, 'id': ent.id})
@@ -4041,7 +4041,7 @@ def api_v2_entidad():
 def _autosave():
     if _ws_activo:
         try:
-            _gestor.guardar(_ws_activo, _almacen)
+            _gestor.save(_ws_activo, _almacen)
         except Exception as _e:
             log.warning("autosave failed: %s", _e)
 
@@ -4103,17 +4103,17 @@ def api_v2_workspace_abrir():
     global _almacen, _ws_activo
     nombre = (request.json or {}).get('nombre', '')
     try:
-        _almacen = _gestor.cargar(nombre)
+        _almacen = _gestor.load(nombre)
     except KeyError:
         return _error('workspace not found', 404)
     _ws_activo = _slug_caso(nombre)
     _aplicar_perfil_opsec(_ws_activo)                # non-attribution mode (157)
     return jsonify({'ok': True, 'activo': _ws_activo, 'total_entities': len(_almacen)})
 
-@app.route('/api/v2/workspaces/historial')
+@app.route('/api/v2/workspaces/history')
 def api_v2_ws_historial():
     """Transform history of the active workspace (F3 step 48)."""
-    return jsonify({'historial': _gestor.historial(_ws_activo) if _ws_activo else []})
+    return jsonify({'history': _gestor.history(_ws_activo) if _ws_activo else []})
 
 @app.route('/api/v2/workspaces/snapshot', methods=['GET', 'POST'])
 def api_v2_ws_snapshot():
@@ -4345,7 +4345,7 @@ def api_v2_keys():
         value = d.get('value', '')
         if not value:
             return _error('missing key value', 400)
-        _boveda.guardar(servicio, value)
+        _boveda.save(servicio, value)
         return jsonify({'ok': True, 'servicios': _boveda.servicios()})
     _boveda.delete(servicio)   # DELETE
     return jsonify({'ok': True, 'servicios': _boveda.servicios()})
@@ -4558,7 +4558,7 @@ def api_v2_monitor_ntfy():
     if not topic:
         return _error('empty topic', 400)
     try:
-        _boveda.guardar('ntfy_topic', topic)
+        _boveda.save('ntfy_topic', topic)
     except Exception as e:
         return _error(f'could not save: {e}', 500)
     ok = send_ntfy(topic, 'OBSIDIAN notifications enabled ✓',
@@ -4648,7 +4648,7 @@ def api_v2_extraer_texto():
                 pass
         if _ws_activo:
             try:
-                _gestor.guardar(_ws_activo, _almacen)
+                _gestor.save(_ws_activo, _almacen)
             except Exception as _e:
                 log.warning("autosave extraer_texto: %s", _e)
     return jsonify({'agregadas': agregadas, 'total': len(agregadas)})
@@ -4656,7 +4656,7 @@ def api_v2_extraer_texto():
 @app.route('/api/v2/chat', methods=['POST'])
 def api_v2_chat():
     """Chat about the case: ask the AI using the graph data (F14 step 170)."""
-    if not ia.disponible():
+    if not ia.available():
         return _error('AI (Ollama) unavailable', 503)
     pregunta = ((request.json or {}).get('pregunta', '') or '').strip()
     if not pregunta:
@@ -4675,7 +4675,7 @@ def api_v2_chat():
 def api_v2_deteccion_ia():
     """A hint (NOT proof) of AI-generated text (F14 step 169). For images, use the
     'ela' transform (126). No reliable keyless method exists -- it is indicative only."""
-    if not ia.disponible():
+    if not ia.available():
         return _error('AI (Ollama) unavailable', 503)
     texto = ((request.json or {}).get('texto', '') or '')[:3000]
     if not texto.strip():
@@ -4693,7 +4693,7 @@ def api_v2_deteccion_ia():
 @app.route('/api/v2/consulta', methods=['POST'])
 def api_v2_consulta():
     """Natural-language query -> transform plan (F14 step 165)."""
-    if not ia.disponible():
+    if not ia.available():
         return _error('AI (Ollama) unavailable', 503)
     pregunta = ((request.json or {}).get('pregunta', '') or '').strip()
     if not pregunta:
@@ -4711,7 +4711,7 @@ def api_v2_consulta():
 @app.route('/api/v2/traducir', methods=['POST'])
 def api_v2_traducir():
     """Translates foreign text (Chinese/Russian/Arabic...) to English with Ollama (F14 step 162)."""
-    if not ia.disponible():
+    if not ia.available():
         return _error('AI (Ollama) unavailable', 503)
     texto = ((request.json or {}).get('texto', '') or '')[:4000]
     if not texto.strip():
@@ -4728,7 +4728,7 @@ def api_v2_ia_modo(modo):
     """Case-level AI (step 34 backfill): MITRE scenario / surface / analyze."""
     if modo not in _PROMPTS_IA:
         return _error('invalid mode', 404)
-    if not ia.disponible():
+    if not ia.available():
         return _error('AI (Ollama) unavailable', 503)
     contexto = json.dumps(_almacen.to_dict(), default=str)[:3500]
     prompt = _PROMPTS_IA[modo].format(objetivo=_objetivo_del_almacen() or 'el objetivo', datos=contexto)
@@ -4961,7 +4961,7 @@ def api_grafo():
 @app.route('/api/datos')
 def api_datos():
     with case_lock:
-        return jsonify({'datos': case['datos'], 'historial': case['historial'][-20:]})
+        return jsonify({'datos': case['datos'], 'history': case['history'][-20:]})
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
 

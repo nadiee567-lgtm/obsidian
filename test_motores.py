@@ -57,6 +57,6 @@ def test_motor_desconocido():
 
 
 def test_todos_los_motores_tienen_ip():
-    # invariante: todo motor debe poder buscar por IP
+    # invariante: todo motor debe poder find por IP
     for m, info in MOTORES.items():
         assert 'ip' in info['campos'], f'{m} sin campo ip'
