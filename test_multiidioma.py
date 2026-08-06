@@ -36,14 +36,14 @@ def test_transliterar_transform():
 # ── 173: regional registries ────────────────────────────────────────────────
 def test_registros_regionales():
     prod, _ = _correr('registros_regionales', 'org', 'ACME Corp')
-    regs = {p.properties.get('registro') for p in prod if p.type == 'url'}
+    regs = {p.properties.get('registry') for p in prod if p.type == 'url'}
     assert {'china_qcc', 'rusia_rusprofile', 'opencorporates'} == regs
 
 
 # ── 174: local engines ──────────────────────────────────────────────────────
 def test_motores_locales():
     prod, _ = _correr('motores_locales', 'person', 'Ivan Petrov')
-    motores = {p.properties.get('motor') for p in prod if p.type == 'url'}
+    motores = {p.properties.get('engine') for p in prod if p.type == 'url'}
     assert {'yandex', 'baidu', 'sogou'} == motores
 
 
@@ -72,7 +72,7 @@ def test_dorks_por_idioma():
 
 def test_dorks_idioma_transform():
     prod, _ = _correr('dorks_idioma', 'person', 'Иван Петров')   # cyrillic -> ru
-    idiomas = {p.properties.get('idioma') for p in prod if p.type == 'url'}
+    idiomas = {p.properties.get('language') for p in prod if p.type == 'url'}
     assert idiomas == {'ru'}
 
 

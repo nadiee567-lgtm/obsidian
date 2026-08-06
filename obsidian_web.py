@@ -2955,13 +2955,13 @@ def _t_binaryedge(entidad, ctx):
            description='Reverse image search in Yandex/Google/TinEye/Bing (F9, keyless)')
 def _t_reverse_image(entidad, ctx):
     for motor, enlace in enlaces_reverse(entidad.value).items():
-        ctx.emit('url', enlace, label=f'reverse:{motor}', motor=motor)
+        ctx.emit('url', enlace, label=f'reverse:{motor}', engine=motor)
 
 @transform(input='url', outputs=('url',), name='busqueda_facial',
            description='Facial recognition: Yandex (by URL) + FaceCheck/PimEyes (manual upload) (F9)')
 def _t_busqueda_facial(entidad, ctx):
     for motor, info in enlaces_facial(entidad.value).items():
-        ctx.emit('url', info['url'], label=f'facial:{motor}', motor=motor, modo=info['modo'])
+        ctx.emit('url', info['url'], label=f'facial:{motor}', engine=motor, mode=info['modo'])
 
 @transform(input='phone', outputs=('url', 'country'), name='telefono_dorks',
            description='Phone search dorks (Truecaller/messaging) + carrier if key (F2 step 33)')
@@ -3310,7 +3310,7 @@ def _t_cronolocalizacion(entidad, ctx):
     coords = parse_gps(entidad.properties.get('gps', ''))
     enlaces = enlaces_cronolocalizacion(*(coords if coords else (None, None)))
     for herr, url in enlaces.items():
-        ctx.emit('url', url, label=f'sun:{herr}', herramienta=herr)
+        ctx.emit('url', url, label=f'sun:{herr}', tool=herr)
 
 @transform(input='url', outputs=('url',), name='satelital',
            description='Satellite cross-check of the location (Google Earth/Sentinel/Bing) -- requires GPS (F9 step 122)')
@@ -3319,13 +3319,13 @@ def _t_satelital(entidad, ctx):
     if not coords:
         return
     for herr, url in enlaces_satelital(*coords).items():
-        ctx.emit('url', url, label=f'satellite:{herr}', herramienta=herr)
+        ctx.emit('url', url, label=f'satellite:{herr}', tool=herr)
 
 @transform(input='url', outputs=('url',), name='landmarks',
            description='Landmark matching by image (Google Lens/Mapillary/Wikimapia) (F9 step 123)')
 def _t_landmarks(entidad, ctx):
     for herr, url in enlaces_landmark(entidad.value).items():
-        ctx.emit('url', url, label=f'landmark:{herr}', herramienta=herr)
+        ctx.emit('url', url, label=f'landmark:{herr}', tool=herr)
 
 @transform(input='url', outputs=(), name='ocr',
            description='Cyrillic/Chinese/Latin OCR of the image (tesseract, langs rus+chi_sim+eng) (F9 step 125)')
@@ -3630,7 +3630,7 @@ def _t_exchange_attrib(entidad, ctx):
                'arkham': f'https://intel.arkm.com/explorer/address/{a}',
                'oxt': f'https://oxt.me/address/{a}'}
     for herr, url in enlaces.items():
-        ctx.emit('url', url, label=f'attrib:{herr}', herramienta=herr)
+        ctx.emit('url', url, label=f'attrib:{herr}', tool=herr)
 
 @transform(input='wallet', outputs=('wallet',), name='cluster_wallets',
            description='Clustering by co-inputs: addresses of the same owner (heuristic, blockchain.info) (F11 step 139)')
@@ -3673,19 +3673,19 @@ def _t_dorks_idioma(entidad, ctx):
     from urllib.parse import quote as _q
     idioma = _ml.detectar_idioma(entidad.value)
     for d in _ml.dorks_por_idioma(entidad.value, idioma):
-        ctx.emit('url', f'https://www.google.com/search?q={_q(d)}', label=f'dork:{idioma}', idioma=idioma)
+        ctx.emit('url', f'https://www.google.com/search?q={_q(d)}', label=f'dork:{idioma}', language=idioma)
 
 @transform(input='person', outputs=('url',), name='motores_locales',
            description='Search in local engines: Yandex, Baidu, Sogou (they index another internet) (F15 step 174)')
 def _t_motores_locales(entidad, ctx):
     for motor, url in _ml.motores_locales(entidad.value).items():
-        ctx.emit('url', url, label=f'motor:{motor}', motor=motor)
+        ctx.emit('url', url, label=f'motor:{motor}', engine=motor)
 
 @transform(input='org', outputs=('url',), name='registros_regionales',
            description='Company registries by region: QCC (China), RusProfile (Russia), OpenCorporates (F15 step 173)')
 def _t_registros_regionales(entidad, ctx):
     for reg, url in _ml.registros_regionales(entidad.value).items():
-        ctx.emit('url', url, label=f'registro:{reg}', registro=reg)
+        ctx.emit('url', url, label=f'registro:{reg}', registry=reg)
 
 @transform(input='person', outputs=('person',), name='transliterar',
            description='Name variants in Cyrillic/Latin to search in each alphabet (F15 step 172)')

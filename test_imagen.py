@@ -27,7 +27,7 @@ def test_reverse_image_transform():
     alm = Store()
     e = alm.create('url', 'https://x.com/a.jpg')
     prod = run_by_name('reverse_image', e, alm)
-    assert {p.properties.get('motor') for p in prod} == {'yandex', 'google', 'tineye', 'bing'}
+    assert {p.properties.get('engine') for p in prod} == {'yandex', 'google', 'tineye', 'bing'}
     assert all(p.type == 'url' for p in prod)
 
 
@@ -43,7 +43,7 @@ def test_busqueda_facial_transform():
     alm = Store()
     e = alm.create('url', 'https://x.com/cara.jpg')
     prod = run_by_name('busqueda_facial', e, alm)
-    motores = {p.properties.get('motor'): p.properties.get('modo') for p in prod}
+    motores = {p.properties.get('engine'): p.properties.get('mode') for p in prod}
     assert motores == {'yandex': 'url', 'facecheck': 'upload', 'pimeyes': 'upload'}
 
 
@@ -87,7 +87,7 @@ def test_cronolocalizacion(monkeypatch):
     alm = Store()
     u = alm.create('url', 'https://x.com/f.jpg', properties={'gps': "40 deg 26' N, 79 deg 58' W"})
     prod = run_by_name('cronolocalizacion', u, alm)
-    assert {p.properties.get('herramienta') for p in prod} == {'suncalc', 'shadowmap'}
+    assert {p.properties.get('tool') for p in prod} == {'suncalc', 'shadowmap'}
     assert any('40' in p.value for p in prod)         # coords en el link
 
 
@@ -103,7 +103,7 @@ def test_landmarks():
     alm = Store()
     u = alm.create('url', 'https://x.com/f.jpg')
     prod = run_by_name('landmarks', u, alm)
-    assert {p.properties.get('herramienta') for p in prod} == {'google_lens', 'mapillary', 'wikimapia'}
+    assert {p.properties.get('tool') for p in prod} == {'google_lens', 'mapillary', 'wikimapia'}
 
 
 def test_ocr_sin_tesseract(monkeypatch):

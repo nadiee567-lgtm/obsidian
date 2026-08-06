@@ -64,7 +64,7 @@ def test_cluster_wallets(monkeypatch):
 # ── 140: exchange attribution (links to tools) ──────────────────────────────
 def test_exchange_attrib():
     prod, _, _ = _correr('exchange_attrib', 'wallet', _GENESIS)
-    herrs = {e.properties.get('herramienta') for e in prod if e.type == 'url'}
+    herrs = {e.properties.get('tool') for e in prod if e.type == 'url'}
     assert herrs == {'blockchair', 'walletexplorer', 'arkham', 'oxt'}
 
 
