@@ -1,10 +1,10 @@
-"""Tests de F13 — OPSEC de la herramienta.
+"""Tests for F13 -- the tool's OPSEC.
 
-Correr:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_opsec.py -q
+Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_opsec.py -q
 """
 
 
-# ── 152: bóveda de sock puppets ──────────────────────────────────────────────
+# ── 152: sock-puppet vault ──────────────────────────────────────────────────
 def test_gestor_personas(tmp_path):
     from core.personas import GestorPersonas
     g = GestorPersonas(str(tmp_path / 'p.json'))
@@ -16,7 +16,7 @@ def test_gestor_personas(tmp_path):
     assert g.borrar('no_existe') is False
 
 
-# ── 153: ruteo por Tor/SOCKS5 (modo anónimo) ─────────────────────────────────
+# ── 153: Tor/SOCKS5 routing (anonymous mode) ────────────────────────────────
 def test_modo_anonimo_toggle():
     import obsidian_web as ob
     try:
@@ -25,10 +25,10 @@ def test_modo_anonimo_toggle():
         ob._set_anonimo(False)
         assert ob.SESSION.proxies == {} and not ob._OPSEC['anonimo']
     finally:
-        ob._set_anonimo(False)                       # no dejar el proxy puesto
+        ob._set_anonimo(False)                       # do not leave the proxy set
 
 
-# ── 154: rotación de proxies ─────────────────────────────────────────────────
+# ── 154: proxy rotation ─────────────────────────────────────────────────────
 def test_rotacion_proxies():
     import obsidian_web as ob
     try:
@@ -42,7 +42,7 @@ def test_rotacion_proxies():
         ob.SESSION.proxies = {}
 
 
-# ── 155: higiene de request (UA aleatorio) ───────────────────────────────────
+# ── 155: request hygiene (random UA) ────────────────────────────────────────
 def test_higiene_request():
     import obsidian_web as ob
     prev = ob.SESSION.headers.get('User-Agent')
@@ -56,10 +56,10 @@ def test_higiene_request():
             ob.SESSION.headers['User-Agent'] = prev
 
 
-# ── 156: jitter / throttling ─────────────────────────────────────────────────
+# ── 156: jitter / throttling ────────────────────────────────────────────────
 def test_jitter():
     import obsidian_web as ob
-    assert ob._jitter() == 0.0                       # sin config, no espera
+    assert ob._jitter() == 0.0                       # no config, no wait
     try:
         ob._OPSEC_JITTER['min'] = 0.01
         ob._OPSEC_JITTER['max'] = 0.03
@@ -70,7 +70,7 @@ def test_jitter():
         ob._OPSEC_JITTER['max'] = 0.0
 
 
-# ── 157: modo no-atribución (perfil OPSEC por workspace) ─────────────────────
+# ── 157: non-attribution mode (per-workspace OPSEC profile) ─────────────────
 def test_perfil_opsec_por_workspace(tmp_path, monkeypatch):
     import json
     import obsidian_web as ob
@@ -90,27 +90,27 @@ def test_perfil_opsec_por_workspace(tmp_path, monkeypatch):
         ob.SESSION.proxies = {}
 
 
-# ── 158: detección de fugas ──────────────────────────────────────────────────
+# ── 158: leak detection ─────────────────────────────────────────────────────
 def test_evaluar_fuga():
     import obsidian_web as ob
-    assert ob._evaluar_fuga(True, '1.2.3.4', '1.2.3.4') is True     # anónimo pero misma IP = FUGA
-    assert ob._evaluar_fuga(True, '9.9.9.9', '1.2.3.4') is False    # IP distinta = ok
-    assert ob._evaluar_fuga(False, '1.2.3.4', '1.2.3.4') is False   # no anónimo = no aplica
+    assert ob._evaluar_fuga(True, '1.2.3.4', '1.2.3.4') is True     # anonymous but same IP = LEAK
+    assert ob._evaluar_fuga(True, '9.9.9.9', '1.2.3.4') is False    # different IP = ok
+    assert ob._evaluar_fuga(False, '1.2.3.4', '1.2.3.4') is False   # not anonymous = not applicable
 
 
-# ── 159: rotación de API keys ────────────────────────────────────────────────
+# ── 159: API key rotation ───────────────────────────────────────────────────
 def test_key_rotativa(monkeypatch):
     import obsidian_web as ob
     ob._KEY_ROT.clear()
     monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'k1|k2|k3')
     assert [ob._key_rotativa('shodan') for _ in range(4)] == ['k1', 'k2', 'k3', 'k1']  # round-robin
     monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'solo')
-    assert ob._key_rotativa('x') == 'solo'                # una sola: tal cual
+    assert ob._key_rotativa('x') == 'solo'                # a single one: as-is
     monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
     assert ob._key_rotativa('x') is None
 
 
-# ── 160: registro de tu propia huella ────────────────────────────────────────
+# ── 160: logging your own footprint ─────────────────────────────────────────
 def test_registrar_huella():
     import obsidian_web as ob
     ob._HUELLA.clear()
