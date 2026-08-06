@@ -43,22 +43,22 @@ class Vault:
         os.chmod(self.enc_file, 0o600)
 
     # -- public API --
-    def save(self, servicio, value):
+    def save(self, service, value):
         d = self._leer()
-        d[servicio] = value
+        d[service] = value
         self._escribir(d)
 
-    def get(self, servicio):
-        return self._leer().get(servicio)
+    def get(self, service):
+        return self._leer().get(service)
 
     def servicios(self):
         """Only the configured service NAMES -- never the values."""
         return sorted(self._leer().keys())
 
-    def delete(self, servicio):
+    def delete(self, service):
         d = self._leer()
-        if servicio in d:
-            del d[servicio]
+        if service in d:
+            del d[service]
             self._escribir(d)
             return True
         return False

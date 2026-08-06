@@ -41,7 +41,7 @@ def test_onion_fetch_tor_caido(monkeypatch):
 # ── 129: Ahmia + Haystak ────────────────────────────────────────────────────
 def test_haystak(monkeypatch):
     class R:
-        text = 'resultados: abcdefghij234567.onion y zzzz2233abcdefgh.onion'
+        text = 'results: abcdefghij234567.onion y zzzz2233abcdefgh.onion'
     monkeypatch.setattr(ob, '_tor_disponible', lambda: True)
     monkeypatch.setattr(ob, '_fetch_tor', lambda url, **k: R())
     prod, _ = _correr('haystak', 'person', 'target')

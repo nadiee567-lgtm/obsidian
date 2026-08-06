@@ -161,10 +161,10 @@ def r_cert_vencido(alm):
         if not exp:
             continue
         try:
-            fecha = datetime.datetime.strptime(exp.replace(' GMT', ''), '%b %d %H:%M:%S %Y')
+            date = datetime.datetime.strptime(exp.replace(' GMT', ''), '%b %d %H:%M:%S %Y')
         except ValueError:
             continue
-        if fecha < ahora:
+        if date < ahora:
             yield Finding('cert-expired', 'medium',
                            f'Expired TLS certificate on {d.value} ({exp})', [d.id])
 

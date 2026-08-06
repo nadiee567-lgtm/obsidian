@@ -103,11 +103,11 @@ _DORK_TERMS = {
 }
 
 
-def dorks_por_idioma(objetivo: str, idioma: str = 'es_en') -> list:
+def dorks_por_idioma(target: str, idioma: str = 'es_en') -> list:
     """Dorks adapted to the language/region (step 176)."""
     t = _DORK_TERMS.get(idioma, _DORK_TERMS['es_en'])
-    dorks = [f'"{objetivo}" {t["contacto"]}', f'"{objetivo}" {t["email"]}', f'"{objetivo}" {t["phone"]}']
-    dorks += [f'"{objetivo}" site:{s}' for s in t['sites']]
+    dorks = [f'"{target}" {t["contacto"]}', f'"{target}" {t["email"]}', f'"{target}" {t["phone"]}']
+    dorks += [f'"{target}" site:{s}' for s in t['sites']]
     return dorks
 
 

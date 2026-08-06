@@ -1,6 +1,6 @@
 """Migration from the old format to the typed model -- F1 step 24.
 
-Converts the flat `case['datos']` (per-module dict: {type, objetivo, resultados})
+Converts the flat `case['data']` (per-module dict: {type, target, results})
 into a Store of typed entities/relations. Replicates the mapping _build_grafo
 already did, so existing cases aren't lost when moving to the new model.
 
@@ -13,18 +13,18 @@ _RE_IP = re.compile(r'\d+\.\d+\.\d+\.\d+')
 
 
 def migrate_case(case: dict) -> Store:
-    """case (dict with 'target' and 'datos') -> typed Store."""
+    """case (dict with 'target' and 'data') -> typed Store."""
     alm = Store()
-    objetivo = case.get('target')
-    raiz = alm.create('target', objetivo, sources={'caso'}) if objetivo else None
+    target = case.get('target')
+    raiz = alm.create('target', target, sources={'caso'}) if target else None
 
-    for clave, value in (case.get('datos') or {}).items():
+    for key, value in (case.get('data') or {}).items():
         if not isinstance(value, dict):
             continue
         type = value.get('type', '')
-        res = value.get('resultados', {}) or {}
+        res = value.get('results', {}) or {}
         try:
-            _MIGRADORES.get(type, lambda *a: None)(alm, raiz, value, res, clave)
+            _MIGRADORES.get(type, lambda *a: None)(alm, raiz, value, res, key)
         except Exception:
             continue   # malformed module: skipped
     return alm
@@ -122,7 +122,7 @@ def _mig_takeover(alm, raiz, value, res, source):
         if not v.get('subdomain'):
             continue
         e = alm.create('subdomain', v['subdomain'], sources={source},
-                      properties={'servicio': v.get('servicio'), 'status': v.get('status')})
+                      properties={'service': v.get('service'), 'status': v.get('status')})
         e.tag('takeover', 'vulnerable')
         _rel(alm, raiz, e, 'takeover')
 
@@ -154,7 +154,7 @@ def _mig_passivedns(alm, raiz, value, res, source):
     for h in res.get('history', [])[:30]:
         if h.get('ip'):
             _rel(alm, d, alm.create('ip', h['ip'], sources={source}),
-                 f"resolved {h.get('fecha', '?')}")
+                 f"resolved {h.get('date', '?')}")
 
 
 def _mig_favicon(alm, raiz, value, res, source):

@@ -82,7 +82,7 @@ _TYPE_VALUE_RENAME = {
     'dominio': 'domain', 'subdominio': 'subdomain', 'usuario': 'user',
     'telefono': 'phone', 'plataforma': 'platform', 'credencial': 'credential',
     'archivo': 'file', 'imagen': 'image', 'puerto': 'port', 'pais': 'country',
-    'persona': 'person', 'objetivo': 'target',
+    'persona': 'person', 'target': 'target',
 }
 
 

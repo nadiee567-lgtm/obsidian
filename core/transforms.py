@@ -193,12 +193,12 @@ def run_batch(tareas, almacen: Store, max_workers: int = 8, lock=None,
             pass
         return name, n, local
 
-    resultados, locales, total = [], [], len(tareas)
+    results, locales, total = [], [], len(tareas)
     with ThreadPoolExecutor(max_workers=min(max_workers, total)) as ex:
         futs = [ex.submit(_uno, t) for t in tareas]
         for i, fut in enumerate(as_completed(futs), 1):
             name, n, local = fut.result()
-            resultados.append((name, n))
+            results.append((name, n))
             locales.append(local)
             if on_progreso:
                 try:
@@ -213,7 +213,7 @@ def run_batch(tareas, almacen: Store, max_workers: int = 8, lock=None,
                 almacen.add(e)
             for r in local.relations:
                 almacen.relate(r.source, r.target, r.label)
-    return resultados
+    return results
 
 
 # ── Step 39: Machines (recipes = chains of transforms, Maltego-style) ────────
@@ -235,10 +235,10 @@ class Runner:
         self._hechos: set = set()   # {(transform_name, entity_id)}
 
     def run(self, name: str, entidad: Entity) -> list:
-        clave = (name, entidad.id)
-        if clave in self._hechos:
+        key = (name, entidad.id)
+        if key in self._hechos:
             return []               # cache: already ran on this entity
-        self._hechos.add(clave)
+        self._hechos.add(key)
         return run_by_name(name, entidad, self.almacen)
 
     def run_machine(self, machine: Machine, semilla: Entity) -> list:

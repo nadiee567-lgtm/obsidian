@@ -8,7 +8,7 @@ from core.correlacion import correlate, risk_score, Finding
 
 def test_puerto_sensible():
     alm = Store()
-    alm.create('port', '1.2.3.4:3389', properties={'servicio': 'rdp'})
+    alm.create('port', '1.2.3.4:3389', properties={'service': 'rdp'})
     alm.create('port', '1.2.3.4:443')   # https, not sensitive
     h = correlate(alm)
     reglas = [x.rule for x in h]

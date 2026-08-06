@@ -9,10 +9,10 @@ from core.migracion import migrate_case
 CASE_VIEJO = {
     'name': 'caso1',
     'target': 'example.com',
-    'datos': {
+    'data': {
         'domain': {
             'type': 'domain', 'target': 'example.com',
-            'resultados': {
+            'results': {
                 'dns': {'A': '93.184.216.34'},
                 'subdominios': ['mail.example.com', 'www.example.com'],
                 'emails': ['admin@example.com'],
@@ -21,16 +21,16 @@ CASE_VIEJO = {
         },
         'ip': {
             'type': 'ip', 'target': '93.184.216.34',
-            'resultados': {'geo': {'country': 'US', 'org': 'Edgecast'}, 'ptr': 'edge.example.com'},
+            'results': {'geo': {'country': 'US', 'org': 'Edgecast'}, 'ptr': 'edge.example.com'},
         },
         'email': {
             'type': 'email', 'target': 'admin@example.com',
-            'resultados': {'email_sec': {'spoofable': True}, 'hibp_breaches': ['LinkedIn']},
+            'results': {'email_sec': {'spoofable': True}, 'hibp_breaches': ['LinkedIn']},
         },
         'takeover': {
             'type': 'subdomain_takeover', 'target': 'example.com',
-            'resultados': {'vulnerables': [{'subdomain': 'old.example.com',
-                                            'servicio': 'GitHub Pages', 'status': '404'}]},
+            'results': {'vulnerables': [{'subdomain': 'old.example.com',
+                                            'service': 'GitHub Pages', 'status': '404'}]},
         },
         'roto': {'type': 'ip'},   # malformed module: must not break anything
     },
@@ -72,5 +72,5 @@ def test_migracion_no_truena_con_modulo_roto():
 
 
 def test_migracion_caso_vacio():
-    alm = migrate_case({'target': None, 'datos': {}})
+    alm = migrate_case({'target': None, 'data': {}})
     assert len(alm) == 0

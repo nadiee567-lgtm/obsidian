@@ -28,9 +28,9 @@ class PersonaManager:
         with open(self.ruta, 'w', encoding='utf-8') as f:
             json.dump(d, f, indent=2, ensure_ascii=False)
 
-    def create(self, name: str, datos: dict) -> str:
+    def create(self, name: str, data: dict) -> str:
         d = self._leer()
-        d[name] = {**(datos or {}),
+        d[name] = {**(data or {}),
                      'created': datetime.datetime.now().isoformat(timespec='seconds')}
         self._escribir(d)
         return name

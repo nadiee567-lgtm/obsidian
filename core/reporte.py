@@ -58,7 +58,7 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
     meta = meta or {}
     generado = meta.get('generado') or datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
     ws = meta.get('workspace') or 'ephemeral'
-    objetivo = meta.get('target') or '—'
+    target = meta.get('target') or '—'
     conteo = _resumen_severidad(hallazgos)
 
     # ── score bar colored by level ──
@@ -183,7 +183,7 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
     <a href="/api/v2/export/csv" download>⬇ CSV</a>
   </div>
   <h1><span class="sq"></span>OBSIDIAN — Reconnaissance report</h1>
-  <div class="meta">Workspace: <b>{_e(ws)}</b> · Target: <b>{_e(objetivo)}</b> ·
+  <div class="meta">Workspace: <b>{_e(ws)}</b> · Target: <b>{_e(target)}</b> ·
     Entities: <b>{len(almacen)}</b> · Generated: <b>{_e(generado)}</b></div>
 
   <h2>Risk summary</h2>

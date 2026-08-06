@@ -330,6 +330,6 @@ def test_keys_probar_sin_key(monkeypatch):
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    d = c.post('/api/v2/keys/probar', json={'servicio': 'shodan'}).get_json()
+    d = c.post('/api/v2/keys/test', json={'service': 'shodan'}).get_json()
     assert d['ok'] is False and 'no key' in d['nota']
-    assert c.post('/api/v2/keys/probar', json={'servicio': 'noexiste'}).status_code == 400
+    assert c.post('/api/v2/keys/test', json={'service': 'noexiste'}).status_code == 400

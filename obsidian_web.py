@@ -61,7 +61,7 @@ def _manejar_error(e):
 def _db_init():
     con = sqlite3.connect(CASES_DB)
     con.execute("""CREATE TABLE IF NOT EXISTS casos (
-        name TEXT PRIMARY KEY, objetivo TEXT, iniciado TEXT,
+        name TEXT PRIMARY KEY, target TEXT, started TEXT,
         actualizado TEXT, datos_json TEXT
     )""")
     con.commit()
@@ -74,10 +74,10 @@ def _db_guardar_caso(caso_dict):
     try:
         con = sqlite3.connect(CASES_DB)
         con.execute(
-            "INSERT INTO casos (name, objetivo, iniciado, actualizado, datos_json) VALUES (?,?,?,?,?) "
-            "ON CONFLICT(name) DO UPDATE SET objetivo=excluded.objetivo, actualizado=excluded.actualizado, datos_json=excluded.datos_json",
-            (caso_dict.get('name'), caso_dict.get('target'), caso_dict.get('iniciado'),
-             datetime.datetime.now().isoformat(), json.dumps(caso_dict.get('datos', {}), default=str))
+            "INSERT INTO casos (name, target, started, actualizado, datos_json) VALUES (?,?,?,?,?) "
+            "ON CONFLICT(name) DO UPDATE SET target=excluded.target, actualizado=excluded.actualizado, datos_json=excluded.datos_json",
+            (caso_dict.get('name'), caso_dict.get('target'), caso_dict.get('started'),
+             datetime.datetime.now().isoformat(), json.dumps(caso_dict.get('data', {}), default=str))
         )
         con.commit()
         con.close()
@@ -89,23 +89,23 @@ def _db_buscar(termino):
     con = sqlite3.connect(CASES_DB)
     con.row_factory = sqlite3.Row
     filas = con.execute(
-        "SELECT name, objetivo, actualizado, datos_json FROM casos WHERE datos_json LIKE ? OR objetivo LIKE ?",
+        "SELECT name, target, actualizado, datos_json FROM casos WHERE datos_json LIKE ? OR target LIKE ?",
         (f'%{termino}%', f'%{termino}%')
     ).fetchall()
     con.close()
-    resultados = []
+    results = []
     for fila in filas:
         try:
-            datos = json.loads(fila['datos_json'])
+            data = json.loads(fila['datos_json'])
         except Exception:
-            datos = {}
-        modulos_con_match = [clave for clave, value in datos.items()
+            data = {}
+        modulos_con_match = [key for key, value in data.items()
                               if termino.lower() in json.dumps(value, default=str).lower()]
-        resultados.append({
+        results.append({
             'caso': fila['name'], 'target': fila['target'],
             'actualizado': fila['actualizado'], 'modulos_con_match': modulos_con_match
         })
-    return resultados
+    return results
 # If vis.js (graph) is missing from the user static dir, copy the one shipped with the program
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _WEB_DIR = os.path.join(_HERE, 'web')
@@ -214,7 +214,7 @@ SESSION = requests.Session()
 SESSION.headers.update({'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0'})
 
 # Global investigation state
-case = {'name': None, 'target': None, 'datos': {}, 'history': [], 'iniciado': None}
+case = {'name': None, 'target': None, 'data': {}, 'history': [], 'started': None}
 case_lock = threading.Lock()
 
 # Typed session model (F2, transform-engine integration).
@@ -286,10 +286,10 @@ def _fetch_seguro(url, timeout=10, stream=False, max_redirs=3):
 def _which(cmd):
     return subprocess.run(['which',cmd], capture_output=True).returncode == 0
 
-def _guardar_dato(clave, value):
+def _guardar_dato(key, value):
     with case_lock:
-        case['datos'][clave] = value
-        case['history'].append({'ts': time.time(), 'clave': clave, 'resumen': str(value)[:100]})
+        case['data'][key] = value
+        case['history'].append({'ts': time.time(), 'key': key, 'resumen': str(value)[:100]})
 
 def _ai_stream(prompt):
     try:
@@ -335,18 +335,18 @@ def _tailscale_ip():
 # ── OSINT modules ─────────────────────────────────────────────────────────────
 
 def _osint_persona(name):
-    datos = {'type':'person','target':name,'resultados':{}}
+    data = {'type':'person','target':name,'results':{}}
     # DuckDuckGo
     try:
         r = SESSION.get(f"https://api.duckduckgo.com/?q={requests.utils.quote(name)}&format=json&no_html=1", timeout=8)
         d = r.json()
         if d.get('AbstractText'):
-            datos['resultados']['resumen'] = d['AbstractText'][:400]
+            data['results']['resumen'] = d['AbstractText'][:400]
         topics = [t['Text'][:200] for t in d.get('RelatedTopics',[])[:5] if isinstance(t,dict) and t.get('Text')]
-        if topics: datos['resultados']['temas'] = topics
+        if topics: data['results']['temas'] = topics
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # Dorks
-    datos['resultados']['dorks'] = [
+    data['results']['dorks'] = [
         f'"{name}" site:linkedin.com',
         f'"{name}" site:twitter.com OR site:x.com',
         f'"{name}" email OR phone OR address',
@@ -359,13 +359,13 @@ def _osint_persona(name):
     try:
         r = SESSION.get(f"https://haveibeenpwned.com/unifiedsearch/{requests.utils.quote(name)}",
                        timeout=6, headers={'User-Agent':'OSINT-Research'})
-        datos['resultados']['hibp'] = 'Possible presence in HIBP' if r.status_code==200 else 'Not found in HIBP'
+        data['results']['hibp'] = 'Possible presence in HIBP' if r.status_code==200 else 'Not found in HIBP'
     except Exception as _e: log.debug("source unavailable: %s", _e)
-    _guardar_dato(f'persona_{name}', datos)
-    return datos
+    _guardar_dato(f'persona_{name}', data)
+    return data
 
 def _osint_usuario(username):
-    datos = {'type':'user','target':username,'resultados':{}}
+    data = {'type':'user','target':username,'results':{}}
     plataformas = {
         'GitHub':    f'https://github.com/{username}',
         'Twitter/X': f'https://x.com/{username}',
@@ -388,12 +388,12 @@ def _osint_usuario(username):
     ths = [threading.Thread(target=_check, args=(p,u)) for p,u in plataformas.items()]
     for t in ths: t.start()
     for t in ths: t.join(timeout=8)
-    datos['resultados']['plataformas'] = encontrados
+    data['results']['plataformas'] = encontrados
     # GitHub API
     try:
         gh = SESSION.get(f'https://api.github.com/users/{username}', timeout=8).json()
         if gh.get('login'):
-            datos['resultados']['github'] = {
+            data['results']['github'] = {
                 'name': gh.get('name','?'), 'bio': gh.get('bio','?'),
                 'repos': gh.get('public_repos',0), 'seguidores': gh.get('followers',0),
                 'ubicacion': gh.get('location','?'), 'email': gh.get('email','hidden'),
@@ -404,13 +404,13 @@ def _osint_usuario(username):
             if repos_r.status_code == 200:
                 repos = [{'name':r['name'],'url':r['html_url'],'stars':r['stargazers_count'],
                           'lenguaje':r.get('language','?')} for r in repos_r.json()]
-                datos['resultados']['github_repos'] = repos
+                data['results']['github_repos'] = repos
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # Sherlock
     if _which('sherlock'):
         out = _cmd(f'sherlock {username} --timeout 5 --print-found 2>/dev/null', timeout=60)
         encontrados_sh = [l.strip() for l in out.splitlines() if '[+]' in l]
-        datos['resultados']['sherlock'] = encontrados_sh
+        data['results']['sherlock'] = encontrados_sh
     # Maigret -- more platform coverage than Sherlock
     if _which('maigret'):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -431,25 +431,25 @@ def _osint_usuario(username):
                             encontrados_mg.append({'platform': sitio, 'url': url})
                 except Exception as _e: log.debug("maigret parse: %s", _e)
             if encontrados_mg:
-                datos['resultados']['maigret'] = encontrados_mg
-    _guardar_dato(f'usuario_{username}', datos)
-    return datos
+                data['results']['maigret'] = encontrados_mg
+    _guardar_dato(f'usuario_{username}', data)
+    return data
 
 def _osint_dominio(dominio):
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
-    datos = {'type':'domain','target':dominio,'resultados':{}}
+    data = {'type':'domain','target':dominio,'results':{}}
     # WHOIS
     whois_raw = _cmd(f'whois {dominio} 2>/dev/null')
     whois_lines = [l.strip() for l in whois_raw.splitlines()
                    if any(k in l.lower() for k in ['registr','creat','expir','name server','email','org','status'])]
-    datos['resultados']['whois'] = whois_lines[:20]
+    data['results']['whois'] = whois_lines[:20]
     # DNS
     dns = {}
     for rtype in ['A','AAAA','MX','NS','TXT','CNAME']:
         out = _cmd(f'dig {dominio} {rtype} +short 2>/dev/null')
         if out.strip() and 'error' not in out.lower():
             dns[rtype] = out.strip()
-    datos['resultados']['dns'] = dns
+    data['results']['dns'] = dns
     # Subdomains crt.sh
     try:
         r = SESSION.get(f'https://crt.sh/?q=%.{dominio}&output=json', timeout=12)
@@ -458,7 +458,7 @@ def _osint_dominio(dominio):
             for s in cert.get('name_value','').split('\n'):
                 s = s.strip().lstrip('*.')
                 if s.endswith(dominio) and s != dominio: subs.add(s)
-        datos['resultados']['subdominios'] = sorted(list(subs))[:30]
+        data['results']['subdominios'] = sorted(list(subs))[:30]
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # Headers / Technologies
     try:
@@ -468,58 +468,58 @@ def _osint_dominio(dominio):
         tech = {k:h[k] for k in ['Server','X-Powered-By','X-Generator','X-Framework'] if k in h}
         missing_sec = [k for k in ['Strict-Transport-Security','Content-Security-Policy',
                                     'X-Frame-Options','X-Content-Type-Options'] if k not in h]
-        datos['resultados']['tecnologias'] = tech
-        datos['resultados']['headers_faltantes'] = missing_sec
+        data['results']['tecnologias'] = tech
+        data['results']['headers_faltantes'] = missing_sec
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # theHarvester
     if _which('theHarvester'):
         out = _cmd(f'theHarvester -d {dominio} -b duckduckgo -l 50 2>/dev/null', timeout=45)
         emails = list(set(re.findall(r'[\w\.-]+@[\w\.-]+', out)))
         hosts  = list(set(re.findall(r'[\w\.-]+\.'+re.escape(dominio), out)))
-        datos['resultados']['emails']  = emails[:15]
-        datos['resultados']['hosts']   = hosts[:15]
+        data['results']['emails']  = emails[:15]
+        data['results']['hosts']   = hosts[:15]
     # Wayback
     try:
         r = SESSION.get(f'http://archive.org/wayback/available?url={dominio}', timeout=8)
         snap = r.json().get('archived_snapshots',{}).get('closest',{})
-        if snap.get('url'): datos['resultados']['wayback'] = snap
+        if snap.get('url'): data['results']['wayback'] = snap
     except Exception as _e: log.debug("source unavailable: %s", _e)
-    _guardar_dato(f'dominio_{dominio}', datos)
-    return datos
+    _guardar_dato(f'dominio_{dominio}', data)
+    return data
 
 def _osint_ip(ip):
-    datos = {'type':'ip','target':ip,'resultados':{}}
+    data = {'type':'ip','target':ip,'results':{}}
     # Geo
     try:
         r = SESSION.get(f'http://ip-api.com/json/{ip}?fields=status,country,regionName,city,isp,org,as,lat,lon,mobile,proxy,hosting', timeout=8)
         d = r.json()
-        if d.get('status') == 'success': datos['resultados']['geo'] = d
+        if d.get('status') == 'success': data['results']['geo'] = d
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # Ports
     if _which('nmap'):
         out = run_tool(['nmap','-T4','--top-ports','20','-sV','--open',ip], timeout=60)
         puertos = [l.strip() for l in out.splitlines() if '/tcp' in l or '/udp' in l]
-        datos['resultados']['puertos'] = puertos
+        data['results']['puertos'] = puertos
     # PTR
     ptr = _cmd(f'dig -x {ip} +short 2>/dev/null').strip()
-    if ptr: datos['resultados']['ptr'] = ptr
+    if ptr: data['results']['ptr'] = ptr
     # ASN
     try:
         r = SESSION.get(f'https://api.hackertarget.com/aslookup/?q={ip}', timeout=8)
-        datos['resultados']['asn'] = r.text.strip()
+        data['results']['asn'] = r.text.strip()
     except Exception as _e: log.debug("source unavailable: %s", _e)
-    _guardar_dato(f'ip_{ip}', datos)
-    return datos
+    _guardar_dato(f'ip_{ip}', data)
+    return data
 
 def _osint_email(email):
-    datos = {'type':'email','target':email,'resultados':{}}
+    data = {'type':'email','target':email,'results':{}}
     dominio = email.split('@')[1] if '@' in email else ''
     # Breach check
     try:
         r = SESSION.get(f'https://breachdirectory.p.rapidapi.com/?func=auto&term={email}',
                        timeout=8, headers={'X-RapidAPI-Key':'demo','X-RapidAPI-Host':'breachdirectory.p.rapidapi.com'})
         if r.status_code == 200:
-            datos['resultados']['breach'] = r.json()
+            data['results']['breach'] = r.json()
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # HIBP
     try:
@@ -527,9 +527,9 @@ def _osint_email(email):
                        timeout=8, headers={'hibp-api-key':'free','User-Agent':'OBSIDIAN-OSINT'})
         if r.status_code == 200:
             breaches = [b.get('Name','?') for b in r.json()]
-            datos['resultados']['hibp_breaches'] = breaches
+            data['results']['hibp_breaches'] = breaches
         elif r.status_code == 404:
-            datos['resultados']['hibp_breaches'] = []
+            data['results']['hibp_breaches'] = []
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # SPF/DKIM/DMARC of the domain
     if dominio:
@@ -537,29 +537,29 @@ def _osint_email(email):
         dmarc = _cmd(f'dig _dmarc.{dominio} TXT +short 2>/dev/null')
         dkim  = _cmd(f'dig default._domainkey.{dominio} TXT +short 2>/dev/null')
         spoofable = not any('v=spf1' in spf.lower() for _ in [1])
-        datos['resultados']['email_sec'] = {
+        data['results']['email_sec'] = {
             'spf': spf.strip()[:200] or 'NOT CONFIGURED',
             'dmarc': dmarc.strip()[:200] or 'NOT CONFIGURED',
             'dkim': dkim.strip()[:200] or 'NOT CONFIGURED',
             'spoofable': spoofable
         }
-    _guardar_dato(f'email_{email}', datos)
-    return datos
+    _guardar_dato(f'email_{email}', data)
+    return data
 
 def _osint_phone(numero):
-    datos = {'type':'phone','target':numero,'resultados':{}}
+    data = {'type':'phone','target':numero,'results':{}}
     numero_limpio = re.sub(r'[^\d+]','',numero)
     # Basic public API
     try:
         r = SESSION.get(f'https://api.hackertarget.com/ipgeo/?q={numero_limpio}', timeout=8)
-        datos['resultados']['raw'] = r.text.strip()
+        data['results']['raw'] = r.text.strip()
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # NumVerify (no key -- basic)
     try:
         r = SESSION.get(f'http://apilayer.net/api/validate?number={numero_limpio}', timeout=8)
         if r.status_code == 200:
             d = r.json()
-            datos['resultados']['info'] = {
+            data['results']['info'] = {
                 'valid': d.get('valid', False),
                 'country': d.get('country_name','?'),
                 'carrier': d.get('carrier','?'),
@@ -567,17 +567,17 @@ def _osint_phone(numero):
             }
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # Search social networks
-    datos['resultados']['busquedas'] = [
+    data['results']['busquedas'] = [
         f'"{numero}" site:truecaller.com',
         f'"{numero}" site:whitepages.com',
         f'"{numero_limpio}"',
         f'"{numero}" whatsapp OR telegram',
     ]
-    _guardar_dato(f'telefono_{numero}', datos)
-    return datos
+    _guardar_dato(f'telefono_{numero}', data)
+    return data
 
 def _recon_github_secrets(username_or_org):
-    datos = {'type':'github_secrets','target':username_or_org,'resultados':{}}
+    data = {'type':'github_secrets','target':username_or_org,'results':{}}
     patrones = [
         ('API Key',      r'api[_-]?key\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{20,})'),
         ('Secret',       r'secret\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{20,})'),
@@ -612,44 +612,44 @@ def _recon_github_secrets(username_or_org):
                                 'value': m[:50]+'...' if len(m)>50 else m,
                                 'commit': sha[:8], 'file': f.get('filename','?')
                             })
-        datos['resultados']['hallazgos'] = hallazgos
-        datos['resultados']['repos_analizados'] = len(repos[:10])
+        data['results']['hallazgos'] = hallazgos
+        data['results']['repos_analizados'] = len(repos[:10])
     except Exception as e:
-        datos['resultados']['error'] = str(e)
-    _guardar_dato(f'github_secrets_{username_or_org}', datos)
-    return datos
+        data['results']['error'] = str(e)
+    _guardar_dato(f'github_secrets_{username_or_org}', data)
+    return data
 
 def _recon_ssl(dominio):
-    datos = {'type':'ssl','target':dominio,'resultados':{}}
+    data = {'type':'ssl','target':dominio,'results':{}}
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
     # Basic info
     cert_info = _cmd(f'echo | openssl s_client -connect {dominio}:443 -servername {dominio} 2>/dev/null | openssl x509 -noout -subject -issuer -dates -fingerprint 2>/dev/null')
-    datos['resultados']['certificado'] = cert_info
+    data['results']['certificado'] = cert_info
     # Vulnerable cipher suites
     for cipher, vuln in [('RC4','OBSOLETE'),('DES','VULNERABLE'),('NULL','CRITICAL'),('EXPORT','CRITICAL')]:
         out = _cmd(f'openssl s_client -connect {dominio}:443 -cipher {cipher} 2>/dev/null | head -3')
         if 'Cipher' in out and 'NONE' not in out:
-            datos['resultados'][f'cipher_{cipher}'] = f'VULNERABLE -- {vuln}'
+            data['results'][f'cipher_{cipher}'] = f'VULNERABLE -- {vuln}'
     # HSTS
     try:
         import urllib3; urllib3.disable_warnings()
         r = SESSION.get(f'https://{dominio}', timeout=8, verify=False)
-        datos['resultados']['hsts'] = r.headers.get('Strict-Transport-Security','NOT CONFIGURED')
-        datos['resultados']['ocsp'] = 'Verify manually'
+        data['results']['hsts'] = r.headers.get('Strict-Transport-Security','NOT CONFIGURED')
+        data['results']['ocsp'] = 'Verify manually'
     except Exception as _e: log.debug("source unavailable: %s", _e)
-    _guardar_dato(f'ssl_{dominio}', datos)
-    return datos
+    _guardar_dato(f'ssl_{dominio}', data)
+    return data
 
 def _recon_favicon(dominio):
     """mmh3 hash of the favicon (Shodan algorithm) -- pivots to related infrastructure."""
-    datos = {'type':'favicon','target':dominio,'resultados':{}}
+    data = {'type':'favicon','target':dominio,'results':{}}
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
     try:
         import mmh3
     except ImportError:
-        datos['resultados']['error'] = "Missing the mmh3 library -- install with: pip install mmh3"
-        _guardar_dato(f'favicon_{dominio}', datos)
-        return datos
+        data['results']['error'] = "Missing the mmh3 library -- install with: pip install mmh3"
+        _guardar_dato(f'favicon_{dominio}', data)
+        return data
     favicon_bytes = None
     for esquema in ('https', 'http'):
         try:
@@ -659,32 +659,32 @@ def _recon_favicon(dominio):
                 break
         except Exception as _e: log.debug("source unavailable: %s", _e)
     if not favicon_bytes:
-        datos['resultados']['error'] = 'favicon.ico not found on the target (try another path manually)'
-        _guardar_dato(f'favicon_{dominio}', datos)
-        return datos
+        data['results']['error'] = 'favicon.ico not found on the target (try another path manually)'
+        _guardar_dato(f'favicon_{dominio}', data)
+        return data
     favicon_b64 = base64.encodebytes(favicon_bytes)
     hash_mmh3 = mmh3.hash(favicon_b64)
-    datos['resultados']['hash'] = hash_mmh3
-    datos['resultados']['tamano_bytes'] = len(favicon_bytes)
+    data['results']['hash'] = hash_mmh3
+    data['results']['tamano_bytes'] = len(favicon_bytes)
     if SHODAN_KEY:
         try:
             r = SESSION.get(f'https://api.shodan.io/shodan/host/search?key={SHODAN_KEY}&query=http.favicon.hash:{hash_mmh3}', timeout=10)
             d = r.json()
-            datos['resultados']['total_relacionados'] = d.get('total', 0)
-            datos['resultados']['relacionados'] = [{
+            data['results']['total_relacionados'] = d.get('total', 0)
+            data['results']['relacionados'] = [{
                 'ip': m.get('ip_str'), 'port': m.get('port'),
                 'org': m.get('org'), 'country': m.get('location',{}).get('country_name'),
                 'hostnames': m.get('hostnames', [])
             } for m in d.get('matches', [])[:15]]
         except Exception as e:
-            datos['resultados']['error_shodan'] = str(e)
+            data['results']['error_shodan'] = str(e)
     else:
-        datos['resultados']['nota'] = f'Computed hash: {hash_mmh3}. Add a Shodan API key (free at shodan.io) to search related infrastructure, or paste the hash manually into shodan.io/search?query=http.favicon.hash:{hash_mmh3}'
-    _guardar_dato(f'favicon_{dominio}', datos)
-    return datos
+        data['results']['nota'] = f'Computed hash: {hash_mmh3}. Add a Shodan API key (free at shodan.io) to search related infrastructure, or paste the hash manually into shodan.io/search?query=http.favicon.hash:{hash_mmh3}'
+    _guardar_dato(f'favicon_{dominio}', data)
+    return data
 
 def _recon_typosquatting(dominio):
-    datos = {'type':'typosquatting','target':dominio,'resultados':{}}
+    data = {'type':'typosquatting','target':dominio,'results':{}}
     name, ext = dominio.rsplit('.',1) if '.' in dominio else (dominio,'com')
     variantes = set()
     # Common substitutions
@@ -713,13 +713,13 @@ def _recon_typosquatting(dominio):
     ths = [threading.Thread(target=_check_domain, args=(v,)) for v in list(variantes)[:25]]
     for t in ths: t.start()
     for t in ths: t.join(timeout=10)
-    datos['resultados']['variantes_totales'] = len(variantes)
-    datos['resultados']['registrados'] = registrados
-    _guardar_dato(f'typosquatting_{dominio}', datos)
-    return datos
+    data['results']['variantes_totales'] = len(variantes)
+    data['results']['registrados'] = registrados
+    _guardar_dato(f'typosquatting_{dominio}', data)
+    return data
 
 def _recon_buckets(empresa):
-    datos = {'type':'buckets','target':empresa,'resultados':{}}
+    data = {'type':'buckets','target':empresa,'results':{}}
     name = empresa.lower().replace(' ','-').replace('_','-')
     variantes = [name, f'{name}-backup', f'{name}-dev', f'{name}-prod',
                  f'{name}-staging', f'{name}-assets', f'{name}-media',
@@ -744,13 +744,13 @@ def _recon_buckets(empresa):
     ths = [threading.Thread(target=_check, args=(b,)) for b in variantes]
     for t in ths: t.start()
     for t in ths: t.join(timeout=15)
-    datos['resultados']['buckets'] = encontrados
-    datos['resultados']['variantes_probadas'] = variantes
-    _guardar_dato(f'buckets_{empresa}', datos)
-    return datos
+    data['results']['buckets'] = encontrados
+    data['results']['variantes_probadas'] = variantes
+    _guardar_dato(f'buckets_{empresa}', data)
+    return data
 
 def _recon_subdomain_takeover(dominio):
-    datos = {'type':'subdomain_takeover','target':dominio,'resultados':{}}
+    data = {'type':'subdomain_takeover','target':dominio,'results':{}}
     try:
         r = SESSION.get(f'https://crt.sh/?q=%.{dominio}&output=json', timeout=12)
         subs = set()
@@ -776,31 +776,31 @@ def _recon_subdomain_takeover(dominio):
     def _check_sub(sub):
         cname = _cmd(f'dig {sub} CNAME +short 2>/dev/null').strip()
         if not cname: return
-        for servicio, fp in FINGERPRINTS.items():
-            if servicio in cname:
+        for service, fp in FINGERPRINTS.items():
+            if service in cname:
                 try:
                     r = SESSION.get(f'http://{sub}', timeout=5)
                     if fp.lower() in r.text.lower():
-                        vulnerables.append({'subdomain':sub,'cname':cname,'servicio':servicio,'status':'VULNERABLE'})
+                        vulnerables.append({'subdomain':sub,'cname':cname,'service':service,'status':'VULNERABLE'})
                 except Exception:
-                    vulnerables.append({'subdomain':sub,'cname':cname,'servicio':servicio,'status':'POSSIBLE'})
+                    vulnerables.append({'subdomain':sub,'cname':cname,'service':service,'status':'POSSIBLE'})
     ths = [threading.Thread(target=_check_sub, args=(s,)) for s in list(subs)[:20]]
     for t in ths: t.start()
     for t in ths: t.join(timeout=20)
-    datos['resultados']['subdominios_analizados'] = len(list(subs)[:20])
-    datos['resultados']['vulnerables'] = vulnerables
-    _guardar_dato(f'takeover_{dominio}', datos)
-    return datos
+    data['results']['subdominios_analizados'] = len(list(subs)[:20])
+    data['results']['vulnerables'] = vulnerables
+    _guardar_dato(f'takeover_{dominio}', data)
+    return data
 
 def _recon_passivedns(dominio):
     """History of IPs the domain has resolved to, via VirusTotal (reuses the Analyze key)."""
-    datos = {'type':'passivedns','target':dominio,'resultados':{}}
+    data = {'type':'passivedns','target':dominio,'results':{}}
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
     vt_key = os.environ.get('VT_API_KEY','')
     if not vt_key:
-        datos['resultados']['nota'] = 'Add a VirusTotal API key (free, Analyze tab) to see the IP history'
-        _guardar_dato(f'passivedns_{dominio}', datos)
-        return datos
+        data['results']['nota'] = 'Add a VirusTotal API key (free, Analyze tab) to see the IP history'
+        _guardar_dato(f'passivedns_{dominio}', data)
+        return data
     try:
         r = SESSION.get(f'https://www.virustotal.com/api/v3/domains/{dominio}/resolutions',
                        headers={'x-apikey': vt_key}, params={'limit': 20}, timeout=12)
@@ -808,22 +808,22 @@ def _recon_passivedns(dominio):
         history = []
         for item in d.get('data', []):
             attr = item.get('attributes', {})
-            fecha = attr.get('date')
+            date = attr.get('date')
             history.append({
                 'ip': attr.get('ip_address', '?'),
-                'fecha': datetime.datetime.utcfromtimestamp(fecha).strftime('%Y-%m-%d') if fecha else '?'
+                'date': datetime.datetime.utcfromtimestamp(date).strftime('%Y-%m-%d') if date else '?'
             })
-        datos['resultados']['history'] = history
-        datos['resultados']['total'] = len(history)
+        data['results']['history'] = history
+        data['results']['total'] = len(history)
     except Exception as e:
-        datos['resultados']['error'] = str(e)
-    _guardar_dato(f'passivedns_{dominio}', datos)
-    return datos
+        data['results']['error'] = str(e)
+    _guardar_dato(f'passivedns_{dominio}', data)
+    return data
 
 def _recon_metadata(url):
     if '://' not in url:
         url = 'https://' + url
-    datos = {'type':'metadata','target':url,'resultados':{}}
+    data = {'type':'metadata','target':url,'results':{}}
     try:
         r = _fetch_seguro(url, timeout=10, stream=True)
         content_type = r.headers.get('Content-Type','')
@@ -837,10 +837,10 @@ def _recon_metadata(url):
                 fname = f.name
             if _which('exiftool'):
                 exif = _cmd(f'exiftool {fname} 2>/dev/null')
-                datos['resultados']['exif'] = exif[:2000]
+                data['results']['exif'] = exif[:2000]
                 # Search for GPS
                 gps = re.findall(r'GPS.*?:\s*(.+)', exif)
-                if gps: datos['resultados']['gps'] = gps
+                if gps: data['results']['gps'] = gps
             os.unlink(fname)
         else:
             # HTML -- extract meta tags
@@ -851,24 +851,24 @@ def _recon_metadata(url):
                 name = tag.get('name') or tag.get('property','')
                 content = tag.get('content','')
                 if name and content: metas[name] = content[:200]
-            datos['resultados']['meta_tags'] = metas
-            datos['resultados']['titulo'] = soup.title.string if soup.title else '?'
+            data['results']['meta_tags'] = metas
+            data['results']['titulo'] = soup.title.string if soup.title else '?'
     except Exception as e:
-        datos['resultados']['error'] = str(e)
-    _guardar_dato(f'metadata_{url[:50]}', datos)
-    return datos
+        data['results']['error'] = str(e)
+    _guardar_dato(f'metadata_{url[:50]}', data)
+    return data
 
 def _recon_render_js(url):
     """Renders the page with a headless browser -- sees what loads via JS, screenshot included."""
-    datos = {'type':'render_js','target':url,'resultados':{}}
+    data = {'type':'render_js','target':url,'results':{}}
     if not url.startswith(('http://','https://')):
         url = 'https://' + url
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        datos['resultados']['error'] = 'Missing playwright -- install with: pip install playwright && playwright install chromium'
-        _guardar_dato(f'render_{url[:50]}', datos)
-        return datos
+        data['results']['error'] = 'Missing playwright -- install with: pip install playwright && playwright install chromium'
+        _guardar_dato(f'render_{url[:50]}', data)
+        return data
     shots_dir = os.path.join(STATIC_DIR, 'screenshots')
     os.makedirs(shots_dir, exist_ok=True)
     nombre_img = f"{hashlib.md5(url.encode()).hexdigest()[:10]}.png"
@@ -878,30 +878,30 @@ def _recon_render_js(url):
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={'width':1280,'height':900})
             page.goto(url, timeout=20000, wait_until='networkidle')
-            datos['resultados']['titulo'] = page.title()
+            data['results']['titulo'] = page.title()
             html_render = page.content()
             page.screenshot(path=ruta_img, full_page=False)
             browser.close()
-        datos['resultados']['screenshot'] = f'/static/screenshots/{nombre_img}'
-        datos['resultados']['emails_en_render'] = list(set(re.findall(
+        data['results']['screenshot'] = f'/static/screenshots/{nombre_img}'
+        data['results']['emails_en_render'] = list(set(re.findall(
             r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', html_render)))[:15]
-        datos['resultados']['tamano_html_render'] = len(html_render)
+        data['results']['tamano_html_render'] = len(html_render)
     except Exception as e:
-        datos['resultados']['error'] = f'Render error: {e}'
-    _guardar_dato(f'render_{url[:50]}', datos)
-    return datos
+        data['results']['error'] = f'Render error: {e}'
+    _guardar_dato(f'render_{url[:50]}', data)
+    return data
 
 def _recon_yara_bulk(carpeta):
     """Scans every file in a folder with yara-rules -- only makes sense on a full PC."""
-    datos = {'type':'yara_bulk','target':carpeta,'resultados':{}}
+    data = {'type':'yara_bulk','target':carpeta,'results':{}}
     if not os.path.isdir(carpeta):
-        datos['resultados']['error'] = f'Not a valid folder: {carpeta}'
-        _guardar_dato(f'yara_bulk_{carpeta}', datos)
-        return datos
+        data['results']['error'] = f'Not a valid folder: {carpeta}'
+        _guardar_dato(f'yara_bulk_{carpeta}', data)
+        return data
     if not _which('yara-rules'):
-        datos['resultados']['error'] = 'yara-rules is not installed'
-        _guardar_dato(f'yara_bulk_{carpeta}', datos)
-        return datos
+        data['results']['error'] = 'yara-rules is not installed'
+        _guardar_dato(f'yara_bulk_{carpeta}', data)
+        return data
     archivos = []
     for root, _dirs, files in os.walk(carpeta):
         for f in files:
@@ -926,15 +926,15 @@ def _recon_yara_bulk(carpeta):
         if salida and 'no rules matched' not in salida.lower():
             hallazgos.append({'file': archivo, 'resultado': salida[:500]})
             if len(hallazgos) >= 50: break
-    datos['resultados']['total_escaneados'] = len(archivos)
-    datos['resultados']['con_coincidencias'] = hallazgos
-    _guardar_dato(f'yara_bulk_{carpeta}', datos)
-    return datos
+    data['results']['total_escaneados'] = len(archivos)
+    data['results']['con_coincidencias'] = hallazgos
+    _guardar_dato(f'yara_bulk_{carpeta}', data)
+    return data
 
-def _gen_wordlist(objetivo):
-    datos = {'type':'wordlist','target':objetivo,'resultados':{}}
-    datos_osint = json.dumps(case['datos'], default=str)[:3000]
-    prompt = f"""Based on the OSINT data collected about "{objetivo}", generate a likely password wordlist.
+def _gen_wordlist(target):
+    data = {'type':'wordlist','target':target,'results':{}}
+    datos_osint = json.dumps(case['data'], default=str)[:3000]
+    prompt = f"""Based on the OSINT data collected about "{target}", generate a likely password wordlist.
 Include variations of:
 - Proper names found
 - Important dates
@@ -949,19 +949,19 @@ Available OSINT data:
 Generate 30-50 entries. One per line. Only the passwords, no explanation."""
     wordlist = _ai(prompt).strip().split('\n')
     wordlist = [w.strip() for w in wordlist if w.strip() and len(w.strip()) >= 6]
-    datos['resultados']['wordlist'] = wordlist
-    datos['resultados']['total'] = len(wordlist)
+    data['results']['wordlist'] = wordlist
+    data['results']['total'] = len(wordlist)
     # Save file
-    path = os.path.join(CASES_DIR, f'wordlist_{re.sub(r"[^a-z0-9]","_",objetivo.lower())}.txt')
+    path = os.path.join(CASES_DIR, f'wordlist_{re.sub(r"[^a-z0-9]","_",target.lower())}.txt')
     with open(path,'w') as f:
         f.write('\n'.join(wordlist))
-    datos['resultados']['file'] = path
-    _guardar_dato(f'wordlist_{objetivo}', datos)
-    return datos
+    data['results']['file'] = path
+    _guardar_dato(f'wordlist_{target}', data)
+    return data
 
-def _sim_escenario(objetivo):
-    datos_osint = json.dumps(case['datos'], default=str)[:3500]
-    prompt = f"""OSINT collected on "{objetivo}". Generate ethical pentesting scenario:
+def _sim_escenario(target):
+    datos_osint = json.dumps(case['data'], default=str)[:3500]
+    prompt = f"""OSINT collected on "{target}". Generate ethical pentesting scenario:
 
 1. ENTRY VECTORS identified (with evidence from data)
 2. PROBABLE KILL CHAIN step by step
@@ -973,9 +973,9 @@ def _sim_escenario(objetivo):
 Data: {datos_osint}"""
     return _ai(prompt)
 
-def _sim_superficie(objetivo):
-    datos_osint = json.dumps(case['datos'], default=str)[:3500]
-    prompt = f"""Attack surface map for "{objetivo}":
+def _sim_superficie(target):
+    datos_osint = json.dumps(case['data'], default=str)[:3500]
+    prompt = f"""Attack surface map for "{target}":
 
 1. EXPOSED ASSETS (IPs, domains, services, technologies)
 2. LEAKED DATA found
@@ -1172,7 +1172,7 @@ def _kali_run(tool_id, arg):
 
 def _check_url(url):
     """Analyzes a URL with VirusTotal (if a key exists) or local heuristics"""
-    datos = {'type': 'url_check', 'url': url, 'resultados': {}}
+    data = {'type': 'url_check', 'url': url, 'results': {}}
     score = 0
     flags = []
 
@@ -1224,7 +1224,7 @@ def _check_url(url):
                 stats = r.json().get('data',{}).get('attributes',{}).get('last_analysis_stats',{})
                 malicious = stats.get('malicious', 0)
                 suspicious = stats.get('suspicious', 0)
-                datos['resultados']['virustotal'] = {
+                data['results']['virustotal'] = {
                     'malicious': malicious, 'suspicious': suspicious,
                     'limpio': stats.get('undetected', 0)
                 }
@@ -1245,25 +1245,25 @@ def _check_url(url):
             if r.status_code == 200:
                 d2 = r.json().get('data', {})
                 ab_score = d2.get('abuseConfidenceScore', 0)
-                datos['resultados']['abuseipdb'] = {'ip': ip_check, 'abuse_score': ab_score, 'reportes': d2.get('totalReports',0)}
+                data['results']['abuseipdb'] = {'ip': ip_check, 'abuse_score': ab_score, 'reportes': d2.get('totalReports',0)}
                 if ab_score > 50:
                     flags.append(f'AbuseIPDB: IP with {ab_score}% abuse confidence')
                     score += 30
         else:
-            datos['resultados']['ip_dominio'] = ip_check
+            data['results']['ip_dominio'] = ip_check
     except Exception as _e: log.debug("source unavailable: %s", _e)
 
     score = min(score, 100)
     nivel = 'CRITICAL' if score >= 70 else 'HIGH' if score >= 40 else 'MEDIUM' if score >= 20 else 'LOW'
-    datos['resultados']['score_phishing'] = score
-    datos['resultados']['nivel_riesgo'] = nivel
-    datos['resultados']['flags'] = flags
-    _guardar_dato(f'url_check_{url[:50]}', datos)
-    return datos
+    data['results']['score_phishing'] = score
+    data['results']['nivel_riesgo'] = nivel
+    data['results']['flags'] = flags
+    _guardar_dato(f'url_check_{url[:50]}', data)
+    return data
 
 def _analizar_password(password):
     """Analyze password strength locally without sending it to any server"""
-    datos = {'type': 'password', 'resultados': {}}
+    data = {'type': 'password', 'results': {}}
     score = 0
     problemas = []
     puntos_fuertes = []
@@ -1321,12 +1321,12 @@ def _analizar_password(password):
     score = min(score, 100)
     nivel = 'VERY STRONG' if score >= 75 else 'STRONG' if score >= 55 else 'MEDIUM' if score >= 35 else 'WEAK'
 
-    datos['resultados'] = {
+    data['results'] = {
         'score': score, 'nivel': nivel, 'longitud': long,
         'entropia_bits': entropia, 'tiempo_crackeo': tiempo,
         'puntos_fuertes': puntos_fuertes, 'problemas': problemas
     }
-    return datos
+    return data
 
 def _cve_correlacion(tecnologias):
     prompt = f"""For the following technologies found in OSINT, list the most critical known CVEs:
@@ -1342,9 +1342,9 @@ Only real, documented CVEs."""
     return _ai(prompt)
 
 def _analizar_todo():
-    if not case['datos']:
+    if not case['data']:
         return 'No data collected yet.'
-    datos_str = json.dumps(case['datos'], default=str)[:4500]
+    datos_str = json.dumps(case['data'], default=str)[:4500]
     prompt = f"""Full OSINT intelligence analysis on "{case.get('target','?')}":
 
 1. EXECUTIVE SUMMARY (3 lines max)
@@ -1358,7 +1358,7 @@ Data: {datos_str}"""
     return _ai(prompt)
 
 def _build_grafo():
-    """Converts case['datos'] into nodes and edges for vis.js"""
+    """Converts case['data'] into nodes and edges for vis.js"""
     nodes = {}  # id -> {id, label, title, group}
     edges = []
     eid   = [0]
@@ -1403,9 +1403,9 @@ def _build_grafo():
     obj_id = nid(obj)
     add_node(obj_id, obj, 'target', f'Target: {obj}', size=35)
 
-    for clave, value in case['datos'].items():
+    for key, value in case['data'].items():
         if not isinstance(value, dict): continue
-        res = value.get('resultados', {})
+        res = value.get('results', {})
         type = value.get('type', '')
 
         # ── DOMAIN ───────────────────────────────────────────────
@@ -1444,8 +1444,8 @@ def _build_grafo():
                 ip_h = h.get('ip')
                 if not ip_h: continue
                 iid3 = nid('ip_'+ip_h)
-                add_node(iid3, ip_h, 'ip', f'historical IP ({h.get("fecha","?")})')
-                add_edge(dom_id, iid3, f'resolved {h.get("fecha","?")}')
+                add_node(iid3, ip_h, 'ip', f'historical IP ({h.get("date","?")})')
+                add_edge(dom_id, iid3, f'resolved {h.get("date","?")}')
 
         # ── IP ────────────────────────────────────────────────────
         elif type == 'ip':
@@ -1528,7 +1528,7 @@ def _build_grafo():
             for v2 in res.get('vulnerables',[]):
                 vid = nid('vuln_'+v2['subdomain'])
                 add_node(vid, '💀 '+v2['subdomain'][:20], 'subdominio_vuln',
-                         f"Takeover via {v2['servicio']}: {v2['status']}")
+                         f"Takeover via {v2['service']}: {v2['status']}")
                 add_edge(obj_id, vid, 'takeover')
 
         # ── TYPOSQUATTING ─────────────────────────────────────────
@@ -1562,26 +1562,26 @@ def _build_grafo():
 # ── Dark Web Monitor ──────────────────────────────────────────────────────────
 
 def _darkweb_search(query):
-    datos = {'type': 'darkweb', 'target': query, 'resultados': {}}
+    data = {'type': 'darkweb', 'target': query, 'results': {}}
 
     # Ahmia -- indexes .onion without needing Tor
     try:
         r = SESSION.get(f'https://ahmia.fi/search/?q={requests.utils.quote(query)}', timeout=12)
-        resultados = []
+        results = []
         for match in re.finditer(r'<h4[^>]*><a href="([^"]+)"[^>]*>([^<]+)</a></h4>.*?<p[^>]*>([^<]*)</p>',
                                   r.text, re.DOTALL):
-            resultados.append({'url': match.group(1), 'titulo': match.group(2).strip(),
+            results.append({'url': match.group(1), 'titulo': match.group(2).strip(),
                                'description': match.group(3).strip()[:200]})
-        datos['resultados']['ahmia'] = resultados[:15]
+        data['results']['ahmia'] = results[:15]
     except Exception as e:
-        datos['resultados']['ahmia_error'] = str(e)
+        data['results']['ahmia_error'] = str(e)
 
     # Pastes -- Pastebin and similar public sites
     try:
         r = SESSION.get(f'https://psbdmp.ws/api/v3/search/{requests.utils.quote(query)}', timeout=8)
         if r.status_code == 200:
             pastes = r.json().get('data', [])[:10]
-            datos['resultados']['pastes'] = [{'id': p.get('id'), 'title': p.get('title','?'),
+            data['results']['pastes'] = [{'id': p.get('id'), 'title': p.get('title','?'),
                                                'url': f"https://pastebin.com/{p.get('id')}"} for p in pastes]
     except Exception as _e: log.debug("source unavailable: %s", _e)
 
@@ -1591,30 +1591,30 @@ def _darkweb_search(query):
             json={'term': query, 'maxresults': 10, 'media': 0, 'sort': 2, 'terminate': []},
             headers={'x-key': 'PUBLIC'}, timeout=10)
         if r.status_code == 200:
-            datos['resultados']['intelx_id'] = r.json().get('id','')
+            data['results']['intelx_id'] = r.json().get('id','')
     except Exception as _e: log.debug("source unavailable: %s", _e)
 
-    _guardar_dato(f'darkweb_{query}', datos)
-    return datos
+    _guardar_dato(f'darkweb_{query}', data)
+    return data
 
 # ── Netlas ────────────────────────────────────────────────────────────────────
 
 NETLAS_KEY = os.environ.get('NETLAS_API_KEY', '')
 
 def _netlas_search(query):
-    datos = {'type': 'netlas', 'target': query, 'resultados': {}}
+    data = {'type': 'netlas', 'target': query, 'results': {}}
     if not NETLAS_KEY:
-        datos['resultados']['nota'] = 'Add a free Netlas API key (50 searches/day at netlas.io) for infrastructure search'
-        _guardar_dato(f'netlas_{query}', datos)
-        return datos
+        data['results']['nota'] = 'Add a free Netlas API key (50 searches/day at netlas.io) for infrastructure search'
+        _guardar_dato(f'netlas_{query}', data)
+        return data
     try:
         r = SESSION.get('https://app.netlas.io/api/responses/',
                        params={'q': query, 'fields': 'ip,host,port,protocol,geo,whois'},
                        headers={'Authorization': f'Bearer {NETLAS_KEY}'}, timeout=15)
         d = r.json()
         items = d.get('items', [])
-        datos['resultados']['total'] = len(items)
-        datos['resultados']['matches'] = [{
+        data['results']['total'] = len(items)
+        data['results']['matches'] = [{
             'ip': it.get('data',{}).get('ip'),
             'host': it.get('data',{}).get('host'),
             'port': it.get('data',{}).get('port'),
@@ -1623,16 +1623,16 @@ def _netlas_search(query):
             'org': (it.get('data',{}).get('whois') or {}).get('org'),
         } for it in items[:10]]
     except Exception as e:
-        datos['resultados']['error'] = str(e)
-    _guardar_dato(f'netlas_{query}', datos)
-    return datos
+        data['results']['error'] = str(e)
+    _guardar_dato(f'netlas_{query}', data)
+    return data
 
 # ── Shodan ────────────────────────────────────────────────────────────────────
 
 SHODAN_KEY = os.environ.get('SHODAN_API_KEY', '')
 
 def _shodan_search(query):
-    datos = {'type': 'shodan', 'target': query, 'resultados': {}}
+    data = {'type': 'shodan', 'target': query, 'results': {}}
     if not SHODAN_KEY:
         # No API key -- use Censys as a free alternative
         try:
@@ -1640,28 +1640,28 @@ def _shodan_search(query):
                           timeout=10)
             if r.status_code == 200:
                 d = r.json()
-                datos['resultados']['censys'] = d.get('results', [])[:10]
+                data['results']['censys'] = d.get('results', [])[:10]
             else:
                 # Fallback: public Shodan web search (limited)
                 r2 = SESSION.get(f'https://internetdb.shodan.io/{query}', timeout=8)
                 if r2.status_code == 200:
-                    datos['resultados']['internetdb'] = r2.json()
+                    data['results']['internetdb'] = r2.json()
                 else:
-                    datos['resultados']['nota'] = 'Add a Shodan API key (free at shodan.io) for full search results'
+                    data['results']['nota'] = 'Add a Shodan API key (free at shodan.io) for full search results'
         except Exception as e:
             try:
                 r2 = SESSION.get(f'https://internetdb.shodan.io/{query}', timeout=8)
                 if r2.status_code == 200:
-                    datos['resultados']['internetdb'] = r2.json()
+                    data['results']['internetdb'] = r2.json()
                 else:
-                    datos['resultados']['nota'] = 'Add Shodan API key for full search results'
+                    data['results']['nota'] = 'Add Shodan API key for full search results'
             except Exception as e2:
-                datos['resultados']['error'] = f'Shodan unavailable: {e2}. (With a free API key at shodan.io you get full search.)'
+                data['results']['error'] = f'Shodan unavailable: {e2}. (With a free API key at shodan.io you get full search.)'
         # Manual banner grab of the IPs found
         ips = []
-        for modulo in case['datos'].values():
-            if isinstance(modulo, dict):
-                res = modulo.get('resultados', {})
+        for module in case['data'].values():
+            if isinstance(module, dict):
+                res = module.get('results', {})
                 for k, v in res.items():
                     if 'dns' in k.lower() or 'ip' in k.lower():
                         encontradas = re.findall(r'\d+\.\d+\.\d+\.\d+', str(v))
@@ -1671,32 +1671,32 @@ def _shodan_search(query):
         for ip in ips:
             out = _cmd(f'nc -w2 -z -v {ip} 80 2>&1; nc -w2 -z -v {ip} 443 2>&1; nc -w2 -z -v {ip} 22 2>&1', timeout=10)
             banners[ip] = out[:300]
-        datos['resultados']['banners'] = banners
+        data['results']['banners'] = banners
     else:
         try:
             r = SESSION.get(f'https://api.shodan.io/shodan/host/search?key={SHODAN_KEY}&query={requests.utils.quote(query)}', timeout=10)
             d = r.json()
-            datos['resultados']['total'] = d.get('total', 0)
-            datos['resultados']['matches'] = [{
+            data['results']['total'] = d.get('total', 0)
+            data['results']['matches'] = [{
                 'ip': m.get('ip_str'), 'port': m.get('port'),
                 'org': m.get('org'), 'country': m.get('location',{}).get('country_name'),
                 'banner': m.get('data','')[:200]
             } for m in d.get('matches', [])[:10]]
         except Exception as e:
-            datos['resultados']['error'] = str(e)
-    _guardar_dato(f'shodan_{query}', datos)
-    return datos
+            data['results']['error'] = str(e)
+    _guardar_dato(f'shodan_{query}', data)
+    return data
 
 def _shodan_ip(ip):
-    datos = {'type': 'shodan_ip', 'target': ip, 'resultados': {}}
+    data = {'type': 'shodan_ip', 'target': ip, 'results': {}}
     if not SHODAN_KEY:
         out = run_tool(['nmap','-sV','-T4','--top-ports','50',ip], timeout=60)
-        datos['resultados']['nmap_full'] = out
+        data['results']['nmap_full'] = out
     else:
         try:
             r = SESSION.get(f'https://api.shodan.io/shodan/host/{ip}?key={SHODAN_KEY}', timeout=10)
             d = r.json()
-            datos['resultados'] = {
+            data['results'] = {
                 'org': d.get('org'), 'country': d.get('country_name'),
                 'puertos': d.get('ports', []),
                 'vulns': list(d.get('vulns', {}).keys()),
@@ -1704,9 +1704,9 @@ def _shodan_ip(ip):
                               for s in d.get('data', [])[:10]]
             }
         except Exception as e:
-            datos['resultados']['error'] = str(e)
-    _guardar_dato(f'shodan_ip_{ip}', datos)
-    return datos
+            data['results']['error'] = str(e)
+    _guardar_dato(f'shodan_ip_{ip}', data)
+    return data
 
 # ── Timeline ──────────────────────────────────────────────────────────────────
 
@@ -1718,36 +1718,36 @@ def _build_timeline():
         r'(\d{2}/\d{2}/\d{4})',
         r'(\d{4}\d{2}\d{2})',
     ]
-    for clave, value in case['datos'].items():
+    for key, value in case['data'].items():
         texto = json.dumps(value, default=str)
-        type  = value.get('type', clave) if isinstance(value, dict) else clave
-        objetivo = value.get('target', '') if isinstance(value, dict) else ''
+        type  = value.get('type', key) if isinstance(value, dict) else key
+        target = value.get('target', '') if isinstance(value, dict) else ''
         for pat in DATE_PATTERNS:
-            for fecha in re.findall(pat, texto):
+            for date in re.findall(pat, texto):
                 try:
-                    if len(fecha) == 8:
-                        fecha_fmt = f"{fecha[:4]}-{fecha[4:6]}-{fecha[6:]}"
+                    if len(date) == 8:
+                        fecha_fmt = f"{date[:4]}-{date[4:6]}-{date[6:]}"
                     else:
-                        fecha_fmt = fecha[:10]
+                        fecha_fmt = date[:10]
                     dt = datetime.datetime.strptime(fecha_fmt[:10], '%Y-%m-%d')
                     eventos.append({
-                        'fecha': fecha_fmt[:10], 'timestamp': dt.timestamp(),
-                        'modulo': type, 'target': objetivo,
-                        'description': f'{type}: {objetivo or clave}'
+                        'date': fecha_fmt[:10], 'timestamp': dt.timestamp(),
+                        'module': type, 'target': target,
+                        'description': f'{type}: {target or key}'
                     })
                 except Exception as _e: log.debug("source unavailable: %s", _e)
     # Add the history of executed modules
     for h in case.get('history', []):
         ts = h.get('ts', 0)
         eventos.append({
-            'fecha': datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M'),
-            'timestamp': ts, 'modulo': 'ejecucion',
-            'target': h.get('clave',''), 'description': f"Module run: {h.get('clave','')}"
+            'date': datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M'),
+            'timestamp': ts, 'module': 'ejecucion',
+            'target': h.get('key',''), 'description': f"Module run: {h.get('key','')}"
         })
     vistos = set()
     unicos = []
     for e in eventos:
-        k = e['fecha'] + e['description']
+        k = e['date'] + e['description']
         if k not in vistos:
             vistos.add(k)
             unicos.append(e)
@@ -1759,28 +1759,28 @@ monitor_state = {'activo': False, 'thread': None, 'alertas': [], 'target': None,
 
 def _monitor_loop():
     while monitor_state['activo']:
-        objetivo = monitor_state['target']
-        if not objetivo:
+        target = monitor_state['target']
+        if not target:
             time.sleep(60); continue
         # Re-scan domain and user
         try:
-            type = 'domain' if re.match(r'^[\w\.-]+\.[a-z]{2,}$', objetivo) else 'person'
+            type = 'domain' if re.match(r'^[\w\.-]+\.[a-z]{2,}$', target) else 'person'
             if type == 'domain':
-                nuevo = _osint_dominio(objetivo)
-                viejo = case['datos'].get(f'dominio_{objetivo}', {})
+                nuevo = _osint_dominio(target)
+                viejo = case['data'].get(f'dominio_{target}', {})
                 if str(nuevo) != str(viejo):
                     monitor_state['alertas'].append({
                         'ts': datetime.datetime.now().isoformat(),
                         'type': 'cambio_dominio',
-                        'message': f'Change detected on {objetivo}',
+                        'message': f'Change detected on {target}',
                         'nuevo': nuevo
                     })
         except Exception as _e: log.debug("source unavailable: %s", _e)
         time.sleep(monitor_state['intervalo'])
 
-def _monitor_start(objetivo, intervalo=3600):
+def _monitor_start(target, intervalo=3600):
     if monitor_state['activo']: return False
-    monitor_state.update({'activo': True, 'target': objetivo,
+    monitor_state.update({'activo': True, 'target': target,
                           'intervalo': intervalo, 'alertas': []})
     t = threading.Thread(target=_monitor_loop, daemon=True)
     monitor_state['thread'] = t
@@ -1795,9 +1795,9 @@ def _generar_reporte_html():
     path = _ruta_caso_segura(name, '_reporte.html') or os.path.join(CASES_DIR, f'reporte_{int(time.time())}_reporte.html')
     ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
     secciones = ''
-    for clave, value in case['datos'].items():
+    for key, value in case['data'].items():
         v = json.dumps(value, ensure_ascii=False, indent=2, default=str) if isinstance(value,(dict,list)) else str(value)
-        secciones += f'<div class="section"><h2>{html.escape(clave.replace("_"," ").upper())}</h2><pre>{html.escape(v[:3000])}</pre></div>'
+        secciones += f'<div class="section"><h2>{html.escape(key.replace("_"," ").upper())}</h2><pre>{html.escape(v[:3000])}</pre></div>'
     contenido = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <title>OBSIDIAN — {html.escape(str(case.get('target','?')))}</title>
 <style>body{{background:#0d0d1a;color:#cdd6f4;font-family:monospace;padding:40px}}
@@ -1877,7 +1877,7 @@ def index():
 def api_status():
     with case_lock:
         return jsonify({'caso': case['name'], 'target': case['target'],
-                       'modulos': len(case['datos']), 'ok': True})
+                       'modulos': len(case['data']), 'ok': True})
 
 @app.route('/api/case', methods=['GET','POST','DELETE'])
 def api_caso():
@@ -1891,11 +1891,11 @@ def api_caso():
             return jsonify({'error':'Invalid case name'}), 400
         with case_lock:
             case.update({'name':slug, 'target':d.get('target',''),
-                         'datos':{}, 'history':[], 'iniciado':datetime.datetime.now().isoformat()})
+                         'data':{}, 'history':[], 'started':datetime.datetime.now().isoformat()})
         return jsonify({'ok':True})
     if request.method == 'DELETE':
         with case_lock:
-            case.update({'name':None,'target':None,'datos':{},'history':[]})
+            case.update({'name':None,'target':None,'data':{},'history':[]})
         return jsonify({'ok':True})
 
 @app.route('/api/case/save', methods=['POST'])
@@ -1911,7 +1911,7 @@ def api_guardar():
 def api_buscar():
     termino = request.args.get('q','').strip()
     if not termino: return jsonify({'error':'No search term'}), 400
-    return jsonify({'resultados': _db_buscar(termino)})
+    return jsonify({'results': _db_buscar(termino)})
 
 @app.route('/api/case/load', methods=['POST'])
 def api_cargar():
@@ -1921,7 +1921,7 @@ def api_cargar():
     if not os.path.exists(path): return jsonify({'error':'Not found'}), 404
     with open(path) as f: data = json.load(f)
     with case_lock: case.update(data)
-    return jsonify({'ok':True, 'modulos':len(case['datos'])})
+    return jsonify({'ok':True, 'modulos':len(case['data'])})
 
 # The security validators (_validar, _objetivo_seguro, _slug_caso,
 # _ruta_caso_segura, _url_publica...) now live in core/validacion.py and are
@@ -1931,8 +1931,8 @@ def api_cargar():
 @app.route('/api/run', methods=['POST'])
 def api_run():
     d    = request.json or {}
-    mod  = d.get('modulo','')
-    arg  = d.get('argumento','').strip()
+    mod  = d.get('module','')
+    arg  = d.get('argument','').strip()
     stream = d.get('stream', False)
 
     MODULOS = {
@@ -1953,10 +1953,10 @@ def api_run():
         'wordlist':   lambda: _gen_wordlist(arg or case.get('target','')),
         'yara_bulk':  lambda: _recon_yara_bulk(arg),
         'render_js':  lambda: _recon_render_js(arg),
-        'cve':        lambda: {'type':'cve','resultados':{'analisis':_cve_correlacion(arg)}},
-        'escenario':  lambda: {'type':'escenario','resultados':{'analisis':_sim_escenario(arg or case.get('target',''))}},
-        'superficie': lambda: {'type':'superficie','resultados':{'analisis':_sim_superficie(arg or case.get('target',''))}},
-        'analizar':   lambda: {'type':'analisis','resultados':{'analisis':_analizar_todo()}},
+        'cve':        lambda: {'type':'cve','results':{'analisis':_cve_correlacion(arg)}},
+        'escenario':  lambda: {'type':'escenario','results':{'analisis':_sim_escenario(arg or case.get('target',''))}},
+        'superficie': lambda: {'type':'superficie','results':{'analisis':_sim_superficie(arg or case.get('target',''))}},
+        'analizar':   lambda: {'type':'analisis','results':{'analisis':_analizar_todo()}},
         'darkweb':    lambda: _darkweb_search(arg),
         'shodan':     lambda: _shodan_search(arg),
         'netlas':     lambda: _netlas_search(arg),
@@ -1972,7 +1972,7 @@ def api_run():
         return jsonify({'error': f'Invalid target: not shaped like {_MODULO_TIPO[mod]}'}), 400
 
     def _run_stream():
-        yield f"data: {json.dumps({'status':'iniciando','modulo':mod})}\n\n"
+        yield f"data: {json.dumps({'status':'iniciando','module':mod})}\n\n"
         try:
             resultado = MODULOS[mod]()
             yield f"data: {json.dumps({'status':'completado','resultado':resultado})}\n\n"
@@ -2287,9 +2287,9 @@ def _t_puertos(entidad, ctx):
         num = parts[0].split('/')[0] if parts else ''
         if not num.isdigit():
             continue
-        servicio = parts[2] if len(parts) > 2 else '?'
+        service = parts[2] if len(parts) > 2 else '?'
         # the value carries the IP: port 80 of two hosts != the same node
-        ctx.emit('port', f'{entidad.value}:{num}', label='open', servicio=servicio)
+        ctx.emit('port', f'{entidad.value}:{num}', label='open', service=service)
 
 @transform(input='domain', outputs=('domain',), name='dns_mx',
            description='Mail servers of the domain (MX)')
@@ -2768,7 +2768,7 @@ def _t_shodan(entidad, ctx):
             port = serv.get('port')
             if port:
                 ctx.emit('port', f'{entidad.value}:{port}', label='shodan',
-                           servicio=serv.get('_shodan', {}).get('module') or serv.get('product', ''))
+                           service=serv.get('_shodan', {}).get('module') or serv.get('product', ''))
             prod = serv.get('product')
             if prod and prod not in vistos_prod:
                 vistos_prod.add(prod)
@@ -2798,7 +2798,7 @@ def _t_censys(entidad, ctx):
             p = s.get('port')
             if p:
                 ctx.emit('port', f"{entidad.value}:{p}", label='censys',
-                           servicio=s.get('service_name', ''))
+                           service=s.get('service_name', ''))
             prod = s.get('service_name')
             if prod and prod not in vistos:
                 vistos.add(prod)
@@ -2822,7 +2822,7 @@ def _t_zoomeye(entidad, ctx):
             p = pi.get('port') or m.get('port')
             if p:
                 ctx.emit('port', f"{entidad.value}:{p}", label='zoomeye',
-                           servicio=pi.get('service', ''))
+                           service=pi.get('service', ''))
             app = pi.get('app')
             if app:
                 ctx.emit('tech', app, label='zoomeye')
@@ -2872,7 +2872,7 @@ def _t_quake(entidad, ctx):
             p = m.get('port')
             name = (m.get('service', {}) or {}).get('name')
             if p:
-                ctx.emit('port', f"{entidad.value}:{p}", label='quake', servicio=name or '')
+                ctx.emit('port', f"{entidad.value}:{p}", label='quake', service=name or '')
             if name:
                 ctx.emit('tech', name, label='quake')
     except Exception as _e:
@@ -2930,7 +2930,7 @@ def _t_criminalip(entidad, ctx):
             num = p.get('open_port_no') or p.get('port')
             if num:
                 ctx.emit('port', f"{entidad.value}:{num}", label='criminalip',
-                           servicio=p.get('app_name', ''))
+                           service=p.get('app_name', ''))
     except Exception as _e:
         log.debug("criminalip unavailable: %s", _e)
 
@@ -3083,8 +3083,8 @@ def _t_takeover(entidad, ctx):
         cname = run_tool(['dig', sub, 'CNAME', '+short'], timeout=4).strip()
         if not cname:
             return
-        for servicio, fp in _TAKEOVER_FP.items():
-            if servicio in cname:
+        for service, fp in _TAKEOVER_FP.items():
+            if service in cname:
                 estado = 'POSSIBLE'
                 try:
                     if fp.lower() in SESSION.get(f'http://{sub}', timeout=5).text.lower():
@@ -3092,7 +3092,7 @@ def _t_takeover(entidad, ctx):
                 except Exception:
                     pass
                 with lock:
-                    vulnerables[sub] = {'cname': cname, 'servicio': servicio, 'estado': estado}
+                    vulnerables[sub] = {'cname': cname, 'service': service, 'estado': estado}
                 return
     ths = [threading.Thread(target=_chk, args=(s,)) for s in list(subs)[:20]]
     for t in ths:
@@ -3101,7 +3101,7 @@ def _t_takeover(entidad, ctx):
         t.join(timeout=20)
     for sub, info in vulnerables.items():
         s = ctx.emit('subdomain', sub, label='takeover',
-                       servicio=info['servicio'], cname=info['cname'], estado=info['estado'])
+                       service=info['service'], cname=info['cname'], estado=info['estado'])
         if s:
             s.tag('takeover')          # triggers the r_takeover rule (F4/55)
 
@@ -3118,9 +3118,9 @@ def _t_passivedns(entidad, ctx):
             attr = item.get('attributes', {}) or {}
             ip = attr.get('ip_address')
             if ip:
-                fecha = attr.get('date')
-                visto = (datetime.datetime.fromtimestamp(fecha, datetime.timezone.utc)
-                         .strftime('%Y-%m-%d')) if fecha else ''
+                date = attr.get('date')
+                visto = (datetime.datetime.fromtimestamp(date, datetime.timezone.utc)
+                         .strftime('%Y-%m-%d')) if date else ''
                 ctx.emit('ip', ip, label='pdns-historical', visto=visto)
     except Exception as _e:
         log.debug("passivedns unavailable: %s", _e)
@@ -3417,10 +3417,10 @@ def _tg_mensajes(usuario, limite=30):
             await cli.connect()
             if not await cli.is_user_authorized():
                 return None
-            objetivo = await cli.get_entity(usuario)
-            textos = [m.text async for m in cli.iter_messages(objetivo, limit=limite) if m.text]
+            target = await cli.get_entity(usuario)
+            textos = [m.text async for m in cli.iter_messages(target, limit=limite) if m.text]
             await cli.disconnect()
-            return getattr(objetivo, 'id', None), textos
+            return getattr(target, 'id', None), textos
 
         res = asyncio.run(_run())
         if not res:
@@ -3446,7 +3446,7 @@ def _t_telegram(entidad, ctx):
         ctx.emit('url', u[:200], label='in-telegram')
 
 _LEAK_KW = ['leak', 'breach', 'database', 'combolist', 'stealer', 'ransomware',
-            'dump', 'fullz', 'rdp access', 'initial access', 'base de datos', 'filtracion']
+            'dump', 'fullz', 'rdp access', 'initial access', 'base de data', 'filtracion']
 
 def coincidencias_leak(textos, keywords=None):
     """Messages that mention leak/breach terms (step 131). PURE/testable."""
@@ -3963,7 +3963,7 @@ def api_v2_recon():
                 _gestor.save(_ws_activo, _almacen)
             except Exception as _e:
                 log.warning("autosave recon failed: %s", _e)
-    return jsonify({'resultados': res, 'total_entities': len(_almacen), 'workspace': _ws_activo})
+    return jsonify({'results': res, 'total_entities': len(_almacen), 'workspace': _ws_activo})
 
 _tareas = TaskManager()
 
@@ -3995,7 +3995,7 @@ def api_v2_recon_async():
                     _gestor.save(_ws_activo, _almacen)
                 except Exception as _e:
                     log.warning("autosave recon_async: %s", _e)
-        return {'resultados': res, 'total_entities': len(_almacen)}
+        return {'results': res, 'total_entities': len(_almacen)}
 
     return jsonify({'job_id': _tareas.create(trabajo)})
 
@@ -4072,7 +4072,7 @@ def api_v2_tag():
 
 @app.route('/api/v2/grafo')
 def api_v2_grafo():
-    """Typed graph. ?migrar=1 converts the old case['datos'] to the new model."""
+    """Typed graph. ?migrar=1 converts the old case['data'] to the new model."""
     if request.args.get('migrar') == '1':
         return jsonify(migrate_case(case).to_dict())
     return jsonify(_almacen.to_dict())
@@ -4153,18 +4153,18 @@ def api_v2_opsec_huella():
 
 _KEY_ROT = {}
 
-def _key_rotativa(servicio):
+def _key_rotativa(service):
     """A service's key, rotating across several accounts if 'k1|k2|k3' was saved
     (spreads load across accounts of the same service). Step 159. Backward-compatible:
     a single key is returned as-is."""
-    raw = _boveda.get(servicio)
+    raw = _boveda.get(service)
     if not raw or '|' not in raw:
         return raw
     keys = [k.strip() for k in raw.split('|') if k.strip()]
     if not keys:
         return None
-    i = _KEY_ROT.get(servicio, 0)
-    _KEY_ROT[servicio] = i + 1
+    i = _KEY_ROT.get(service, 0)
+    _KEY_ROT[service] = i + 1
     return keys[i % len(keys)]
 
 _USER_AGENTS = [
@@ -4326,7 +4326,7 @@ def api_v2_personas():
     if not name:
         return _error('missing persona name', 400)
     if request.method == 'POST':
-        _personas.create(name, d.get('datos', {}))
+        _personas.create(name, d.get('data', {}))
         return jsonify({'ok': True, 'personas': _personas.list_ws()})
     _personas.delete(name)   # DELETE
     return jsonify({'ok': True, 'personas': _personas.list_ws()})
@@ -4338,16 +4338,16 @@ def api_v2_keys():
     if request.method == 'GET':
         return jsonify({'servicios': _boveda.servicios()})
     d = request.json or {}
-    servicio = (d.get('servicio', '') or '').strip().lower()
-    if not servicio:
+    service = (d.get('service', '') or '').strip().lower()
+    if not service:
         return _error('missing service', 400)
     if request.method == 'POST':
         value = d.get('value', '')
         if not value:
             return _error('missing key value', 400)
-        _boveda.save(servicio, value)
+        _boveda.save(service, value)
         return jsonify({'ok': True, 'servicios': _boveda.servicios()})
-    _boveda.delete(servicio)   # DELETE
+    _boveda.delete(service)   # DELETE
     return jsonify({'ok': True, 'servicios': _boveda.servicios()})
 
 # Service -> (transform, type, known test value that has data)
@@ -4364,27 +4364,27 @@ _TEST_SERVICIO = {
     'hibp': ('email_breaches', 'email', 'test@example.com'),
 }
 
-@app.route('/api/v2/keys/probar', methods=['POST'])
+@app.route('/api/v2/keys/test', methods=['POST'])
 def api_v2_keys_probar():
     """Verifies a REAL key: runs its transform on a known target and reports whether
     the parser produced data (this confirms each engine against its real API)."""
-    servicio = ((request.json or {}).get('servicio', '') or '').strip().lower()
-    mapeo = _TEST_SERVICIO.get(servicio)
+    service = ((request.json or {}).get('service', '') or '').strip().lower()
+    mapeo = _TEST_SERVICIO.get(service)
     if not mapeo:
         return _error('service has no defined test', 400)
     name, type, value = mapeo
-    tiene = bool(_boveda.get(servicio))
+    tiene = bool(_boveda.get(service))
     alm = Store()
     try:
         n = len(run_by_name(name, alm.create(type, value), alm))
     except Exception as e:
-        return jsonify({'servicio': servicio, 'ok': False, 'nota': f'error: {e}'})
+        return jsonify({'service': service, 'ok': False, 'nota': f'error: {e}'})
     if n > 0:
-        return jsonify({'servicio': servicio, 'ok': True, 'entities': n,
+        return jsonify({'service': service, 'ok': True, 'entities': n,
                         'nota': f'✓ worked -- {n} real entity(ies)'})
     if not tiene:
-        return jsonify({'servicio': servicio, 'ok': False, 'nota': 'no key configured'})
-    return jsonify({'servicio': servicio, 'ok': False, 'entities': 0,
+        return jsonify({'service': service, 'ok': False, 'nota': 'no key configured'})
+    return jsonify({'service': service, 'ok': False, 'entities': 0,
                     'nota': 'key present but 0 results (invalid, out of quota, or different schema?)'})
 
 _TIPOS_ACTIVO = ('domain', 'subdomain', 'ip', 'port', 'tech', 'url', 'cve', 'bucket', 'org')
@@ -4587,31 +4587,31 @@ def api_v2_monitor_stop():
     return jsonify({'activo': False})
 
 _PROMPTS_IA = {
-    'escenario': ('OSINT collected on "{objetivo}". Generate an ETHICAL pentesting scenario:\n'
+    'escenario': ('OSINT collected on "{target}". Generate an ETHICAL pentesting scenario:\n'
                   '1. ENTRY VECTORS (with evidence from the data)\n'
                   '2. Probable KILL CHAIN step by step\n'
                   '3. Relevant MITRE ATT&CK TECHNIQUES (with IDs)\n'
                   '4. TOP 3 most critical vulnerabilities\n'
-                  '5. COUNTERMEASURES per vector\n\nData:\n{datos}'),
-    'superficie': ('Attack surface map of "{objetivo}":\n'
+                  '5. COUNTERMEASURES per vector\n\nData:\n{data}'),
+    'superficie': ('Attack surface map of "{target}":\n'
                    '1. EXPOSED ASSETS (IPs, domains, services, technologies)\n'
                    '2. LEAKED DATA found\n3. TECHNOLOGIES with known CVEs\n'
                    '4. WEAK CONFIGURATIONS\n5. RISK SCORE 0-10 with justification\n'
-                   '6. HARDENING RECOMMENDATIONS\n\nData:\n{datos}'),
-    'analizar': ('Analyze the WHOLE OSINT case of "{objetivo}" and correlate: what story the data tells '
-                 'together, non-obvious findings, and the next 3 investigation steps.\n\nData:\n{datos}'),
-    'resumen': ('Summarize the OSINT case of "{objetivo}" in ONE clear paragraph understandable to a '
-                'non-technical person: what was found and what it means.\n\nData:\n{datos}'),
-    'siguiente': ('You are an OSINT analyst. Given the case of "{objetivo}", suggest the NEXT 3-5 '
-                  'concrete investigation steps (what to run and why), prioritized.\n\nData:\n{datos}'),
-    'narrativa': ('Write a readable REPORT (prose narrative) of the case of "{objetivo}" from the data: '
-                  'context, findings and conclusion. Professional tone.\n\nData:\n{datos}'),
-    'clasificar': ('Rank the findings of the case of "{objetivo}" by real RELEVANCE to an attacker '
-                   '(not just severity), and briefly explain the order.\n\nData:\n{datos}'),
-    'geoloc': ('Geolocate the target/photo of "{objetivo}" from ALL the textual clues in the case '
+                   '6. HARDENING RECOMMENDATIONS\n\nData:\n{data}'),
+    'analizar': ('Analyze the WHOLE OSINT case of "{target}" and correlate: what story the data tells '
+                 'together, non-obvious findings, and the next 3 investigation steps.\n\nData:\n{data}'),
+    'resumen': ('Summarize the OSINT case of "{target}" in ONE clear paragraph understandable to a '
+                'non-technical person: what was found and what it means.\n\nData:\n{data}'),
+    'siguiente': ('You are an OSINT analyst. Given the case of "{target}", suggest the NEXT 3-5 '
+                  'concrete investigation steps (what to run and why), prioritized.\n\nData:\n{data}'),
+    'narrativa': ('Write a readable REPORT (prose narrative) of the case of "{target}" from the data: '
+                  'context, findings and conclusion. Professional tone.\n\nData:\n{data}'),
+    'clasificar': ('Rank the findings of the case of "{target}" by real RELEVANCE to an attacker '
+                   '(not just severity), and briefly explain the order.\n\nData:\n{data}'),
+    'geoloc': ('Geolocate the target/photo of "{target}" from ALL the textual clues in the case '
                '(EXIF/GPS, OCR, languages, domains, titles): give 3-5 location CANDIDATES '
                '(country/city/area) with the reasoning and what to verify. Note: with no vision, reason '
-               'over textual clues.\n\nData:\n{datos}'),
+               'over textual clues.\n\nData:\n{data}'),
 }
 
 _FUENTE_POR_IDIOMA = {'ru': 'Yandex / VK', 'zh': 'Baidu / Weibo', 'ar': 'Google (Arabic)',
@@ -4731,7 +4731,7 @@ def api_v2_ia_modo(modo):
     if not ia.available():
         return _error('AI (Ollama) unavailable', 503)
     contexto = json.dumps(_almacen.to_dict(), default=str)[:3500]
-    prompt = _PROMPTS_IA[modo].format(objetivo=_objetivo_del_almacen() or 'el objetivo', datos=contexto)
+    prompt = _PROMPTS_IA[modo].format(target=_objetivo_del_almacen() or 'el target', data=contexto)
     try:
         resp = ia.ask(prompt, max_tokens=700, temp=0.4)
     except Exception as e:
@@ -4788,11 +4788,11 @@ def api_v2_verificar():
             "In 2-3 sentences: real risk or likely false positive? WHY (based on the "
             "evidence)? What should the user verify?")
         try:
-            razon = ia.ask(prompt, max_tokens=220, temp=0.3)
+            reason = ia.ask(prompt, max_tokens=220, temp=0.3)
         except Exception as e:
             log.warning("verify AI failed: %s", e)
-            razon = 'AI unavailable (is Ollama on :11434?)'
-        revisiones.append({'hallazgo': hall.message, 'severity': hall.severity, 'razon': razon})
+            reason = 'AI unavailable (is Ollama on :11434?)'
+        revisiones.append({'hallazgo': hall.message, 'severity': hall.severity, 'reason': reason})
     return jsonify({'revisiones': revisiones})
 
 @app.route('/v2')
@@ -4804,7 +4804,7 @@ def v2_page():
 
 @app.route('/api/report', methods=['POST'])
 def api_reporte():
-    if not case['datos']: return jsonify({'error':'No data collected yet'}), 400
+    if not case['data']: return jsonify({'error':'No data collected yet'}), 400
     path = _generar_reporte_html()
     return jsonify({'ok':True, 'path':path})
 
@@ -4961,7 +4961,7 @@ def api_grafo():
 @app.route('/api/data')
 def api_datos():
     with case_lock:
-        return jsonify({'datos': case['datos'], 'history': case['history'][-20:]})
+        return jsonify({'data': case['data'], 'history': case['history'][-20:]})
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
 

@@ -157,7 +157,7 @@ input[type=text]::placeholder{color:#55555f}
     <div class="tab" data-tab="osint" onclick="switchTab('osint')">OSINT</div>
     <div class="tab" data-tab="recon" onclick="switchTab('recon')">Recon</div>
     <div class="tab" data-tab="timeline" onclick="switchTab('timeline')">Timeline</div>
-    <div class="tab" data-tab="datos" onclick="switchTab('datos')">Data</div>
+    <div class="tab" data-tab="data" onclick="switchTab('data')">Data</div>
 
     <div class="rgroup-label">Intelligence</div>
     <div class="tab" data-tab="dark" onclick="switchTab('dark')">Dark Web</div>
@@ -512,7 +512,7 @@ input[type=text]::placeholder{color:#55555f}
     </div>
   </div>
 
-  <div class="tab-panel" id="tab-datos">
+  <div class="tab-panel" id="tab-data">
     <div class="card">
       <div class="card-title">Collected Data</div>
       <button class="btn secondary" onclick="cargarDatos()" style="margin-bottom:10px">Refresh</button>
@@ -561,7 +561,7 @@ async function buscarDark() {
     const r = await fetch('/api/darkweb', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
     const d = await r.json();
     out.innerHTML = '';
-    const res = d.resultados || {};
+    const res = d.results || {};
     const ahmia = res.ahmia || [];
     if (ahmia.length) {
       append(out, `[Ahmia — ${ahmia.length} results .onion]\n`, 'ok');
@@ -598,7 +598,7 @@ async function buscarShodan() {
     const r = await fetch('/api/shodan', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d = await r.json();
     out.innerHTML = '';
-    append(out, JSON.stringify(d.resultados, null, 2));
+    append(out, JSON.stringify(d.results, null, 2));
     await refreshStatus();
   } catch(e) { document.getElementById('output-shodan').innerHTML = '<span class="error">'+e.message+'</span>'; }
 }
@@ -618,7 +618,7 @@ async function buscarNetlas() {
   try {
     const r = await fetch('/api/netlas', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
     const d = await r.json();
-    append(out, JSON.stringify(d.resultados, null, 2) + '\n');
+    append(out, JSON.stringify(d.results, null, 2) + '\n');
     await refreshStatus();
   } catch(e) { append(out, 'Error: ' + e.message + '\n', 'error'); }
 }
@@ -953,7 +953,7 @@ async function checkURL() {
   out.innerHTML = '<span class="info">🔍 Analyzing URL...</span>';
   try {
     const r = await fetch('/api/run', {method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({modulo:'url_check',argumento:url})});
+      body:JSON.stringify({module:'url_check',argument:url})});
     const reader = r.body.getReader(); const dec = new TextDecoder();
     let buf = '';
     while(true) {
@@ -964,7 +964,7 @@ async function checkURL() {
         if(!line.startsWith('data:')) continue;
         const d = JSON.parse(line.slice(5));
         if(d.status === 'completado') {
-          const res = d.resultado?.resultados || {};
+          const res = d.resultado?.results || {};
           out.innerHTML = '';
           const score = res.score_phishing || 0;
           const color = score >= 70 ? '#d9564b' : score >= 40 ? '#cc9a3c' : '#6fae7c';
@@ -995,7 +995,7 @@ async function checkPassword() {
   out.innerHTML = '<span class="info">🔐 Analyzing...</span>';
   try {
     const r = await fetch('/api/run', {method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({modulo:'password',argumento:pwd})});
+      body:JSON.stringify({module:'password',argument:pwd})});
     const reader = r.body.getReader(); const dec = new TextDecoder();
     let buf = '';
     while(true) {
@@ -1006,7 +1006,7 @@ async function checkPassword() {
         if(!line.startsWith('data:')) continue;
         const d = JSON.parse(line.slice(5));
         if(d.status === 'completado') {
-          const res = d.resultado?.resultados || {};
+          const res = d.resultado?.results || {};
           out.innerHTML = '';
           const color = res.score >= 75 ? '#6fae7c' : res.score >= 55 ? '#cc9a3c' : '#d9564b';
           append(out, `LEVEL: ${res.nivel} (${res.score}/100)\n`, res.score >= 55 ? 'ok' : 'warn');
@@ -1049,10 +1049,10 @@ async function cargarTimeline() {
     const COLORS = {ejecucion:'#d99a4e',domain:'#5b9bd5',ip:'#d9564b',user:'#cc9a3c',email:'#6fae7c',darkweb:'#d9564b'};
     cont.innerHTML = '<div style="position:absolute;left:10px;top:0;bottom:0;width:2px;background:#26262f"></div>' +
       evs.map(e => {
-        const color = COLORS[e.modulo] || '#8b8b98';
+        const color = COLORS[e.module] || '#8b8b98';
         return `<div style="position:relative;margin-bottom:16px;padding-left:20px">
           <div style="position:absolute;left:-5px;width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #16161c;top:2px"></div>
-          <div style="font-size:.7rem;color:#8b8b98">${e.fecha}</div>
+          <div style="font-size:.7rem;color:#8b8b98">${e.date}</div>
           <div style="font-size:.8rem;color:#e8e8ee;font-weight:600">${e.description}</div>
         </div>`;
       }).join('');
@@ -1194,7 +1194,7 @@ function selMod(mod) {
 }
 
 function getOutput() {
-  const outs = {osint:'output',recon:'output2',sim:'output3',datos:'output4'};
+  const outs = {osint:'output',recon:'output2',sim:'output3',data:'output4'};
   return document.getElementById(outs[tabActiva] || 'output');
 }
 
@@ -1223,7 +1223,7 @@ async function ejecutar() {
     const r = await fetch('/api/run', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({modulo: modActivo, argumento: arg, stream: true})
+      body: JSON.stringify({module: modActivo, argument: arg, stream: true})
     });
     const reader = r.body.getReader();
     const dec = new TextDecoder();
@@ -1239,19 +1239,19 @@ async function ejecutar() {
           else if (d.status === 'completado') {
             const res = d.resultado;
             const tipo = res?.tipo || '';
-            const resultados = res?.resultados || {};
+            const results = res?.results || {};
             // Smart rendering by type
-            if (tipo === 'render_js' && resultados.screenshot) {
-              append(out, `\n✅ Rendered — ${resultados.titulo || '?'}\n`, 'ok');
+            if (tipo === 'render_js' && results.screenshot) {
+              append(out, `\n✅ Rendered — ${results.titulo || '?'}\n`, 'ok');
               const img = document.createElement('img');
-              img.src = resultados.screenshot + '?t=' + Date.now();
+              img.src = results.screenshot + '?t=' + Date.now();
               img.style.cssText = 'max-width:100%;border:1px solid #26262f;border-radius:2px;margin:6px 0;display:block';
               out.appendChild(img);
-              append(out, JSON.stringify(resultados, null, 2) + '\n');
+              append(out, JSON.stringify(results, null, 2) + '\n');
             } else if (tipo === 'github_secrets') {
-              const h = resultados.hallazgos || [];
-              const repos = resultados.repos_analizados || 0;
-              if (resultados.error) { append(out, '❌ Error: ' + resultados.error + '\n', 'error'); }
+              const h = results.hallazgos || [];
+              const repos = results.repos_analizados || 0;
+              if (results.error) { append(out, '❌ Error: ' + results.error + '\n', 'error'); }
               else if (h.length === 0) {
                 append(out, `\n✓ No exposed secrets in ${repos} analyzed repos.\n`, 'ok');
               } else {
@@ -1283,7 +1283,7 @@ async function runSim(mod) {
   try {
     const r = await fetch('/api/run', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({modulo:mod, argumento:arg, stream:true})
+      body: JSON.stringify({module:mod, argument:arg, stream:true})
     });
     const reader = r.body.getReader();
     const dec = new TextDecoder();
@@ -1296,7 +1296,7 @@ async function runSim(mod) {
         try {
           const d = JSON.parse(line.slice(5));
           if (d.status === 'completado') {
-            const analisis = d.resultado?.resultados?.analisis || JSON.stringify(d.resultado,null,2);
+            const analisis = d.resultado?.results?.analisis || JSON.stringify(d.resultado,null,2);
             append(out, '\n' + analisis + '\n');
           }
         } catch(e) {}
@@ -1341,8 +1341,8 @@ async function cargarDatos() {
   try {
     const r = await fetch('/api/data');
     const d = await r.json();
-    if (!Object.keys(d.datos).length) { append(out,'No data collected yet.','info'); return; }
-    append(out, JSON.stringify(d.datos, null, 2));
+    if (!Object.keys(d.data).length) { append(out,'No data collected yet.','info'); return; }
+    append(out, JSON.stringify(d.data, null, 2));
   } catch(e) { append(out,'Error: '+e.message,'error'); }
 }
 
@@ -1355,7 +1355,7 @@ async function buscarEnCasos() {
     const r = await fetch('/api/find?q=' + encodeURIComponent(q));
     const d = await r.json();
     out.innerHTML = '';
-    const res = d.resultados || [];
+    const res = d.results || [];
     if (!res.length) { append(out, 'No matches in any saved case.\n', 'info'); return; }
     append(out, `${res.length} case(s) matched:\n\n`, 'ok');
     res.forEach(r2 => {
