@@ -1,10 +1,10 @@
-"""Tests de los transforms de buscadores multi-motor (F8 pasos 108-113).
+"""Tests for the multi-engine search transforms (F8 steps 108-113).
 
-Las APIs necesitan key, así que aquí se MOCKEA la respuesta con el esquema
-documentado de cada motor. Verifica el parseo y la emisión de entidades, más el
-degradado sin key. La verificación contra la API real queda pendiente de una key.
+The APIs need a key, so here the response is MOCKED with each engine's documented
+schema. It verifies parsing and entity emission, plus the keyless degradation.
+Verification against the real API is pending a key.
 
-Correr:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_buscadores.py -q
+Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_buscadores.py -q
 """
 import obsidian_web as ob
 from core.modelo import Almacen
@@ -68,12 +68,12 @@ def test_zoomeye_sin_key(monkeypatch):
 # ── FOFA CN (110) ────────────────────────────────────────────────────────────
 def test_fofa(monkeypatch):
     resp = {'error': False, 'results': [
-        ['1.2.3.4', '443', 'sitio.com'],
-        ['1.2.3.4', '80', 'otro.com']]}
+        ['1.2.3.4', '443', 'site.com'],
+        ['1.2.3.4', '80', 'other.com']]}
     _con_key(monkeypatch, resp, key='correo@x.com:apikey')
     prod = _correr('fofa', 'ip', '1.2.3.4')
     assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:80'}
-    assert {e.valor for e in prod if e.tipo == 'dominio'} == {'sitio.com', 'otro.com'}
+    assert {e.valor for e in prod if e.tipo == 'dominio'} == {'site.com', 'other.com'}
 
 
 def test_fofa_error_api(monkeypatch):
@@ -87,7 +87,7 @@ def test_fofa_sin_key(monkeypatch):
     assert _correr('fofa', 'ip', '1.2.3.4') == []
 
 
-# ── Quake/360 CN (111) — usa POST ────────────────────────────────────────────
+# ── Quake/360 CN (111) -- uses POST ─────────────────────────────────────────
 def test_quake(monkeypatch):
     resp = {'data': [{'port': 443, 'service': {'name': 'http/ssl'}},
                      {'port': 22, 'service': {'name': 'ssh'}}]}
@@ -138,7 +138,7 @@ def test_criminalip(monkeypatch):
 
 
 def test_binaryedge(monkeypatch):
-    resp = {'events': [{'port': 443}, {'port': 22}, {'port': 443}]}   # dedup por id
+    resp = {'events': [{'port': 443}, {'port': 22}, {'port': 443}]}   # dedup by id
     _con_key(monkeypatch, resp)
     prod = _correr('binaryedge', 'ip', '1.2.3.4')
     assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
@@ -152,7 +152,7 @@ def test_criminalip_binaryedge_sin_key(monkeypatch):
     assert _correr('binaryedge', 'ip', '1.2.3.4') == []
 
 
-# ── Pivote por favicon (114) ─────────────────────────────────────────────────
+# ── Favicon pivot (114) ─────────────────────────────────────────────────────
 def test_favicon_pivote(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'obtener',
                         lambda s: {'fofa': 'a@b.com:k', 'shodan': 'sk'}.get(s))
@@ -165,7 +165,7 @@ def test_favicon_pivote(monkeypatch):
     h = alm.crear('hash', '123456', propiedades={'tipo_hash': 'favicon'})
     prod = ejecutar_por_nombre('favicon_pivote', h, alm)
     ips = {e.valor for e in prod if e.tipo == 'ip'}
-    assert ips == {'9.9.9.9', '8.8.8.8', '7.7.7.7'}   # dedup cross-motor de 9.9.9.9
+    assert ips == {'9.9.9.9', '8.8.8.8', '7.7.7.7'}   # cross-engine dedup of 9.9.9.9
 
 
 def test_favicon_pivote_ignora_hash_no_favicon(monkeypatch):
@@ -175,7 +175,7 @@ def test_favicon_pivote_ignora_hash_no_favicon(monkeypatch):
     assert ejecutar_por_nombre('favicon_pivote', h, alm) == []
 
 
-# ── Pivote por certificado TLS (115) ─────────────────────────────────────────
+# ── TLS certificate pivot (115) ─────────────────────────────────────────────
 def test_cert_pivote(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'obtener',
                         lambda s: {'fofa': 'a@b.com:k', 'shodan': 'sk'}.get(s))
@@ -190,29 +190,29 @@ def test_cert_pivote(monkeypatch):
     assert {e.valor for e in prod if e.tipo == 'ip'} == {'5.5.5.5', '6.6.6.6'}
 
 
-# ── Dedup cross-engine (116) ─────────────────────────────────────────────────
+# ── Cross-engine dedup (116) ────────────────────────────────────────────────
 def test_dedup_cross_engine(monkeypatch):
-    """Mismo host/puerto reportado por 2 motores = 1 entidad con 2 fuentes."""
+    """Same host/port reported by 2 engines = 1 entity with 2 sources."""
     monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'id:secret')
     alm = Almacen()
     ip = alm.crear('ip', '1.2.3.4')
-    # Shodan ve el puerto 443
+    # Shodan sees port 443
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: FakeResp({'data': [{'port': 443, 'product': 'nginx'}]}))
     ejecutar_por_nombre('shodan', ip, alm)
-    # Censys ve el MISMO puerto 443
+    # Censys sees the SAME port 443
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: FakeResp({'result': {'services': [{'port': 443, 'service_name': 'HTTP'}]}}))
     ejecutar_por_nombre('censys', ip, alm)
     puertos = [e for e in alm.entidades if e.tipo == 'puerto' and e.valor == '1.2.3.4:443']
-    assert len(puertos) == 1                              # UNA sola entidad (id determinista)
-    assert {'shodan', 'censys'} <= puertos[0].origenes    # con las DOS fuentes
+    assert len(puertos) == 1                              # ONE single entity (deterministic id)
+    assert {'shodan', 'censys'} <= puertos[0].origenes    # with BOTH sources
 
 
 def test_todos_los_motores_registrados():
-    """Los 9 motores de core.motores tienen su transform registrado."""
+    """The 9 engines in core.motores each have a registered transform."""
     from core.transforms import REGISTRO
     from core.motores import MOTORES
     nombres = {t.nombre for t in REGISTRO.aplicables('ip')}
     faltan = set(MOTORES) - nombres
-    assert not faltan, f'motores sin transform: {faltan}'
+    assert not faltan, f'engines without a transform: {faltan}'

@@ -1,7 +1,7 @@
-"""Tests de integración de los transforms principales, con las APIs MOCKEADAS
-(F7 paso 101). No tocan la red: parchean run_tool (dig/nmap) y SESSION.get.
+"""Integration tests for the main transforms, with the APIs MOCKED (F7 step 101).
+They don't touch the network: they patch run_tool (dig/nmap) and SESSION.get.
 
-Correr:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_transforms_integracion.py -q
+Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_transforms_integracion.py -q
 """
 import obsidian_web as ob
 from core.modelo import Almacen
@@ -36,7 +36,7 @@ def test_dns_a_sin_resultados(monkeypatch):
 def test_dns_a_ignora_basura(monkeypatch):
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: ';; connection timed out\n1.2.3.4\n')
     prod = _correr('dns_a', 'dominio', 'ejemplo.com')
-    assert {e.valor for e in prod} == {'1.2.3.4'}      # descarta lo no-IP
+    assert {e.valor for e in prod} == {'1.2.3.4'}      # discards non-IP
 
 
 def test_ptr(monkeypatch):
@@ -73,7 +73,7 @@ def test_shodan(monkeypatch):
     host = {'org': 'ACME Corp', 'data': [
         {'port': 443, 'product': 'nginx'},
         {'port': 22, 'product': 'OpenSSH'},
-        {'port': 8443, 'product': 'nginx'}]}       # nginx repetido → 1 sola tech
+        {'port': 8443, 'product': 'nginx'}]}       # nginx repeated → a single tech
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: FakeResp(host))
     prod = _correr('shodan', 'ip', '1.2.3.4')
     puertos = {e.valor for e in prod if e.tipo == 'puerto'}
@@ -91,8 +91,8 @@ def test_shodan_sin_key_no_hace_nada(monkeypatch):
 
 
 def test_transform_con_api_caida_no_propaga(monkeypatch):
-    """Si la API revienta, el transform lo atrapa y devuelve vacío (aislamiento)."""
+    """If the API blows up, the transform catches it and returns empty (isolation)."""
     def boom(*a, **k):
-        raise RuntimeError('red caída')
+        raise RuntimeError('network down')
     monkeypatch.setattr(ob.SESSION, 'get', boom)
     assert _correr('crtsh', 'dominio', 'ejemplo.com') == []

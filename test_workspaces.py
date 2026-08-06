@@ -1,6 +1,6 @@
-"""Tests del gestor de workspaces (F3 pasos 43-47).
+"""Tests for the workspace manager (F3 steps 43-47).
 
-Correr:  ../.venv/bin/python -m pytest test_workspaces.py -q
+Run:  ../.venv/bin/python -m pytest test_workspaces.py -q
 """
 import pytest
 from core.workspaces import Gestor
@@ -23,7 +23,7 @@ def test_no_duplicar(tmp_path):
 
 
 def test_persistencia_aislada(tmp_path):
-    """Cada workspace guarda lo suyo, sin mezclarse con otro."""
+    """Each workspace stores its own, without mixing with another."""
     g = Gestor(str(tmp_path))
     a = g.crear('caso_a')
     a.crear('dominio', 'example.com', origenes={'whois'})
@@ -33,22 +33,22 @@ def test_persistencia_aislada(tmp_path):
     b.crear('ip', '8.8.8.8')
     g.guardar('caso_b', b)
 
-    # recargar cada uno: solo ve lo suyo
+    # reload each one: sees only its own
     ra = g.cargar('caso_a')
     rb = g.cargar('caso_b')
     assert ra.buscar('dominio', 'example.com') is not None
-    assert ra.buscar('ip', '8.8.8.8') is None       # aislado
+    assert ra.buscar('ip', '8.8.8.8') is None       # isolated
     assert rb.buscar('ip', '8.8.8.8') is not None
     assert rb.buscar('dominio', 'example.com') is None
 
 
 def test_sobrevive_recarga(tmp_path):
-    """El estado persiste (no vive solo en memoria)."""
+    """State persists (does not live only in memory)."""
     g1 = Gestor(str(tmp_path))
     a = g1.crear('caso1')
     a.crear('email', 'a@b.com', tags={'interesante'})
     g1.guardar('caso1', a)
-    # nuevo Gestor (simula reinicio del server)
+    # new Gestor (simulates a server restart)
     g2 = Gestor(str(tmp_path))
     r = g2.cargar('caso1')
     e = r.buscar('email', 'a@b.com')
@@ -69,7 +69,7 @@ def test_nombres_maliciosos_rechazados(tmp_path):
     for malo in ['../../etc/passwd', '..', 'a/b', 'x\\y', '']:
         with pytest.raises(ValueError):
             g.crear(malo)
-    # y no se creó nada fuera del directorio
+    # and nothing was created outside the directory
     assert g.listar() == []
 
 
@@ -80,7 +80,7 @@ def test_historial(tmp_path):
     g.registrar('caso', 'rdap', 'example.com', 5)
     h = g.historial('caso')
     assert len(h) == 2
-    assert h[0]['transform'] == 'rdap' and h[0]['salidas'] == 5   # más reciente primero
+    assert h[0]['transform'] == 'rdap' and h[0]['salidas'] == 5   # most recent first
 
 
 def test_snapshots(tmp_path):
@@ -91,10 +91,10 @@ def test_snapshots(tmp_path):
     sid = g.snapshot('caso')
     assert sid in g.listar_snapshots('caso')
 
-    # cambiar el caso, luego restaurar el snapshot -> vuelve el estado viejo
+    # change the case, then restore the snapshot -> the old state returns
     a2 = g.cargar('caso')
     a2.crear('ip', '1.1.1.1')
     g.guardar('caso', a2)
     assert len(g.cargar('caso')) == 2
     g.restaurar('caso', sid)
-    assert len(g.cargar('caso')) == 1   # volvió al snapshot (solo 8.8.8.8)
+    assert len(g.cargar('caso')) == 1   # reverted to the snapshot (only 8.8.8.8)
