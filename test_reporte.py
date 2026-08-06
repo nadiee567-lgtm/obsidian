@@ -4,7 +4,7 @@ Run:  ../.venv/bin/python -m pytest test_reporte.py -q
 """
 from core.modelo import Store
 from core.correlacion import Finding
-from core.reporte import generar_reporte
+from core.reporte import generate_report
 
 
 def _almacen_demo():
@@ -19,7 +19,7 @@ def _almacen_demo():
 def test_reporte_tiene_secciones():
     alm, d, ip = _almacen_demo()
     h = [Finding('ip-listed', 'high', 'IP en feed de amenazas', [ip.id])]
-    html = generar_reporte(alm, hallazgos=h, score=20,
+    html = generate_report(alm, hallazgos=h, score=20,
                            meta={'workspace': 'caso-1', 'target': 'target.com'})
     for txt in ('Risk summary', 'Findings', 'Entity inventory',
                 'target.com', '93.184.216.34', 'ip-listed', '20/100', 'caso-1'):
@@ -28,13 +28,13 @@ def test_reporte_tiene_secciones():
 
 def test_reporte_sin_hallazgos():
     alm, _, _ = _almacen_demo()
-    html = generar_reporte(alm, hallazgos=[], score=0)
+    html = generate_report(alm, hallazgos=[], score=0)
     assert 'No risks detected' in html
     assert '0/100' in html
 
 
 def test_reporte_almacen_vacio():
-    html = generar_reporte(Store(), hallazgos=[], score=0)
+    html = generate_report(Store(), hallazgos=[], score=0)
     assert 'No entities' in html
 
 
@@ -44,7 +44,7 @@ def test_reporte_escapa_xss():
     alm.create('domain', 'malo.com',
               properties={'nota': '<script>alert(1)</script>'})
     h = [Finding('r', 'critical', 'injection <img src=x onerror=alert(1)>', [])]
-    html = generar_reporte(alm, hallazgos=h, score=40)
+    html = generate_report(alm, hallazgos=h, score=40)
     assert '<script>alert(1)</script>' not in html          # raw NO
     assert '&lt;script&gt;' in html                          # escaped YES
     assert '<img src=x onerror' not in html                  # the finding's neither
@@ -54,7 +54,7 @@ def test_reporte_escapa_xss():
 def test_reporte_grafo_embebido():
     alm, d, ip = _almacen_demo()
     # fake vis_js: we only check it gets embedded and builds the datasets
-    html = generar_reporte(alm, hallazgos=[], score=0, vis_js='/*VISLIB*/')
+    html = generate_report(alm, hallazgos=[], score=0, vis_js='/*VISLIB*/')
     assert 'Relationship graph' in html
     assert '/*VISLIB*/' in html
     assert 'vis.Network' in html

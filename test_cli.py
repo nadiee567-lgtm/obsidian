@@ -6,13 +6,13 @@ import obsidian_cli as cli
 
 
 def test_parser_run():
-    a = cli.construir_parser().parse_args(['run', 'domain', 'x.com', 'dns_a', '-w', 'c1'])
+    a = cli.build_parser().parse_args(['run', 'domain', 'x.com', 'dns_a', '-w', 'c1'])
     assert a.type == 'domain' and a.value == 'x.com' and a.transform == 'dns_a'
     assert a.workspace == 'c1' and a.fn is cli.cmd_run
 
 
 def test_parser_recon_con_keys():
-    a = cli.construir_parser().parse_args(['recon', 'ip', '1.1.1.1', '--with-keys'])
+    a = cli.build_parser().parse_args(['recon', 'ip', '1.1.1.1', '--with-keys'])
     assert a.with_keys is True and a.fn is cli.cmd_recon
 
 

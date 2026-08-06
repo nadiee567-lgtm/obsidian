@@ -150,7 +150,7 @@ def test_ela_genera_imagen():
 
 def test_phash_transform(monkeypatch):
     from core.transforms import run_by_name
-    monkeypatch.setattr(ob, '_descargar_imagen', lambda url: _img_grad())
+    monkeypatch.setattr(ob, '_download_image', lambda url: _img_grad())
     alm = Store()
     u = alm.create('url', 'https://x.com/a.jpg')
     prod = run_by_name('phash', u, alm)
@@ -161,7 +161,7 @@ def test_phash_transform(monkeypatch):
 
 def test_ela_transform(monkeypatch):
     from core.transforms import run_by_name
-    monkeypatch.setattr(ob, '_descargar_imagen', lambda url: _img_grad())
+    monkeypatch.setattr(ob, '_download_image', lambda url: _img_grad())
     alm = Store()
     u = alm.create('url', 'https://x.com/a.jpg')
     run_by_name('ela', u, alm)

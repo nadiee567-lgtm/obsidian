@@ -18,7 +18,7 @@ class FakeResp:
         return self._data
 
 
-def _correr(name, type, value):
+def _run_one(name, type, value):
     alm = Store()
     e = alm.create(type, value)
     return run_by_name(name, e, alm)
@@ -36,7 +36,7 @@ def test_censys(monkeypatch):
         'services': [{'port': 443, 'service_name': 'HTTP'},
                      {'port': 22, 'service_name': 'SSH'}]}}
     _con_key(monkeypatch, resp, key='id:secret')
-    prod = _correr('censys', 'ip', '1.2.3.4')
+    prod = _run_one('censys', 'ip', '1.2.3.4')
     assert {e.value for e in prod if e.type == 'port'} == {'1.2.3.4:443', '1.2.3.4:22'}
     assert {e.value for e in prod if e.type == 'tech'} == {'HTTP', 'SSH'}
     assert any(e.type == 'asn' and e.value == 'AS64500' for e in prod)
@@ -46,7 +46,7 @@ def test_censys(monkeypatch):
 def test_censys_sin_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('CENSYS_API', '')
-    assert _correr('censys', 'ip', '1.2.3.4') == []
+    assert _run_one('censys', 'ip', '1.2.3.4') == []
 
 
 # ── ZoomEye CN (109) ─────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ def test_zoomeye(monkeypatch):
     resp = {'matches': [{'portinfo': {'port': 80, 'service': 'http', 'app': 'nginx'}},
                         {'portinfo': {'port': 443, 'service': 'https', 'app': 'nginx'}}]}
     _con_key(monkeypatch, resp)
-    prod = _correr('zoomeye', 'ip', '1.2.3.4')
+    prod = _run_one('zoomeye', 'ip', '1.2.3.4')
     assert {e.value for e in prod if e.type == 'port'} == {'1.2.3.4:80', '1.2.3.4:443'}
     assert 'nginx' in {e.value for e in prod if e.type == 'tech'}
 
@@ -62,7 +62,7 @@ def test_zoomeye(monkeypatch):
 def test_zoomeye_sin_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('ZOOMEYE_KEY', '')
-    assert _correr('zoomeye', 'ip', '1.2.3.4') == []
+    assert _run_one('zoomeye', 'ip', '1.2.3.4') == []
 
 
 # ── FOFA CN (110) ────────────────────────────────────────────────────────────
@@ -71,20 +71,20 @@ def test_fofa(monkeypatch):
         ['1.2.3.4', '443', 'site.com'],
         ['1.2.3.4', '80', 'other.com']]}
     _con_key(monkeypatch, resp, key='correo@x.com:apikey')
-    prod = _correr('fofa', 'ip', '1.2.3.4')
+    prod = _run_one('fofa', 'ip', '1.2.3.4')
     assert {e.value for e in prod if e.type == 'port'} == {'1.2.3.4:443', '1.2.3.4:80'}
     assert {e.value for e in prod if e.type == 'domain'} == {'site.com', 'other.com'}
 
 
 def test_fofa_error_api(monkeypatch):
     _con_key(monkeypatch, {'error': True, 'errmsg': 'quota'}, key='a@b.com:k')
-    assert _correr('fofa', 'ip', '1.2.3.4') == []
+    assert _run_one('fofa', 'ip', '1.2.3.4') == []
 
 
 def test_fofa_sin_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('FOFA_KEY', '')
-    assert _correr('fofa', 'ip', '1.2.3.4') == []
+    assert _run_one('fofa', 'ip', '1.2.3.4') == []
 
 
 # ── Quake/360 CN (111) -- uses POST ─────────────────────────────────────────
@@ -93,7 +93,7 @@ def test_quake(monkeypatch):
                      {'port': 22, 'service': {'name': 'ssh'}}]}
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'fakekey')
     monkeypatch.setattr(ob.SESSION, 'post', lambda *a, **k: FakeResp(resp))
-    prod = _correr('quake', 'ip', '1.2.3.4')
+    prod = _run_one('quake', 'ip', '1.2.3.4')
     assert {e.value for e in prod if e.type == 'port'} == {'1.2.3.4:443', '1.2.3.4:22'}
     assert {e.value for e in prod if e.type == 'tech'} == {'http/ssl', 'ssh'}
 
@@ -101,14 +101,14 @@ def test_quake(monkeypatch):
 def test_quake_sin_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('QUAKE_KEY', '')
-    assert _correr('quake', 'ip', '1.2.3.4') == []
+    assert _run_one('quake', 'ip', '1.2.3.4') == []
 
 
 # ── Hunter.how + Netlas (112) ────────────────────────────────────────────────
 def test_hunter(monkeypatch):
     resp = {'data': {'list': [{'port': 443, 'domain': 'a.com'}, {'port': 80, 'domain': 'b.com'}]}}
     _con_key(monkeypatch, resp)
-    prod = _correr('hunter', 'ip', '1.2.3.4')
+    prod = _run_one('hunter', 'ip', '1.2.3.4')
     assert {e.value for e in prod if e.type == 'port'} == {'1.2.3.4:443', '1.2.3.4:80'}
     assert {e.value for e in prod if e.type == 'domain'} == {'a.com', 'b.com'}
 
@@ -116,7 +116,7 @@ def test_hunter(monkeypatch):
 def test_netlas(monkeypatch):
     resp = {'items': [{'data': {'port': 443}}, {'data': {'port': 22}}]}
     _con_key(monkeypatch, resp)
-    prod = _correr('netlas', 'ip', '1.2.3.4')
+    prod = _run_one('netlas', 'ip', '1.2.3.4')
     assert {e.value for e in prod if e.type == 'port'} == {'1.2.3.4:443', '1.2.3.4:22'}
 
 
@@ -124,8 +124,8 @@ def test_hunter_netlas_sin_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('HUNTER_KEY', '')
     monkeypatch.setenv('NETLAS_KEY', '')
-    assert _correr('hunter', 'ip', '1.2.3.4') == []
-    assert _correr('netlas', 'ip', '1.2.3.4') == []
+    assert _run_one('hunter', 'ip', '1.2.3.4') == []
+    assert _run_one('netlas', 'ip', '1.2.3.4') == []
 
 
 # ── Criminal IP + BinaryEdge (113) ───────────────────────────────────────────
@@ -133,14 +133,14 @@ def test_criminalip(monkeypatch):
     resp = {'port': {'data': [{'open_port_no': 443, 'app_name': 'HTTPS'},
                               {'open_port_no': 8080, 'app_name': 'HTTP'}]}}
     _con_key(monkeypatch, resp)
-    prod = _correr('criminalip', 'ip', '1.2.3.4')
+    prod = _run_one('criminalip', 'ip', '1.2.3.4')
     assert {e.value for e in prod if e.type == 'port'} == {'1.2.3.4:443', '1.2.3.4:8080'}
 
 
 def test_binaryedge(monkeypatch):
     resp = {'events': [{'port': 443}, {'port': 22}, {'port': 443}]}   # dedup by id
     _con_key(monkeypatch, resp)
-    prod = _correr('binaryedge', 'ip', '1.2.3.4')
+    prod = _run_one('binaryedge', 'ip', '1.2.3.4')
     assert {e.value for e in prod if e.type == 'port'} == {'1.2.3.4:443', '1.2.3.4:22'}
 
 
@@ -148,8 +148,8 @@ def test_criminalip_binaryedge_sin_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('CRIMINALIP_KEY', '')
     monkeypatch.setenv('BINARYEDGE_KEY', '')
-    assert _correr('criminalip', 'ip', '1.2.3.4') == []
-    assert _correr('binaryedge', 'ip', '1.2.3.4') == []
+    assert _run_one('criminalip', 'ip', '1.2.3.4') == []
+    assert _run_one('binaryedge', 'ip', '1.2.3.4') == []
 
 
 # ── Favicon pivot (114) ─────────────────────────────────────────────────────

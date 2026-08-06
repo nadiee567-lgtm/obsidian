@@ -7,7 +7,7 @@ from core.modelo import Store
 from core.transforms import run_by_name
 
 
-def _correr(name, type, value):
+def _run_one(name, type, value):
     alm = Store()
     e = alm.create(type, value)
     return run_by_name(name, e, alm), e, alm
@@ -15,7 +15,7 @@ def _correr(name, type, value):
 
 # ── 33: phone ───────────────────────────────────────────────────────────────
 def test_telefono_dorks_keyless():
-    prod, _, _ = _correr('telefono_dorks', 'phone', '+14155552671')
+    prod, _, _ = _run_one('telefono_dorks', 'phone', '+14155552671')
     dorks = {p.properties.get('dork') for p in prod if p.type == 'url'}
     assert dorks == {'truecaller', 'whitepages', 'messaging', 'general'}
     assert all(p.type == 'url' for p in prod)      # no key: only dorks, no country
@@ -24,7 +24,7 @@ def test_telefono_dorks_keyless():
 # ── 34: typosquatting / buckets / takeover / passivedns ─────────────────────
 def test_typosquatting(monkeypatch):
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: '1.2.3.4\n')   # everything "resolves"
-    prod, _, _ = _correr('typosquatting', 'domain', 'google.com')
+    prod, _, _ = _run_one('typosquatting', 'domain', 'google.com')
     assert prod and all(p.type == 'domain' and 'typosquat' in p.tags for p in prod)
 
 
@@ -33,7 +33,7 @@ def test_buckets(monkeypatch):
         status_code = 200
         text = ''
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: R())
-    prod, _, _ = _correr('buckets', 'org', 'ACME Corp')
+    prod, _, _ = _run_one('buckets', 'org', 'ACME Corp')
     assert prod and all(p.type == 'bucket' for p in prod)
     assert any('public' in p.tags for p in prod)
 
@@ -46,7 +46,7 @@ def test_takeover(monkeypatch):
             return [{'name_value': 'abandonado.ejemplo.com'}]
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: Rj())
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: 'user.github.io.\n')  # orphan CNAME
-    prod, _, _ = _correr('takeover', 'domain', 'ejemplo.com')
+    prod, _, _ = _run_one('takeover', 'domain', 'ejemplo.com')
     vulns = [p for p in prod if 'takeover' in p.tags]
     assert vulns and vulns[0].value == 'abandonado.ejemplo.com'
 
@@ -57,14 +57,14 @@ def test_passivedns(monkeypatch):
         def json(self):
             return {'data': [{'attributes': {'ip_address': '9.9.9.9', 'date': 1600000000}}]}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: R())
-    prod, _, _ = _correr('passivedns', 'domain', 'ejemplo.com')
+    prod, _, _ = _run_one('passivedns', 'domain', 'ejemplo.com')
     assert {p.value for p in prod if p.type == 'ip'} == {'9.9.9.9'}
 
 
 def test_passivedns_sin_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('VT_API_KEY', '')
-    prod, _, _ = _correr('passivedns', 'domain', 'ejemplo.com')
+    prod, _, _ = _run_one('passivedns', 'domain', 'ejemplo.com')
     assert prod == []
 
 
@@ -89,7 +89,7 @@ def test_github_sec_y_regla(monkeypatch):
         return _Rj([])
     monkeypatch.setattr(ob._boveda, 'get', lambda s: '')
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
-    prod, _, alm = _correr('github_sec', 'user', 'user')
+    prod, _, alm = _run_one('github_sec', 'user', 'user')
     creds = [p for p in prod if p.type == 'credential']
     assert creds and 'github-secret' in creds[0].tags
     h = correlate(alm)
@@ -115,7 +115,7 @@ def test_http_probe_detecta_panel_login(monkeypatch):
         headers = {}
         text = '<html><title>Admin</title><input type="password" name="pw"></html>'
     monkeypatch.setattr(ob, '_fetch_seguro', lambda *a, **k: R())
-    _, e, _ = _correr('http_probe', 'domain', 'admin.x.com')
+    _, e, _ = _run_one('http_probe', 'domain', 'admin.x.com')
     assert 'login-panel' in e.tags
 
 
@@ -271,7 +271,7 @@ def test_ejecutar_lote_progreso():
 def test_persona(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _Rj({'AbstractText': 'Person bio.'}))
-    prod, e, _ = _correr('person', 'person', 'Juan Perez')
+    prod, e, _ = _run_one('person', 'person', 'Juan Perez')
     assert {p.properties.get('dork') for p in prod} == {'linkedin', 'x', 'contact', 'pdf', 'github', 'facebook'}
     assert e.properties.get('resumen') == 'Person bio.'
 
@@ -281,7 +281,7 @@ def test_darkweb_ahmia(monkeypatch):
     class R:
         text = html
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: R())
-    prod, _, _ = _correr('darkweb', 'person', 'algo')
+    prod, _, _ = _run_one('darkweb', 'person', 'algo')
     urls = {p.value for p in prod if p.type == 'url'}
     assert urls == {'http://abc.onion', 'http://xyz.onion'}   # normalizer strips the trailing /
 
@@ -289,25 +289,25 @@ def test_darkweb_ahmia(monkeypatch):
 def test_url_check_urlhaus(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'post',
                         lambda *a, **k: _Rj({'query_status': 'ok', 'threat': 'malware_download'}))
-    _, e, _ = _correr('url_check', 'url', 'http://malo.com/x')
+    _, e, _ = _run_one('url_check', 'url', 'http://malo.com/x')
     assert 'malicious-url' in e.tags and e.properties.get('urlhaus') == 'malware_download'
 
 
 def test_render_js_bloquea_ssrf(monkeypatch):
     monkeypatch.setattr(ob, '_url_publica', lambda u: False)   # internal host
-    prod, _, _ = _correr('render_js', 'url', 'http://169.254.169.254/')
+    prod, _, _ = _run_one('render_js', 'url', 'http://169.254.169.254/')
     assert prod == []                              # does not render internal hosts
 
 
 def test_yara_bulk_carpeta_invalida():
-    prod, _, _ = _correr('yara_bulk', 'file', '/does/not/exist/xyz')
+    prod, _, _ = _run_one('yara_bulk', 'file', '/does/not/exist/xyz')
     assert prod == []
 
 
 def test_wordlist_ia(monkeypatch):
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'juan2024\npassword123\nperez.juan\nabc')
-    _, e, _ = _correr('wordlist', 'person', 'Juan')
+    _, e, _ = _run_one('wordlist', 'person', 'Juan')
     palabras = e.properties.get('wordlist')
     assert 'juan2024' in palabras and 'abc' not in palabras   # filters <6 chars
 

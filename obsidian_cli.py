@@ -25,7 +25,7 @@ import obsidian_web as _ob   # registers the transforms (does not start Flask)
 from core.modelo import Store, valid_type
 from core.transforms import REGISTRO, run_by_name, run_batch
 from core.correlacion import correlate, risk_score
-from core.reporte import generar_reporte
+from core.reporte import generate_report
 from core.exportar import exportar_json, exportar_csv
 from core.workspaces import Manager
 from core.config import WORKSPACES_DIR, STATIC_DIR, VIS_FILE
@@ -111,7 +111,7 @@ def cmd_report(a):
     if not len(alm):
         return _err("empty or nonexistent workspace")
     h = correlate(alm)
-    html = generar_reporte(alm, h, risk_score(h),
+    html = generate_report(alm, h, risk_score(h),
                            meta={'workspace': a.workspace},
                            vis_js=None if a.no_graph else _vis_js())
     if a.output:
@@ -151,7 +151,7 @@ def cmd_workspaces(a):
     return 0
 
 
-def construir_parser():
+def build_parser():
     p = argparse.ArgumentParser(prog='obsidian', description='OBSIDIAN -- OSINT engine from the terminal')
     sub = p.add_subparsers(dest='cmd', required=True)
 
@@ -188,7 +188,7 @@ def construir_parser():
 
 
 def main(argv=None):
-    args = construir_parser().parse_args(argv)
+    args = build_parser().parse_args(argv)
     return args.fn(args)
 
 

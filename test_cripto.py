@@ -15,7 +15,7 @@ class _R:
         return self._data
 
 
-def _correr(name, type, value):
+def _run_one(name, type, value):
     alm = Store()
     e = alm.create(type, value)
     return run_by_name(name, e, alm), e, alm
@@ -26,7 +26,7 @@ def test_extraer_wallets(monkeypatch):
     eth = '0x' + 'a' * 40
     txt = f'donate to 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa or to {eth} thanks'
     monkeypatch.setattr(ob, '_fetch_seguro', lambda *a, **k: _R(text=txt))
-    prod, _, _ = _correr('extraer_wallets', 'url', 'https://x.com')
+    prod, _, _ = _run_one('extraer_wallets', 'url', 'https://x.com')
     ws = {e.value for e in prod if e.type == 'wallet'}
     assert '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa' in ws and eth in ws
 
@@ -39,13 +39,13 @@ def test_tx_grafo(monkeypatch):
     tx_json = {'txs': [{'inputs': [{'prev_out': {'addr': 'inp111'}}],
                         'out': [{'addr': 'out222'}, {'addr': _GENESIS}]}]}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=tx_json))
-    prod, _, _ = _correr('tx_grafo', 'wallet', _GENESIS)
+    prod, _, _ = _run_one('tx_grafo', 'wallet', _GENESIS)
     ws = {e.value for e in prod if e.type == 'wallet'}
     assert ws == {'inp111', 'out222'}                # counterparties, without itself
 
 
 def test_tx_grafo_ignora_no_btc():
-    prod, _, _ = _correr('tx_grafo', 'wallet', '0x' + 'a' * 40)   # ETH -> not applicable yet
+    prod, _, _ = _run_one('tx_grafo', 'wallet', '0x' + 'a' * 40)   # ETH -> not applicable yet
     assert prod == []
 
 
@@ -55,7 +55,7 @@ def test_cluster_wallets(monkeypatch):
                                    {'prev_out': {'addr': 'hermana1'}}],
                         'out': [{'addr': 'target'}]}]}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=tx_json))
-    prod, _, _ = _correr('cluster_wallets', 'wallet', _GENESIS)
+    prod, _, _ = _run_one('cluster_wallets', 'wallet', _GENESIS)
     hermanas = [e for e in prod if e.type == 'wallet']
     assert {e.value for e in hermanas} == {'hermana1'}          # co-input, not the destination
     assert 'same-owner' in hermanas[0].tags
@@ -63,7 +63,7 @@ def test_cluster_wallets(monkeypatch):
 
 # ── 140: exchange attribution (links to tools) ──────────────────────────────
 def test_exchange_attrib():
-    prod, _, _ = _correr('exchange_attrib', 'wallet', _GENESIS)
+    prod, _, _ = _run_one('exchange_attrib', 'wallet', _GENESIS)
     herrs = {e.properties.get('tool') for e in prod if e.type == 'url'}
     assert herrs == {'blockchair', 'walletexplorer', 'arkham', 'oxt'}
 
@@ -72,7 +72,7 @@ def test_exchange_attrib():
 def test_riesgo_wallet_y_regla(monkeypatch):
     from core.correlacion import correlate
     monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
-    prod, e, alm = _correr('riesgo_wallet', 'wallet', '1BadRansomAddr')
+    prod, e, alm = _run_one('riesgo_wallet', 'wallet', '1BadRansomAddr')
     assert 'ransomware' in e.tags
     h = correlate(alm)
     assert any(x.rule == 'wallet-ransomware' and x.severity == 'critical' for x in h)
@@ -80,7 +80,7 @@ def test_riesgo_wallet_y_regla(monkeypatch):
 
 def test_riesgo_wallet_limpia(monkeypatch):
     monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
-    _, e, _ = _correr('riesgo_wallet', 'wallet', _GENESIS)   # not in the list
+    _, e, _ = _run_one('riesgo_wallet', 'wallet', _GENESIS)   # not in the list
     assert 'ransomware' not in e.tags
 
 
@@ -88,12 +88,12 @@ def test_riesgo_wallet_limpia(monkeypatch):
 def test_eth_balance(monkeypatch):
     # 0xDE0B6B3A7640000 = 1 ETH in wei
     monkeypatch.setattr(ob.SESSION, 'post', lambda *a, **k: _R(data={'result': '0xDE0B6B3A7640000'}))
-    _, e, _ = _correr('eth_balance', 'wallet', '0x' + 'a' * 40)
+    _, e, _ = _run_one('eth_balance', 'wallet', '0x' + 'a' * 40)
     assert abs(e.properties.get('eth_balance') - 1.0) < 1e-9 and e.properties.get('cadena') == 'eth'
 
 
 def test_eth_balance_ignora_btc():
-    _, e, _ = _correr('eth_balance', 'wallet', _GENESIS)     # BTC -> not applicable
+    _, e, _ = _run_one('eth_balance', 'wallet', _GENESIS)     # BTC -> not applicable
     assert 'eth_balance' not in e.properties
 
 

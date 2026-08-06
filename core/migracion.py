@@ -1,7 +1,7 @@
 """Migration from the old format to the typed model -- F1 step 24.
 
 Converts the flat `case['data']` (per-module dict: {type, target, results})
-into a Store of typed entities/relations. Replicates the mapping _build_grafo
+into a Store of typed entities/relations. Replicates the mapping _build_graph
 already did, so existing cases aren't lost when moving to the new model.
 
 Defensive: a malformed module is skipped, it does not take down the whole migration."""
@@ -35,7 +35,7 @@ def _rel(alm, a, b, label):
         alm.relate(a, b, label)
 
 
-def _mig_dominio(alm, raiz, value, res, source):
+def _mig_domain(alm, raiz, value, res, source):
     dom = value.get('target', '')
     if not dom:
         return
@@ -67,7 +67,7 @@ def _mig_ip(alm, raiz, value, res, source):
         _rel(alm, i, alm.create('domain', res['ptr'], sources={source}), 'PTR')
 
 
-def _mig_usuario(alm, raiz, value, res, source):
+def _mig_user(alm, raiz, value, res, source):
     user = value.get('target', '')
     if not user:
         return
@@ -167,9 +167,9 @@ def _mig_favicon(alm, raiz, value, res, source):
 
 
 _MIGRADORES = {
-    'domain': _mig_dominio,
+    'domain': _mig_domain,
     'ip': _mig_ip,
-    'user': _mig_usuario,
+    'user': _mig_user,
     'email': _mig_email,
     'buckets': _mig_buckets,
     'subdomain_takeover': _mig_takeover,

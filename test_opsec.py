@@ -116,6 +116,6 @@ def test_registrar_huella():
     ob._HUELLA.clear()
     ob._OPSEC['anonimo'] = False
     ob._PROXIES['pool'] = []
-    ob._registrar_huella('crtsh', 'domain', 'x.com')
+    ob._record_footprint('crtsh', 'domain', 'x.com')
     assert ob._HUELLA[0]['transform'] == 'crtsh' and ob._HUELLA[0]['anonimo'] is False
     assert ob._HUELLA[0]['target'] == 'domain:x.com'

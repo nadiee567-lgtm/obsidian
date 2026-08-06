@@ -7,7 +7,7 @@ from core.modelo import Store
 from core.transforms import run_by_name
 
 
-def _correr(name, type, value):
+def _run_one(name, type, value):
     alm = Store()
     e = alm.create(type, value)
     return run_by_name(name, e, alm), e
@@ -15,7 +15,7 @@ def _correr(name, type, value):
 
 # ── 171: regional social platforms ──────────────────────────────────────────
 def test_plataformas_regionales():
-    prod, _ = _correr('plataformas_regionales', 'user', 'nadiee')
+    prod, _ = _run_one('plataformas_regionales', 'user', 'nadiee')
     plats = {p.properties.get('platform') for p in prod if p.type == 'url'}
     assert {'vk', 'ok', 'weibo', 'douyin', 'telegram'} == plats
 
@@ -28,21 +28,21 @@ def test_transliterar_funciones():
 
 
 def test_transliterar_transform():
-    prod, _ = _correr('transliterar', 'person', 'Иван')
+    prod, _ = _run_one('transliterar', 'person', 'Иван')
     variantes = {p.value for p in prod if p.type == 'person'}
     assert 'ivan' in variantes                    # latin variant
 
 
 # ── 173: regional registries ────────────────────────────────────────────────
 def test_registros_regionales():
-    prod, _ = _correr('registros_regionales', 'org', 'ACME Corp')
+    prod, _ = _run_one('registros_regionales', 'org', 'ACME Corp')
     regs = {p.properties.get('registry') for p in prod if p.type == 'url'}
     assert {'china_qcc', 'rusia_rusprofile', 'opencorporates'} == regs
 
 
 # ── 174: local engines ──────────────────────────────────────────────────────
 def test_motores_locales():
-    prod, _ = _correr('motores_locales', 'person', 'Ivan Petrov')
+    prod, _ = _run_one('motores_locales', 'person', 'Ivan Petrov')
     motores = {p.properties.get('engine') for p in prod if p.type == 'url'}
     assert {'yandex', 'baidu', 'sogou'} == motores
 
@@ -71,7 +71,7 @@ def test_dorks_por_idioma():
 
 
 def test_dorks_idioma_transform():
-    prod, _ = _correr('dorks_idioma', 'person', 'Иван Петров')   # cyrillic -> ru
+    prod, _ = _run_one('dorks_idioma', 'person', 'Иван Петров')   # cyrillic -> ru
     idiomas = {p.properties.get('language') for p in prod if p.type == 'url'}
     assert idiomas == {'ru'}
 

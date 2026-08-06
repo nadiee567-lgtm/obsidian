@@ -32,7 +32,7 @@ def _resumen_severidad(hallazgos) -> dict:
     return conteo
 
 
-def _grafo_data(almacen) -> tuple:
+def _graph_data(almacen) -> tuple:
     """Nodes/edges for vis-network, with the same per-type color as /v2."""
     nodos, aristas = [], []
     for e in almacen.entities:
@@ -44,7 +44,7 @@ def _grafo_data(almacen) -> tuple:
     return nodos, aristas
 
 
-def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) -> str:
+def generate_report(almacen, hallazgos=None, score=0, meta=None, vis_js=None) -> str:
     """Returns the full report HTML.
 
     almacen   -- typed Store (source of entities/relations)
@@ -113,7 +113,7 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
 
     # ── embedded graph (optional, self-contained) ──
     if vis_js:
-        nodos, aristas = _grafo_data(almacen)
+        nodos, aristas = _graph_data(almacen)
         grafo_html = f'''
   <h2>Relationship graph</h2>
   <div id="grafo"></div>

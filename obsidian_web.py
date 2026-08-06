@@ -16,7 +16,7 @@ from core.migracion import migrate_case
 from core.workspaces import Manager
 from core.boveda import Vault
 from core.correlacion import correlate, risk_score, load_yaml_rules, exposure_score
-from core.reporte import generar_reporte
+from core.reporte import generate_report
 from core.exportar import exportar_json, exportar_csv
 from core.monitor import Monitor, snapshot as _snap_estado
 from core.notificar import send_ntfy, build_ntfy
@@ -69,7 +69,7 @@ def _db_init():
 
 _db_init()
 
-def _db_guardar_caso(caso_dict):
+def _db_save_case(caso_dict):
     """Mirror of the case in SQLite -- does not replace the JSON, only makes it searchable."""
     try:
         con = sqlite3.connect(CASES_DB)
@@ -84,7 +84,7 @@ def _db_guardar_caso(caso_dict):
     except Exception as e:
         log.error("error saving SQLite mirror: %s", e)
 
-def _db_buscar(termino):
+def _db_find(termino):
     """Searches a term (email, domain, username...) across all saved cases."""
     con = sqlite3.connect(CASES_DB)
     con.row_factory = sqlite3.Row
@@ -109,7 +109,7 @@ def _db_buscar(termino):
 # If vis.js (graph) is missing from the user static dir, copy the one shipped with the program
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _WEB_DIR = os.path.join(_HERE, 'web')
-def _cargar_web(name):
+def _load_web(name):
     """Loads a UI file (HTML/JS/CSS) from web/. The front-end lives in files, not
     embedded in the .py. It is read as text: the usual .replace()/.format() still
     apply (no Jinja, which would clash with the CSS braces and the ${} of JS)."""
@@ -163,7 +163,7 @@ _LOCK_SECONDS   = 300
 _PUBLIC_PATHS   = {'/login', '/manifest.json', '/sw.js', '/cert.pem'}
 _PUBLIC_PREFIXES = ('/static/', '/icon-')
 
-_LOGIN_HTML = _cargar_web('login.html')
+_LOGIN_HTML = _load_web('login.html')
 
 @app.before_request
 def _require_auth():
@@ -286,7 +286,7 @@ def _fetch_seguro(url, timeout=10, stream=False, max_redirs=3):
 def _which(cmd):
     return subprocess.run(['which',cmd], capture_output=True).returncode == 0
 
-def _guardar_dato(key, value):
+def _save_datum(key, value):
     with case_lock:
         case['data'][key] = value
         case['history'].append({'ts': time.time(), 'key': key, 'resumen': str(value)[:100]})
@@ -334,7 +334,7 @@ def _tailscale_ip():
 
 # ── OSINT modules ─────────────────────────────────────────────────────────────
 
-def _osint_persona(name):
+def _osint_person(name):
     data = {'type':'person','target':name,'results':{}}
     # DuckDuckGo
     try:
@@ -361,10 +361,10 @@ def _osint_persona(name):
                        timeout=6, headers={'User-Agent':'OSINT-Research'})
         data['results']['hibp'] = 'Possible presence in HIBP' if r.status_code==200 else 'Not found in HIBP'
     except Exception as _e: log.debug("source unavailable: %s", _e)
-    _guardar_dato(f'persona_{name}', data)
+    _save_datum(f'persona_{name}', data)
     return data
 
-def _osint_usuario(username):
+def _osint_user(username):
     data = {'type':'user','target':username,'results':{}}
     plataformas = {
         'GitHub':    f'https://github.com/{username}',
@@ -432,10 +432,10 @@ def _osint_usuario(username):
                 except Exception as _e: log.debug("maigret parse: %s", _e)
             if encontrados_mg:
                 data['results']['maigret'] = encontrados_mg
-    _guardar_dato(f'usuario_{username}', data)
+    _save_datum(f'usuario_{username}', data)
     return data
 
-def _osint_dominio(dominio):
+def _osint_domain(dominio):
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
     data = {'type':'domain','target':dominio,'results':{}}
     # WHOIS
@@ -484,7 +484,7 @@ def _osint_dominio(dominio):
         snap = r.json().get('archived_snapshots',{}).get('closest',{})
         if snap.get('url'): data['results']['wayback'] = snap
     except Exception as _e: log.debug("source unavailable: %s", _e)
-    _guardar_dato(f'dominio_{dominio}', data)
+    _save_datum(f'dominio_{dominio}', data)
     return data
 
 def _osint_ip(ip):
@@ -508,7 +508,7 @@ def _osint_ip(ip):
         r = SESSION.get(f'https://api.hackertarget.com/aslookup/?q={ip}', timeout=8)
         data['results']['asn'] = r.text.strip()
     except Exception as _e: log.debug("source unavailable: %s", _e)
-    _guardar_dato(f'ip_{ip}', data)
+    _save_datum(f'ip_{ip}', data)
     return data
 
 def _osint_email(email):
@@ -543,7 +543,7 @@ def _osint_email(email):
             'dkim': dkim.strip()[:200] or 'NOT CONFIGURED',
             'spoofable': spoofable
         }
-    _guardar_dato(f'email_{email}', data)
+    _save_datum(f'email_{email}', data)
     return data
 
 def _osint_phone(numero):
@@ -573,7 +573,7 @@ def _osint_phone(numero):
         f'"{numero_limpio}"',
         f'"{numero}" whatsapp OR telegram',
     ]
-    _guardar_dato(f'telefono_{numero}', data)
+    _save_datum(f'telefono_{numero}', data)
     return data
 
 def _recon_github_secrets(username_or_org):
@@ -616,7 +616,7 @@ def _recon_github_secrets(username_or_org):
         data['results']['repos_analizados'] = len(repos[:10])
     except Exception as e:
         data['results']['error'] = str(e)
-    _guardar_dato(f'github_secrets_{username_or_org}', data)
+    _save_datum(f'github_secrets_{username_or_org}', data)
     return data
 
 def _recon_ssl(dominio):
@@ -637,7 +637,7 @@ def _recon_ssl(dominio):
         data['results']['hsts'] = r.headers.get('Strict-Transport-Security','NOT CONFIGURED')
         data['results']['ocsp'] = 'Verify manually'
     except Exception as _e: log.debug("source unavailable: %s", _e)
-    _guardar_dato(f'ssl_{dominio}', data)
+    _save_datum(f'ssl_{dominio}', data)
     return data
 
 def _recon_favicon(dominio):
@@ -648,7 +648,7 @@ def _recon_favicon(dominio):
         import mmh3
     except ImportError:
         data['results']['error'] = "Missing the mmh3 library -- install with: pip install mmh3"
-        _guardar_dato(f'favicon_{dominio}', data)
+        _save_datum(f'favicon_{dominio}', data)
         return data
     favicon_bytes = None
     for esquema in ('https', 'http'):
@@ -660,7 +660,7 @@ def _recon_favicon(dominio):
         except Exception as _e: log.debug("source unavailable: %s", _e)
     if not favicon_bytes:
         data['results']['error'] = 'favicon.ico not found on the target (try another path manually)'
-        _guardar_dato(f'favicon_{dominio}', data)
+        _save_datum(f'favicon_{dominio}', data)
         return data
     favicon_b64 = base64.encodebytes(favicon_bytes)
     hash_mmh3 = mmh3.hash(favicon_b64)
@@ -680,7 +680,7 @@ def _recon_favicon(dominio):
             data['results']['error_shodan'] = str(e)
     else:
         data['results']['nota'] = f'Computed hash: {hash_mmh3}. Add a Shodan API key (free at shodan.io) to search related infrastructure, or paste the hash manually into shodan.io/search?query=http.favicon.hash:{hash_mmh3}'
-    _guardar_dato(f'favicon_{dominio}', data)
+    _save_datum(f'favicon_{dominio}', data)
     return data
 
 def _recon_typosquatting(dominio):
@@ -715,7 +715,7 @@ def _recon_typosquatting(dominio):
     for t in ths: t.join(timeout=10)
     data['results']['variantes_totales'] = len(variantes)
     data['results']['registrados'] = registrados
-    _guardar_dato(f'typosquatting_{dominio}', data)
+    _save_datum(f'typosquatting_{dominio}', data)
     return data
 
 def _recon_buckets(empresa):
@@ -746,7 +746,7 @@ def _recon_buckets(empresa):
     for t in ths: t.join(timeout=15)
     data['results']['buckets'] = encontrados
     data['results']['variantes_probadas'] = variantes
-    _guardar_dato(f'buckets_{empresa}', data)
+    _save_datum(f'buckets_{empresa}', data)
     return data
 
 def _recon_subdomain_takeover(dominio):
@@ -789,7 +789,7 @@ def _recon_subdomain_takeover(dominio):
     for t in ths: t.join(timeout=20)
     data['results']['subdominios_analizados'] = len(list(subs)[:20])
     data['results']['vulnerables'] = vulnerables
-    _guardar_dato(f'takeover_{dominio}', data)
+    _save_datum(f'takeover_{dominio}', data)
     return data
 
 def _recon_passivedns(dominio):
@@ -799,7 +799,7 @@ def _recon_passivedns(dominio):
     vt_key = os.environ.get('VT_API_KEY','')
     if not vt_key:
         data['results']['nota'] = 'Add a VirusTotal API key (free, Analyze tab) to see the IP history'
-        _guardar_dato(f'passivedns_{dominio}', data)
+        _save_datum(f'passivedns_{dominio}', data)
         return data
     try:
         r = SESSION.get(f'https://www.virustotal.com/api/v3/domains/{dominio}/resolutions',
@@ -817,7 +817,7 @@ def _recon_passivedns(dominio):
         data['results']['total'] = len(history)
     except Exception as e:
         data['results']['error'] = str(e)
-    _guardar_dato(f'passivedns_{dominio}', data)
+    _save_datum(f'passivedns_{dominio}', data)
     return data
 
 def _recon_metadata(url):
@@ -855,7 +855,7 @@ def _recon_metadata(url):
             data['results']['titulo'] = soup.title.string if soup.title else '?'
     except Exception as e:
         data['results']['error'] = str(e)
-    _guardar_dato(f'metadata_{url[:50]}', data)
+    _save_datum(f'metadata_{url[:50]}', data)
     return data
 
 def _recon_render_js(url):
@@ -867,7 +867,7 @@ def _recon_render_js(url):
         from playwright.sync_api import sync_playwright
     except ImportError:
         data['results']['error'] = 'Missing playwright -- install with: pip install playwright && playwright install chromium'
-        _guardar_dato(f'render_{url[:50]}', data)
+        _save_datum(f'render_{url[:50]}', data)
         return data
     shots_dir = os.path.join(STATIC_DIR, 'screenshots')
     os.makedirs(shots_dir, exist_ok=True)
@@ -888,7 +888,7 @@ def _recon_render_js(url):
         data['results']['tamano_html_render'] = len(html_render)
     except Exception as e:
         data['results']['error'] = f'Render error: {e}'
-    _guardar_dato(f'render_{url[:50]}', data)
+    _save_datum(f'render_{url[:50]}', data)
     return data
 
 def _recon_yara_bulk(carpeta):
@@ -896,11 +896,11 @@ def _recon_yara_bulk(carpeta):
     data = {'type':'yara_bulk','target':carpeta,'results':{}}
     if not os.path.isdir(carpeta):
         data['results']['error'] = f'Not a valid folder: {carpeta}'
-        _guardar_dato(f'yara_bulk_{carpeta}', data)
+        _save_datum(f'yara_bulk_{carpeta}', data)
         return data
     if not _which('yara-rules'):
         data['results']['error'] = 'yara-rules is not installed'
-        _guardar_dato(f'yara_bulk_{carpeta}', data)
+        _save_datum(f'yara_bulk_{carpeta}', data)
         return data
     archivos = []
     for root, _dirs, files in os.walk(carpeta):
@@ -928,7 +928,7 @@ def _recon_yara_bulk(carpeta):
             if len(hallazgos) >= 50: break
     data['results']['total_escaneados'] = len(archivos)
     data['results']['con_coincidencias'] = hallazgos
-    _guardar_dato(f'yara_bulk_{carpeta}', data)
+    _save_datum(f'yara_bulk_{carpeta}', data)
     return data
 
 def _gen_wordlist(target):
@@ -956,10 +956,10 @@ Generate 30-50 entries. One per line. Only the passwords, no explanation."""
     with open(path,'w') as f:
         f.write('\n'.join(wordlist))
     data['results']['file'] = path
-    _guardar_dato(f'wordlist_{target}', data)
+    _save_datum(f'wordlist_{target}', data)
     return data
 
-def _sim_escenario(target):
+def _sim_scenario(target):
     datos_osint = json.dumps(case['data'], default=str)[:3500]
     prompt = f"""OSINT collected on "{target}". Generate ethical pentesting scenario:
 
@@ -973,7 +973,7 @@ def _sim_escenario(target):
 Data: {datos_osint}"""
     return _ai(prompt)
 
-def _sim_superficie(target):
+def _sim_surface(target):
     datos_osint = json.dumps(case['data'], default=str)[:3500]
     prompt = f"""Attack surface map for "{target}":
 
@@ -1258,7 +1258,7 @@ def _check_url(url):
     data['results']['score_phishing'] = score
     data['results']['nivel_riesgo'] = nivel
     data['results']['flags'] = flags
-    _guardar_dato(f'url_check_{url[:50]}', data)
+    _save_datum(f'url_check_{url[:50]}', data)
     return data
 
 def _analizar_password(password):
@@ -1328,7 +1328,7 @@ def _analizar_password(password):
     }
     return data
 
-def _cve_correlacion(tecnologias):
+def _cve_correlation(tecnologias):
     prompt = f"""For the following technologies found in OSINT, list the most critical known CVEs:
 {tecnologias}
 
@@ -1357,7 +1357,7 @@ def _analizar_todo():
 Data: {datos_str}"""
     return _ai(prompt)
 
-def _build_grafo():
+def _build_graph():
     """Converts case['data'] into nodes and edges for vis.js"""
     nodes = {}  # id -> {id, label, title, group}
     edges = []
@@ -1594,7 +1594,7 @@ def _darkweb_search(query):
             data['results']['intelx_id'] = r.json().get('id','')
     except Exception as _e: log.debug("source unavailable: %s", _e)
 
-    _guardar_dato(f'darkweb_{query}', data)
+    _save_datum(f'darkweb_{query}', data)
     return data
 
 # ── Netlas ────────────────────────────────────────────────────────────────────
@@ -1605,7 +1605,7 @@ def _netlas_search(query):
     data = {'type': 'netlas', 'target': query, 'results': {}}
     if not NETLAS_KEY:
         data['results']['nota'] = 'Add a free Netlas API key (50 searches/day at netlas.io) for infrastructure search'
-        _guardar_dato(f'netlas_{query}', data)
+        _save_datum(f'netlas_{query}', data)
         return data
     try:
         r = SESSION.get('https://app.netlas.io/api/responses/',
@@ -1624,7 +1624,7 @@ def _netlas_search(query):
         } for it in items[:10]]
     except Exception as e:
         data['results']['error'] = str(e)
-    _guardar_dato(f'netlas_{query}', data)
+    _save_datum(f'netlas_{query}', data)
     return data
 
 # ── Shodan ────────────────────────────────────────────────────────────────────
@@ -1684,7 +1684,7 @@ def _shodan_search(query):
             } for m in d.get('matches', [])[:10]]
         except Exception as e:
             data['results']['error'] = str(e)
-    _guardar_dato(f'shodan_{query}', data)
+    _save_datum(f'shodan_{query}', data)
     return data
 
 def _shodan_ip(ip):
@@ -1705,7 +1705,7 @@ def _shodan_ip(ip):
             }
         except Exception as e:
             data['results']['error'] = str(e)
-    _guardar_dato(f'shodan_ip_{ip}', data)
+    _save_datum(f'shodan_ip_{ip}', data)
     return data
 
 # ── Timeline ──────────────────────────────────────────────────────────────────
@@ -1766,7 +1766,7 @@ def _monitor_loop():
         try:
             type = 'domain' if re.match(r'^[\w\.-]+\.[a-z]{2,}$', target) else 'person'
             if type == 'domain':
-                nuevo = _osint_dominio(target)
+                nuevo = _osint_domain(target)
                 viejo = case['data'].get(f'dominio_{target}', {})
                 if str(nuevo) != str(viejo):
                     monitor_state['alertas'].append({
@@ -1790,7 +1790,7 @@ def _monitor_start(target, intervalo=3600):
 def _monitor_stop():
     monitor_state['activo'] = False
 
-def _generar_reporte_html():
+def _generate_html_report():
     name = case['name'] or f'reporte_{int(time.time())}'
     path = _ruta_caso_segura(name, '_reporte.html') or os.path.join(CASES_DIR, f'reporte_{int(time.time())}_reporte.html')
     ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -1899,22 +1899,22 @@ def api_caso():
         return jsonify({'ok':True})
 
 @app.route('/api/case/save', methods=['POST'])
-def api_guardar():
+def api_save():
     if not case['name']: return jsonify({'error':'No active case'}), 400
     path = _ruta_caso_segura(case['name'])
     if not path: return jsonify({'error':'Invalid case name'}), 400
     with open(path,'w') as f: json.dump(case, f, ensure_ascii=False, indent=2, default=str)
-    _db_guardar_caso(case)
+    _db_save_case(case)
     return jsonify({'ok':True, 'path':path})
 
 @app.route('/api/find')
-def api_buscar():
+def api_find():
     termino = request.args.get('q','').strip()
     if not termino: return jsonify({'error':'No search term'}), 400
-    return jsonify({'results': _db_buscar(termino)})
+    return jsonify({'results': _db_find(termino)})
 
 @app.route('/api/case/load', methods=['POST'])
-def api_cargar():
+def api_load():
     name = (request.json or {}).get('name','')
     path = _ruta_caso_segura(name)
     if not path: return jsonify({'error':'Invalid case name'}), 400
@@ -1936,9 +1936,9 @@ def api_run():
     stream = d.get('stream', False)
 
     MODULOS = {
-        'person':    lambda: _osint_persona(arg),
-        'user':    lambda: _osint_usuario(arg),
-        'domain':    lambda: _osint_dominio(arg),
+        'person':    lambda: _osint_person(arg),
+        'user':    lambda: _osint_user(arg),
+        'domain':    lambda: _osint_domain(arg),
         'ip':         lambda: _osint_ip(arg),
         'email':      lambda: _osint_email(arg),
         'phone':   lambda: _osint_phone(arg),
@@ -1953,9 +1953,9 @@ def api_run():
         'wordlist':   lambda: _gen_wordlist(arg or case.get('target','')),
         'yara_bulk':  lambda: _recon_yara_bulk(arg),
         'render_js':  lambda: _recon_render_js(arg),
-        'cve':        lambda: {'type':'cve','results':{'analisis':_cve_correlacion(arg)}},
-        'escenario':  lambda: {'type':'escenario','results':{'analisis':_sim_escenario(arg or case.get('target',''))}},
-        'superficie': lambda: {'type':'superficie','results':{'analisis':_sim_superficie(arg or case.get('target',''))}},
+        'cve':        lambda: {'type':'cve','results':{'analisis':_cve_correlation(arg)}},
+        'escenario':  lambda: {'type':'escenario','results':{'analisis':_sim_scenario(arg or case.get('target',''))}},
+        'superficie': lambda: {'type':'superficie','results':{'analisis':_sim_surface(arg or case.get('target',''))}},
         'analizar':   lambda: {'type':'analisis','results':{'analisis':_analizar_todo()}},
         'darkweb':    lambda: _darkweb_search(arg),
         'shodan':     lambda: _shodan_search(arg),
@@ -3497,7 +3497,7 @@ def _t_haystak(entidad, ctx):
     for on in list(set(re.findall(r'[a-z2-7]{16,56}\.onion', r.text)))[:15]:
         ctx.emit('url', 'http://' + on, label='haystak')
 
-def _descargar_imagen(url):
+def _download_image(url):
     """Downloads an image to a temp file (anti-SSRF). Returns the path or None."""
     try:
         r = _fetch_seguro(url, timeout=10, stream=True)
@@ -3513,7 +3513,7 @@ def _descargar_imagen(url):
 @transform(input='url', outputs=(), name='ela', requires_key=False,
            description='Edit detection via Error Level Analysis (generates ELA image) (F9 step 126)')
 def _t_ela(entidad, ctx):
-    fn = _descargar_imagen(entidad.value)
+    fn = _download_image(entidad.value)
     if not fn:
         return
     try:
@@ -3536,7 +3536,7 @@ def _t_ela(entidad, ctx):
 @transform(input='url', outputs=('hash',), name='phash',
            description='Perceptual hash (dHash): groups the same image reused across profiles (F9 step 127)')
 def _t_phash(entidad, ctx):
-    fn = _descargar_imagen(entidad.value)
+    fn = _download_image(entidad.value)
     if not fn:
         return
     try:
@@ -3710,7 +3710,7 @@ _FEEDS_AMENAZA = [
     ('Feodo Tracker (botnet C2)', 'https://feodotracker.abuse.ch/downloads/ipblocklist.txt'),
 ]
 
-def _cargar_blocklist():
+def _load_blocklist():
     if _BLOCKLIST['nets'] is not None and time.time() - _BLOCKLIST['ts'] < 21600:
         return _BLOCKLIST['nets']
     nets = []
@@ -3737,7 +3737,7 @@ def _t_ip_blocklist(entidad, ctx):
         ip = ipaddress.ip_address(entidad.value)
     except ValueError:
         return
-    for red, fuente in _cargar_blocklist():
+    for red, fuente in _load_blocklist():
         if ip in red:
             entidad.tag('threat-listed')   # signal, NOT a 'malicious' verdict
             entidad.properties['amenaza_fuente'] = fuente
@@ -3824,7 +3824,7 @@ def api_v2_transforms(type):
 # lock serializes those writes and the monitor's snapshot reads.
 _almacen_lock = threading.RLock()
 
-def _correr_transform_interno(type, value, name):
+def _run_transform_internal(type, value, name):
     """Runs a transform and persists (autosave). Shared by /run and the monitor.
     Raises ValueError/KeyError; the caller decides what to do with the error."""
     if not valid_type(type):
@@ -3836,7 +3836,7 @@ def _correr_transform_interno(type, value, name):
         _rotar_proxy()                                      # OPSEC: rotate proxy per transform (154)
     _higiene_request()                                      # OPSEC: randomize UA (155)
     _jitter()                                               # OPSEC: spacing between requests (156)
-    _registrar_huella(name, type, value)                  # OPSEC: log your footprint (160)
+    _record_footprint(name, type, value)                  # OPSEC: log your footprint (160)
     with _almacen_lock:
         semilla = _almacen.add(semilla)
         producidas = run_by_name(name, semilla, _almacen)
@@ -3853,7 +3853,7 @@ def api_v2_run():
     """Runs a transform on an entity {type, value} (step 36)."""
     d = request.json or {}
     try:
-        producidas = _correr_transform_interno(
+        producidas = _run_transform_internal(
             d.get('type', ''), d.get('value', ''), d.get('transform', ''))
     except (KeyError, ValueError) as e:
         return _error(str(e), 400)
@@ -3899,7 +3899,7 @@ def _estado_datos():
 
 _REGLAS_FILE = os.path.join(HOME, '.obsidian', 'reglas.yaml')
 
-def _cargar_reglas_usuario():
+def _load_user_rules():
     try:
         if os.path.exists(_REGLAS_FILE):
             with open(_REGLAS_FILE, encoding='utf-8') as f:
@@ -3926,7 +3926,7 @@ def api_v2_reglas():
     return jsonify({'reglas': _REGLAS_YAML})
 
 @app.route('/api/v2/find/translate', methods=['POST'])
-def api_v2_buscar_traducir():
+def api_v2_find_translate():
     """Translates a unified query to EACH engine's dialect (F8 step 117).
     Body: {campos:{ip,dominio,favicon,cert,puerto,...}, cn:true|false|null}."""
     d = request.json or {}
@@ -4046,7 +4046,7 @@ def _autosave():
             log.warning("autosave failed: %s", _e)
 
 @app.route('/api/v2/entity/note', methods=['POST'])
-def api_v2_nota():
+def api_v2_note():
     """Analyst note on an entity (F6 step 88)."""
     d = request.json or {}
     e = _almacen.get(d.get('id', ''))
@@ -4071,7 +4071,7 @@ def api_v2_tag():
     return jsonify({'ok': True, 'tags': sorted(e.tags)})
 
 @app.route('/api/v2/grafo')
-def api_v2_grafo():
+def api_v2_graph():
     """Typed graph. ?migrar=1 converts the old case['data'] to the new model."""
     if request.args.get('migrar') == '1':
         return jsonify(migrate_case(case).to_dict())
@@ -4137,7 +4137,7 @@ def _set_anonimo(on):
 
 _HUELLA = []
 
-def _registrar_huella(name, type, value):
+def _record_footprint(name, type, value):
     """Records which transform you ran on which target and whether it was anonymized
     -- your footprint/exposure while investigating (F13 step 160)."""
     _HUELLA.insert(0, {'ts': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -4146,7 +4146,7 @@ def _registrar_huella(name, type, value):
     del _HUELLA[500:]
 
 @app.route('/api/v2/opsec/footprint')
-def api_v2_opsec_huella():
+def api_v2_opsec_footprint():
     """Your footprint: what you touched and how much was un-anonymized (exposure). Step 160."""
     expuestos = sum(1 for h in _HUELLA if not h['anonimo'])
     return jsonify({'total': len(_HUELLA), 'expuestos': expuestos, 'huella': _HUELLA[:100]})
@@ -4314,7 +4314,7 @@ def api_v2_opsec_perfil():
 _personas = PersonaManager(os.path.join(HOME, '.obsidian', 'personas.json'))
 
 @app.route('/api/v2/persons', methods=['GET', 'POST', 'DELETE'])
-def api_v2_personas():
+def api_v2_persons():
     """Sock-puppet vault: non-attributable investigation identities (F13 step 152)."""
     if request.method == 'GET':
         name = request.args.get('name')
@@ -4433,7 +4433,7 @@ def api_v2_exposicion():
                     'superficie': conteos, 'hallazgos': len(h)})
 
 @app.route('/api/v2/findings')
-def api_v2_hallazgos():
+def api_v2_findings():
     """Runs the correlation engine on the active case (F4 steps 62, 64)."""
     h = correlate(_almacen)
     return jsonify({'hallazgos': [x.to_dict() for x in h], 'score': risk_score(h)})
@@ -4455,7 +4455,7 @@ def _objetivo_del_almacen():
 
 @app.route('/api/v2/report')
 @app.route('/v2/report')
-def api_v2_reporte():
+def api_v2_report():
     """Self-contained HTML report of the active case (F7 step 93): risk summary,
     findings, entity inventory and embedded graph. ?grafo=0 omits it (lighter)."""
     h = correlate(_almacen)
@@ -4465,7 +4465,7 @@ def api_v2_reporte():
         if os.path.exists(ruta_vis):
             with open(ruta_vis, encoding='utf-8') as f:
                 vis_js = f.read()
-    html_doc = generar_reporte(
+    html_doc = generate_report(
         _almacen, hallazgos=h, score=risk_score(h),
         meta={'workspace': _ws_activo, 'target': _objetivo_del_almacen()},
         vis_js=vis_js)
@@ -4502,7 +4502,7 @@ def _monitor_snapshot():
 def _monitor_refrescar():
     for t in _monitor_tareas:
         try:
-            _correr_transform_interno(t['type'], t['value'], t['transform'])
+            _run_transform_internal(t['type'], t['value'], t['transform'])
         except Exception as e:
             log.debug("monitor: transform %s failed: %s", t.get('transform'), e)
 
@@ -4739,7 +4739,7 @@ def api_v2_ia_modo(modo):
     return jsonify({'modo': modo, 'resultado': resp})
 
 @app.route('/api/v2/findings/ia', methods=['POST'])
-def api_v2_hallazgos_ia():
+def api_v2_findings_ai():
     """AI-assisted correlation (F4 step 65): Ollama summarizes the risk and
     suggests the next step from the case findings."""
     h = correlate(_almacen)
@@ -4799,18 +4799,18 @@ def api_v2_verificar():
 def v2_page():
     """v2 engine demo page: run transforms and view the typed graph.
     Protected by the auth guard (not in _PUBLIC_PATHS)."""
-    return _cargar_web('v2.html')
+    return _load_web('v2.html')
 
 
 @app.route('/api/report', methods=['POST'])
-def api_reporte():
+def api_report():
     if not case['data']: return jsonify({'error':'No data collected yet'}), 400
-    path = _generar_reporte_html()
+    path = _generate_html_report()
     return jsonify({'ok':True, 'path':path})
 
 @app.route('/report_pdf')
 def reporte_pdf():
-    path = _generar_reporte_html()
+    path = _generate_html_report()
     with open(path) as f: contenido = f.read()
     # Inject print CSS for PDF
     contenido = contenido.replace('</head>',
@@ -4955,8 +4955,8 @@ def api_monitor():
         return jsonify({'ok': True})
 
 @app.route('/api/grafo')
-def api_grafo():
-    return jsonify(_build_grafo())
+def api_graph():
+    return jsonify(_build_graph())
 
 @app.route('/api/data')
 def api_datos():
@@ -4965,7 +4965,7 @@ def api_datos():
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
 
-WEB_HTML = _cargar_web('app.html')
+WEB_HTML = _load_web('app.html')
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -4979,7 +4979,7 @@ for _rl_nombre in ('crtsh', 'ct_certspotter', 'shodan', 'censys', 'zoomeye', 'fo
     _set_limite(_rl_nombre, _LIMITE_API)
 
 if __name__ == '__main__':
-    _cargar_reglas_usuario()
+    _load_user_rules()
     if os.environ.get('OBSIDIAN_ANONIMO') and _tor_disponible():
         _set_anonimo(True)
     host = os.environ.get('OBSIDIAN_HOST', '127.0.0.1')
