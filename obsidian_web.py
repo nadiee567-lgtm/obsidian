@@ -1300,7 +1300,7 @@ def _analizar_password(password):
         problemas.append('Obvious sequence (123, abc)')
         score = max(0, score - 10)
 
-    # Entropía aproximada
+    # Approximate entropy
     charset = 0
     if re.search(r'[a-z]', password): charset += 26
     if re.search(r'[A-Z]', password): charset += 26
@@ -1309,7 +1309,7 @@ def _analizar_password(password):
     import math
     entropia = round(long * math.log2(charset), 1) if charset > 0 else 0
 
-    # Tiempo de crackeo aproximado (bcrypt 10k hashes/s)
+    # Approximate crack time (bcrypt 10k hashes/s)
     combinaciones = charset ** long if charset > 0 else 1
     segundos = combinaciones / 20000
     if segundos < 60: tiempo = f'{int(segundos)}s'
@@ -1358,7 +1358,7 @@ Data: {datos_str}"""
     return _ai(prompt)
 
 def _build_grafo():
-    """Convierte case['datos'] en nodos y aristas para vis.js"""
+    """Converts case['datos'] into nodes and edges for vis.js"""
     nodes = {}  # id -> {id, label, title, group}
     edges = []
     eid   = [0]
@@ -1398,21 +1398,21 @@ def _build_grafo():
                       'label': label, 'color': '#3a3a46',
                       'font': {'color':'#8b8b98','size':9}})
 
-    # Nodo raíz — objetivo
+    # Root node -- target
     obj = case.get('objetivo') or '?'
     obj_id = nid(obj)
-    add_node(obj_id, obj, 'objetivo', f'Objetivo: {obj}', size=35)
+    add_node(obj_id, obj, 'objetivo', f'Target: {obj}', size=35)
 
     for clave, valor in case['datos'].items():
         if not isinstance(valor, dict): continue
         res = valor.get('resultados', {})
         tipo = valor.get('tipo', '')
 
-        # ── DOMINIO ──────────────────────────────────────────────
+        # ── DOMAIN ───────────────────────────────────────────────
         if tipo == 'dominio':
             dom = valor.get('objetivo','')
             dom_id = nid('dom_'+dom)
-            add_node(dom_id, dom, 'dominio', f'Dominio: {dom}', size=28)
+            add_node(dom_id, dom, 'dominio', f'Domain: {dom}', size=28)
             add_edge(obj_id, dom_id, 'dominio')
 
             for ip in re.findall(r'\d+\.\d+\.\d+\.\d+', str(res.get('dns',{}).get('A',''))):
@@ -1422,7 +1422,7 @@ def _build_grafo():
 
             for sub in res.get('subdominios',[])[:15]:
                 sid = nid('sub_'+sub)
-                add_node(sid, sub, 'subdominio', f'Subdominio: {sub}')
+                add_node(sid, sub, 'subdominio', f'Subdomain: {sub}')
                 add_edge(dom_id, sid, 'subdominio')
 
             for email in res.get('emails',[])[:10]:
@@ -1439,7 +1439,7 @@ def _build_grafo():
         elif tipo == 'passivedns':
             dom = valor.get('objetivo','')
             dom_id = nid('dom_'+dom)
-            add_node(dom_id, dom, 'dominio', f'Dominio: {dom}', size=28)
+            add_node(dom_id, dom, 'dominio', f'Domain: {dom}', size=28)
             for h in res.get('historial', [])[:15]:
                 ip_h = h.get('ip')
                 if not ip_h: continue
@@ -1475,22 +1475,22 @@ def _build_grafo():
                 if not ip_f: continue
                 iid2 = nid('favinfra_'+ip_f)
                 org = m.get('org') or '?'
-                add_node(iid2, ip_f, 'ip', f"Mismo favicon que {dom} — {org}", size=22)
-                add_edge(obj_id, iid2, 'favicon compartido')
+                add_node(iid2, ip_f, 'ip', f"Same favicon as {dom} -- {org}", size=22)
+                add_edge(obj_id, iid2, 'shared favicon')
 
-        # ── USUARIO ───────────────────────────────────────────────
+        # ── USER ─────────────────────────────────────────────────
         elif tipo == 'usuario':
             user = valor.get('objetivo','')
             uid = nid('user_'+user)
-            add_node(uid, '@'+user, 'usuario', f'Usuario: {user}', size=28)
+            add_node(uid, '@'+user, 'usuario', f'User: {user}', size=28)
             add_edge(obj_id, uid, 'usuario')
             for p in res.get('plataformas',[]) + res.get('maigret',[]):
                 plat = p.get('plataforma','?')
                 pid2 = nid('plat_'+plat+user)
                 add_node(pid2, plat, 'plataforma', p.get('url',''))
-                add_edge(uid, pid2, 'perfil')
+                add_edge(uid, pid2, 'profile')
             gh = res.get('github',{})
-            if gh.get('email') and gh['email'] != 'oculto':
+            if gh.get('email') and gh['email'] != 'hidden':
                 eid3 = nid('mail_'+gh['email'])
                 add_node(eid3, gh['email'], 'email', f"GitHub email: {gh['email']}")
                 add_edge(uid, eid3, 'email')
@@ -1508,12 +1508,12 @@ def _build_grafo():
             sec = res.get('email_sec',{})
             if sec.get('spoofable'):
                 sid2 = nid('spoof_'+email)
-                add_node(sid2, '⚠ Spoofable', 'cve', 'Dominio vulnerable a spoofing')
-                add_edge(eid4, sid2, 'riesgo')
+                add_node(sid2, '⚠ Spoofable', 'cve', 'Domain vulnerable to spoofing')
+                add_edge(eid4, sid2, 'risk')
             for breach in res.get('hibp_breaches',[])[:5]:
                 bid = nid('breach_'+breach)
                 add_node(bid, breach, 'cve', f'Breach: {breach}')
-                add_edge(eid4, bid, 'filtrado en')
+                add_edge(eid4, bid, 'leaked in')
 
         # ── BUCKETS ───────────────────────────────────────────────
         elif tipo == 'buckets':
@@ -1545,7 +1545,7 @@ def _build_grafo():
                 hid = nid('secret_'+h['repo']+h['tipo'])
                 add_node(hid, f"🔑 {h['tipo']}", 'cve',
                          f"{h['repo']} @{h['commit']}: {h['valor']}")
-                add_edge(obj_id, hid, 'secreto expuesto')
+                add_edge(obj_id, hid, 'exposed secret')
 
     return {
         'nodes': list(nodes.values()),
@@ -1557,14 +1557,14 @@ def _build_grafo():
         }
     }
 
-# ── Cámara + Búsqueda Facial ──────────────────────────────────────────────────
+# ── Camera + Facial Search ────────────────────────────────────────────────────
 
 # ── Dark Web Monitor ──────────────────────────────────────────────────────────
 
 def _darkweb_search(query):
     datos = {'tipo': 'darkweb', 'objetivo': query, 'resultados': {}}
 
-    # Ahmia — indexa .onion sin necesitar Tor
+    # Ahmia -- indexes .onion without needing Tor
     try:
         r = SESSION.get(f'https://ahmia.fi/search/?q={requests.utils.quote(query)}', timeout=12)
         resultados = []
@@ -1576,7 +1576,7 @@ def _darkweb_search(query):
     except Exception as e:
         datos['resultados']['ahmia_error'] = str(e)
 
-    # Pastes — Pastebin y similares públicos
+    # Pastes -- Pastebin and similar public sites
     try:
         r = SESSION.get(f'https://psbdmp.ws/api/v3/search/{requests.utils.quote(query)}', timeout=8)
         if r.status_code == 200:
@@ -1585,7 +1585,7 @@ def _darkweb_search(query):
                                                'url': f"https://pastebin.com/{p.get('id')}"} for p in pastes]
     except Exception as _e: log.debug("source unavailable: %s", _e)
 
-    # IntelligenceX (sin API key — búsqueda básica)
+    # IntelligenceX (no API key -- basic search)
     try:
         r = SESSION.post('https://2.intelx.io/intelligent/search',
             json={'term': query, 'maxresults': 10, 'media': 0, 'sort': 2, 'terminate': []},
@@ -2262,7 +2262,7 @@ def _t_github(entidad, ctx):
         gh = SESSION.get(f'https://api.github.com/users/{entidad.valor}', timeout=8).json()
         if not gh.get('login'):
             return
-        if gh.get('email') and gh['email'] != 'oculto':
+        if gh.get('email') and gh['email'] != 'hidden':
             ctx.emitir('email', gh['email'], etiqueta='github email')
         repos = SESSION.get(f'https://api.github.com/users/{entidad.valor}/repos'
                             '?per_page=10&sort=updated', timeout=8)
