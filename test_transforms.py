@@ -124,8 +124,8 @@ def test_corredor_cachea():
     alm = Store()
     dom = alm.create('dominio', 'example.com')
     corr = tr.Runner(alm)
-    corr.ejecutar('dns', dom)
-    corr.ejecutar('dns', dom)      # second time: cache, does not re-run
+    corr.run('dns', dom)
+    corr.run('dns', dom)      # second time: cache, does not re-run
     assert len(corridas) == 1
 
 

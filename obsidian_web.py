@@ -3402,7 +3402,7 @@ def _tg_mensajes(usuario, limite=30):
     """Fetches the latest messages from a Telegram user/channel. Returns
     (True, (id, [texts])) or (False, failure_reason). Shared by the Telegram
     transforms (steps 130, 131)."""
-    cred = _boveda.obtener('telegram') or os.environ.get('TELEGRAM_API', '')
+    cred = _boveda.get('telegram') or os.environ.get('TELEGRAM_API', '')
     if not cred or ':' not in cred:
         return False, 'missing api_id:api_hash (free at my.telegram.org) in the vault'
     if not os.path.exists(_TG_SESION):
@@ -3843,7 +3843,7 @@ def _correr_transform_interno(tipo, valor, nombre):
         if _ws_activo:                          # autosave (46) + audit (48)
             try:
                 _gestor.guardar(_ws_activo, _almacen)
-                _gestor.registrar(_ws_activo, nombre, valor, len(producidas))
+                _gestor.record(_ws_activo, nombre, valor, len(producidas))
             except Exception as _e:
                 log.warning("autosave failed: %s", _e)
     return producidas
@@ -4049,7 +4049,7 @@ def _autosave():
 def api_v2_nota():
     """Analyst note on an entity (F6 step 88)."""
     d = request.json or {}
-    e = _almacen.obtener(d.get('id', ''))
+    e = _almacen.get(d.get('id', ''))
     if not e:
         return _error('entity not found', 404)
     e.propiedades['nota'] = (d.get('nota', '') or '')[:1000]
@@ -4060,7 +4060,7 @@ def api_v2_nota():
 def api_v2_tag():
     """Toggle an analyst tag (interesante/descartado/falso-positivo)."""
     d = request.json or {}
-    e = _almacen.obtener(d.get('id', ''))
+    e = _almacen.get(d.get('id', ''))
     if not e:
         return _error('entity not found', 404)
     tag = (d.get('tag', '') or '').strip()[:30]
@@ -4092,7 +4092,7 @@ def api_v2_workspaces():
         _ws_activo = _slug_caso(nombre)
         return jsonify({'ok': True, 'activo': _ws_activo})
     if request.method == 'DELETE':
-        _gestor.borrar(nombre)
+        _gestor.delete(nombre)
         if _ws_activo == _slug_caso(nombre):
             _almacen, _ws_activo = Store(), None
         return jsonify({'ok': True, 'activo': _ws_activo})
@@ -4157,7 +4157,7 @@ def _key_rotativa(servicio):
     """A service's key, rotating across several accounts if 'k1|k2|k3' was saved
     (spreads load across accounts of the same service). Step 159. Backward-compatible:
     a single key is returned as-is."""
-    raw = _boveda.obtener(servicio)
+    raw = _boveda.get(servicio)
     if not raw or '|' not in raw:
         return raw
     keys = [k.strip() for k in raw.split('|') if k.strip()]
@@ -4319,7 +4319,7 @@ def api_v2_personas():
     if request.method == 'GET':
         nombre = request.args.get('nombre')
         if nombre:
-            return jsonify({'persona': _personas.obtener(nombre)})
+            return jsonify({'persona': _personas.get(nombre)})
         return jsonify({'personas': _personas.list_ws()})
     d = request.json or {}
     nombre = (d.get('nombre', '') or '').strip()
@@ -4328,7 +4328,7 @@ def api_v2_personas():
     if request.method == 'POST':
         _personas.create(nombre, d.get('datos', {}))
         return jsonify({'ok': True, 'personas': _personas.list_ws()})
-    _personas.borrar(nombre)   # DELETE
+    _personas.delete(nombre)   # DELETE
     return jsonify({'ok': True, 'personas': _personas.list_ws()})
 
 @app.route('/api/v2/keys', methods=['GET', 'POST', 'DELETE'])
@@ -4347,7 +4347,7 @@ def api_v2_keys():
             return _error('missing key value', 400)
         _boveda.guardar(servicio, valor)
         return jsonify({'ok': True, 'servicios': _boveda.servicios()})
-    _boveda.borrar(servicio)   # DELETE
+    _boveda.delete(servicio)   # DELETE
     return jsonify({'ok': True, 'servicios': _boveda.servicios()})
 
 # Service -> (transform, type, known test value that has data)
@@ -4373,7 +4373,7 @@ def api_v2_keys_probar():
     if not mapeo:
         return _error('service has no defined test', 400)
     nombre, tipo, valor = mapeo
-    tiene = bool(_boveda.obtener(servicio))
+    tiene = bool(_boveda.get(servicio))
     alm = Store()
     try:
         n = len(run_by_name(nombre, alm.create(tipo, valor), alm))
@@ -4512,7 +4512,7 @@ def _ntfy_topic():
     if t:
         return t
     try:
-        return _boveda.obtener('ntfy_topic')
+        return _boveda.get('ntfy_topic')
     except Exception:
         return None
 

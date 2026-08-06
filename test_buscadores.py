@@ -25,7 +25,7 @@ def _correr(nombre, tipo, valor):
 
 
 def _con_key(monkeypatch, resp, key='fakekey'):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: key)
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: key)
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: FakeResp(resp))
 
 
@@ -44,7 +44,7 @@ def test_censys(monkeypatch):
 
 
 def test_censys_sin_key(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('CENSYS_API', '')
     assert _correr('censys', 'ip', '1.2.3.4') == []
 
@@ -60,7 +60,7 @@ def test_zoomeye(monkeypatch):
 
 
 def test_zoomeye_sin_key(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('ZOOMEYE_KEY', '')
     assert _correr('zoomeye', 'ip', '1.2.3.4') == []
 
@@ -82,7 +82,7 @@ def test_fofa_error_api(monkeypatch):
 
 
 def test_fofa_sin_key(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('FOFA_KEY', '')
     assert _correr('fofa', 'ip', '1.2.3.4') == []
 
@@ -91,7 +91,7 @@ def test_fofa_sin_key(monkeypatch):
 def test_quake(monkeypatch):
     resp = {'data': [{'port': 443, 'service': {'name': 'http/ssl'}},
                      {'port': 22, 'service': {'name': 'ssh'}}]}
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'fakekey')
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: 'fakekey')
     monkeypatch.setattr(ob.SESSION, 'post', lambda *a, **k: FakeResp(resp))
     prod = _correr('quake', 'ip', '1.2.3.4')
     assert {e.valor for e in prod if e.tipo == 'puerto'} == {'1.2.3.4:443', '1.2.3.4:22'}
@@ -99,7 +99,7 @@ def test_quake(monkeypatch):
 
 
 def test_quake_sin_key(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('QUAKE_KEY', '')
     assert _correr('quake', 'ip', '1.2.3.4') == []
 
@@ -121,7 +121,7 @@ def test_netlas(monkeypatch):
 
 
 def test_hunter_netlas_sin_key(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('HUNTER_KEY', '')
     monkeypatch.setenv('NETLAS_KEY', '')
     assert _correr('hunter', 'ip', '1.2.3.4') == []
@@ -145,7 +145,7 @@ def test_binaryedge(monkeypatch):
 
 
 def test_criminalip_binaryedge_sin_key(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('CRIMINALIP_KEY', '')
     monkeypatch.setenv('BINARYEDGE_KEY', '')
     assert _correr('criminalip', 'ip', '1.2.3.4') == []
@@ -154,7 +154,7 @@ def test_criminalip_binaryedge_sin_key(monkeypatch):
 
 # ── Favicon pivot (114) ─────────────────────────────────────────────────────
 def test_favicon_pivote(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener',
+    monkeypatch.setattr(ob._boveda, 'get',
                         lambda s: {'fofa': 'a@b.com:k', 'shodan': 'sk'}.get(s))
     def fake_get(url, *a, **k):
         if 'fofa' in url:
@@ -169,7 +169,7 @@ def test_favicon_pivote(monkeypatch):
 
 
 def test_favicon_pivote_ignora_hash_no_favicon(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'a@b.com:k')
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: 'a@b.com:k')
     alm = Store()
     h = alm.create('hash', 'abc', propiedades={'tipo_hash': 'sha1'})
     assert run_by_name('favicon_pivote', h, alm) == []
@@ -177,7 +177,7 @@ def test_favicon_pivote_ignora_hash_no_favicon(monkeypatch):
 
 # ── TLS certificate pivot (115) ─────────────────────────────────────────────
 def test_cert_pivote(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener',
+    monkeypatch.setattr(ob._boveda, 'get',
                         lambda s: {'fofa': 'a@b.com:k', 'shodan': 'sk'}.get(s))
     def fake_get(url, *a, **k):
         if 'fofa' in url:
@@ -193,7 +193,7 @@ def test_cert_pivote(monkeypatch):
 # ── Cross-engine dedup (116) ────────────────────────────────────────────────
 def test_dedup_cross_engine(monkeypatch):
     """Same host/port reported by 2 engines = 1 entity with 2 sources."""
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'id:secret')
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: 'id:secret')
     alm = Store()
     ip = alm.create('ip', '1.2.3.4')
     # Shodan sees port 443

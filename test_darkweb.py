@@ -57,14 +57,14 @@ def test_haystak_sin_tor(monkeypatch):
 
 # ── 130: Telegram (Telethon) -- degradation paths (the active one needs an account) ─
 def test_telegram_sin_credenciales(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('TELEGRAM_API', '')
     prod, e = _correr('telegram', 'usuario', 'durov')
     assert prod == [] and 'api_id:api_hash' in e.propiedades.get('telegram', '')
 
 
 def test_telegram_sin_sesion(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: '123:abchash')
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: '123:abchash')
     monkeypatch.setattr(ob.os.path, 'exists', lambda p: not str(p).endswith('telegram.session'))
     prod, e = _correr('telegram', 'usuario', 'durov')
     assert prod == [] and 'login' in e.propiedades.get('telegram', '')
@@ -136,7 +136,7 @@ def test_pastes_psbdmp_muerto(monkeypatch):
 
 # ── 134: historical leaks (Intelligence X, keyed) ───────────────────────────
 def test_intelx(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'fakekey')
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: 'fakekey')
     monkeypatch.setattr(ob.SESSION, 'post', lambda *a, **k: _RjD({'id': 'search-123'}))
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _RjD({'records': [{'systemid': 'sys-a', 'name': 'leak1',
@@ -146,7 +146,7 @@ def test_intelx(monkeypatch):
 
 
 def test_intelx_sin_key(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('INTELX_KEY', '')
     prod, _ = _correr('intelx', 'email', 'a@b.com')
     assert prod == []
@@ -154,7 +154,7 @@ def test_intelx_sin_key(monkeypatch):
 
 # ── 135: breach aggregator (keyless-first, unifies sources) ─────────────────
 def test_breaches_agrega_y_dedup(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)   # no HIBP
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)   # no HIBP
     monkeypatch.setenv('HIBP_API_KEY', '')
     def fake_get(url, *a, **k):
         if 'xposedornot' in url:
@@ -170,7 +170,7 @@ def test_breaches_agrega_y_dedup(monkeypatch):
 
 
 def test_breaches_limpio(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _RjD({}))
     prod, e = _correr('breaches', 'email', 'nadie@limpio.com')
     assert prod == [] and 'filtrado' not in e.tags

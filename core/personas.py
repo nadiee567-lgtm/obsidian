@@ -38,10 +38,10 @@ class PersonaManager:
     def list_ws(self) -> list:
         return sorted(self._leer().keys())
 
-    def obtener(self, nombre: str):
+    def get(self, nombre: str):
         return self._leer().get(nombre)
 
-    def borrar(self, nombre: str) -> bool:
+    def delete(self, nombre: str) -> bool:
         d = self._leer()
         if nombre in d:
             del d[nombre]

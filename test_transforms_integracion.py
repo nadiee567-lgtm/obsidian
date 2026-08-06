@@ -69,7 +69,7 @@ def test_geo_ip_status_fail(monkeypatch):
 
 
 def test_shodan(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'fakekey')
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: 'fakekey')
     host = {'org': 'ACME Corp', 'data': [
         {'port': 443, 'product': 'nginx'},
         {'port': 22, 'product': 'OpenSSH'},
@@ -85,7 +85,7 @@ def test_shodan(monkeypatch):
 
 
 def test_shodan_sin_key_no_hace_nada(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('SHODAN_API_KEY', '')
     assert _correr('shodan', 'ip', '1.2.3.4') == []
 

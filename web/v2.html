@@ -502,7 +502,7 @@ async function panelKeys(){
       try{ const d=await (await fetch('/api/v2/keys/probar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({servicio:s})})).json();
         st.textContent=d.nota||''; st.style.color=d.ok?'var(--green)':'var(--amber)'; }catch(e){ st.textContent='error: '+e.message; } };
     row.appendChild(p);
-    if(ok){ const b=el('button'); b.textContent='borrar'; b.onclick=async()=>{ await fetch('/api/v2/keys',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({servicio:s})}); panelKeys(); }; row.appendChild(b); }
+    if(ok){ const b=el('button'); b.textContent='delete'; b.onclick=async()=>{ await fetch('/api/v2/keys',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({servicio:s})}); panelKeys(); }; row.appendChild(b); }
     row.appendChild(st); ov.appendChild(row);
   });
   ov.style.display='block'; $('#kCerrar').onclick=()=>ov.style.display='none';

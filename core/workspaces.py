@@ -37,7 +37,7 @@ class Manager:
         return sorted(os.path.splitext(os.path.basename(p))[0]
                       for p in glob.glob(os.path.join(self.dir, '*.db')))
 
-    def existe(self, nombre):
+    def exists(self, nombre):
         r = self._ruta(nombre)
         return bool(r and os.path.exists(r))
 
@@ -64,7 +64,7 @@ class Manager:
             raise ValueError('invalid workspace name')
         save_store(almacen, r)
 
-    def borrar(self, nombre):
+    def delete(self, nombre):
         r = self._ruta(nombre)
         if r and os.path.exists(r):
             os.remove(r)
@@ -82,7 +82,7 @@ class Manager:
         os.rename(rv, rn)
 
     # ── History / audit (step 48) ──
-    def registrar(self, nombre, transform, entrada, salidas):
+    def record(self, nombre, transform, entrada, salidas):
         r = self._ruta(nombre)
         if r and os.path.exists(r):
             record_event(r, transform, entrada, salidas)

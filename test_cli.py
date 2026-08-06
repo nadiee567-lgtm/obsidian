@@ -27,8 +27,8 @@ def test_run_tipo_invalido():
 
 
 def test_export_workspace_inexistente():
-    assert cli.main(['export', 'json', '-w', 'no-existe-zzz-999']) == 1
+    assert cli.main(['export', 'json', '-w', 'no-exists-zzz-999']) == 1
 
 
 def test_report_workspace_inexistente():
-    assert cli.main(['report', '-w', 'no-existe-zzz-999']) == 1
+    assert cli.main(['report', '-w', 'no-exists-zzz-999']) == 1

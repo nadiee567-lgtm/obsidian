@@ -136,7 +136,7 @@ def limites() -> dict:
     return dict(_LIMITES)
 
 
-def ejecutar(t: Transform, entidad: Entity, almacen: Store) -> list:
+def run(t: Transform, entidad: Entity, almacen: Store) -> list:
     """Runs a transform on an entity (step 28). Returns the produced entities.
     ISOLATES failures (step 38): if the transform crashes, it does not propagate
     -- it returns whatever it managed to emit. Honors the transform's rate limit
@@ -160,7 +160,7 @@ def run_by_name(nombre: str, entidad: Entity, almacen: Store) -> list:
     t = REGISTRO.by_name(nombre)
     if t is None:
         raise KeyError(f"transform not registered: {nombre}")
-    return ejecutar(t, entidad, almacen)
+    return run(t, entidad, almacen)
 
 
 def run_batch(tareas, almacen: Store, max_workers: int = 8, lock=None,
@@ -234,7 +234,7 @@ class Runner:
         self.almacen = almacen
         self._hechos: set = set()   # {(transform_name, entity_id)}
 
-    def ejecutar(self, nombre: str, entidad: Entity) -> list:
+    def run(self, nombre: str, entidad: Entity) -> list:
         clave = (nombre, entidad.id)
         if clave in self._hechos:
             return []               # cache: already ran on this entity
@@ -252,7 +252,7 @@ class Runner:
                 continue
             objetivos = [e for e in list(pool.values()) if e.tipo == t.entrada]
             for ent in objetivos:
-                for nueva in self.ejecutar(paso, ent):
+                for nueva in self.run(paso, ent):
                     pool[nueva.id] = nueva
                     producidas.append(nueva)
         return producidas

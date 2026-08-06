@@ -48,14 +48,14 @@ class Vault:
         d[servicio] = valor
         self._escribir(d)
 
-    def obtener(self, servicio):
+    def get(self, servicio):
         return self._leer().get(servicio)
 
     def servicios(self):
         """Only the configured service NAMES -- never the values."""
         return sorted(self._leer().keys())
 
-    def borrar(self, servicio):
+    def delete(self, servicio):
         d = self._leer()
         if servicio in d:
             del d[servicio]

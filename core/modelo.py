@@ -228,7 +228,7 @@ class Store:
         """Shortcut: builds an Entity and adds it (deduplicating)."""
         return self.add(Entity(tipo=tipo, valor=valor, **kw))
 
-    def obtener(self, id_: str) -> Entity | None:
+    def get(self, id_: str) -> Entity | None:
         return self._entidades.get(id_)
 
     def buscar(self, tipo, valor) -> Entity | None:

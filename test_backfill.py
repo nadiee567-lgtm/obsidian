@@ -52,7 +52,7 @@ def test_takeover(monkeypatch):
 
 
 def test_passivedns(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'k')
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: 'k')
     class R:
         def json(self):
             return {'data': [{'attributes': {'ip_address': '9.9.9.9', 'date': 1600000000}}]}
@@ -62,7 +62,7 @@ def test_passivedns(monkeypatch):
 
 
 def test_passivedns_sin_key(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('VT_API_KEY', '')
     prod, _, _ = _correr('passivedns', 'dominio', 'ejemplo.com')
     assert prod == []
@@ -87,7 +87,7 @@ def test_github_sec_y_regla(monkeypatch):
         if '/repos' in url:
             return _Rj([{'full_name': 'user/repo1'}])
         return _Rj([])
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: '')
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: '')
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
     prod, _, alm = _correr('github_sec', 'usuario', 'user')
     creds = [p for p in prod if p.tipo == 'credencial']
@@ -300,7 +300,7 @@ def test_render_js_bloquea_ssrf(monkeypatch):
 
 
 def test_yara_bulk_carpeta_invalida():
-    prod, _, _ = _correr('yara_bulk', 'archivo', '/no/existe/xyz')
+    prod, _, _ = _correr('yara_bulk', 'archivo', '/does/not/exist/xyz')
     assert prod == []
 
 
@@ -325,7 +325,7 @@ def test_ia_caso_endpoint(monkeypatch):
 
 
 def test_keys_probar_sin_key(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'obtener', lambda s: None)   # empty vault
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)   # empty vault
     monkeypatch.setenv('SHODAN_API_KEY', '')
     c = ob.app.test_client()
     with c.session_transaction() as s:

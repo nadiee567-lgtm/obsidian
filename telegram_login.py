@@ -30,7 +30,7 @@ def _cred():
         return api_id, api_hash
     if Vault is not None:
         try:
-            cred = Vault(os.path.join(HOME, '.obsidian')).obtener('telegram') or ''
+            cred = Vault(os.path.join(HOME, '.obsidian')).get('telegram') or ''
             if ':' in cred:
                 a, b = cred.split(':', 1)
                 return a, b

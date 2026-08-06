@@ -12,7 +12,7 @@ def test_crear_y_listar(tmp_path):
     g.create('caso1')
     g.create('target-com')
     assert g.list_ws() == ['caso1', 'target-com']
-    assert g.existe('caso1') and not g.existe('inexistente')
+    assert g.exists('caso1') and not g.exists('inexistente')
 
 
 def test_no_duplicar(tmp_path):
@@ -60,7 +60,7 @@ def test_borrar_y_renombrar(tmp_path):
     g.create('viejo')
     g.rename('viejo', 'nuevo')
     assert g.list_ws() == ['nuevo']
-    assert g.borrar('nuevo') is True
+    assert g.delete('nuevo') is True
     assert g.list_ws() == []
 
 
@@ -76,8 +76,8 @@ def test_nombres_maliciosos_rechazados(tmp_path):
 def test_historial(tmp_path):
     g = Manager(str(tmp_path))
     g.create('caso')
-    g.registrar('caso', 'dns_a', 'example.com', 3)
-    g.registrar('caso', 'rdap', 'example.com', 5)
+    g.record('caso', 'dns_a', 'example.com', 3)
+    g.record('caso', 'rdap', 'example.com', 5)
     h = g.historial('caso')
     assert len(h) == 2
     assert h[0]['transform'] == 'rdap' and h[0]['salidas'] == 5   # most recent first

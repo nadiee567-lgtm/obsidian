@@ -34,14 +34,14 @@ _gestor = Manager(WORKSPACES_DIR)
 
 
 def _almacen(ws):
-    if ws and _gestor.existe(ws):
+    if ws and _gestor.exists(ws):
         return _gestor.cargar(ws)
     return Store()
 
 
 def _guardar(ws, alm):
     if ws:
-        if not _gestor.existe(ws):
+        if not _gestor.exists(ws):
             _gestor.create(ws)
         _gestor.guardar(ws, alm)
 
