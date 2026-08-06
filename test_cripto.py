@@ -3,7 +3,7 @@
 Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_cripto.py -q
 """
 import obsidian_web as ob
-from core.modelo import Almacen
+from core.modelo import Store
 from core.transforms import ejecutar_por_nombre
 
 
@@ -16,7 +16,7 @@ class _R:
 
 
 def _correr(nombre, tipo, valor):
-    alm = Almacen()
+    alm = Store()
     e = alm.crear(tipo, valor)
     return ejecutar_por_nombre(nombre, e, alm), e, alm
 
@@ -101,7 +101,7 @@ def test_eth_balance_ignora_btc():
 def test_monitor_detecta_movimiento_wallet():
     """Watching a wallet = the monitor diffs its balance; a movement => alert."""
     from core.monitor import snapshot, diff
-    alm = Almacen()
+    alm = Store()
     w = alm.crear('wallet', _GENESIS, propiedades={'btc_balance': 1.5, 'btc_tx': 10})
     antes = snapshot(alm)
     w.propiedades['btc_balance'] = 3.0                 # money moved in/out

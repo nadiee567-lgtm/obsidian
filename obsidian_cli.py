@@ -6,7 +6,7 @@ automatic recon, correlate risks, generate a report and export -- over the same
 persistent workspaces as the UI.
 
 Importing obsidian_web registers ALL transforms in REGISTRO (they live there)
-without starting the server. The CLI uses the core directly (Almacen, transforms,
+without starting the server. The CLI uses the core directly (Store, transforms,
 report, export, workspaces) -- zero logic duplication.
 
 Examples:
@@ -22,7 +22,7 @@ import os
 import sys
 
 import obsidian_web as _ob   # registers the transforms (does not start Flask)
-from core.modelo import Almacen, tipo_valido
+from core.modelo import Store, tipo_valido
 from core.transforms import REGISTRO, ejecutar_por_nombre, ejecutar_lote
 from core.correlacion import correlacionar, score_riesgo
 from core.reporte import generar_reporte
@@ -36,7 +36,7 @@ _gestor = Gestor(WORKSPACES_DIR)
 def _almacen(ws):
     if ws and _gestor.existe(ws):
         return _gestor.cargar(ws)
-    return Almacen()
+    return Store()
 
 
 def _guardar(ws, alm):

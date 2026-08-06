@@ -7,7 +7,7 @@ Verification against the real API is pending a key.
 Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_buscadores.py -q
 """
 import obsidian_web as ob
-from core.modelo import Almacen
+from core.modelo import Store
 from core.transforms import ejecutar_por_nombre
 
 
@@ -19,7 +19,7 @@ class FakeResp:
 
 
 def _correr(nombre, tipo, valor):
-    alm = Almacen()
+    alm = Store()
     e = alm.crear(tipo, valor)
     return ejecutar_por_nombre(nombre, e, alm)
 
@@ -161,7 +161,7 @@ def test_favicon_pivote(monkeypatch):
             return FakeResp({'error': False, 'results': [['9.9.9.9'], ['8.8.8.8']]})
         return FakeResp({'matches': [{'ip_str': '7.7.7.7'}, {'ip_str': '9.9.9.9'}]})
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
-    alm = Almacen()
+    alm = Store()
     h = alm.crear('hash', '123456', propiedades={'tipo_hash': 'favicon'})
     prod = ejecutar_por_nombre('favicon_pivote', h, alm)
     ips = {e.valor for e in prod if e.tipo == 'ip'}
@@ -170,7 +170,7 @@ def test_favicon_pivote(monkeypatch):
 
 def test_favicon_pivote_ignora_hash_no_favicon(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'a@b.com:k')
-    alm = Almacen()
+    alm = Store()
     h = alm.crear('hash', 'abc', propiedades={'tipo_hash': 'sha1'})
     assert ejecutar_por_nombre('favicon_pivote', h, alm) == []
 
@@ -184,7 +184,7 @@ def test_cert_pivote(monkeypatch):
             return FakeResp({'error': False, 'results': [['5.5.5.5']]})
         return FakeResp({'matches': [{'ip_str': '6.6.6.6'}]})
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
-    alm = Almacen()
+    alm = Store()
     d = alm.crear('dominio', 'ejemplo.com', propiedades={'cert_cn': '*.ejemplo.com'})
     prod = ejecutar_por_nombre('cert_pivote', d, alm)
     assert {e.valor for e in prod if e.tipo == 'ip'} == {'5.5.5.5', '6.6.6.6'}
@@ -194,7 +194,7 @@ def test_cert_pivote(monkeypatch):
 def test_dedup_cross_engine(monkeypatch):
     """Same host/port reported by 2 engines = 1 entity with 2 sources."""
     monkeypatch.setattr(ob._boveda, 'obtener', lambda s: 'id:secret')
-    alm = Almacen()
+    alm = Store()
     ip = alm.crear('ip', '1.2.3.4')
     # Shodan sees port 443
     monkeypatch.setattr(ob.SESSION, 'get',

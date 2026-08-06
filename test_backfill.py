@@ -3,12 +3,12 @@
 Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_backfill.py -q
 """
 import obsidian_web as ob
-from core.modelo import Almacen
+from core.modelo import Store
 from core.transforms import ejecutar_por_nombre
 
 
 def _correr(nombre, tipo, valor):
-    alm = Almacen()
+    alm = Store()
     e = alm.crear(tipo, valor)
     return ejecutar_por_nombre(nombre, e, alm), e, alm
 
@@ -99,7 +99,7 @@ def test_github_sec_y_regla(monkeypatch):
 # ── 56: exposed login/panel + credential ────────────────────────────────────
 def test_login_expuesto_regla():
     from core.correlacion import correlacionar
-    alm = Almacen()
+    alm = Store()
     alm.crear('dominio', 'admin.x.com').etiquetar('panel-login')
     r = [x for x in correlacionar(alm) if x.regla == 'login-expuesto']
     assert r and r[0].severidad == 'alto'
@@ -122,7 +122,7 @@ def test_http_probe_detecta_panel_login(monkeypatch):
 # ── 136: leak -> login correlation ──────────────────────────────────────────
 def test_leak_login():
     from core.correlacion import correlacionar
-    alm = Almacen()
+    alm = Store()
     e = alm.crear('email', 'admin@acme.com'); e.etiquetar('filtrado')
     p = alm.crear('subdominio', 'panel.acme.com'); p.etiquetar('panel-login')
     r = [x for x in correlacionar(alm) if x.regla == 'leak-login']
@@ -132,7 +132,7 @@ def test_leak_login():
 
 def test_leak_login_sin_filtrado():
     from core.correlacion import correlacionar
-    alm = Almacen()
+    alm = Store()
     alm.crear('subdominio', 'panel.acme.com').etiquetar('panel-login')   # panel but no credential
     assert not [x for x in correlacionar(alm) if x.regla == 'leak-login']
 
@@ -140,7 +140,7 @@ def test_leak_login_sin_filtrado():
 # ── 59: platform pivot ──────────────────────────────────────────────────────
 def test_pivote_plataformas():
     from core.correlacion import correlacionar
-    alm = Almacen()
+    alm = Store()
     u = alm.crear('usuario', 'nadiee')
     for i in range(6):
         p = alm.crear('plataforma', f'plat{i}')
@@ -151,7 +151,7 @@ def test_pivote_plataformas():
 
 def test_pivote_plataformas_pocas_no_dispara():
     from core.correlacion import correlacionar
-    alm = Almacen()
+    alm = Store()
     u = alm.crear('usuario', 'x')
     for i in range(3):                                   # <5 → no finding
         alm.relacionar(u.id, alm.crear('plataforma', f'p{i}').id, 'presente')
@@ -171,7 +171,7 @@ def test_reglas_yaml():
 """
     try:
         assert cargar_reglas_yaml(yaml_txt) == 1
-        alm = Almacen()
+        alm = Store()
         alm.crear('puerto', '1.2.3.4:21')
         alm.crear('puerto', '1.2.3.4:443')              # does not match
         r = [x for x in correlacionar(alm) if x.regla == 'puerto-ftp']
@@ -214,7 +214,7 @@ def test_rate_limit_concurrencia():
     set_limite('_test_rl', 1)
     try:
         def run():
-            alm = Almacen()
+            alm = Store()
             ejecutar_por_nombre('_test_rl', alm.crear('dominio', 'x.com'), alm)
         ths = [threading.Thread(target=run) for _ in range(4)]
         for t in ths:
@@ -262,7 +262,7 @@ def test_ejecutar_lote_progreso():
     vistos = []
     ejecutar_lote([('url', 'https://a.com/x.jpg', 'reverse_image'),
                    ('url', 'https://b.com/y.jpg', 'reverse_image')],
-                  Almacen(), on_progreso=lambda *a: vistos.append(a))
+                  Store(), on_progreso=lambda *a: vistos.append(a))
     assert len(vistos) == 2                       # one callback per finished transform
     assert vistos[-1][3] == 2                      # total == 2 on the last
 

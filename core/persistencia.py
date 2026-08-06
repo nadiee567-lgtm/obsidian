@@ -9,7 +9,7 @@ import sqlite3
 import json
 import datetime
 
-from core.modelo import Entidad, Almacen
+from core.modelo import Entity, Store
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS entidades (
@@ -48,7 +48,7 @@ def _conectar(db_path):
     return con
 
 
-def guardar_almacen(almacen: Almacen, db_path: str) -> None:
+def guardar_almacen(almacen: Store, db_path: str) -> None:
     """Dumps the full store to the DB (upsert by id)."""
     con = _conectar(db_path)
     with con:
@@ -72,16 +72,16 @@ def guardar_almacen(almacen: Almacen, db_path: str) -> None:
     con.close()
 
 
-def cargar_almacen(db_path: str) -> Almacen:
+def cargar_almacen(db_path: str) -> Store:
     """Rebuilds a Store from the DB. SILENT load (no bus): does not fire events,
     because loading from disk is not 'discovering' new data."""
     con = _conectar(db_path)
-    alm = Almacen()   # no bus -> agregar() does not publish
+    alm = Store()   # no bus -> agregar() does not publish
     for row in con.execute(
         "SELECT tipo,valor,propiedades,origenes,tags,procedencia,confianza,creada FROM entidades"
     ):
         tipo, valor, props, orig, tags, proc, conf, creada = row
-        e = Entidad(
+        e = Entity(
             tipo=tipo, valor=valor,
             propiedades=json.loads(props or '{}'),
             origenes=set(json.loads(orig or '[]')),

@@ -10,7 +10,7 @@ from core.config import HOME, HOME_INIT, CASES_DIR, STATIC_DIR, CASES_DB, PORT, 
 from core.validacion import (_SHELL_PELIGROSOS, _MODULO_TIPO, _es_ip, _validar,
                              _objetivo_seguro, _slug_caso, _ruta_caso_segura, _url_publica)
 from core.registro import get_logger
-from core.modelo import Almacen, Entidad, tipo_valido, TIPOS
+from core.modelo import Store, Entity, tipo_valido, TIPOS
 from core.transforms import transform, REGISTRO, ejecutar_por_nombre, ejecutar_lote
 from core.migracion import migrar_caso
 from core.workspaces import Gestor
@@ -219,7 +219,7 @@ case_lock = threading.Lock()
 
 # Typed session model (F2, transform-engine integration).
 # Coexists with `case` during migration; the /api/v2/* endpoints use this.
-_almacen = Almacen()
+_almacen = Store()
 
 # F3: workspace manager (isolated SQLite cases). _ws_activo = None -> ephemeral
 # mode (not saved); if one is active, each transform autosaves.
@@ -3829,7 +3829,7 @@ def _correr_transform_interno(tipo, valor, nombre):
     Raises ValueError/KeyError; the caller decides what to do with the error."""
     if not tipo_valido(tipo):
         raise ValueError('invalid entity type')
-    semilla = Entidad(tipo, (valor or '').strip())          # may raise ValueError
+    semilla = Entity(tipo, (valor or '').strip())          # may raise ValueError
     if not semilla.valor_bien_formado():
         raise ValueError(f'malformed value for {tipo}')
     if _PROXIES['pool']:
@@ -4025,7 +4025,7 @@ def api_v2_entidad():
     if not tipo_valido(tipo):
         return _error('invalid entity type', 400)
     try:
-        ent = Entidad(tipo, valor)
+        ent = Entity(tipo, valor)
     except ValueError as e:
         return _error(str(e), 400)
     if not ent.valor_bien_formado():
@@ -4094,7 +4094,7 @@ def api_v2_workspaces():
     if request.method == 'DELETE':
         _gestor.borrar(nombre)
         if _ws_activo == _slug_caso(nombre):
-            _almacen, _ws_activo = Almacen(), None
+            _almacen, _ws_activo = Store(), None
         return jsonify({'ok': True, 'activo': _ws_activo})
 
 @app.route('/api/v2/workspaces/abrir', methods=['POST'])
@@ -4374,7 +4374,7 @@ def api_v2_keys_probar():
         return _error('service has no defined test', 400)
     nombre, tipo, valor = mapeo
     tiene = bool(_boveda.obtener(servicio))
-    alm = Almacen()
+    alm = Store()
     try:
         n = len(ejecutar_por_nombre(nombre, alm.crear(tipo, valor), alm))
     except Exception as e:

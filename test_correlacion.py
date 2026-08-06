@@ -2,12 +2,12 @@
 
 Run:  ../.venv/bin/python -m pytest test_correlacion.py -q
 """
-from core.modelo import Almacen
+from core.modelo import Store
 from core.correlacion import correlacionar, score_riesgo, Hallazgo
 
 
 def test_puerto_sensible():
-    alm = Almacen()
+    alm = Store()
     alm.crear('puerto', '1.2.3.4:3389', propiedades={'servicio': 'rdp'})
     alm.crear('puerto', '1.2.3.4:443')   # https, not sensitive
     h = correlacionar(alm)
@@ -17,7 +17,7 @@ def test_puerto_sensible():
 
 
 def test_cert_vencido():
-    alm = Almacen()
+    alm = Store()
     alm.crear('dominio', 'viejo.com', propiedades={'cert_expira': 'Jan 1 00:00:00 2020 GMT'})
     alm.crear('dominio', 'nuevo.com', propiedades={'cert_expira': 'Jan 1 00:00:00 2099 GMT'})
     reglas = [x.regla for x in correlacionar(alm)]
@@ -25,7 +25,7 @@ def test_cert_vencido():
 
 
 def test_ip_maliciosa_es_critica():
-    alm = Almacen()
+    alm = Store()
     ip = alm.crear('ip', '45.9.9.9')
     ip.etiquetar('malicioso')
     h = correlacionar(alm)
@@ -33,7 +33,7 @@ def test_ip_maliciosa_es_critica():
 
 
 def test_email_filtrado_y_spoofable():
-    alm = Almacen()
+    alm = Store()
     e = alm.crear('email', 'a@b.com')
     e.etiquetar('filtrado', 'spoofable')
     reglas = {x.regla for x in correlacionar(alm)}
@@ -41,7 +41,7 @@ def test_email_filtrado_y_spoofable():
 
 
 def test_orden_por_severidad():
-    alm = Almacen()
+    alm = Store()
     alm.crear('email', 'x@y.com').etiquetar('spoofable')   # medium
     alm.crear('ip', '45.0.0.1').etiquetar('malicioso')     # critical
     alm.crear('puerto', '1.1.1.1:3306')                    # high
@@ -60,12 +60,12 @@ def test_score_riesgo():
 
 
 def test_sin_datos_sin_hallazgos():
-    assert correlacionar(Almacen()) == []
+    assert correlacionar(Store()) == []
 
 
 def test_feedback_suprime_descartados():
     """If the analyst tags the entity as a false positive, its finding disappears."""
-    alm = Almacen()
+    alm = Store()
     ip = alm.crear('ip', '45.9.9.9')
     ip.etiquetar('malicioso')
     assert len(correlacionar(alm)) == 1

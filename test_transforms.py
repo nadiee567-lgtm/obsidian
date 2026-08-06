@@ -3,7 +3,7 @@
 Run:  ../.venv/bin/python -m pytest test_transforms.py -q
 """
 import pytest
-from core.modelo import Almacen, Entidad
+from core.modelo import Store, Entity
 from core.eventos import Bus, ENTIDAD_NUEVA
 import core.transforms as tr
 
@@ -51,7 +51,7 @@ def test_ejecutar_emite_relaciona_y_anota_procedencia():
         ctx.emitir('ip', '93.184.216.34', etiqueta='A')
         ctx.emitir('subdominio', 'www.' + entidad.valor, etiqueta='subdominio')
 
-    alm = Almacen()
+    alm = Store()
     dom = alm.crear('dominio', 'example.com')
     producidas = tr.ejecutar_por_nombre('dns', dom, alm)
 
@@ -66,7 +66,7 @@ def test_ejecutar_emite_relaciona_y_anota_procedencia():
 def test_ejecutar_valida_tipo_de_entrada():
     @tr.transform(entrada='dominio', nombre='solo_dominio')
     def _f(entidad, ctx): pass
-    alm = Almacen()
+    alm = Store()
     ip = alm.crear('ip', '8.8.8.8')
     with pytest.raises(ValueError):
         tr.ejecutar_por_nombre('solo_dominio', ip, alm)
@@ -79,7 +79,7 @@ def test_transform_que_revienta_no_propaga():
         ctx.emitir('ip', '1.1.1.1')       # this does get through
         raise RuntimeError("boom")         # crashes afterwards
 
-    alm = Almacen()
+    alm = Store()
     dom = alm.crear('dominio', 'example.com')
     producidas = tr.ejecutar_por_nombre('medio_roto', dom, alm)   # does NOT raise
     assert len(producidas) == 1
@@ -91,7 +91,7 @@ def test_emitir_valor_basura_se_ignora():
         assert ctx.emitir('ip', '   ') is None   # empty value -> None, no crash
         ctx.emitir('ip', '8.8.8.8')
 
-    alm = Almacen()
+    alm = Store()
     dom = alm.crear('dominio', 'example.com')
     producidas = tr.ejecutar_por_nombre('sucio', dom, alm)
     assert len(producidas) == 1
@@ -107,7 +107,7 @@ def test_transform_dispara_eventos_del_bus():
     def _f(entidad, ctx):
         ctx.emitir('ip', '9.9.9.9')
 
-    alm = Almacen(bus=bus)
+    alm = Store(bus=bus)
     dom = alm.crear('dominio', 'example.com')   # 1 event
     tr.ejecutar_por_nombre('dns', dom, alm)     # +1 event (the ip)
     assert len(nuevas) == 2
@@ -121,7 +121,7 @@ def test_corredor_cachea():
         corridas.append(1)
         ctx.emitir('ip', '8.8.8.8')
 
-    alm = Almacen()
+    alm = Store()
     dom = alm.crear('dominio', 'example.com')
     corr = tr.Corredor(alm)
     corr.ejecutar('dns', dom)
@@ -139,7 +139,7 @@ def test_machine_cascada():
     def _ports(entidad, ctx):
         ctx.emitir('puerto', '443', etiqueta='open')
 
-    alm = Almacen()
+    alm = Store()
     dom = alm.crear('dominio', 'example.com')
     receta = tr.Machine(nombre='recon', pasos=('dns', 'ports'))
     producidas = tr.Corredor(alm).ejecutar_machine(receta, dom)

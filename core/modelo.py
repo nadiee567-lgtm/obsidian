@@ -86,7 +86,7 @@ def _ahora() -> str:
 
 # ── Step 14: the Entity ──────────────────────────────────────────────────────
 @dataclass
-class Entidad:
+class Entity:
     """Atomic unit of data. The id derives from (type, normalized value), so two
     entities of the same datum are the SAME entity even if another source creates
     it. `origenes` accumulates which transforms produced it (traceability)."""
@@ -139,7 +139,7 @@ class Entidad:
         tv = _TIPO_VALIDACION.get(self.tipo)
         return True if tv is None else _validar(self.valor, tv)
 
-    def fusionar(self, otra: 'Entidad') -> None:
+    def fusionar(self, otra: 'Entity') -> None:
         """Absorbs another entity of the same id (step 17): merges origins and
         properties, raises confidence, keeps the oldest date."""
         if otra.id != self.id:
@@ -163,7 +163,7 @@ class Entidad:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict) -> 'Entidad':
+    def from_dict(cls, d: dict) -> 'Entity':
         e = cls(tipo=d['tipo'], valor=d['valor'],
                 propiedades=dict(d.get('propiedades', {})),
                 origenes=set(d.get('origenes', [])),
@@ -176,7 +176,7 @@ class Entidad:
 
 # ── Step 15: the Relation ────────────────────────────────────────────────────
 @dataclass
-class Relacion:
+class Relation:
     """Typed, directed edge between two entities (by id). Deterministic id from
     (source, target, label) -> the same relation is never duplicated."""
     origen: str        # entity id
@@ -192,18 +192,18 @@ class Relacion:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> 'Relacion':
+    def from_dict(cls, d: dict) -> 'Relation':
         return cls(origen=d['origen'], destino=d['destino'], etiqueta=d.get('etiqueta', ''))
 
 
 # ── Steps 16 + 17: the Store with automatic dedup ────────────────────────────
-class Almacen:
+class Store:
     """Holds a case's entities and relations. Deduplicates by id on add. If given
     a Bus, publishes events on create/merge/relate (step 19)."""
 
     def __init__(self, bus=None):
-        self._entidades: dict[str, Entidad] = {}
-        self._relaciones: dict[str, Relacion] = {}
+        self._entidades: dict[str, Entity] = {}
+        self._relaciones: dict[str, Relation] = {}
         self._por_tipo: dict[str, set] = {}     # type -> {id, ...}
         self._bus = bus
 
@@ -212,7 +212,7 @@ class Almacen:
             self._bus.publicar(evento, *args)
 
     # -- entities --
-    def agregar(self, ent: Entidad) -> Entidad:
+    def agregar(self, ent: Entity) -> Entity:
         """Adds or merges. Returns the live entity in the store (step 17)."""
         existente = self._entidades.get(ent.id)
         if existente:
@@ -224,14 +224,14 @@ class Almacen:
         self._publicar('entidad_nueva', ent)
         return ent
 
-    def crear(self, tipo, valor, **kw) -> Entidad:
+    def crear(self, tipo, valor, **kw) -> Entity:
         """Shortcut: builds an Entity and adds it (deduplicating)."""
-        return self.agregar(Entidad(tipo=tipo, valor=valor, **kw))
+        return self.agregar(Entity(tipo=tipo, valor=valor, **kw))
 
-    def obtener(self, id_: str) -> Entidad | None:
+    def obtener(self, id_: str) -> Entity | None:
         return self._entidades.get(id_)
 
-    def buscar(self, tipo, valor) -> Entidad | None:
+    def buscar(self, tipo, valor) -> Entity | None:
         """Looks up by (type, value) without adding -- respects normalization."""
         eid = hashlib.sha1(f"{tipo}:{normalizar(tipo, valor)}".encode()).hexdigest()[:16]
         return self._entidades.get(eid)
@@ -240,11 +240,11 @@ class Almacen:
         return [self._entidades[i] for i in self._por_tipo.get(tipo, ())]
 
     # -- relations --
-    def relacionar(self, origen, destino, etiqueta='') -> Relacion:
+    def relacionar(self, origen, destino, etiqueta='') -> Relation:
         """Connects two entities (by id or Entity object). Deduplicates."""
-        oid = origen.id if isinstance(origen, Entidad) else origen
-        did = destino.id if isinstance(destino, Entidad) else destino
-        rel = Relacion(origen=oid, destino=did, etiqueta=etiqueta)
+        oid = origen.id if isinstance(origen, Entity) else origen
+        did = destino.id if isinstance(destino, Entity) else destino
+        rel = Relation(origen=oid, destino=did, etiqueta=etiqueta)
         if rel.id not in self._relaciones:
             self._relaciones[rel.id] = rel
             self._publicar('relacion_nueva', rel)
@@ -270,11 +270,11 @@ class Almacen:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> 'Almacen':
+    def from_dict(cls, d: dict) -> 'Store':
         alm = cls()
         for ed in d.get('entidades', []):
-            alm.agregar(Entidad.from_dict(ed))
+            alm.agregar(Entity.from_dict(ed))
         for rd in d.get('relaciones', []):
-            r = Relacion.from_dict(rd)
+            r = Relation.from_dict(rd)
             alm._relaciones[r.id] = r
         return alm

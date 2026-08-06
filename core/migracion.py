@@ -7,14 +7,14 @@ already did, so existing cases aren't lost when moving to the new model.
 Defensive: a malformed module is skipped, it does not take down the whole migration."""
 import re
 
-from core.modelo import Almacen
+from core.modelo import Store
 
 _RE_IP = re.compile(r'\d+\.\d+\.\d+\.\d+')
 
 
-def migrar_caso(case: dict) -> Almacen:
+def migrar_caso(case: dict) -> Store:
     """case (dict with 'objetivo' and 'datos') -> typed Store."""
-    alm = Almacen()
+    alm = Store()
     objetivo = case.get('objetivo')
     raiz = alm.crear('objetivo', objetivo, origenes={'caso'}) if objetivo else None
 

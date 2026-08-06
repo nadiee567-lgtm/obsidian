@@ -2,13 +2,13 @@
 
 Run:  ../.venv/bin/python -m pytest test_reporte.py -q
 """
-from core.modelo import Almacen
+from core.modelo import Store
 from core.correlacion import Hallazgo
 from core.reporte import generar_reporte
 
 
 def _almacen_demo():
-    alm = Almacen()
+    alm = Store()
     d = alm.crear('dominio', 'objetivo.com', propiedades={'org': 'ACME'})
     ip = alm.crear('ip', '93.184.216.34', propiedades={'pais': 'US'})
     ip.etiquetar('listado-amenaza')
@@ -34,13 +34,13 @@ def test_reporte_sin_hallazgos():
 
 
 def test_reporte_almacen_vacio():
-    html = generar_reporte(Almacen(), hallazgos=[], score=0)
+    html = generar_reporte(Store(), hallazgos=[], score=0)
     assert 'No entities' in html
 
 
 def test_reporte_escapa_xss():
     """Raw target data with a payload → must come out escaped, never executable."""
-    alm = Almacen()
+    alm = Store()
     alm.crear('dominio', 'malo.com',
               propiedades={'nota': '<script>alert(1)</script>'})
     h = [Hallazgo('r', 'critico', 'injection <img src=x onerror=alert(1)>', [])]

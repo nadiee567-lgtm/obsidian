@@ -2,12 +2,12 @@
 
 Correr:  ../.venv/bin/python -m pytest test_persistencia.py -q
 """
-from core.modelo import Almacen
+from core.modelo import Store
 from core.persistencia import guardar_almacen, cargar_almacen
 
 
 def _almacen_ejemplo():
-    alm = Almacen()
+    alm = Store()
     d = alm.crear('dominio', 'example.com', origenes={'whois'},
                   propiedades={'registrar': 'GoDaddy'})
     d.etiquetar('interesante')

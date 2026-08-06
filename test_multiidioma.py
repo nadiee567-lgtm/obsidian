@@ -3,12 +3,12 @@
 Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_multiidioma.py -q
 """
 import obsidian_web as ob
-from core.modelo import Almacen
+from core.modelo import Store
 from core.transforms import ejecutar_por_nombre
 
 
 def _correr(nombre, tipo, valor):
-    alm = Almacen()
+    alm = Store()
     e = alm.crear(tipo, valor)
     return ejecutar_por_nombre(nombre, e, alm), e
 

@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
-from core.modelo import Almacen, Entidad, tipo_valido
+from core.modelo import Store, Entity, tipo_valido
 
 
 @dataclass
@@ -93,15 +93,15 @@ class Contexto:
     """API the transform author receives. `emitir` creates an output entity, adds
     it to the store (dedup + events), relates it to the input and sets its
     provenance -- all automatic."""
-    def __init__(self, almacen: Almacen, entrada: Entidad, nombre_transform: str):
+    def __init__(self, almacen: Store, entrada: Entity, nombre_transform: str):
         self.almacen = almacen
         self.entrada = entrada
         self._nombre = nombre_transform
         self.emitidas: list = []
 
-    def emitir(self, tipo, valor, etiqueta='', **propiedades) -> Entidad | None:
+    def emitir(self, tipo, valor, etiqueta='', **propiedades) -> Entity | None:
         try:
-            ent = Entidad(tipo=tipo, valor=valor, propiedades=propiedades)
+            ent = Entity(tipo=tipo, valor=valor, propiedades=propiedades)
         except ValueError:
             return None   # garbage value: ignored, does not break the transform
         viva = self.almacen.agregar(ent)
@@ -136,7 +136,7 @@ def limites() -> dict:
     return dict(_LIMITES)
 
 
-def ejecutar(t: Transform, entidad: Entidad, almacen: Almacen) -> list:
+def ejecutar(t: Transform, entidad: Entity, almacen: Store) -> list:
     """Runs a transform on an entity (step 28). Returns the produced entities.
     ISOLATES failures (step 38): if the transform crashes, it does not propagate
     -- it returns whatever it managed to emit. Honors the transform's rate limit
@@ -156,14 +156,14 @@ def ejecutar(t: Transform, entidad: Entidad, almacen: Almacen) -> list:
     return ctx.emitidas
 
 
-def ejecutar_por_nombre(nombre: str, entidad: Entidad, almacen: Almacen) -> list:
+def ejecutar_por_nombre(nombre: str, entidad: Entity, almacen: Store) -> list:
     t = REGISTRO.por_nombre(nombre)
     if t is None:
         raise KeyError(f"transform not registered: {nombre}")
     return ejecutar(t, entidad, almacen)
 
 
-def ejecutar_lote(tareas, almacen: Almacen, max_workers: int = 8, lock=None,
+def ejecutar_lote(tareas, almacen: Store, max_workers: int = 8, lock=None,
                   on_progreso=None) -> list:
     """Runs several transforms IN PARALLEL (step 102). Transforms are I/O-bound
     (network), so they are launched concurrently -- each in an ISOLATED Store, no
@@ -184,7 +184,7 @@ def ejecutar_lote(tareas, almacen: Almacen, max_workers: int = 8, lock=None,
 
     def _uno(t):
         tipo, valor, nombre = t
-        local = Almacen()
+        local = Store()
         n = 0
         try:
             semilla = local.crear(tipo, valor)
@@ -230,18 +230,18 @@ class Machine:
 class Corredor:
     """Runs transforms/machines over a store, remembering which
     (transform, entity) pairs already ran to avoid repeating them in the same session."""
-    def __init__(self, almacen: Almacen):
+    def __init__(self, almacen: Store):
         self.almacen = almacen
         self._hechos: set = set()   # {(transform_name, entity_id)}
 
-    def ejecutar(self, nombre: str, entidad: Entidad) -> list:
+    def ejecutar(self, nombre: str, entidad: Entity) -> list:
         clave = (nombre, entidad.id)
         if clave in self._hechos:
             return []               # cache: already ran on this entity
         self._hechos.add(clave)
         return ejecutar_por_nombre(nombre, entidad, self.almacen)
 
-    def ejecutar_machine(self, machine: Machine, semilla: Entidad) -> list:
+    def ejecutar_machine(self, machine: Machine, semilla: Entity) -> list:
         """Runs the recipe: each step runs on the entities of the type it
         expects (seed + what was produced before). The cache avoids re-running."""
         pool = {semilla.id: semilla}

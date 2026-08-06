@@ -88,7 +88,7 @@ def test_workspaces_flujo(tmp_path):
     prev_g, prev_ws, prev_a = ob._gestor, ob._ws_activo, ob._almacen
     ob._gestor = Gestor(str(tmp_path))
     ob._ws_activo = None
-    ob._almacen = ob.Almacen()
+    ob._almacen = ob.Store()
     try:
         c = _client()
         # create -> becomes active
@@ -100,7 +100,7 @@ def test_workspaces_flujo(tmp_path):
         # simulate saved data and open fresh
         ob._almacen.crear('ip', '8.8.8.8')
         ob._gestor.guardar('caso demo', ob._almacen)
-        ob._almacen = ob.Almacen()
+        ob._almacen = ob.Store()
         r = c.post('/api/v2/workspaces/abrir', json={'nombre': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['total_entidades'] == 1
         # delete -> no active

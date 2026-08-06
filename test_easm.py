@@ -3,7 +3,7 @@
 Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_easm.py -q
 """
 import obsidian_web as ob
-from core.modelo import Almacen
+from core.modelo import Store
 from core.transforms import ejecutar_por_nombre
 
 
@@ -24,7 +24,7 @@ def _cliente_con(alm, monkeypatch):
 
 # ── 144: asset inventory ────────────────────────────────────────────────────
 def test_inventario(monkeypatch):
-    alm = Almacen()
+    alm = Store()
     alm.crear('dominio', 'x.com')
     alm.crear('ip', '1.2.3.4')
     alm.crear('puerto', '1.2.3.4:443')
@@ -38,7 +38,7 @@ def test_inventario(monkeypatch):
 # ── 145 + 146: continuous discovery + change detection (via the monitor) ─────
 def test_descubrimiento_y_cambios_via_monitor():
     from core.monitor import snapshot, diff
-    alm = Almacen()
+    alm = Store()
     d = alm.crear('dominio', 'x.com', propiedades={'cert_expira': '2027'})
     antes = snapshot(alm)
     alm.crear('subdominio', 'nuevo.x.com')       # new asset (145)
@@ -53,7 +53,7 @@ def test_descubrimiento_y_cambios_via_monitor():
 # ── 147: infrastructure clustering ──────────────────────────────────────────
 def test_infra_compartida():
     from core.correlacion import correlacionar
-    alm = Almacen()
+    alm = Store()
     alm.crear('dominio', 'a.com', propiedades={'favicon_hash': '123456'})
     alm.crear('dominio', 'b.com', propiedades={'favicon_hash': '123456'})   # same favicon
     alm.crear('dominio', 'c.com', propiedades={'favicon_hash': '999'})       # different
@@ -63,7 +63,7 @@ def test_infra_compartida():
 
 def test_infra_compartida_sin_grupo():
     from core.correlacion import correlacionar
-    alm = Almacen()
+    alm = Store()
     alm.crear('dominio', 'solo.com', propiedades={'favicon_hash': '111'})
     assert not [x for x in correlacionar(alm) if x.regla == 'infra-compartida']
 
@@ -77,7 +77,7 @@ def test_cve_lookup_tech(monkeypatch):
                  'configurations': [{'nodes': [{'cpeMatch': [{'criteria': 'cpe:2.3:a:apache:httpd:2.4'}]}]}]}},
     ]}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=resp))
-    alm = Almacen()
+    alm = Store()
     prod = ejecutar_por_nombre('cve_lookup', alm.crear('tech', 'nginx'), alm)
     cids = {x.valor for x in prod if x.tipo == 'cve'}
     assert cids == {'CVE-2021-1234'}             # anti-noise CPE filter: only the nginx one
@@ -93,7 +93,7 @@ def test_score_exposicion():
 
 
 def test_exposicion_endpoint(monkeypatch):
-    alm = Almacen()
+    alm = Store()
     for i in range(5):
         alm.crear('subdominio', f's{i}.x.com')
     c = _cliente_con(alm, monkeypatch)
@@ -104,7 +104,7 @@ def test_exposicion_endpoint(monkeypatch):
 # ── 150: Shadow IT / forgotten assets ───────────────────────────────────────
 def test_shadow_it():
     from core.correlacion import correlacionar
-    alm = Almacen()
+    alm = Store()
     alm.crear('bucket', 'acme-backups').etiquetar('publico')           # open storage
     alm.crear('subdominio', 'viejo.acme.com', propiedades={'http_status': 503})  # broken
     alm.crear('subdominio', 'vivo.acme.com', propiedades={'http_status': 200})   # healthy
@@ -118,7 +118,7 @@ def test_diff_historico(tmp_path):
     from core.workspaces import Gestor
     g = Gestor(str(tmp_path))
     g.crear('caso')
-    alm = Almacen()
+    alm = Store()
     alm.crear('subdominio', 'a.x.com')
     g.guardar('caso', alm)
     sid = g.snapshot('caso')                     # historical snapshot: 1 asset

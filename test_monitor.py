@@ -2,12 +2,12 @@
 
 Run:  ../.venv/bin/python -m pytest test_monitor.py -q
 """
-from core.modelo import Almacen
+from core.modelo import Store
 from core.monitor import snapshot, diff, Monitor
 
 
 def test_diff_detecta_entidad_nueva():
-    alm = Almacen()
+    alm = Store()
     alm.crear('dominio', 'objetivo.com')
     antes = snapshot(alm)
     alm.crear('subdominio', 'nuevo.objetivo.com')      # a subdomain appeared
@@ -18,7 +18,7 @@ def test_diff_detecta_entidad_nueva():
 
 
 def test_diff_detecta_relacion_nueva():
-    alm = Almacen()
+    alm = Store()
     d = alm.crear('dominio', 'objetivo.com')
     ip = alm.crear('ip', '1.2.3.4')
     antes = snapshot(alm)
@@ -28,7 +28,7 @@ def test_diff_detecta_relacion_nueva():
 
 
 def test_diff_detecta_cambio_de_propiedad():
-    alm = Almacen()
+    alm = Store()
     d = alm.crear('dominio', 'objetivo.com', propiedades={'cert_expira': '2027'})
     antes = snapshot(alm)
     d.propiedades['cert_expira'] = '2020'              # the cert changed (expired)
@@ -39,7 +39,7 @@ def test_diff_detecta_cambio_de_propiedad():
 
 
 def test_diff_detecta_tag_nuevo():
-    alm = Almacen()
+    alm = Store()
     s = alm.crear('subdominio', 's.objetivo.com')
     antes = snapshot(alm)
     s.etiquetar('takeover')                            # became vulnerable
@@ -48,14 +48,14 @@ def test_diff_detecta_tag_nuevo():
 
 
 def test_diff_sin_cambios():
-    alm = Almacen()
+    alm = Store()
     alm.crear('dominio', 'objetivo.com')
     snap = snapshot(alm)
     assert not diff(snap, snapshot(alm)).hay()
 
 
 def test_monitor_ciclo_alerta_en_cambio():
-    alm = Almacen()
+    alm = Store()
     alm.crear('dominio', 'objetivo.com')
     disparos = []
     def refrescar():                                   # simulates a re-scan with news
@@ -70,7 +70,7 @@ def test_monitor_ciclo_alerta_en_cambio():
 
 
 def test_monitor_ciclo_sin_cambios_no_alerta():
-    alm = Almacen()
+    alm = Store()
     alm.crear('dominio', 'objetivo.com')
     m = Monitor(lambda: snapshot(alm), lambda: None, intervalo=999)
     m.ciclo()
@@ -78,7 +78,7 @@ def test_monitor_ciclo_sin_cambios_no_alerta():
 
 
 def test_monitor_refrescar_que_falla_no_tumba_el_ciclo():
-    alm = Almacen()
+    alm = Store()
     alm.crear('dominio', 'objetivo.com')
     def refrescar():
         raise RuntimeError('network down')

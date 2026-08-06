@@ -28,7 +28,7 @@ def _celda(v) -> str:
 
 
 def exportar_json(almacen, hallazgos=None, score=0, meta=None) -> str:
-    """Full case in JSON, re-importable with Almacen.from_dict()."""
+    """Full case in JSON, re-importable with Store.from_dict()."""
     meta = dict(meta or {})
     meta.setdefault('generado', datetime.datetime.now().isoformat(timespec='seconds'))
     d = almacen.to_dict()

@@ -6,13 +6,13 @@ import csv
 import io
 import json
 
-from core.modelo import Almacen
+from core.modelo import Store
 from core.correlacion import Hallazgo
 from core.exportar import exportar_json, exportar_csv
 
 
 def _demo():
-    alm = Almacen()
+    alm = Store()
     d = alm.crear('dominio', 'objetivo.com', propiedades={'org': 'ACME'})
     ip = alm.crear('ip', '93.184.216.34')
     ip.etiquetar('listado-amenaza')
@@ -29,7 +29,7 @@ def test_json_reimportable():
     assert obj['score'] == 20
     assert len(obj['hallazgos']) == 1
     # the full case can be reconstructed
-    alm2 = Almacen.from_dict(obj)
+    alm2 = Store.from_dict(obj)
     assert len(alm2) == len(alm) == 2
     assert {e.valor for e in alm2.entidades} == {'objetivo.com', '93.184.216.34'}
     assert len(alm2.relaciones) == 1
@@ -46,7 +46,7 @@ def test_csv_tiene_cabecera_y_filas():
 
 def test_csv_neutraliza_inyeccion_de_formulas():
     """A tag starting with a formula (=+-@) must not stay executable in the cell."""
-    alm = Almacen()
+    alm = Store()
     e = alm.crear('email', 'a@b.com')
     e.etiquetar('=HYPERLINK(evil)')
     filas = list(csv.reader(io.StringIO(exportar_csv(alm))))
@@ -56,7 +56,7 @@ def test_csv_neutraliza_inyeccion_de_formulas():
 
 
 def test_csv_valor_peligroso_al_inicio():
-    alm = Almacen()
+    alm = Store()
     alm.crear('usuario', '=cmd')          # usuario allows arbitrary text
     filas = list(csv.reader(io.StringIO(exportar_csv(alm))))
     assert filas[1][1] == "'=cmd"         # sanitized
@@ -64,7 +64,7 @@ def test_csv_valor_peligroso_al_inicio():
 
 def test_csv_ninguna_celda_empieza_con_formula():
     """Invariant: NO data cell starts with a formula character."""
-    alm = Almacen()
+    alm = Store()
     alm.crear('usuario', '+evil')
     alm.crear('usuario', '-2+3')
     u = alm.crear('email', 'x@y.com'); u.etiquetar('@cmd')

@@ -11,7 +11,7 @@ import glob
 import shutil
 import datetime
 
-from core.modelo import Almacen
+from core.modelo import Store
 from core.persistencia import guardar_almacen, cargar_almacen, registrar_evento, leer_historial
 from core.validacion import _slug_caso
 
@@ -48,7 +48,7 @@ class Gestor:
             raise ValueError('invalid workspace name')
         if os.path.exists(r):
             raise ValueError('a workspace with that name already exists')
-        alm = Almacen()
+        alm = Store()
         guardar_almacen(alm, r)   # creates the file + schema
         return alm
 
