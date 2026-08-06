@@ -66,7 +66,7 @@ def test_metadata_exif_como_entidades(monkeypatch):
     e = alm.create('url', 'https://x.com/foto.jpg')
     prod = run_by_name('metadata', e, alm)
     techs = {p.value for p in prod if p.type == 'tech'}
-    personas = {p.value for p in prod if p.type == 'persona'}
+    personas = {p.value for p in prod if p.type == 'person'}
     urls = [p for p in prod if p.type == 'url']
     assert 'Apple iPhone 12' in techs and '14.2' in techs
     assert 'Jane Doe' in personas

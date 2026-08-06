@@ -20,7 +20,7 @@ def test_traducir_favicon():
 
 
 def test_join_operador_por_motor():
-    campos = {'ip': '1.2.3.4', 'puerto': '443'}
+    campos = {'ip': '1.2.3.4', 'port': '443'}
     assert traducir('shodan', campos) == 'ip:1.2.3.4 port:443'          # espacio
     assert traducir('fofa', campos) == 'ip="1.2.3.4" && port="443"'     # &&
     assert traducir('quake', campos) == 'ip:"1.2.3.4" AND port:"443"'   # AND
@@ -28,11 +28,11 @@ def test_join_operador_por_motor():
 
 def test_ignora_campos_no_soportados():
     # binaryedge no soporta 'favicon' → se omite, queda solo el puerto
-    assert traducir('binaryedge', {'favicon': '9', 'puerto': '80'}) == 'port:80'
+    assert traducir('binaryedge', {'favicon': '9', 'port': '80'}) == 'port:80'
 
 
 def test_ignora_vacios():
-    assert traducir('shodan', {'ip': '', 'puerto': '80'}) == 'port:80'
+    assert traducir('shodan', {'ip': '', 'port': '80'}) == 'port:80'
     assert traducir('shodan', {}) == ''
 
 

@@ -9,18 +9,18 @@ from core.eventos import Bus, ENTIDAD_NUEVA, ENTIDAD_ACTUALIZADA, RELACION_NUEVA
 
 # ── deterministic id + normalization (steps 14, 22) ─────────────────────────
 def test_id_deterministico_mismo_dato():
-    a = Entity('dominio', 'Example.com')
-    b = Entity('dominio', 'www.example.com.')   # www + uppercase + trailing dot
+    a = Entity('domain', 'Example.com')
+    b = Entity('domain', 'www.example.com.')   # www + uppercase + trailing dot
     assert a.id == b.id, "the same domain must give the same id"
 
 def test_normalizacion():
-    assert normalize('dominio', 'WWW.Example.COM.') == 'example.com'
+    assert normalize('domain', 'WWW.Example.COM.') == 'example.com'
     assert normalize('email', 'A@B.COM') == 'a@b.com'
     assert normalize('ip', '2001:4860:4860:0:0:0:0:8888') == '2001:4860:4860::8888'
     assert normalize('url', 'http://x.com/') == 'http://x.com'
 
 def test_ids_distintos_por_tipo_y_valor():
-    assert Entity('dominio', 'x.com').id != Entity('usuario', 'x.com').id
+    assert Entity('domain', 'x.com').id != Entity('user', 'x.com').id
     assert Entity('ip', '8.8.8.8').id != Entity('ip', '1.1.1.1').id
 
 
@@ -31,7 +31,7 @@ def test_tipo_invalido_falla():
 
 def test_valor_vacio_falla():
     with pytest.raises(ValueError):
-        Entity('dominio', '   ')
+        Entity('domain', '   ')
 
 def test_todos_los_tipos_del_catalogo_sirven():
     for type in TIPOS:
@@ -41,11 +41,11 @@ def test_todos_los_tipos_del_catalogo_sirven():
 
 # ── merge / dedup (step 17) ──────────────────────────────────────────────────
 def test_fusionar_une_origenes_y_props():
-    a = Entity('ip', '8.8.8.8', sources={'shodan'}, properties={'pais': 'US'}, confidence=0.5)
-    b = Entity('ip', '8.8.8.8', sources={'nmap'}, properties={'puerto': 53}, confidence=0.9)
+    a = Entity('ip', '8.8.8.8', sources={'shodan'}, properties={'country': 'US'}, confidence=0.5)
+    b = Entity('ip', '8.8.8.8', sources={'nmap'}, properties={'port': 53}, confidence=0.9)
     a.merge(b)
     assert a.sources == {'shodan', 'nmap'}
-    assert a.properties == {'pais': 'US', 'puerto': 53}
+    assert a.properties == {'country': 'US', 'port': 53}
     assert a.confidence == 0.9
 
 def test_fusionar_distinto_id_falla():
@@ -56,10 +56,10 @@ def test_fusionar_distinto_id_falla():
 # ── store: automatic dedup (steps 16, 17) ───────────────────────────────────
 def test_almacen_deduplica():
     alm = Store()
-    alm.create('dominio', 'example.com', sources={'whois'})
-    alm.create('dominio', 'WWW.example.com', sources={'crtsh'})   # same domain
+    alm.create('domain', 'example.com', sources={'whois'})
+    alm.create('domain', 'WWW.example.com', sources={'crtsh'})   # same domain
     assert len(alm) == 1, "must collapse into a single entity"
-    ent = alm.buscar('dominio', 'example.com')
+    ent = alm.buscar('domain', 'example.com')
     assert ent.sources == {'whois', 'crtsh'}, "merged sources"
 
 def test_almacen_de_tipo_y_buscar():
@@ -74,7 +74,7 @@ def test_almacen_de_tipo_y_buscar():
 # ── relations: deterministic and non-duplicated (step 15) ───────────────────
 def test_relaciones_dedup():
     alm = Store()
-    d = alm.create('dominio', 'example.com')
+    d = alm.create('domain', 'example.com')
     i = alm.create('ip', '93.184.216.34')
     alm.relate(d, i, 'resuelve_a')
     alm.relate(d, i, 'resuelve_a')   # same relation again
@@ -84,7 +84,7 @@ def test_relaciones_dedup():
 # ── round-trip serialization (step 21) ──────────────────────────────────────
 def test_roundtrip_almacen():
     alm = Store()
-    d = alm.create('dominio', 'example.com', sources={'whois'}, properties={'reg': 'GoDaddy'})
+    d = alm.create('domain', 'example.com', sources={'whois'}, properties={'reg': 'GoDaddy'})
     i = alm.create('ip', '93.184.216.34', sources={'dns'})
     alm.relate(d, i, 'resuelve_a')
 
@@ -93,7 +93,7 @@ def test_roundtrip_almacen():
 
     assert len(alm2) == 2
     assert len(alm2.relations) == 1
-    ent = alm2.buscar('dominio', 'example.com')
+    ent = alm2.buscar('domain', 'example.com')
     assert ent.sources == {'whois'}
     assert ent.properties == {'reg': 'GoDaddy'}
 
@@ -119,16 +119,16 @@ def test_tags_se_fusionan():
 # ── detailed provenance (step 18) ───────────────────────────────────────────
 def test_valor_bien_formado():
     assert Entity('ip', '8.8.8.8').well_formed() is True
-    assert Entity('dominio', 'example.com').well_formed() is True
+    assert Entity('domain', 'example.com').well_formed() is True
     assert Entity('email', 'a@b.com').well_formed() is True
     # a value malformed for its type is detected (even if it can be created)
     assert Entity('ip', '999.999.999.999').well_formed() is False
     # types without a strict validator: always True (person with spaces, etc.)
-    assert Entity('persona', 'Juan Perez Garcia').well_formed() is True
+    assert Entity('person', 'Juan Perez Garcia').well_formed() is True
 
 
 def test_procedencia():
-    e = Entity('subdominio', 'mail.example.com')
+    e = Entity('subdomain', 'mail.example.com')
     e.note_provenance('transform_subdominios', input_id='abc123')
     assert 'transform_subdominios' in e.sources
     assert {'transform': 'transform_subdominios', 'input': 'abc123'} in e.provenance
@@ -144,8 +144,8 @@ def test_bus_publica_entidad_nueva_y_actualizada():
     bus.suscribir(ENTIDAD_NUEVA, lambda e: nuevas.append(e))
     bus.suscribir(ENTIDAD_ACTUALIZADA, lambda e: actualizadas.append(e))
     alm = Store(bus=bus)
-    alm.create('dominio', 'example.com')            # new
-    alm.create('dominio', 'www.example.com')        # same id -> updated
+    alm.create('domain', 'example.com')            # new
+    alm.create('domain', 'www.example.com')        # same id -> updated
     assert len(nuevas) == 1
     assert len(actualizadas) == 1
 
@@ -154,7 +154,7 @@ def test_bus_publica_relacion_nueva():
     rels = []
     bus.suscribir(RELACION_NUEVA, lambda r: rels.append(r))
     alm = Store(bus=bus)
-    d = alm.create('dominio', 'example.com')
+    d = alm.create('domain', 'example.com')
     i = alm.create('ip', '93.184.216.34')
     alm.relate(d, i, 'resuelve_a')
     alm.relate(d, i, 'resuelve_a')   # dup: does not re-publish

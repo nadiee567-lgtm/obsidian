@@ -9,8 +9,8 @@ from core.reporte import generar_reporte
 
 def _almacen_demo():
     alm = Store()
-    d = alm.create('dominio', 'objetivo.com', properties={'org': 'ACME'})
-    ip = alm.create('ip', '93.184.216.34', properties={'pais': 'US'})
+    d = alm.create('domain', 'objetivo.com', properties={'org': 'ACME'})
+    ip = alm.create('ip', '93.184.216.34', properties={'country': 'US'})
     ip.tag('listado-amenaza')
     alm.relate(d.id, ip.id, 'resuelve')
     return alm, d, ip
@@ -20,7 +20,7 @@ def test_reporte_tiene_secciones():
     alm, d, ip = _almacen_demo()
     h = [Finding('ip-listada', 'high', 'IP en feed de amenazas', [ip.id])]
     html = generar_reporte(alm, hallazgos=h, score=20,
-                           meta={'workspace': 'caso-1', 'objetivo': 'objetivo.com'})
+                           meta={'workspace': 'caso-1', 'target': 'objetivo.com'})
     for txt in ('Risk summary', 'Findings', 'Entity inventory',
                 'objetivo.com', '93.184.216.34', 'ip-listada', '20/100', 'caso-1'):
         assert txt in html, f'missing from the report: {txt}'
@@ -41,7 +41,7 @@ def test_reporte_almacen_vacio():
 def test_reporte_escapa_xss():
     """Raw target data with a payload → must come out escaped, never executable."""
     alm = Store()
-    alm.create('dominio', 'malo.com',
+    alm.create('domain', 'malo.com',
               properties={'nota': '<script>alert(1)</script>'})
     h = [Finding('r', 'critical', 'injection <img src=x onerror=alert(1)>', [])]
     html = generar_reporte(alm, hallazgos=h, score=40)

@@ -28,9 +28,9 @@ def test_transforms_reales_registrados():
 def test_transforms_aplicables_por_tipo():
     ip = {t.nombre for t in REGISTRO.applicable('ip')}
     assert {'ptr', 'geo_ip', 'puertos'} <= ip
-    dominio = {t.nombre for t in REGISTRO.applicable('dominio')}
+    dominio = {t.nombre for t in REGISTRO.applicable('domain')}
     assert {'dns_a', 'crtsh', 'dns_mx', 'dns_ns'} <= dominio
-    usuario = {t.nombre for t in REGISTRO.applicable('usuario')}
+    usuario = {t.nombre for t in REGISTRO.applicable('user')}
     assert 'github_usuario' in usuario
 
 
@@ -42,7 +42,7 @@ def test_endpoints_viejos_intactos():
 
 def test_v2_transforms_aplicables():
     c = _client()
-    r = c.get('/api/v2/transforms/dominio')
+    r = c.get('/api/v2/transforms/domain')
     assert r.status_code == 200
     nombres = [t['nombre'] for t in r.get_json()['transforms']]
     assert 'dns_a' in nombres and 'crtsh' in nombres
@@ -64,7 +64,7 @@ def test_v2_run_tipo_invalido():
 
 def test_v2_run_transform_inexistente():
     c = _client()
-    r = c.post('/api/v2/run', json={'type': 'dominio', 'value': 'example.com', 'transform': 'noexiste'})
+    r = c.post('/api/v2/run', json={'type': 'domain', 'value': 'example.com', 'transform': 'noexiste'})
     assert r.status_code == 400
 
 
@@ -78,7 +78,7 @@ def test_v2_grafo_migrar_vacio():
 def test_auth_protege_v2():
     # without a session, /api/v2 must require auth (no leaking)
     c = ob.app.test_client()
-    r = c.get('/api/v2/transforms/dominio')
+    r = c.get('/api/v2/transforms/domain')
     assert r.status_code == 401
 
 

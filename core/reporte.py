@@ -26,7 +26,7 @@ def _e(v) -> str:
 def _resumen_severidad(hallazgos) -> dict:
     conteo = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
     for h in hallazgos:
-        sev = getattr(h, 'severidad', None)
+        sev = getattr(h, 'severity', None)
         if sev in conteo:
             conteo[sev] += 1
     return conteo
@@ -50,15 +50,15 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
     almacen   -- typed Store (source of entities/relations)
     hallazgos -- list of Finding from correlacion.correlate() (or None)
     score     -- risk score 0-100 (correlacion.risk_score)
-    meta      -- {'workspace','objetivo','generado'} optional
+    meta      -- {'workspace','target','generado'} optional
     vis_js    -- vis-network.min.js content to embed (or None: no graph)
     """
     hallazgos = list(hallazgos or [])
-    hallazgos.sort(key=lambda h: -_SEV_ORDEN.get(getattr(h, 'severidad', ''), 0))
+    hallazgos.sort(key=lambda h: -_SEV_ORDEN.get(getattr(h, 'severity', ''), 0))
     meta = meta or {}
     generado = meta.get('generado') or datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
     ws = meta.get('workspace') or 'ephemeral'
-    objetivo = meta.get('objetivo') or '—'
+    objetivo = meta.get('target') or '—'
     conteo = _resumen_severidad(hallazgos)
 
     # ── score bar colored by level ──
@@ -71,13 +71,13 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
     if hallazgos:
         filas = []
         for h in hallazgos:
-            sev = getattr(h, 'severidad', 'low')
+            sev = getattr(h, 'severity', 'low')
             col = _SEV_COLOR.get(sev, '#8b8b98')
             n_ent = len(getattr(h, 'entities', []) or [])
             filas.append(
                 f'<tr><td><span class="sev" style="background:{col}">{_e(sev)}</span></td>'
-                f'<td class="regla">{_e(getattr(h, "regla", ""))}</td>'
-                f'<td>{_e(getattr(h, "mensaje", ""))}</td>'
+                f'<td class="rule">{_e(getattr(h, "rule", ""))}</td>'
+                f'<td>{_e(getattr(h, "message", ""))}</td>'
                 f'<td class="num">{n_ent}</td></tr>')
         hallazgos_html = (
             '<table class="hallazgos"><thead><tr><th>Severity</th><th>Rule</th>'
@@ -156,7 +156,7 @@ def generar_reporte(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
   th{{text-align:left;color:var(--muted);font-weight:600;padding:.4rem .6rem;border-bottom:1px solid var(--line);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em}}
   td{{padding:.5rem .6rem;border-bottom:1px solid var(--line);vertical-align:top}}
   td.num,.num{{text-align:center;color:var(--muted);font-family:ui-monospace,monospace}}
-  .regla{{font-family:ui-monospace,monospace;color:var(--cyan);font-size:.8rem}}
+  .rule{{font-family:ui-monospace,monospace;color:var(--cyan);font-size:.8rem}}
   .sev{{display:inline-block;padding:.1rem .5rem;border-radius:4px;color:#16161e;font-weight:700;font-size:.72rem;text-transform:uppercase}}
   .type{{margin:1.2rem 0}} .type h3{{font-size:.92rem;margin:0 0 .5rem;display:flex;align-items:center;gap:.5rem}}
   .type .dot{{width:.7rem;height:.7rem;border-radius:50%}} .type .cnt{{color:var(--muted);font-family:ui-monospace,monospace;font-size:.8rem}}

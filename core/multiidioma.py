@@ -97,16 +97,16 @@ def transliterar(nombre: str) -> dict:
 
 # ── Language detection by alphabet (step 175) ────────────────────────────────
 _DORK_TERMS = {
-    'ru': {'contacto': 'контакты', 'email': 'почта', 'telefono': 'телефон', 'sites': ['vk.com', 'ok.ru']},
-    'zh': {'contacto': '联系', 'email': '邮箱', 'telefono': '电话', 'sites': ['weibo.com', 'zhihu.com']},
-    'es_en': {'contacto': 'contact', 'email': 'email', 'telefono': 'phone', 'sites': ['linkedin.com']},
+    'ru': {'contacto': 'контакты', 'email': 'почта', 'phone': 'телефон', 'sites': ['vk.com', 'ok.ru']},
+    'zh': {'contacto': '联系', 'email': '邮箱', 'phone': '电话', 'sites': ['weibo.com', 'zhihu.com']},
+    'es_en': {'contacto': 'contact', 'email': 'email', 'phone': 'phone', 'sites': ['linkedin.com']},
 }
 
 
 def dorks_por_idioma(objetivo: str, idioma: str = 'es_en') -> list:
     """Dorks adapted to the language/region (step 176)."""
     t = _DORK_TERMS.get(idioma, _DORK_TERMS['es_en'])
-    dorks = [f'"{objetivo}" {t["contacto"]}', f'"{objetivo}" {t["email"]}', f'"{objetivo}" {t["telefono"]}']
+    dorks = [f'"{objetivo}" {t["contacto"]}', f'"{objetivo}" {t["email"]}', f'"{objetivo}" {t["phone"]}']
     dorks += [f'"{objetivo}" site:{s}' for s in t['sites']]
     return dorks
 

@@ -40,9 +40,9 @@ os.makedirs(CASES_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
 
 # ── Uniform error handling (step 11) ─────────────────────────────────────────
-def _error(mensaje, codigo=400):
+def _error(message, codigo=400):
     """Consistent JSON error response: {'error': msg, 'code': n}."""
-    return jsonify({'error': mensaje, 'code': codigo}), codigo
+    return jsonify({'error': message, 'code': codigo}), codigo
 
 @app.errorhandler(Exception)
 def _manejar_error(e):
@@ -76,7 +76,7 @@ def _db_guardar_caso(caso_dict):
         con.execute(
             "INSERT INTO casos (nombre, objetivo, iniciado, actualizado, datos_json) VALUES (?,?,?,?,?) "
             "ON CONFLICT(nombre) DO UPDATE SET objetivo=excluded.objetivo, actualizado=excluded.actualizado, datos_json=excluded.datos_json",
-            (caso_dict.get('nombre'), caso_dict.get('objetivo'), caso_dict.get('iniciado'),
+            (caso_dict.get('nombre'), caso_dict.get('target'), caso_dict.get('iniciado'),
              datetime.datetime.now().isoformat(), json.dumps(caso_dict.get('datos', {}), default=str))
         )
         con.commit()
@@ -102,7 +102,7 @@ def _db_buscar(termino):
         modulos_con_match = [clave for clave, value in datos.items()
                               if termino.lower() in json.dumps(value, default=str).lower()]
         resultados.append({
-            'caso': fila['nombre'], 'objetivo': fila['objetivo'],
+            'caso': fila['nombre'], 'target': fila['target'],
             'actualizado': fila['actualizado'], 'modulos_con_match': modulos_con_match
         })
     return resultados
@@ -214,7 +214,7 @@ SESSION = requests.Session()
 SESSION.headers.update({'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0'})
 
 # Global investigation state
-case = {'nombre': None, 'objetivo': None, 'datos': {}, 'historial': [], 'iniciado': None}
+case = {'nombre': None, 'target': None, 'datos': {}, 'historial': [], 'iniciado': None}
 case_lock = threading.Lock()
 
 # Typed session model (F2, transform-engine integration).
@@ -335,7 +335,7 @@ def _tailscale_ip():
 # ── OSINT modules ─────────────────────────────────────────────────────────────
 
 def _osint_persona(nombre):
-    datos = {'type':'persona','objetivo':nombre,'resultados':{}}
+    datos = {'type':'person','target':nombre,'resultados':{}}
     # DuckDuckGo
     try:
         r = SESSION.get(f"https://api.duckduckgo.com/?q={requests.utils.quote(nombre)}&format=json&no_html=1", timeout=8)
@@ -365,7 +365,7 @@ def _osint_persona(nombre):
     return datos
 
 def _osint_usuario(username):
-    datos = {'type':'usuario','objetivo':username,'resultados':{}}
+    datos = {'type':'user','target':username,'resultados':{}}
     plataformas = {
         'GitHub':    f'https://github.com/{username}',
         'Twitter/X': f'https://x.com/{username}',
@@ -383,7 +383,7 @@ def _osint_usuario(username):
         try:
             r = SESSION.get(url, timeout=5, allow_redirects=True)
             if r.status_code == 200 and 'not found' not in r.text.lower()[:300]:
-                encontrados.append({'plataforma':plat,'url':url})
+                encontrados.append({'platform':plat,'url':url})
         except Exception as _e: log.debug("source unavailable: %s", _e)
     ths = [threading.Thread(target=_check, args=(p,u)) for p,u in plataformas.items()]
     for t in ths: t.start()
@@ -428,7 +428,7 @@ def _osint_usuario(username):
                             if 'claim' not in estado: continue
                             sitio = rec.get('sitename') or rec.get('site_name') or rec.get('name') or '?'
                             url   = rec.get('url_user') or rec.get('url') or ''
-                            encontrados_mg.append({'plataforma': sitio, 'url': url})
+                            encontrados_mg.append({'platform': sitio, 'url': url})
                 except Exception as _e: log.debug("maigret parse: %s", _e)
             if encontrados_mg:
                 datos['resultados']['maigret'] = encontrados_mg
@@ -437,7 +437,7 @@ def _osint_usuario(username):
 
 def _osint_dominio(dominio):
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
-    datos = {'type':'dominio','objetivo':dominio,'resultados':{}}
+    datos = {'type':'domain','target':dominio,'resultados':{}}
     # WHOIS
     whois_raw = _cmd(f'whois {dominio} 2>/dev/null')
     whois_lines = [l.strip() for l in whois_raw.splitlines()
@@ -488,7 +488,7 @@ def _osint_dominio(dominio):
     return datos
 
 def _osint_ip(ip):
-    datos = {'type':'ip','objetivo':ip,'resultados':{}}
+    datos = {'type':'ip','target':ip,'resultados':{}}
     # Geo
     try:
         r = SESSION.get(f'http://ip-api.com/json/{ip}?fields=status,country,regionName,city,isp,org,as,lat,lon,mobile,proxy,hosting', timeout=8)
@@ -512,7 +512,7 @@ def _osint_ip(ip):
     return datos
 
 def _osint_email(email):
-    datos = {'type':'email','objetivo':email,'resultados':{}}
+    datos = {'type':'email','target':email,'resultados':{}}
     dominio = email.split('@')[1] if '@' in email else ''
     # Breach check
     try:
@@ -547,7 +547,7 @@ def _osint_email(email):
     return datos
 
 def _osint_phone(numero):
-    datos = {'type':'telefono','objetivo':numero,'resultados':{}}
+    datos = {'type':'phone','target':numero,'resultados':{}}
     numero_limpio = re.sub(r'[^\d+]','',numero)
     # Basic public API
     try:
@@ -561,7 +561,7 @@ def _osint_phone(numero):
             d = r.json()
             datos['resultados']['info'] = {
                 'valid': d.get('valid', False),
-                'pais': d.get('country_name','?'),
+                'country': d.get('country_name','?'),
                 'carrier': d.get('carrier','?'),
                 'type': d.get('line_type','?')
             }
@@ -577,7 +577,7 @@ def _osint_phone(numero):
     return datos
 
 def _recon_github_secrets(username_or_org):
-    datos = {'type':'github_secrets','objetivo':username_or_org,'resultados':{}}
+    datos = {'type':'github_secrets','target':username_or_org,'resultados':{}}
     patrones = [
         ('API Key',      r'api[_-]?key\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{20,})'),
         ('Secret',       r'secret\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{20,})'),
@@ -610,7 +610,7 @@ def _recon_github_secrets(username_or_org):
                             hallazgos.append({
                                 'repo': repo_name, 'type': nombre_pat,
                                 'value': m[:50]+'...' if len(m)>50 else m,
-                                'commit': sha[:8], 'archivo': f.get('filename','?')
+                                'commit': sha[:8], 'file': f.get('filename','?')
                             })
         datos['resultados']['hallazgos'] = hallazgos
         datos['resultados']['repos_analizados'] = len(repos[:10])
@@ -620,7 +620,7 @@ def _recon_github_secrets(username_or_org):
     return datos
 
 def _recon_ssl(dominio):
-    datos = {'type':'ssl','objetivo':dominio,'resultados':{}}
+    datos = {'type':'ssl','target':dominio,'resultados':{}}
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
     # Basic info
     cert_info = _cmd(f'echo | openssl s_client -connect {dominio}:443 -servername {dominio} 2>/dev/null | openssl x509 -noout -subject -issuer -dates -fingerprint 2>/dev/null')
@@ -642,7 +642,7 @@ def _recon_ssl(dominio):
 
 def _recon_favicon(dominio):
     """mmh3 hash of the favicon (Shodan algorithm) -- pivots to related infrastructure."""
-    datos = {'type':'favicon','objetivo':dominio,'resultados':{}}
+    datos = {'type':'favicon','target':dominio,'resultados':{}}
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
     try:
         import mmh3
@@ -672,8 +672,8 @@ def _recon_favicon(dominio):
             d = r.json()
             datos['resultados']['total_relacionados'] = d.get('total', 0)
             datos['resultados']['relacionados'] = [{
-                'ip': m.get('ip_str'), 'puerto': m.get('port'),
-                'org': m.get('org'), 'pais': m.get('location',{}).get('country_name'),
+                'ip': m.get('ip_str'), 'port': m.get('port'),
+                'org': m.get('org'), 'country': m.get('location',{}).get('country_name'),
                 'hostnames': m.get('hostnames', [])
             } for m in d.get('matches', [])[:15]]
         except Exception as e:
@@ -684,7 +684,7 @@ def _recon_favicon(dominio):
     return datos
 
 def _recon_typosquatting(dominio):
-    datos = {'type':'typosquatting','objetivo':dominio,'resultados':{}}
+    datos = {'type':'typosquatting','target':dominio,'resultados':{}}
     nombre, ext = dominio.rsplit('.',1) if '.' in dominio else (dominio,'com')
     variantes = set()
     # Common substitutions
@@ -709,7 +709,7 @@ def _recon_typosquatting(dominio):
     def _check_domain(v):
         out = _cmd(f'dig {v} A +short 2>/dev/null', timeout=3)
         if out.strip() and not 'error' in out.lower():
-            registrados.append({'dominio':v,'ip':out.strip()})
+            registrados.append({'domain':v,'ip':out.strip()})
     ths = [threading.Thread(target=_check_domain, args=(v,)) for v in list(variantes)[:25]]
     for t in ths: t.start()
     for t in ths: t.join(timeout=10)
@@ -719,7 +719,7 @@ def _recon_typosquatting(dominio):
     return datos
 
 def _recon_buckets(empresa):
-    datos = {'type':'buckets','objetivo':empresa,'resultados':{}}
+    datos = {'type':'buckets','target':empresa,'resultados':{}}
     nombre = empresa.lower().replace(' ','-').replace('_','-')
     variantes = [nombre, f'{nombre}-backup', f'{nombre}-dev', f'{nombre}-prod',
                  f'{nombre}-staging', f'{nombre}-assets', f'{nombre}-media',
@@ -750,7 +750,7 @@ def _recon_buckets(empresa):
     return datos
 
 def _recon_subdomain_takeover(dominio):
-    datos = {'type':'subdomain_takeover','objetivo':dominio,'resultados':{}}
+    datos = {'type':'subdomain_takeover','target':dominio,'resultados':{}}
     try:
         r = SESSION.get(f'https://crt.sh/?q=%.{dominio}&output=json', timeout=12)
         subs = set()
@@ -781,9 +781,9 @@ def _recon_subdomain_takeover(dominio):
                 try:
                     r = SESSION.get(f'http://{sub}', timeout=5)
                     if fp.lower() in r.text.lower():
-                        vulnerables.append({'subdominio':sub,'cname':cname,'servicio':servicio,'status':'VULNERABLE'})
+                        vulnerables.append({'subdomain':sub,'cname':cname,'servicio':servicio,'status':'VULNERABLE'})
                 except Exception:
-                    vulnerables.append({'subdominio':sub,'cname':cname,'servicio':servicio,'status':'POSSIBLE'})
+                    vulnerables.append({'subdomain':sub,'cname':cname,'servicio':servicio,'status':'POSSIBLE'})
     ths = [threading.Thread(target=_check_sub, args=(s,)) for s in list(subs)[:20]]
     for t in ths: t.start()
     for t in ths: t.join(timeout=20)
@@ -794,7 +794,7 @@ def _recon_subdomain_takeover(dominio):
 
 def _recon_passivedns(dominio):
     """History of IPs the domain has resolved to, via VirusTotal (reuses the Analyze key)."""
-    datos = {'type':'passivedns','objetivo':dominio,'resultados':{}}
+    datos = {'type':'passivedns','target':dominio,'resultados':{}}
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
     vt_key = os.environ.get('VT_API_KEY','')
     if not vt_key:
@@ -823,7 +823,7 @@ def _recon_passivedns(dominio):
 def _recon_metadata(url):
     if '://' not in url:
         url = 'https://' + url
-    datos = {'type':'metadata','objetivo':url,'resultados':{}}
+    datos = {'type':'metadata','target':url,'resultados':{}}
     try:
         r = _fetch_seguro(url, timeout=10, stream=True)
         content_type = r.headers.get('Content-Type','')
@@ -860,7 +860,7 @@ def _recon_metadata(url):
 
 def _recon_render_js(url):
     """Renders the page with a headless browser -- sees what loads via JS, screenshot included."""
-    datos = {'type':'render_js','objetivo':url,'resultados':{}}
+    datos = {'type':'render_js','target':url,'resultados':{}}
     if not url.startswith(('http://','https://')):
         url = 'https://' + url
     try:
@@ -893,7 +893,7 @@ def _recon_render_js(url):
 
 def _recon_yara_bulk(carpeta):
     """Scans every file in a folder with yara-rules -- only makes sense on a full PC."""
-    datos = {'type':'yara_bulk','objetivo':carpeta,'resultados':{}}
+    datos = {'type':'yara_bulk','target':carpeta,'resultados':{}}
     if not os.path.isdir(carpeta):
         datos['resultados']['error'] = f'Not a valid folder: {carpeta}'
         _guardar_dato(f'yara_bulk_{carpeta}', datos)
@@ -924,7 +924,7 @@ def _recon_yara_bulk(carpeta):
             log.warning("yara error: %s", _e)
             continue
         if salida and 'no rules matched' not in salida.lower():
-            hallazgos.append({'archivo': archivo, 'resultado': salida[:500]})
+            hallazgos.append({'file': archivo, 'resultado': salida[:500]})
             if len(hallazgos) >= 50: break
     datos['resultados']['total_escaneados'] = len(archivos)
     datos['resultados']['con_coincidencias'] = hallazgos
@@ -932,7 +932,7 @@ def _recon_yara_bulk(carpeta):
     return datos
 
 def _gen_wordlist(objetivo):
-    datos = {'type':'wordlist','objetivo':objetivo,'resultados':{}}
+    datos = {'type':'wordlist','target':objetivo,'resultados':{}}
     datos_osint = json.dumps(case['datos'], default=str)[:3000]
     prompt = f"""Based on the OSINT data collected about "{objetivo}", generate a likely password wordlist.
 Include variations of:
@@ -955,7 +955,7 @@ Generate 30-50 entries. One per line. Only the passwords, no explanation."""
     path = os.path.join(CASES_DIR, f'wordlist_{re.sub(r"[^a-z0-9]","_",objetivo.lower())}.txt')
     with open(path,'w') as f:
         f.write('\n'.join(wordlist))
-    datos['resultados']['archivo'] = path
+    datos['resultados']['file'] = path
     _guardar_dato(f'wordlist_{objetivo}', datos)
     return datos
 
@@ -1345,7 +1345,7 @@ def _analizar_todo():
     if not case['datos']:
         return 'No data collected yet.'
     datos_str = json.dumps(case['datos'], default=str)[:4500]
-    prompt = f"""Full OSINT intelligence analysis on "{case.get('objetivo','?')}":
+    prompt = f"""Full OSINT intelligence analysis on "{case.get('target','?')}":
 
 1. EXECUTIVE SUMMARY (3 lines max)
 2. CRITICAL FINDINGS [!]
@@ -1364,15 +1364,15 @@ def _build_grafo():
     eid   = [0]
 
     COLORES = {
-        'objetivo':   '#d99a4e',
-        'dominio':    '#5b9bd5',
-        'subdominio': '#7fb8d9',
+        'target':   '#d99a4e',
+        'domain':    '#5b9bd5',
+        'subdomain': '#7fb8d9',
         'ip':         '#d9564b',
         'email':      '#6fae7c',
-        'usuario':    '#cc9a3c',
-        'plataforma': '#c17a52',
+        'user':    '#cc9a3c',
+        'platform': '#c17a52',
         'org':        '#b07a9e',
-        'pais':       '#7a85b0',
+        'country':       '#7a85b0',
         'bucket':     '#d9564b',
         'repo':       '#d99a4e',
         'cve':        '#d9564b',
@@ -1399,9 +1399,9 @@ def _build_grafo():
                       'font': {'color':'#8b8b98','size':9}})
 
     # Root node -- target
-    obj = case.get('objetivo') or '?'
+    obj = case.get('target') or '?'
     obj_id = nid(obj)
-    add_node(obj_id, obj, 'objetivo', f'Target: {obj}', size=35)
+    add_node(obj_id, obj, 'target', f'Target: {obj}', size=35)
 
     for clave, value in case['datos'].items():
         if not isinstance(value, dict): continue
@@ -1409,11 +1409,11 @@ def _build_grafo():
         type = value.get('type', '')
 
         # ── DOMAIN ───────────────────────────────────────────────
-        if type == 'dominio':
-            dom = value.get('objetivo','')
+        if type == 'domain':
+            dom = value.get('target','')
             dom_id = nid('dom_'+dom)
-            add_node(dom_id, dom, 'dominio', f'Domain: {dom}', size=28)
-            add_edge(obj_id, dom_id, 'dominio')
+            add_node(dom_id, dom, 'domain', f'Domain: {dom}', size=28)
+            add_edge(obj_id, dom_id, 'domain')
 
             for ip in re.findall(r'\d+\.\d+\.\d+\.\d+', str(res.get('dns',{}).get('A',''))):
                 iid = nid('ip_'+ip)
@@ -1422,8 +1422,8 @@ def _build_grafo():
 
             for sub in res.get('subdominios',[])[:15]:
                 sid = nid('sub_'+sub)
-                add_node(sid, sub, 'subdominio', f'Subdomain: {sub}')
-                add_edge(dom_id, sid, 'subdominio')
+                add_node(sid, sub, 'subdomain', f'Subdomain: {sub}')
+                add_edge(dom_id, sid, 'subdomain')
 
             for email in res.get('emails',[])[:10]:
                 eid2 = nid('mail_'+email)
@@ -1437,9 +1437,9 @@ def _build_grafo():
 
         # ── PASSIVE DNS ──────────────────────────────────────────
         elif type == 'passivedns':
-            dom = value.get('objetivo','')
+            dom = value.get('target','')
             dom_id = nid('dom_'+dom)
-            add_node(dom_id, dom, 'dominio', f'Domain: {dom}', size=28)
+            add_node(dom_id, dom, 'domain', f'Domain: {dom}', size=28)
             for h in res.get('historial', [])[:15]:
                 ip_h = h.get('ip')
                 if not ip_h: continue
@@ -1449,14 +1449,14 @@ def _build_grafo():
 
         # ── IP ────────────────────────────────────────────────────
         elif type == 'ip':
-            ip = value.get('objetivo','')
+            ip = value.get('target','')
             iid = nid('ip_'+ip)
             add_node(iid, ip, 'ip', f'IP: {ip}', size=25)
             add_edge(obj_id, iid, 'ip')
             geo = res.get('geo',{})
             if geo.get('country'):
                 cid = nid('pais_'+geo['country'])
-                add_node(cid, geo['country'], 'pais', f"Country: {geo['country']}")
+                add_node(cid, geo['country'], 'country', f"Country: {geo['country']}")
                 add_edge(iid, cid, 'location')
             if geo.get('org'):
                 oid2 = nid('org_'+geo['org'])
@@ -1464,12 +1464,12 @@ def _build_grafo():
                 add_edge(iid, oid2, 'org')
             if res.get('ptr'):
                 pid = nid('ptr_'+res['ptr'])
-                add_node(pid, res['ptr'][:25], 'dominio', f"PTR: {res['ptr']}")
+                add_node(pid, res['ptr'][:25], 'domain', f"PTR: {res['ptr']}")
                 add_edge(iid, pid, 'PTR')
 
         # ── FAVICON HASH ─────────────────────────────────────────
         elif type == 'favicon':
-            dom = value.get('objetivo','')
+            dom = value.get('target','')
             for m in res.get('relacionados', [])[:15]:
                 ip_f = m.get('ip')
                 if not ip_f: continue
@@ -1479,15 +1479,15 @@ def _build_grafo():
                 add_edge(obj_id, iid2, 'shared favicon')
 
         # ── USER ─────────────────────────────────────────────────
-        elif type == 'usuario':
-            user = value.get('objetivo','')
+        elif type == 'user':
+            user = value.get('target','')
             uid = nid('user_'+user)
-            add_node(uid, '@'+user, 'usuario', f'User: {user}', size=28)
-            add_edge(obj_id, uid, 'usuario')
+            add_node(uid, '@'+user, 'user', f'User: {user}', size=28)
+            add_edge(obj_id, uid, 'user')
             for p in res.get('plataformas',[]) + res.get('maigret',[]):
-                plat = p.get('plataforma','?')
+                plat = p.get('platform','?')
                 pid2 = nid('plat_'+plat+user)
-                add_node(pid2, plat, 'plataforma', p.get('url',''))
+                add_node(pid2, plat, 'platform', p.get('url',''))
                 add_edge(uid, pid2, 'profile')
             gh = res.get('github',{})
             if gh.get('email') and gh['email'] != 'hidden':
@@ -1501,7 +1501,7 @@ def _build_grafo():
 
         # ── EMAIL ─────────────────────────────────────────────────
         elif type == 'email':
-            email = value.get('objetivo','')
+            email = value.get('target','')
             eid4 = nid('mail_'+email)
             add_node(eid4, email, 'email', f'Email: {email}', size=25)
             add_edge(obj_id, eid4, 'email')
@@ -1526,16 +1526,16 @@ def _build_grafo():
         # ── SUBDOMAIN TAKEOVER ────────────────────────────────────
         elif type == 'subdomain_takeover':
             for v2 in res.get('vulnerables',[]):
-                vid = nid('vuln_'+v2['subdominio'])
-                add_node(vid, '💀 '+v2['subdominio'][:20], 'subdominio_vuln',
+                vid = nid('vuln_'+v2['subdomain'])
+                add_node(vid, '💀 '+v2['subdomain'][:20], 'subdominio_vuln',
                          f"Takeover via {v2['servicio']}: {v2['status']}")
                 add_edge(obj_id, vid, 'takeover')
 
         # ── TYPOSQUATTING ─────────────────────────────────────────
         elif type == 'typosquatting':
             for dom2 in res.get('registrados',[]):
-                tid2 = nid('typo_'+dom2['dominio'])
-                add_node(tid2, '🎭 '+dom2['dominio'], 'subdominio',
+                tid2 = nid('typo_'+dom2['domain'])
+                add_node(tid2, '🎭 '+dom2['domain'], 'subdomain',
                          f"IP: {dom2['ip']}")
                 add_edge(obj_id, tid2, 'typosquat')
 
@@ -1553,7 +1553,7 @@ def _build_grafo():
         'stats': {
             'nodos': len(nodes),
             'conexiones': len(edges),
-            'objetivo': obj
+            'target': obj
         }
     }
 
@@ -1562,7 +1562,7 @@ def _build_grafo():
 # ── Dark Web Monitor ──────────────────────────────────────────────────────────
 
 def _darkweb_search(query):
-    datos = {'type': 'darkweb', 'objetivo': query, 'resultados': {}}
+    datos = {'type': 'darkweb', 'target': query, 'resultados': {}}
 
     # Ahmia -- indexes .onion without needing Tor
     try:
@@ -1602,7 +1602,7 @@ def _darkweb_search(query):
 NETLAS_KEY = os.environ.get('NETLAS_API_KEY', '')
 
 def _netlas_search(query):
-    datos = {'type': 'netlas', 'objetivo': query, 'resultados': {}}
+    datos = {'type': 'netlas', 'target': query, 'resultados': {}}
     if not NETLAS_KEY:
         datos['resultados']['nota'] = 'Add a free Netlas API key (50 searches/day at netlas.io) for infrastructure search'
         _guardar_dato(f'netlas_{query}', datos)
@@ -1617,9 +1617,9 @@ def _netlas_search(query):
         datos['resultados']['matches'] = [{
             'ip': it.get('data',{}).get('ip'),
             'host': it.get('data',{}).get('host'),
-            'puerto': it.get('data',{}).get('port'),
+            'port': it.get('data',{}).get('port'),
             'protocolo': it.get('data',{}).get('protocol'),
-            'pais': (it.get('data',{}).get('geo') or {}).get('country_name'),
+            'country': (it.get('data',{}).get('geo') or {}).get('country_name'),
             'org': (it.get('data',{}).get('whois') or {}).get('org'),
         } for it in items[:10]]
     except Exception as e:
@@ -1632,7 +1632,7 @@ def _netlas_search(query):
 SHODAN_KEY = os.environ.get('SHODAN_API_KEY', '')
 
 def _shodan_search(query):
-    datos = {'type': 'shodan', 'objetivo': query, 'resultados': {}}
+    datos = {'type': 'shodan', 'target': query, 'resultados': {}}
     if not SHODAN_KEY:
         # No API key -- use Censys as a free alternative
         try:
@@ -1678,8 +1678,8 @@ def _shodan_search(query):
             d = r.json()
             datos['resultados']['total'] = d.get('total', 0)
             datos['resultados']['matches'] = [{
-                'ip': m.get('ip_str'), 'puerto': m.get('port'),
-                'org': m.get('org'), 'pais': m.get('location',{}).get('country_name'),
+                'ip': m.get('ip_str'), 'port': m.get('port'),
+                'org': m.get('org'), 'country': m.get('location',{}).get('country_name'),
                 'banner': m.get('data','')[:200]
             } for m in d.get('matches', [])[:10]]
         except Exception as e:
@@ -1688,7 +1688,7 @@ def _shodan_search(query):
     return datos
 
 def _shodan_ip(ip):
-    datos = {'type': 'shodan_ip', 'objetivo': ip, 'resultados': {}}
+    datos = {'type': 'shodan_ip', 'target': ip, 'resultados': {}}
     if not SHODAN_KEY:
         out = run_tool(['nmap','-sV','-T4','--top-ports','50',ip], timeout=60)
         datos['resultados']['nmap_full'] = out
@@ -1697,10 +1697,10 @@ def _shodan_ip(ip):
             r = SESSION.get(f'https://api.shodan.io/shodan/host/{ip}?key={SHODAN_KEY}', timeout=10)
             d = r.json()
             datos['resultados'] = {
-                'org': d.get('org'), 'pais': d.get('country_name'),
+                'org': d.get('org'), 'country': d.get('country_name'),
                 'puertos': d.get('ports', []),
                 'vulns': list(d.get('vulns', {}).keys()),
-                'servicios': [{'puerto': s.get('port'), 'banner': s.get('data','')[:150]}
+                'servicios': [{'port': s.get('port'), 'banner': s.get('data','')[:150]}
                               for s in d.get('data', [])[:10]]
             }
         except Exception as e:
@@ -1721,7 +1721,7 @@ def _build_timeline():
     for clave, value in case['datos'].items():
         texto = json.dumps(value, default=str)
         type  = value.get('type', clave) if isinstance(value, dict) else clave
-        objetivo = value.get('objetivo', '') if isinstance(value, dict) else ''
+        objetivo = value.get('target', '') if isinstance(value, dict) else ''
         for pat in DATE_PATTERNS:
             for fecha in re.findall(pat, texto):
                 try:
@@ -1732,7 +1732,7 @@ def _build_timeline():
                     dt = datetime.datetime.strptime(fecha_fmt[:10], '%Y-%m-%d')
                     eventos.append({
                         'fecha': fecha_fmt[:10], 'timestamp': dt.timestamp(),
-                        'modulo': type, 'objetivo': objetivo,
+                        'modulo': type, 'target': objetivo,
                         'descripcion': f'{type}: {objetivo or clave}'
                     })
                 except Exception as _e: log.debug("source unavailable: %s", _e)
@@ -1742,7 +1742,7 @@ def _build_timeline():
         eventos.append({
             'fecha': datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M'),
             'timestamp': ts, 'modulo': 'ejecucion',
-            'objetivo': h.get('clave',''), 'descripcion': f"Module run: {h.get('clave','')}"
+            'target': h.get('clave',''), 'descripcion': f"Module run: {h.get('clave','')}"
         })
     vistos = set()
     unicos = []
@@ -1755,24 +1755,24 @@ def _build_timeline():
 
 # ── Continuous monitor ────────────────────────────────────────────────────────
 
-monitor_state = {'activo': False, 'thread': None, 'alertas': [], 'objetivo': None, 'intervalo': 3600}
+monitor_state = {'activo': False, 'thread': None, 'alertas': [], 'target': None, 'intervalo': 3600}
 
 def _monitor_loop():
     while monitor_state['activo']:
-        objetivo = monitor_state['objetivo']
+        objetivo = monitor_state['target']
         if not objetivo:
             time.sleep(60); continue
         # Re-scan domain and user
         try:
-            type = 'dominio' if re.match(r'^[\w\.-]+\.[a-z]{2,}$', objetivo) else 'persona'
-            if type == 'dominio':
+            type = 'domain' if re.match(r'^[\w\.-]+\.[a-z]{2,}$', objetivo) else 'person'
+            if type == 'domain':
                 nuevo = _osint_dominio(objetivo)
                 viejo = case['datos'].get(f'dominio_{objetivo}', {})
                 if str(nuevo) != str(viejo):
                     monitor_state['alertas'].append({
                         'ts': datetime.datetime.now().isoformat(),
                         'type': 'cambio_dominio',
-                        'mensaje': f'Change detected on {objetivo}',
+                        'message': f'Change detected on {objetivo}',
                         'nuevo': nuevo
                     })
         except Exception as _e: log.debug("source unavailable: %s", _e)
@@ -1780,7 +1780,7 @@ def _monitor_loop():
 
 def _monitor_start(objetivo, intervalo=3600):
     if monitor_state['activo']: return False
-    monitor_state.update({'activo': True, 'objetivo': objetivo,
+    monitor_state.update({'activo': True, 'target': objetivo,
                           'intervalo': intervalo, 'alertas': []})
     t = threading.Thread(target=_monitor_loop, daemon=True)
     monitor_state['thread'] = t
@@ -1799,7 +1799,7 @@ def _generar_reporte_html():
         v = json.dumps(value, ensure_ascii=False, indent=2, default=str) if isinstance(value,(dict,list)) else str(value)
         secciones += f'<div class="section"><h2>{html.escape(clave.replace("_"," ").upper())}</h2><pre>{html.escape(v[:3000])}</pre></div>'
     contenido = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-<title>OBSIDIAN — {html.escape(str(case.get('objetivo','?')))}</title>
+<title>OBSIDIAN — {html.escape(str(case.get('target','?')))}</title>
 <style>body{{background:#0d0d1a;color:#cdd6f4;font-family:monospace;padding:40px}}
 h1{{color:#cba6f7;letter-spacing:.2em;border-bottom:2px solid #313244;padding-bottom:12px}}
 h2{{color:#89b4fa;font-size:.9rem;margin:20px 0 6px}}.meta{{color:#6c7086;margin-bottom:28px;font-size:.82rem}}
@@ -1807,7 +1807,7 @@ h2{{color:#89b4fa;font-size:.9rem;margin:20px 0 6px}}.meta{{color:#6c7086;margin
 pre{{color:#a6e3a1;font-size:.78rem;white-space:pre-wrap;word-break:break-all}}
 .badge{{background:#f38ba822;color:#f38ba8;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700}}</style>
 </head><body><h1>⬛ OBSIDIAN REPORT <span class="badge">CONFIDENTIAL</span></h1>
-<div class="meta"><b>Target:</b> {html.escape(str(case.get('objetivo','?')))} | <b>Case:</b> {html.escape(nombre)} | <b>Generated:</b> {ts}</div>
+<div class="meta"><b>Target:</b> {html.escape(str(case.get('target','?')))} | <b>Case:</b> {html.escape(nombre)} | <b>Generated:</b> {ts}</div>
 {secciones}</body></html>"""
     with open(path,'w') as f: f.write(contenido)
     return path
@@ -1876,7 +1876,7 @@ def index():
 @app.route('/api/status')
 def api_status():
     with case_lock:
-        return jsonify({'caso': case['nombre'], 'objetivo': case['objetivo'],
+        return jsonify({'caso': case['nombre'], 'target': case['target'],
                        'modulos': len(case['datos']), 'ok': True})
 
 @app.route('/api/caso', methods=['GET','POST','DELETE'])
@@ -1890,12 +1890,12 @@ def api_caso():
         if not slug:
             return jsonify({'error':'Invalid case name'}), 400
         with case_lock:
-            case.update({'nombre':slug, 'objetivo':d.get('objetivo',''),
+            case.update({'nombre':slug, 'target':d.get('target',''),
                          'datos':{}, 'historial':[], 'iniciado':datetime.datetime.now().isoformat()})
         return jsonify({'ok':True})
     if request.method == 'DELETE':
         with case_lock:
-            case.update({'nombre':None,'objetivo':None,'datos':{},'historial':[]})
+            case.update({'nombre':None,'target':None,'datos':{},'historial':[]})
         return jsonify({'ok':True})
 
 @app.route('/api/caso/guardar', methods=['POST'])
@@ -1936,12 +1936,12 @@ def api_run():
     stream = d.get('stream', False)
 
     MODULOS = {
-        'persona':    lambda: _osint_persona(arg),
-        'usuario':    lambda: _osint_usuario(arg),
-        'dominio':    lambda: _osint_dominio(arg),
+        'person':    lambda: _osint_persona(arg),
+        'user':    lambda: _osint_usuario(arg),
+        'domain':    lambda: _osint_dominio(arg),
         'ip':         lambda: _osint_ip(arg),
         'email':      lambda: _osint_email(arg),
-        'telefono':   lambda: _osint_phone(arg),
+        'phone':   lambda: _osint_phone(arg),
         'github_sec': lambda: _recon_github_secrets(arg),
         'ssl':        lambda: _recon_ssl(arg),
         'favicon':    lambda: _recon_favicon(arg),
@@ -1950,12 +1950,12 @@ def api_run():
         'takeover':   lambda: _recon_subdomain_takeover(arg),
         'metadata':   lambda: _recon_metadata(arg),
         'passivedns': lambda: _recon_passivedns(arg),
-        'wordlist':   lambda: _gen_wordlist(arg or case.get('objetivo','')),
+        'wordlist':   lambda: _gen_wordlist(arg or case.get('target','')),
         'yara_bulk':  lambda: _recon_yara_bulk(arg),
         'render_js':  lambda: _recon_render_js(arg),
         'cve':        lambda: {'type':'cve','resultados':{'analisis':_cve_correlacion(arg)}},
-        'escenario':  lambda: {'type':'escenario','resultados':{'analisis':_sim_escenario(arg or case.get('objetivo',''))}},
-        'superficie': lambda: {'type':'superficie','resultados':{'analisis':_sim_superficie(arg or case.get('objetivo',''))}},
+        'escenario':  lambda: {'type':'escenario','resultados':{'analisis':_sim_escenario(arg or case.get('target',''))}},
+        'superficie': lambda: {'type':'superficie','resultados':{'analisis':_sim_superficie(arg or case.get('target',''))}},
         'analizar':   lambda: {'type':'analisis','resultados':{'analisis':_analizar_todo()}},
         'darkweb':    lambda: _darkweb_search(arg),
         'shodan':     lambda: _shodan_search(arg),
@@ -1977,7 +1977,7 @@ def api_run():
             resultado = MODULOS[mod]()
             yield f"data: {json.dumps({'status':'completado','resultado':resultado})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'status':'error','mensaje':str(e)})}\n\n"
+            yield f"data: {json.dumps({'status':'error','message':str(e)})}\n\n"
 
     return Response(stream_with_context(_run_stream()),
                    mimetype='text/event-stream',
@@ -1987,7 +1987,7 @@ def api_run():
 # F2 -- Integrated transform engine (endpoints /api/v2/*, additive)
 # ════════════════════════════════════════════════════════════════════════════
 
-@transform(entrada='dominio', salidas=('ip',), nombre='dns_a',
+@transform(entrada='domain', salidas=('ip',), nombre='dns_a',
            descripcion='A records of the domain (dig)')
 def _t_dns_a(entidad, ctx):
     out = run_tool(['dig', entidad.value, 'A', '+short'], timeout=10)
@@ -1996,16 +1996,16 @@ def _t_dns_a(entidad, ctx):
         if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', linea):
             ctx.emitir('ip', linea, label='A')
 
-@transform(entrada='ip', salidas=('dominio',), nombre='ptr',
+@transform(entrada='ip', salidas=('domain',), nombre='ptr',
            descripcion='PTR / reverse DNS (dig -x)')
 def _t_ptr(entidad, ctx):
     out = run_tool(['dig', '-x', entidad.value, '+short'], timeout=10)
     for linea in out.splitlines():
         linea = linea.strip().rstrip('.')
         if linea and not linea.startswith(';'):
-            ctx.emitir('dominio', linea, label='PTR')
+            ctx.emitir('domain', linea, label='PTR')
 
-@transform(entrada='url', salidas=('tech', 'persona', 'url'), nombre='metadata',
+@transform(entrada='url', salidas=('tech', 'person', 'url'), nombre='metadata',
            descripcion='EXIF metadata as pivotable entities: GPS, device, software, author (F9)')
 def _t_metadata(entidad, ctx):
     if not _which('exiftool'):
@@ -2042,7 +2042,7 @@ def _t_metadata(entidad, ctx):
                 ctx.emitir('tech', interesantes['Software'], label='software')
             for kk in ('Author', 'Creator', 'Artist'):
                 if interesantes.get(kk):
-                    ctx.emitir('persona', interesantes[kk], label=kk.lower())
+                    ctx.emitir('person', interesantes[kk], label=kk.lower())
             gps = interesantes.get('GPS Position') or interesantes.get('GPS Latitude')
             if gps:
                 entidad.tag('tiene-gps')
@@ -2054,7 +2054,7 @@ def _t_metadata(entidad, ctx):
         except OSError:
             pass
 
-@transform(entrada='dominio', salidas=(), nombre='dorks',
+@transform(entrada='domain', salidas=(), nombre='dorks',
            descripcion='Generates useful Google dorks for the domain (files, panels, indexes, backups)')
 def _t_dorks(entidad, ctx):
     from urllib.parse import quote_plus
@@ -2086,7 +2086,7 @@ def _t_wallet_balance(entidad, ctx):
     except Exception as _e:
         log.debug("wallet_balance unavailable: %s", _e)
 
-@transform(entrada='dominio', salidas=('hash',), nombre='favicon_hash',
+@transform(entrada='domain', salidas=('hash',), nombre='favicon_hash',
            descripcion='mmh3 hash of the favicon -- pivotable node for Shodan/FOFA (F8)')
 def _t_favicon_hash(entidad, ctx):
     try:
@@ -2143,7 +2143,7 @@ def _t_favicon_pivote(entidad, ctx):
     for ip in _pivote_ips({'favicon': entidad.value}):
         ctx.emitir('ip', ip, label='mismo-favicon')
 
-@transform(entrada='dominio', salidas=('subdominio',), nombre='wayback',
+@transform(entrada='domain', salidas=('subdomain',), nombre='wayback',
            descripcion='Historical snapshot + old subdomains of the domain (Wayback Machine)')
 def _t_wayback(entidad, ctx):
     # 1. is there a snapshot? ('available' endpoint, reliable)
@@ -2166,11 +2166,11 @@ def _t_wayback(entidad, ctx):
             host = (urlparse(fila[0] if isinstance(fila, list) else fila).hostname or '').lstrip('*.')
             if host.endswith(entidad.value) and host != entidad.value and host not in vistos:
                 vistos.add(host)
-                ctx.emitir('subdominio', host, label='historical (wayback)')
+                ctx.emitir('subdomain', host, label='historical (wayback)')
     except Exception as _e:
         log.debug("wayback cdx: %s", _e)
 
-@transform(entrada='dominio', salidas=('subdominio', 'ip'), nombre='subdominios_ht',
+@transform(entrada='domain', salidas=('subdomain', 'ip'), nombre='subdominios_ht',
            descripcion='Subdomains (+ their IP) via HackerTarget hostsearch (keyless)')
 def _t_subdominios_ht(entidad, ctx):
     try:
@@ -2183,7 +2183,7 @@ def _t_subdominios_ht(entidad, ctx):
             sub, ip = (x.strip() for x in linea.split(',', 1))
             if not sub.endswith(entidad.value) or sub == entidad.value:
                 continue
-            sub_ent = ctx.emitir('subdominio', sub, label='subdominio')
+            sub_ent = ctx.emitir('subdomain', sub, label='subdomain')
             if sub_ent and re.fullmatch(r'\d+\.\d+\.\d+\.\d+', ip):
                 ip_ent = ctx.almacen.create('ip', ip, sources={'subdominios_ht'})
                 ip_ent.note_provenance('subdominios_ht', input_id=sub_ent.id)
@@ -2191,7 +2191,7 @@ def _t_subdominios_ht(entidad, ctx):
     except Exception as _e:
         log.debug("subdominios_ht unavailable: %s", _e)
 
-@transform(entrada='dominio', salidas=('subdominio',), nombre='crtsh',
+@transform(entrada='domain', salidas=('subdomain',), nombre='crtsh',
            descripcion='Subdomains from crt.sh (Certificate Transparency)')
 def _t_crtsh(entidad, ctx):
     try:
@@ -2202,11 +2202,11 @@ def _t_crtsh(entidad, ctx):
                 s = s.strip().lstrip('*.')
                 if s.endswith(entidad.value) and s != entidad.value and s not in vistos:
                     vistos.add(s)
-                    ctx.emitir('subdominio', s, label='subdominio')
+                    ctx.emitir('subdomain', s, label='subdomain')
     except Exception as _e:
         log.debug("crtsh unavailable: %s", _e)
 
-@transform(entrada='dominio', salidas=('subdominio',), nombre='ct_certspotter',
+@transform(entrada='domain', salidas=('subdomain',), nombre='ct_certspotter',
            descripcion='Subdomains from Certificate Transparency (certspotter, keyless)')
 def _t_ct_certspotter(entidad, ctx):
     try:
@@ -2221,11 +2221,11 @@ def _t_ct_certspotter(entidad, ctx):
                 nombre = nombre.lstrip('*.')
                 if nombre.endswith(entidad.value) and nombre != entidad.value and nombre not in vistos:
                     vistos.add(nombre)
-                    ctx.emitir('subdominio', nombre, label='subdominio')
+                    ctx.emitir('subdomain', nombre, label='subdomain')
     except Exception as _e:
         log.debug("certspotter unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('pais', 'org', 'asn'), nombre='geo_ip',
+@transform(entrada='ip', salidas=('country', 'org', 'asn'), nombre='geo_ip',
            descripcion='Geolocation and network info of the IP (ip-api.com)')
 def _t_geo_ip(entidad, ctx):
     try:
@@ -2235,7 +2235,7 @@ def _t_geo_ip(entidad, ctx):
         if d.get('status') != 'success':
             return
         if d.get('country'):
-            ctx.emitir('pais', d['country'], label='location')
+            ctx.emitir('country', d['country'], label='location')
         org = d.get('org') or d.get('isp')
         if org:
             ctx.emitir('org', org, label='org')
@@ -2244,7 +2244,7 @@ def _t_geo_ip(entidad, ctx):
     except Exception as _e:
         log.debug("geo_ip unavailable: %s", _e)
 
-@transform(entrada='usuario', salidas=('plataforma',), nombre='sherlock',
+@transform(entrada='user', salidas=('platform',), nombre='sherlock',
            descripcion='User accounts across 400+ platforms (Sherlock)')
 def _t_sherlock(entidad, ctx):
     if not _which('sherlock'):
@@ -2253,9 +2253,9 @@ def _t_sherlock(entidad, ctx):
     for linea in out.splitlines():
         m = re.match(r'\[\+\]\s*(.+?):\s*(https?://\S+)', linea.strip())
         if m:
-            ctx.emitir('plataforma', m.group(1).strip(), label='profile', url=m.group(2).strip())
+            ctx.emitir('platform', m.group(1).strip(), label='profile', url=m.group(2).strip())
 
-@transform(entrada='usuario', salidas=('email', 'repo'), nombre='github_usuario',
+@transform(entrada='user', salidas=('email', 'repo'), nombre='github_usuario',
            descripcion='User email and public repos on GitHub')
 def _t_github(entidad, ctx):
     try:
@@ -2274,7 +2274,7 @@ def _t_github(entidad, ctx):
     except Exception as _e:
         log.debug("github_usuario unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('puerto',), nombre='puertos',
+@transform(entrada='ip', salidas=('port',), nombre='puertos',
            descripcion='Open ports and services (nmap top-20)')
 def _t_puertos(entidad, ctx):
     if not _which('nmap'):
@@ -2289,9 +2289,9 @@ def _t_puertos(entidad, ctx):
             continue
         servicio = parts[2] if len(parts) > 2 else '?'
         # the value carries the IP: port 80 of two hosts != the same node
-        ctx.emitir('puerto', f'{entidad.value}:{num}', label='open', servicio=servicio)
+        ctx.emitir('port', f'{entidad.value}:{num}', label='open', servicio=servicio)
 
-@transform(entrada='dominio', salidas=('dominio',), nombre='dns_mx',
+@transform(entrada='domain', salidas=('domain',), nombre='dns_mx',
            descripcion='Mail servers of the domain (MX)')
 def _t_dns_mx(entidad, ctx):
     out = run_tool(['dig', entidad.value, 'MX', '+short'], timeout=10)
@@ -2301,16 +2301,16 @@ def _t_dns_mx(entidad, ctx):
             continue
         host = linea.split()[-1]   # "10 mail.example.com" -> "mail.example.com"
         if host:
-            ctx.emitir('dominio', host, label='MX')
+            ctx.emitir('domain', host, label='MX')
 
-@transform(entrada='dominio', salidas=('dominio',), nombre='dns_ns',
+@transform(entrada='domain', salidas=('domain',), nombre='dns_ns',
            descripcion='Name servers of the domain (NS)')
 def _t_dns_ns(entidad, ctx):
     out = run_tool(['dig', entidad.value, 'NS', '+short'], timeout=10)
     for linea in out.splitlines():
         host = linea.strip().rstrip('.')
         if host:
-            ctx.emitir('dominio', host, label='NS')
+            ctx.emitir('domain', host, label='NS')
 
 @transform(entrada='email', salidas=('org',), nombre='email_breaches',
            descripcion='Breaches the email appeared in (HIBP; requires a real HIBP_API_KEY)')
@@ -2349,7 +2349,7 @@ def _pastes_github(entidad):
     except Exception as _e:
         log.debug("pastes_github unavailable: %s", _e)
 
-@transform(entrada='dominio', salidas=(), nombre='pastes_github',
+@transform(entrada='domain', salidas=(), nombre='pastes_github',
            descripcion='Domain mentions + secrets on GitHub (free token in the vault)')
 def _t_pastes_github_dom(entidad, ctx):
     _pastes_github(entidad)
@@ -2467,7 +2467,7 @@ def _t_pastes(entidad, ctx):
         ctx.emitir('url', f'https://www.google.com/search?q={_q(f"{q} site:{sitio}")}',
                    label=f'paste-dork:{sitio}', sitio=sitio)
 
-@transform(entrada='dominio', salidas=(), nombre='stealer_dominio',
+@transform(entrada='domain', salidas=(), nombre='stealer_dominio',
            descripcion='Domain exposure in stealer logs (infected employees/users, HudsonRock keyless) (F10 step 132)')
 def _t_stealer_dominio(entidad, ctx):
     try:
@@ -2524,12 +2524,12 @@ def _screenshot(entidad):
     except Exception as _e:
         log.debug("screenshot failed: %s", _e)
 
-@transform(entrada='dominio', salidas=(), nombre='screenshot',
+@transform(entrada='domain', salidas=(), nombre='screenshot',
            descripcion='Screenshot of the site (headless browser)')
 def _t_screenshot_dom(entidad, ctx):
     _screenshot(entidad)
 
-@transform(entrada='subdominio', salidas=(), nombre='screenshot_sub',
+@transform(entrada='subdomain', salidas=(), nombre='screenshot_sub',
            descripcion='Screenshot of the subdomain (headless)')
 def _t_screenshot_sub(entidad, ctx):
     _screenshot(entidad)
@@ -2554,12 +2554,12 @@ def _nuclei(entidad):
     if hallados:
         entidad.properties['nuclei'] = hallados[:20]
 
-@transform(entrada='dominio', salidas=(), nombre='nuclei',
+@transform(entrada='domain', salidas=(), nombre='nuclei',
            descripcion='Template-based vulnerability scan (nuclei)')
 def _t_nuclei_dom(entidad, ctx):
     _nuclei(entidad)
 
-@transform(entrada='subdominio', salidas=(), nombre='nuclei_sub',
+@transform(entrada='subdomain', salidas=(), nombre='nuclei_sub',
            descripcion='Subdomain vulnerability scan (nuclei)')
 def _t_nuclei_sub(entidad, ctx):
     _nuclei(entidad)
@@ -2619,13 +2619,13 @@ def _tech_detect(entidad):
             techs.add(nombre)
     return {t for t in techs if t and len(t) < 40}
 
-@transform(entrada='dominio', salidas=('tech',), nombre='tech',
+@transform(entrada='domain', salidas=('tech',), nombre='tech',
            descripcion='Technologies the site uses (HTTP fingerprint)')
 def _t_tech_dom(entidad, ctx):
     for t in _tech_detect(entidad):
         ctx.emitir('tech', t, label='uses')
 
-@transform(entrada='subdominio', salidas=('tech',), nombre='tech_sub',
+@transform(entrada='subdomain', salidas=('tech',), nombre='tech_sub',
            descripcion='Subdomain technologies (HTTP fingerprint)')
 def _t_tech_sub(entidad, ctx):
     for t in _tech_detect(entidad):
@@ -2655,17 +2655,17 @@ def _t_cve_lookup(entidad, ctx):
             if e:
                 e.tag('sin-verificar-version')
 
-@transform(entrada='dominio', salidas=(), nombre='http_probe',
+@transform(entrada='domain', salidas=(), nombre='http_probe',
            descripcion='HTTP probe: status, title, server, redirect (httpx-style)')
 def _t_http_probe_dom(entidad, ctx):
     _http_probe(entidad)
 
-@transform(entrada='subdominio', salidas=(), nombre='http_probe_sub',
+@transform(entrada='subdomain', salidas=(), nombre='http_probe_sub',
            descripcion='HTTP probe of the subdomain (httpx-style)')
 def _t_http_probe_sub(entidad, ctx):
     _http_probe(entidad)
 
-@transform(entrada='dominio', salidas=('dominio',), nombre='reverse_whois',
+@transform(entrada='domain', salidas=('domain',), nombre='reverse_whois',
            descripcion='Other domains of the same registrant (ViewDNS, free key in the vault). The only F5 one without a keyless option.')
 def _t_reverse_whois(entidad, ctx):
     key = _key_rotativa('viewdns') or os.environ.get('VIEWDNS_KEY', '')
@@ -2677,11 +2677,11 @@ def _t_reverse_whois(entidad, ctx):
         for reg in (d.get('response', {}) or {}).get('matches', [])[:50]:
             dom = reg.get('domain')
             if dom and dom != entidad.value:
-                ctx.emitir('dominio', dom, label='same registrant')
+                ctx.emitir('domain', dom, label='same registrant')
     except Exception as _e:
         log.debug("reverse_whois unavailable: %s", _e)
 
-@transform(entrada='dominio', salidas=('dominio', 'org'), nombre='rdap',
+@transform(entrada='domain', salidas=('domain', 'org'), nombre='rdap',
            descripcion='Modern WHOIS (RDAP, no key): registrar, name servers, dates')
 def _t_rdap(entidad, ctx):
     try:
@@ -2701,7 +2701,7 @@ def _t_rdap(entidad, ctx):
                     ctx.emitir('org', nombre, label='registrar')
         for ns in d.get('nameservers', []):
             if ns.get('ldhName'):
-                ctx.emitir('dominio', ns['ldhName'], label='NS')
+                ctx.emitir('domain', ns['ldhName'], label='NS')
         fechas = {e.get('eventAction'): (e.get('eventDate') or '')[:10] for e in d.get('events', [])}
         if fechas.get('registration'):
             entidad.properties['creado'] = fechas['registration']
@@ -2750,7 +2750,7 @@ def _t_abuseipdb(entidad, ctx):
     except Exception as _e:
         log.debug("abuseipdb unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('puerto', 'org', 'tech'), nombre='shodan',
+@transform(entrada='ip', salidas=('port', 'org', 'tech'), nombre='shodan',
            requiere_key=True,
            descripcion='Ports/services/org of the IP (Shodan, key in the vault)')
 def _t_shodan(entidad, ctx):
@@ -2767,7 +2767,7 @@ def _t_shodan(entidad, ctx):
         for serv in d.get('data', []):
             port = serv.get('port')
             if port:
-                ctx.emitir('puerto', f'{entidad.value}:{port}', label='shodan',
+                ctx.emitir('port', f'{entidad.value}:{port}', label='shodan',
                            servicio=serv.get('_shodan', {}).get('module') or serv.get('product', ''))
             prod = serv.get('product')
             if prod and prod not in vistos_prod:
@@ -2776,7 +2776,7 @@ def _t_shodan(entidad, ctx):
     except Exception as _e:
         log.debug("shodan unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('puerto', 'org', 'tech', 'asn'), nombre='censys',
+@transform(entrada='ip', salidas=('port', 'org', 'tech', 'asn'), nombre='censys',
            requiere_key=True,
            descripcion='Services of the IP (Censys, key "id:secret" in the vault)')
 def _t_censys(entidad, ctx):
@@ -2797,7 +2797,7 @@ def _t_censys(entidad, ctx):
         for s in res.get('services', []):
             p = s.get('port')
             if p:
-                ctx.emitir('puerto', f"{entidad.value}:{p}", label='censys',
+                ctx.emitir('port', f"{entidad.value}:{p}", label='censys',
                            servicio=s.get('service_name', ''))
             prod = s.get('service_name')
             if prod and prod not in vistos:
@@ -2806,7 +2806,7 @@ def _t_censys(entidad, ctx):
     except Exception as _e:
         log.debug("censys unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('puerto', 'tech'), nombre='zoomeye',
+@transform(entrada='ip', salidas=('port', 'tech'), nombre='zoomeye',
            requiere_key=True,
            descripcion='Services of the IP in ZoomEye (CN engine, key in the vault)')
 def _t_zoomeye(entidad, ctx):
@@ -2821,7 +2821,7 @@ def _t_zoomeye(entidad, ctx):
             pi = m.get('portinfo', {}) or {}
             p = pi.get('port') or m.get('port')
             if p:
-                ctx.emitir('puerto', f"{entidad.value}:{p}", label='zoomeye',
+                ctx.emitir('port', f"{entidad.value}:{p}", label='zoomeye',
                            servicio=pi.get('service', ''))
             app = pi.get('app')
             if app:
@@ -2829,7 +2829,7 @@ def _t_zoomeye(entidad, ctx):
     except Exception as _e:
         log.debug("zoomeye unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('puerto', 'dominio'), nombre='fofa',
+@transform(entrada='ip', salidas=('port', 'domain'), nombre='fofa',
            requiere_key=True,
            descripcion='Hosts/domains in FOFA (CN engine, key "email:key" in the vault)')
 def _t_fofa(entidad, ctx):
@@ -2850,13 +2850,13 @@ def _t_fofa(entidad, ctx):
             port = row[1] if len(row) > 1 else None
             dom = row[2] if len(row) > 2 else None
             if port:
-                ctx.emitir('puerto', f"{entidad.value}:{port}", label='fofa')
+                ctx.emitir('port', f"{entidad.value}:{port}", label='fofa')
             if dom:
-                ctx.emitir('dominio', dom, label='fofa')
+                ctx.emitir('domain', dom, label='fofa')
     except Exception as _e:
         log.debug("fofa unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('puerto', 'tech'), nombre='quake',
+@transform(entrada='ip', salidas=('port', 'tech'), nombre='quake',
            requiere_key=True,
            descripcion='Services of the IP in Quake/360 (CN engine, key in the vault)')
 def _t_quake(entidad, ctx):
@@ -2872,13 +2872,13 @@ def _t_quake(entidad, ctx):
             p = m.get('port')
             nombre = (m.get('service', {}) or {}).get('name')
             if p:
-                ctx.emitir('puerto', f"{entidad.value}:{p}", label='quake', servicio=nombre or '')
+                ctx.emitir('port', f"{entidad.value}:{p}", label='quake', servicio=nombre or '')
             if nombre:
                 ctx.emitir('tech', nombre, label='quake')
     except Exception as _e:
         log.debug("quake unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('puerto', 'dominio'), nombre='hunter',
+@transform(entrada='ip', salidas=('port', 'domain'), nombre='hunter',
            requiere_key=True,
            descripcion='Hosts/domains in Hunter.how (CN engine, key in the vault)')
 def _t_hunter(entidad, ctx):
@@ -2892,13 +2892,13 @@ def _t_hunter(entidad, ctx):
         for m in ((r.json() or {}).get('data', {}) or {}).get('list', []):
             p, dom = m.get('port'), m.get('domain')
             if p:
-                ctx.emitir('puerto', f"{entidad.value}:{p}", label='hunter')
+                ctx.emitir('port', f"{entidad.value}:{p}", label='hunter')
             if dom:
-                ctx.emitir('dominio', dom, label='hunter')
+                ctx.emitir('domain', dom, label='hunter')
     except Exception as _e:
         log.debug("hunter unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('puerto',), nombre='netlas',
+@transform(entrada='ip', salidas=('port',), nombre='netlas',
            requiere_key=True,
            descripcion='Responses of the IP in Netlas (key in the vault)')
 def _t_netlas(entidad, ctx):
@@ -2912,11 +2912,11 @@ def _t_netlas(entidad, ctx):
         for it in (r.json() or {}).get('items', []):
             p = (it.get('data', {}) or {}).get('port')
             if p:
-                ctx.emitir('puerto', f"{entidad.value}:{p}", label='netlas')
+                ctx.emitir('port', f"{entidad.value}:{p}", label='netlas')
     except Exception as _e:
         log.debug("netlas unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('puerto',), nombre='criminalip',
+@transform(entrada='ip', salidas=('port',), nombre='criminalip',
            requiere_key=True,
            descripcion='Ports/exposure of the IP (Criminal IP, key in the vault)')
 def _t_criminalip(entidad, ctx):
@@ -2929,12 +2929,12 @@ def _t_criminalip(entidad, ctx):
         for p in ((r.json() or {}).get('port', {}) or {}).get('data', []) or []:
             num = p.get('open_port_no') or p.get('port')
             if num:
-                ctx.emitir('puerto', f"{entidad.value}:{num}", label='criminalip',
+                ctx.emitir('port', f"{entidad.value}:{num}", label='criminalip',
                            servicio=p.get('app_name', ''))
     except Exception as _e:
         log.debug("criminalip unavailable: %s", _e)
 
-@transform(entrada='ip', salidas=('puerto',), nombre='binaryedge',
+@transform(entrada='ip', salidas=('port',), nombre='binaryedge',
            requiere_key=True,
            descripcion='Exposed ports of the IP (BinaryEdge, key in the vault)')
 def _t_binaryedge(entidad, ctx):
@@ -2947,7 +2947,7 @@ def _t_binaryedge(entidad, ctx):
         for ev in (r.json() or {}).get('events', []):
             p = ev.get('port')
             if p:
-                ctx.emitir('puerto', f"{entidad.value}:{p}", label='binaryedge')
+                ctx.emitir('port', f"{entidad.value}:{p}", label='binaryedge')
     except Exception as _e:
         log.debug("binaryedge unavailable: %s", _e)
 
@@ -2963,7 +2963,7 @@ def _t_busqueda_facial(entidad, ctx):
     for motor, info in enlaces_facial(entidad.value).items():
         ctx.emitir('url', info['url'], label=f'facial:{motor}', motor=motor, modo=info['modo'])
 
-@transform(entrada='telefono', salidas=('url', 'pais'), nombre='telefono_dorks',
+@transform(entrada='phone', salidas=('url', 'country'), nombre='telefono_dorks',
            descripcion='Phone search dorks (Truecaller/messaging) + carrier if key (F2 step 33)')
 def _t_telefono_dorks(entidad, ctx):
     from urllib.parse import quote as _q
@@ -2987,11 +2987,11 @@ def _t_telefono_dorks(entidad, ctx):
                 entidad.properties['carrier'] = d.get('carrier', '')
                 entidad.properties['tipo_linea'] = d.get('line_type', '')
                 if d.get('country_name'):
-                    ctx.emitir('pais', d['country_name'], label='country')
+                    ctx.emitir('country', d['country_name'], label='country')
         except Exception as _e:
             log.debug("numverify unavailable: %s", _e)
 
-@transform(entrada='dominio', salidas=('dominio',), nombre='typosquatting',
+@transform(entrada='domain', salidas=('domain',), nombre='typosquatting',
            descripcion='Typosquat variants of the domain that ARE registered (F2 step 34)')
 def _t_typosquatting(entidad, ctx):
     dom = entidad.value
@@ -3024,7 +3024,7 @@ def _t_typosquatting(entidad, ctx):
     for t in ths:
         t.join(timeout=12)
     for v, ip in registrados.items():
-        d = ctx.emitir('dominio', v, label='typosquat', resuelve=ip)
+        d = ctx.emitir('domain', v, label='typosquat', resuelve=ip)
         if d:
             d.tag('typosquat')
 
@@ -3067,7 +3067,7 @@ _TAKEOVER_FP = {
     'shopify.com': 'Sorry, this shop is currently unavailable',
 }
 
-@transform(entrada='dominio', salidas=('subdominio',), nombre='takeover',
+@transform(entrada='domain', salidas=('subdomain',), nombre='takeover',
            descripcion='Orphaned subdomains vulnerable to takeover (CNAME to abandoned service) (F2 step 34)')
 def _t_takeover(entidad, ctx):
     dom = entidad.value
@@ -3100,12 +3100,12 @@ def _t_takeover(entidad, ctx):
     for t in ths:
         t.join(timeout=20)
     for sub, info in vulnerables.items():
-        s = ctx.emitir('subdominio', sub, label='takeover',
+        s = ctx.emitir('subdomain', sub, label='takeover',
                        servicio=info['servicio'], cname=info['cname'], estado=info['estado'])
         if s:
             s.tag('takeover')          # triggers the r_takeover rule (F4/55)
 
-@transform(entrada='dominio', salidas=('ip',), nombre='passivedns', requiere_key=True,
+@transform(entrada='domain', salidas=('ip',), nombre='passivedns', requiere_key=True,
            descripcion='IP history of the domain (Passive DNS via VirusTotal, key in the vault) (F2 step 34)')
 def _t_passivedns(entidad, ctx):
     key = _key_rotativa('virustotal') or os.environ.get('VT_API_KEY', '')
@@ -3134,7 +3134,7 @@ _SECRET_PATTERNS = [
     ('Private Key', r'-----BEGIN (?:RSA|EC|OPENSSH) PRIVATE KEY-----'),
 ]
 
-@transform(entrada='usuario', salidas=('credencial', 'repo'), nombre='github_sec',
+@transform(entrada='user', salidas=('credential', 'repo'), nombre='github_sec',
            descripcion='Hardcoded secrets in commits of the user public repos (F4 step 60)')
 def _t_github_sec(entidad, ctx):
     user = entidad.value
@@ -3164,7 +3164,7 @@ def _t_github_sec(entidad, ctx):
                     for nombre_pat, patron in _SECRET_PATTERNS:
                         for m in re.findall(patron, patch, re.IGNORECASE):
                             val = (m if isinstance(m, str) else ':'.join(x for x in m if x)) or nombre_pat
-                            c = ctx.emitir('credencial', val[:60], label='secret',
+                            c = ctx.emitir('credential', val[:60], label='secret',
                                            tipo_secreto=nombre_pat, repo=full,
                                            commit=sha[:8], archivo=f.get('filename', '?'))
                             if c:
@@ -3172,7 +3172,7 @@ def _t_github_sec(entidad, ctx):
     except Exception as _e:
         log.debug("github_sec unavailable: %s", _e)
 
-@transform(entrada='persona', salidas=('url',), nombre='persona',
+@transform(entrada='person', salidas=('url',), nombre='person',
            descripcion='OSINT on a person: summary (DuckDuckGo) + dorks (LinkedIn/X/GitHub...) (keyless)')
 def _t_persona(entidad, ctx):
     from urllib.parse import quote as _q
@@ -3192,7 +3192,7 @@ def _t_persona(entidad, ctx):
     for k, q in dorks.items():
         ctx.emitir('url', f'https://www.google.com/search?q={_q(q)}', label=f'dork:{k}', dork=k)
 
-@transform(entrada='persona', salidas=('url',), nombre='darkweb',
+@transform(entrada='person', salidas=('url',), nombre='darkweb',
            descripcion='Dark web search (Ahmia, clearnet .onion index, no Tor) (keyless)')
 def _t_darkweb(entidad, ctx):
     from urllib.parse import quote as _q
@@ -3245,7 +3245,7 @@ def _t_render_js(entidad, ctx):
     except Exception as _e:
         log.debug("render_js: %s", _e)
 
-@transform(entrada='archivo', salidas=(), nombre='yara_bulk',
+@transform(entrada='file', salidas=(), nombre='yara_bulk',
            descripcion='Scans a folder with yara-rules (local only)')
 def _t_yara_bulk(entidad, ctx):
     carpeta = entidad.value
@@ -3268,14 +3268,14 @@ def _t_yara_bulk(entidad, ctx):
         except Exception:
             continue
         if salida and 'no rules matched' not in salida.lower():
-            hallazgos.append({'archivo': archivo, 'resultado': salida[:300]})
+            hallazgos.append({'file': archivo, 'resultado': salida[:300]})
             if len(hallazgos) >= 50:
                 break
     if hallazgos:
         entidad.properties['yara_hallazgos'] = hallazgos[:20]
         entidad.tag('yara-match')
 
-@transform(entrada='persona', salidas=(), nombre='wordlist',
+@transform(entrada='person', salidas=(), nombre='wordlist',
            descripcion='Likely password wordlist from the case via AI (Ollama)')
 def _t_wordlist(entidad, ctx):
     if not ia.disponible():
@@ -3296,7 +3296,7 @@ def _t_wordlist(entidad, ctx):
     entidad.properties['wordlist'] = palabras
     entidad.properties['wordlist_total'] = len(palabras)
     try:
-        slug = _slug_caso(entidad.value.lower()) or 'objetivo'
+        slug = _slug_caso(entidad.value.lower()) or 'target'
         ruta = os.path.join(CASES_DIR, f'wordlist_{slug}.txt')
         with open(ruta, 'w', encoding='utf-8') as f:
             f.write('\n'.join(palabras))
@@ -3429,7 +3429,7 @@ def _tg_mensajes(usuario, limite=30):
     except Exception as e:
         return False, f'error: {e}'
 
-@transform(entrada='usuario', salidas=('email', 'url'), nombre='telegram',
+@transform(entrada='user', salidas=('email', 'url'), nombre='telegram',
            requiere_key=True,
            descripcion='Mentions/links of the user or channel in Telegram (Telethon) (F10 step 130)')
 def _t_telegram(entidad, ctx):
@@ -3459,7 +3459,7 @@ def coincidencias_leak(textos, keywords=None):
             hits.append({'keyword': kw, 'texto': t[:200]})
     return hits
 
-@transform(entrada='usuario', salidas=('dominio', 'email'), nombre='canal_leaks',
+@transform(entrada='user', salidas=('domain', 'email'), nombre='canal_leaks',
            requiere_key=True,
            descripcion='Watches a Telegram channel for mentions of leaks/breaches/ransomware (F10 step 131)')
 def _t_canal_leaks(entidad, ctx):
@@ -3476,13 +3476,13 @@ def _t_canal_leaks(entidad, ctx):
     entidad.properties['leaks_muestra'] = [h['texto'] for h in hits[:5]]
     unido = '\n'.join(h['texto'] for h in hits)
     for dom in list(set(re.findall(r'\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b', unido.lower())))[:15]:
-        ctx.emitir('dominio', dom, label='mentioned-in-leaks')
+        ctx.emitir('domain', dom, label='mentioned-in-leaks')
     for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', unido)))[:15]:
         ctx.emitir('email', em, label='mentioned-in-leaks')
 
 _HAYSTAK_ONION = ('http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion')
 
-@transform(entrada='persona', salidas=('url',), nombre='haystak',
+@transform(entrada='person', salidas=('url',), nombre='haystak',
            descripcion='Dark web search in Haystak (via Tor) -- .onion links (F10 step 129)')
 def _t_haystak(entidad, ctx):
     if not _tor_disponible():
@@ -3667,7 +3667,7 @@ def _t_extraer_wallets(entidad, ctx):
         for addr in list(set(rx.findall(texto)))[:30]:
             ctx.emitir('wallet', addr, label=cadena, cadena=cadena)
 
-@transform(entrada='persona', salidas=('url',), nombre='dorks_idioma',
+@transform(entrada='person', salidas=('url',), nombre='dorks_idioma',
            descripcion='Dorks adapted to the name language (Cyrillic/Chinese/Latin) (F15 step 176)')
 def _t_dorks_idioma(entidad, ctx):
     from urllib.parse import quote as _q
@@ -3675,7 +3675,7 @@ def _t_dorks_idioma(entidad, ctx):
     for d in _ml.dorks_por_idioma(entidad.value, idioma):
         ctx.emitir('url', f'https://www.google.com/search?q={_q(d)}', label=f'dork:{idioma}', idioma=idioma)
 
-@transform(entrada='persona', salidas=('url',), nombre='motores_locales',
+@transform(entrada='person', salidas=('url',), nombre='motores_locales',
            descripcion='Search in local engines: Yandex, Baidu, Sogou (they index another internet) (F15 step 174)')
 def _t_motores_locales(entidad, ctx):
     for motor, url in _ml.motores_locales(entidad.value).items():
@@ -3687,18 +3687,18 @@ def _t_registros_regionales(entidad, ctx):
     for reg, url in _ml.registros_regionales(entidad.value).items():
         ctx.emitir('url', url, label=f'registro:{reg}', registro=reg)
 
-@transform(entrada='persona', salidas=('persona',), nombre='transliterar',
+@transform(entrada='person', salidas=('person',), nombre='transliterar',
            descripcion='Name variants in Cyrillic/Latin to search in each alphabet (F15 step 172)')
 def _t_transliterar(entidad, ctx):
     for alfabeto, variante in _ml.transliterar(entidad.value).items():
         if variante and variante.lower() != entidad.value.lower():
-            ctx.emitir('persona', variante, label=f'translit:{alfabeto}')
+            ctx.emitir('person', variante, label=f'translit:{alfabeto}')
 
-@transform(entrada='usuario', salidas=('url',), nombre='plataformas_regionales',
+@transform(entrada='user', salidas=('url',), nombre='plataformas_regionales',
            descripcion='Profiles on regional platforms: VK, Weibo, Douyin, OK, Telegram (F15 step 171)')
 def _t_plataformas_regionales(entidad, ctx):
     for plat, url in _ml.perfiles_regionales(entidad.value).items():
-        ctx.emitir('url', url, label=f'plataforma:{plat}', plataforma=plat)
+        ctx.emitir('url', url, label=f'plataforma:{plat}', platform=plat)
 
 _BLOCKLIST = {'nets': None, 'ts': 0}   # in-memory cache (refreshes every 6h)
 
@@ -3765,7 +3765,7 @@ def _t_greynoise(entidad, ctx):
     except Exception as _e:
         log.debug("greynoise unavailable: %s", _e)
 
-@transform(entrada='dominio', salidas=(), nombre='dns_txt',
+@transform(entrada='domain', salidas=(), nombre='dns_txt',
            descripcion='TXT records of the domain (SPF, verifications, etc.)')
 def _t_dns_txt(entidad, ctx):
     out = run_tool(['dig', entidad.value, 'TXT', '+short'], timeout=10)
@@ -3773,7 +3773,7 @@ def _t_dns_txt(entidad, ctx):
     if txt:
         entidad.properties['txt'] = txt[:10]
 
-@transform(entrada='dominio', salidas=('org',), nombre='ssl',
+@transform(entrada='domain', salidas=('org',), nombre='ssl',
            descripcion='TLS certificate of the domain: issuer and validity')
 def _t_ssl(entidad, ctx):
     try:
@@ -3793,7 +3793,7 @@ def _t_ssl(entidad, ctx):
     except Exception as _e:
         log.debug("ssl unavailable: %s", _e)
 
-@transform(entrada='dominio', salidas=('ip',), nombre='cert_pivote', requiere_key=True,
+@transform(entrada='domain', salidas=('ip',), nombre='cert_pivote', requiere_key=True,
            descripcion='IPs with the same TLS cert (CN) across FOFA/Shodan -- same infra (F8)')
 def _t_cert_pivote(entidad, ctx):
     cn = entidad.properties.get('cert_cn')
@@ -4141,7 +4141,7 @@ def _registrar_huella(nombre, type, value):
     """Records which transform you ran on which target and whether it was anonymized
     -- your footprint/exposure while investigating (F13 step 160)."""
     _HUELLA.insert(0, {'ts': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                       'transform': nombre, 'objetivo': f'{type}:{value}',
+                       'transform': nombre, 'target': f'{type}:{value}',
                        'anonimo': _OPSEC['anonimo'] or bool(_PROXIES['pool'])})
     del _HUELLA[500:]
 
@@ -4285,7 +4285,7 @@ def _aplicar_perfil_opsec(ws):
     _PROXIES['pool'] = list(p.get('proxies', []) or [])
     _PROXIES['i'] = 0
     _set_anonimo(bool(p.get('anonimo')) and _tor_disponible())
-    _OPSEC['persona'] = p.get('persona')
+    _OPSEC['person'] = p.get('person')
     return p
 
 @app.route('/api/v2/opsec/perfil', methods=['GET', 'POST'])
@@ -4309,7 +4309,7 @@ def api_v2_opsec_perfil():
         return jsonify({'ok': True})
     return jsonify({'perfil': _leer_perfiles().get(_ws_activo, {}), 'activo': _ws_activo,
                     'estado': {'anonimo': _OPSEC['anonimo'], 'higiene': _OPSEC_HIGIENE['on'],
-                               'proxies': len(_PROXIES['pool']), 'persona': _OPSEC.get('persona')}})
+                               'proxies': len(_PROXIES['pool']), 'person': _OPSEC.get('person')}})
 
 _personas = PersonaManager(os.path.join(HOME, '.obsidian', 'personas.json'))
 
@@ -4319,7 +4319,7 @@ def api_v2_personas():
     if request.method == 'GET':
         nombre = request.args.get('nombre')
         if nombre:
-            return jsonify({'persona': _personas.get(nombre)})
+            return jsonify({'person': _personas.get(nombre)})
         return jsonify({'personas': _personas.list_ws()})
     d = request.json or {}
     nombre = (d.get('nombre', '') or '').strip()
@@ -4357,10 +4357,10 @@ _TEST_SERVICIO = {
     'quake': ('quake', 'ip', '8.8.8.8'), 'hunter': ('hunter', 'ip', '8.8.8.8'),
     'netlas': ('netlas', 'ip', '8.8.8.8'), 'criminalip': ('criminalip', 'ip', '8.8.8.8'),
     'binaryedge': ('binaryedge', 'ip', '8.8.8.8'),
-    'virustotal': ('passivedns', 'dominio', 'google.com'),
+    'virustotal': ('passivedns', 'domain', 'google.com'),
     'abuseipdb': ('abuseipdb', 'ip', '8.8.8.8'),
-    'github': ('github_usuario', 'usuario', 'torvalds'),
-    'viewdns': ('reverse_whois', 'dominio', 'google.com'),
+    'github': ('github_usuario', 'user', 'torvalds'),
+    'viewdns': ('reverse_whois', 'domain', 'google.com'),
     'hibp': ('email_breaches', 'email', 'test@example.com'),
 }
 
@@ -4387,7 +4387,7 @@ def api_v2_keys_probar():
     return jsonify({'servicio': servicio, 'ok': False, 'entities': 0,
                     'nota': 'key present but 0 results (invalid, out of quota, or different schema?)'})
 
-_TIPOS_ACTIVO = ('dominio', 'subdominio', 'ip', 'puerto', 'tech', 'url', 'cve', 'bucket', 'org')
+_TIPOS_ACTIVO = ('domain', 'subdomain', 'ip', 'port', 'tech', 'url', 'cve', 'bucket', 'org')
 
 @app.route('/api/v2/inventario')
 def api_v2_inventario():
@@ -4399,7 +4399,7 @@ def api_v2_inventario():
             inv[t] = [{'value': e.value, 'tags': sorted(e.tags),
                        'props': {k: e.properties[k] for k in list(e.properties)[:4]}}
                       for e in sorted(ents, key=lambda x: x.value)]
-    return jsonify({'objetivo': _objetivo_del_almacen(),
+    return jsonify({'target': _objetivo_del_almacen(),
                     'total_activos': sum(len(v) for v in inv.values()),
                     'inventario': inv})
 
@@ -4439,16 +4439,16 @@ def api_v2_hallazgos():
     return jsonify({'hallazgos': [x.to_dict() for x in h], 'score': risk_score(h)})
 
 def _objetivo_del_almacen():
-    """Best 'objetivo' candidate of the case for the report header. Prefers the SEED
+    """Best 'target' candidate of the case for the report header. Prefers the SEED
     (entity with no provenance = added by hand, not derived by a transform), so the
     report shows the real target and not a child datum."""
     ents = _almacen.entities
     if not ents:
         return None
-    obj = _almacen.of_type('objetivo')
+    obj = _almacen.of_type('target')
     if obj:
         return sorted(obj, key=lambda e: e.value)[0].value
-    orden = {'dominio': 0, 'ip': 1, 'email': 2, 'usuario': 3, 'url': 4, 'wallet': 5}
+    orden = {'domain': 0, 'ip': 1, 'email': 2, 'user': 3, 'url': 4, 'wallet': 5}
     semillas = [e for e in ents if not e.provenance]     # no provenance = seed
     cand = [e for e in (semillas or ents) if e.type in orden] or (semillas or ents)
     return sorted(cand, key=lambda e: (orden.get(e.type, 9), e.value))[0].value
@@ -4467,7 +4467,7 @@ def api_v2_reporte():
                 vis_js = f.read()
     html_doc = generar_reporte(
         _almacen, hallazgos=h, score=risk_score(h),
-        meta={'workspace': _ws_activo, 'objetivo': _objetivo_del_almacen()},
+        meta={'workspace': _ws_activo, 'target': _objetivo_del_almacen()},
         vis_js=vis_js)
     return Response(html_doc, mimetype='text/html')
 
@@ -4480,7 +4480,7 @@ def api_v2_export_json():
     """Full case in JSON, re-importable (F7 step 94)."""
     h = correlate(_almacen)
     data = exportar_json(_almacen, h, risk_score(h),
-                         {'workspace': _ws_activo, 'objetivo': _objetivo_del_almacen()})
+                         {'workspace': _ws_activo, 'target': _objetivo_del_almacen()})
     return Response(data, mimetype='application/json',
                     headers={'Content-Disposition': f'attachment; filename="{_nombre_export()}.json"'})
 
@@ -4620,13 +4620,13 @@ _FUENTE_POR_IDIOMA = {'ru': 'Yandex / VK', 'zh': 'Baidu / Weibo', 'ar': 'Google 
 @app.route('/api/v2/zona_horaria', methods=['POST'])
 def api_v2_zona_horaria():
     """Time zone and local time of a country, for chrono-location (F15 step 178)."""
-    return jsonify(_ml.zona_horaria((request.json or {}).get('pais', '')))
+    return jsonify(_ml.zona_horaria((request.json or {}).get('country', '')))
 
 @app.route('/api/v2/normalizar_telefono', methods=['POST'])
 def api_v2_normalizar_telefono():
     """Normalizes a phone to +E.164 based on the country (F15 step 177)."""
     d = request.json or {}
-    return jsonify({'e164': _ml.normalizar_telefono(d.get('numero', ''), d.get('pais', 'US'))})
+    return jsonify({'e164': _ml.normalizar_telefono(d.get('numero', ''), d.get('country', 'US'))})
 
 @app.route('/api/v2/idioma', methods=['POST'])
 def api_v2_idioma():
@@ -4749,7 +4749,7 @@ def api_v2_hallazgos_ia():
     for e in _almacen.entities:
         conteo[e.type] = conteo.get(e.type, 0) + 1
     ents = ', '.join(f'{n} {t}' for t, n in conteo.items())
-    lista = '\n'.join(f'- [{x.severidad}] {x.mensaje}' for x in h)
+    lista = '\n'.join(f'- [{x.severity}] {x.message}' for x in h)
     prompt = (
         f"You are a cybersecurity analyst. In an OSINT investigation on a target "
         f"(entities: {ents}) these findings were detected:\n\n{lista}\n\n"
@@ -4783,7 +4783,7 @@ def api_v2_verificar():
             "You are a security analyst reviewing an AUTOMATIC alert. Be VERY skeptical "
             "of single-source signals: they can be false positives (CDNs like Cloudflare, "
             "TOR nodes, shared hosting are not malicious on their own).\n\n"
-            f"ALERT [{hall.severidad}]: {hall.mensaje}\n"
+            f"ALERT [{hall.severity}]: {hall.message}\n"
             "REAL EVIDENCE collected:\n" + ("\n".join(ev) or "(no extra evidence)") + "\n\n"
             "In 2-3 sentences: real risk or likely false positive? WHY (based on the "
             "evidence)? What should the user verify?")
@@ -4792,7 +4792,7 @@ def api_v2_verificar():
         except Exception as e:
             log.warning("verify AI failed: %s", e)
             razon = 'AI unavailable (is Ollama on :11434?)'
-        revisiones.append({'hallazgo': hall.mensaje, 'severidad': hall.severidad, 'razon': razon})
+        revisiones.append({'hallazgo': hall.message, 'severity': hall.severity, 'razon': razon})
     return jsonify({'revisiones': revisiones})
 
 @app.route('/v2')
@@ -4851,7 +4851,7 @@ def api_kali():
             resultado = _kali_run(tool_id, arg)
             yield f"data: {json.dumps({'status':'completado','resultado':resultado})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'status':'error','mensaje':str(e)})}\n\n"
+            yield f"data: {json.dumps({'status':'error','message':str(e)})}\n\n"
     return Response(stream_with_context(_stream()),
                    mimetype='text/event-stream',
                    headers={'Cache-Control':'no-cache','X-Accel-Buffering':'no'})
@@ -4871,7 +4871,7 @@ def api_parrot():
             resultado = _distrobox_run('parrot', PARROT_TOOLS, tool_id, arg)
             yield f"data: {json.dumps({'status':'completado','resultado':resultado})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'status':'error','mensaje':str(e)})}\n\n"
+            yield f"data: {json.dumps({'status':'error','message':str(e)})}\n\n"
     return Response(stream_with_context(_stream()),
                    mimetype='text/event-stream',
                    headers={'Cache-Control':'no-cache','X-Accel-Buffering':'no'})
@@ -4891,7 +4891,7 @@ def api_remnux():
             resultado = _distrobox_run('remnux', REMNUX_TOOLS, tool_id, arg)
             yield f"data: {json.dumps({'status':'completado','resultado':resultado})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'status':'error','mensaje':str(e)})}\n\n"
+            yield f"data: {json.dumps({'status':'error','message':str(e)})}\n\n"
     return Response(stream_with_context(_stream()),
                    mimetype='text/event-stream',
                    headers={'Cache-Control':'no-cache','X-Accel-Buffering':'no'})
@@ -4942,12 +4942,12 @@ def api_timeline():
 def api_monitor():
     if request.method == 'GET':
         return jsonify({'activo': monitor_state['activo'],
-                       'objetivo': monitor_state['objetivo'],
+                       'target': monitor_state['target'],
                        'alertas': monitor_state['alertas'][-20:],
                        'intervalo': monitor_state['intervalo']})
     if request.method == 'POST':
         d = request.json or {}
-        ok = _monitor_start(d.get('objetivo', case.get('objetivo','')),
+        ok = _monitor_start(d.get('target', case.get('target','')),
                             int(d.get('intervalo', 3600)))
         return jsonify({'ok': ok})
     if request.method == 'DELETE':

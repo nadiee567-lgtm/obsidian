@@ -20,8 +20,8 @@ from core.validacion import _validar   # step 25: a single source of truth
 # Entity type -> core.validacion validation type (the ones with a strict shape).
 # The rest (persona, org, hash...) are not validated by shape.
 _TIPO_VALIDACION = {
-    'ip': 'ip', 'dominio': 'dominio', 'subdominio': 'dominio',
-    'email': 'email', 'usuario': 'usuario',
+    'ip': 'ip', 'domain': 'domain', 'subdomain': 'domain',
+    'email': 'email', 'user': 'user',
 }
 
 
@@ -29,28 +29,28 @@ _TIPO_VALIDACION = {
 # Single source of truth for which types exist and how they look (the graph will
 # read from here in F6). label = readable name; color = palette used in the graph.
 TIPOS = {
-    'objetivo':   {'label': 'Target',       'color': '#d99a4e'},
-    'dominio':    {'label': 'Domain',       'color': '#5b9bd5'},
-    'subdominio': {'label': 'Subdomain',    'color': '#7fb8d9'},
+    'target':   {'label': 'Target',       'color': '#d99a4e'},
+    'domain':    {'label': 'Domain',       'color': '#5b9bd5'},
+    'subdomain': {'label': 'Subdomain',    'color': '#7fb8d9'},
     'ip':         {'label': 'IP',           'color': '#d9564b'},
     'email':      {'label': 'Email',        'color': '#6fae7c'},
-    'usuario':    {'label': 'Username',     'color': '#cc9a3c'},
-    'telefono':   {'label': 'Phone',        'color': '#c99a6b'},
-    'persona':    {'label': 'Person',       'color': '#e0af68'},
+    'user':    {'label': 'Username',     'color': '#cc9a3c'},
+    'phone':   {'label': 'Phone',        'color': '#c99a6b'},
+    'person':    {'label': 'Person',       'color': '#e0af68'},
     'org':        {'label': 'Organization', 'color': '#b07a9e'},
     'url':        {'label': 'URL',          'color': '#5fa8a0'},
-    'puerto':     {'label': 'Port',         'color': '#8b8b98'},
+    'port':     {'label': 'Port',         'color': '#8b8b98'},
     'hash':       {'label': 'Hash',         'color': '#9a7ecc'},
-    'archivo':    {'label': 'File',         'color': '#7a85b0'},
+    'file':    {'label': 'File',         'color': '#7a85b0'},
     'cve':        {'label': 'CVE',          'color': '#d9564b'},
     'bucket':     {'label': 'Bucket',       'color': '#d9564b'},
-    'credencial': {'label': 'Credential',   'color': '#f7768e'},
+    'credential': {'label': 'Credential',   'color': '#f7768e'},
     'asn':        {'label': 'ASN',          'color': '#7a85b0'},
-    'pais':       {'label': 'Country',      'color': '#7a85b0'},
+    'country':       {'label': 'Country',      'color': '#7a85b0'},
     'tech':       {'label': 'Technology',   'color': '#5fa8a0'},
-    'imagen':     {'label': 'Image',        'color': '#73daca'},
+    'image':     {'label': 'Image',        'color': '#73daca'},
     'wallet':     {'label': 'Wallet',       'color': '#e0af68'},
-    'plataforma': {'label': 'Platform',     'color': '#c17a52'},
+    'platform': {'label': 'Platform',     'color': '#c17a52'},
     'repo':       {'label': 'Repository',   'color': '#d99a4e'},
 }
 
@@ -64,7 +64,7 @@ def normalize(type: str, value: str) -> str:
     """Canonical form of a value, so two writes of the same datum yield the same
     id. E.g.: 'WWW.Example.COM.' and 'example.com' -> 'example.com'."""
     v = (value or '').strip()
-    if type in ('dominio', 'subdominio'):
+    if type in ('domain', 'subdomain'):
         v = v.lower().rstrip('.')
         if v.startswith('www.'):
             v = v[4:]

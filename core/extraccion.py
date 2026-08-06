@@ -17,7 +17,7 @@ _RX = [
     ('url', re.compile(r'https?://[^\s"\'<>]+')),
     ('wallet', re.compile(r'\b(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|0x[a-fA-F0-9]{40})\b')),
     ('ip', re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b')),
-    ('dominio', re.compile(r'\b(?:[a-z0-9-]+\.)+[a-z]{2,24}\b', re.I)),
+    ('domain', re.compile(r'\b(?:[a-z0-9-]+\.)+[a-z]{2,24}\b', re.I)),
 ]
 
 
@@ -32,7 +32,7 @@ def extract_entities(texto: str) -> list:
             if type == 'ip':
                 if any(int(o) > 255 for o in v.split('.')):
                     continue                     # invalid octet
-            if type == 'dominio' and v.rsplit('.', 1)[-1].lower() in _NO_TLD:
+            if type == 'domain' and v.rsplit('.', 1)[-1].lower() in _NO_TLD:
                 continue                         # it's a file, not a domain
             key = (type, v.lower())
             if v and key not in vistos:

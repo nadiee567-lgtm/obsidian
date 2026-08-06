@@ -76,7 +76,7 @@ REGISTRO = _Registry()
 def transform(entrada: str, salidas=(), nombre=None, requiere_key=False, descripcion=''):
     """Decorator that registers a function as a transform.
 
-    @transform(entrada='dominio', salidas=('ip','subdominio'))
+    @transform(entrada='domain', salidas=('ip','subdomain'))
     def resolver(entidad, ctx):
         ctx.emitir('ip', '1.2.3.4', label='A')
     """

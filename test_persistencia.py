@@ -8,7 +8,7 @@ from core.persistencia import save_store, load_store
 
 def _almacen_ejemplo():
     alm = Store()
-    d = alm.create('dominio', 'example.com', sources={'whois'},
+    d = alm.create('domain', 'example.com', sources={'whois'},
                   properties={'registrar': 'GoDaddy'})
     d.tag('interesante')
     i = alm.create('ip', '93.184.216.34', sources={'dns'})
@@ -26,7 +26,7 @@ def test_guardar_y_cargar_roundtrip(tmp_path):
     assert len(cargado) == 2
     assert len(cargado.relations) == 1
 
-    d = cargado.buscar('dominio', 'example.com')
+    d = cargado.buscar('domain', 'example.com')
     assert d.sources == {'whois'}
     assert d.properties == {'registrar': 'GoDaddy'}
     assert d.tags == {'interesante'}

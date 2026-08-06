@@ -13,7 +13,7 @@ from core.exportar import exportar_json, exportar_csv
 
 def _demo():
     alm = Store()
-    d = alm.create('dominio', 'objetivo.com', properties={'org': 'ACME'})
+    d = alm.create('domain', 'objetivo.com', properties={'org': 'ACME'})
     ip = alm.create('ip', '93.184.216.34')
     ip.tag('listado-amenaza')
     alm.relate(d.id, ip.id, 'resuelve')
@@ -57,7 +57,7 @@ def test_csv_neutraliza_inyeccion_de_formulas():
 
 def test_csv_valor_peligroso_al_inicio():
     alm = Store()
-    alm.create('usuario', '=cmd')          # usuario allows arbitrary text
+    alm.create('user', '=cmd')          # usuario allows arbitrary text
     filas = list(csv.reader(io.StringIO(exportar_csv(alm))))
     assert filas[1][1] == "'=cmd"         # sanitized
 
@@ -65,8 +65,8 @@ def test_csv_valor_peligroso_al_inicio():
 def test_csv_ninguna_celda_empieza_con_formula():
     """Invariant: NO data cell starts with a formula character."""
     alm = Store()
-    alm.create('usuario', '+evil')
-    alm.create('usuario', '-2+3')
+    alm.create('user', '+evil')
+    alm.create('user', '-2+3')
     u = alm.create('email', 'x@y.com'); u.tag('@cmd')
     filas = list(csv.reader(io.StringIO(exportar_csv(alm))))
     for fila in filas[1:]:

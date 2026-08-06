@@ -13,10 +13,10 @@ _RE_IP = re.compile(r'\d+\.\d+\.\d+\.\d+')
 
 
 def migrate_case(case: dict) -> Store:
-    """case (dict with 'objetivo' and 'datos') -> typed Store."""
+    """case (dict with 'target' and 'datos') -> typed Store."""
     alm = Store()
-    objetivo = case.get('objetivo')
-    raiz = alm.create('objetivo', objetivo, sources={'caso'}) if objetivo else None
+    objetivo = case.get('target')
+    raiz = alm.create('target', objetivo, sources={'caso'}) if objetivo else None
 
     for clave, value in (case.get('datos') or {}).items():
         if not isinstance(value, dict):
@@ -36,15 +36,15 @@ def _rel(alm, a, b, label):
 
 
 def _mig_dominio(alm, raiz, value, res, source):
-    dom = value.get('objetivo', '')
+    dom = value.get('target', '')
     if not dom:
         return
-    d = alm.create('dominio', dom, sources={source})
-    _rel(alm, raiz, d, 'dominio')
+    d = alm.create('domain', dom, sources={source})
+    _rel(alm, raiz, d, 'domain')
     for ip in _RE_IP.findall(str(res.get('dns', {}).get('A', ''))):
         _rel(alm, d, alm.create('ip', ip, sources={source}), 'A')
     for sub in res.get('subdominios', [])[:50]:
-        _rel(alm, d, alm.create('subdominio', sub, sources={source}), 'subdominio')
+        _rel(alm, d, alm.create('subdomain', sub, sources={source}), 'subdomain')
     for email in res.get('emails', [])[:30]:
         _rel(alm, d, alm.create('email', email, sources={source}), 'email')
     for h, v in (res.get('tecnologias', {}) or {}).items():
@@ -53,30 +53,30 @@ def _mig_dominio(alm, raiz, value, res, source):
 
 
 def _mig_ip(alm, raiz, value, res, source):
-    ip = value.get('objetivo', '')
+    ip = value.get('target', '')
     if not ip:
         return
     i = alm.create('ip', ip, sources={source})
     _rel(alm, raiz, i, 'ip')
     geo = res.get('geo', {}) or {}
     if geo.get('country'):
-        _rel(alm, i, alm.create('pais', geo['country'], sources={source}), 'location')
+        _rel(alm, i, alm.create('country', geo['country'], sources={source}), 'location')
     if geo.get('org'):
         _rel(alm, i, alm.create('org', geo['org'], sources={source}), 'org')
     if res.get('ptr'):
-        _rel(alm, i, alm.create('dominio', res['ptr'], sources={source}), 'PTR')
+        _rel(alm, i, alm.create('domain', res['ptr'], sources={source}), 'PTR')
 
 
 def _mig_usuario(alm, raiz, value, res, source):
-    user = value.get('objetivo', '')
+    user = value.get('target', '')
     if not user:
         return
-    u = alm.create('usuario', user, sources={source})
-    _rel(alm, raiz, u, 'usuario')
+    u = alm.create('user', user, sources={source})
+    _rel(alm, raiz, u, 'user')
     for p in (res.get('plataformas', []) or []) + (res.get('maigret', []) or []):
-        plat = p.get('plataforma')
+        plat = p.get('platform')
         if plat:
-            e = alm.create('plataforma', plat, sources={source},
+            e = alm.create('platform', plat, sources={source},
                           properties={'url': p.get('url', '')})
             _rel(alm, u, e, 'profile')
     gh = res.get('github', {}) or {}
@@ -88,7 +88,7 @@ def _mig_usuario(alm, raiz, value, res, source):
 
 
 def _mig_email(alm, raiz, value, res, source):
-    email = value.get('objetivo', '')
+    email = value.get('target', '')
     if not email:
         return
     props = {}
@@ -119,9 +119,9 @@ def _mig_buckets(alm, raiz, value, res, source):
 
 def _mig_takeover(alm, raiz, value, res, source):
     for v in res.get('vulnerables', []) or []:
-        if not v.get('subdominio'):
+        if not v.get('subdomain'):
             continue
-        e = alm.create('subdominio', v['subdominio'], sources={source},
+        e = alm.create('subdomain', v['subdomain'], sources={source},
                       properties={'servicio': v.get('servicio'), 'status': v.get('status')})
         e.tag('takeover', 'vulnerable')
         _rel(alm, raiz, e, 'takeover')
@@ -129,9 +129,9 @@ def _mig_takeover(alm, raiz, value, res, source):
 
 def _mig_typo(alm, raiz, value, res, source):
     for d in res.get('registrados', []) or []:
-        if not d.get('dominio'):
+        if not d.get('domain'):
             continue
-        e = alm.create('dominio', d['dominio'], sources={source},
+        e = alm.create('domain', d['domain'], sources={source},
                       properties={'ip': d.get('ip')})
         e.tag('typosquat')
         _rel(alm, raiz, e, 'typosquat')
@@ -141,7 +141,7 @@ def _mig_github_secrets(alm, raiz, value, res, source):
     for h in res.get('hallazgos', []) or []:
         if not h.get('value'):
             continue
-        e = alm.create('credencial', h['value'], sources={source},
+        e = alm.create('credential', h['value'], sources={source},
                       properties={'tipo_secreto': h.get('type'), 'repo': h.get('repo'),
                                    'commit': h.get('commit')})
         e.tag('expuesto')
@@ -149,8 +149,8 @@ def _mig_github_secrets(alm, raiz, value, res, source):
 
 
 def _mig_passivedns(alm, raiz, value, res, source):
-    dom = value.get('objetivo', '')
-    d = alm.create('dominio', dom, sources={source}) if dom else raiz
+    dom = value.get('target', '')
+    d = alm.create('domain', dom, sources={source}) if dom else raiz
     for h in res.get('historial', [])[:30]:
         if h.get('ip'):
             _rel(alm, d, alm.create('ip', h['ip'], sources={source}),
@@ -167,9 +167,9 @@ def _mig_favicon(alm, raiz, value, res, source):
 
 
 _MIGRADORES = {
-    'dominio': _mig_dominio,
+    'domain': _mig_dominio,
     'ip': _mig_ip,
-    'usuario': _mig_usuario,
+    'user': _mig_usuario,
     'email': _mig_email,
     'buckets': _mig_buckets,
     'subdomain_takeover': _mig_takeover,

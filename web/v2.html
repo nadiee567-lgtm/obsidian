@@ -124,12 +124,12 @@
 
   <div class="barra">
     <select id="type">
-      <option value="dominio">dominio</option>
+      <option value="domain">domain</option>
       <option value="ip">ip</option>
       <option value="email">email</option>
-      <option value="usuario">usuario</option>
+      <option value="user">user</option>
       <option value="wallet">wallet (BTC)</option>
-      <option value="url">url (imagen/doc)</option>
+      <option value="url">url (image/doc)</option>
     </select>
     <input id="value" placeholder="example.com">
     <button class="primary" id="btnAgregar">+ Add to graph →</button>
@@ -183,13 +183,13 @@
 <div id="ctx"></div>
 
 <script>
-const COLOR={objetivo:'#d99a4e',dominio:'#5b9bd5',subdominio:'#7fb8d9',ip:'#d9564b',email:'#6fae7c',
-  usuario:'#cc9a3c',telefono:'#c99a6b',persona:'#e0af68',org:'#bb9af7',url:'#5fa8a0',puerto:'#8b8b98',
-  hash:'#9a7ecc',cve:'#f7768e',bucket:'#d9564b',credencial:'#f7768e',asn:'#7a85b0',pais:'#7a85b0',
-  tech:'#5fa8a0',imagen:'#73daca',wallet:'#e0af68',plataforma:'#c17a52',repo:'#d99a4e',subdominio_vuln:'#f7768e'};
-const SHAPE={objetivo:'star',ip:'diamond',email:'triangle',usuario:'hexagon',org:'box',pais:'box',
-  puerto:'square',cve:'triangleDown',tech:'dot',plataforma:'dot',repo:'dot',wallet:'diamond',
-  credencial:'triangleDown',asn:'box'};
+const COLOR={target:'#d99a4e',domain:'#5b9bd5',subdomain:'#7fb8d9',ip:'#d9564b',email:'#6fae7c',
+  user:'#cc9a3c',phone:'#c99a6b',person:'#e0af68',org:'#bb9af7',url:'#5fa8a0',port:'#8b8b98',
+  hash:'#9a7ecc',cve:'#f7768e',bucket:'#d9564b',credential:'#f7768e',asn:'#7a85b0',country:'#7a85b0',
+  tech:'#5fa8a0',image:'#73daca',wallet:'#e0af68',platform:'#c17a52',repo:'#d99a4e',subdomain_vuln:'#f7768e'};
+const SHAPE={target:'star',ip:'diamond',email:'triangle',user:'hexagon',org:'box',country:'box',
+  port:'square',cve:'triangleDown',tech:'dot',platform:'dot',repo:'dot',wallet:'diamond',
+  credential:'triangleDown',asn:'box'};
 const SEVCOLOR={critical:'#f7768e',high:'#ff9e64',medium:'#e0af68',low:'#7dcfff'};
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
@@ -218,7 +218,7 @@ network.on('oncontext',p=>{
 });
 
 function setStatus(msg,cls){ const s=$('#status'); s.textContent=msg; s.className=cls||''; }
-// escapa datos crudos del objetivo antes de meterlos en innerHTML (anti-XSS almacenado)
+// escapa datos crudos del target antes de meterlos en innerHTML (anti-XSS almacenado)
 function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 async function pintarGrafo(){
@@ -406,9 +406,9 @@ async function pintarHallazgos(){
   const c=$('#hallazgos'); c.textContent='';
   if(!d.hallazgos.length){ c.innerHTML='<div class="vacio">No risks detected (yet).</div>'; return; }
   d.hallazgos.forEach(h=>{
-    const row=el('div','hall'); row.style.setProperty('--sc',SEVCOLOR[h.severidad]||'#6b7488');
-    const s=el('span','sev'); s.textContent=h.severidad; row.appendChild(s);
-    const m=el('span','msg'); m.textContent=h.mensaje; row.appendChild(m);
+    const row=el('div','hall'); row.style.setProperty('--sc',SEVCOLOR[h.severity]||'#6b7488');
+    const s=el('span','sev'); s.textContent=h.severity; row.appendChild(s);
+    const m=el('span','msg'); m.textContent=h.message; row.appendChild(m);
     c.appendChild(row);
   });
 }
@@ -456,7 +456,7 @@ $('#btnExport').onclick=exportarPNG; $('#btnReacomodar').onclick=reacomodar;
 function parseFecha(v){ if(/^\d{8}$/.test(v)) v=v.slice(0,4)+'-'+v.slice(4,6)+'-'+v.slice(6,8);
   const d=new Date(v); return isNaN(d)?null:d; }
 function timeline(){
-  const campos={creado:'dominio registrado',cert_desde:'cert emitido',cert_expira:'cert expira',wayback_desde:'primer snapshot'};
+  const campos={creado:'domain registrado',cert_desde:'cert emitido',cert_expira:'cert expira',wayback_desde:'primer snapshot'};
   const ent=[];
   Object.values(entMap).forEach(e=>Object.entries(campos).forEach(([k,ev])=>{
     if(e.properties&&e.properties[k]){ const f=parseFecha(String(e.properties[k])); if(f) ent.push({f,ev,quien:e.value}); }

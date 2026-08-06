@@ -8,7 +8,7 @@ from core.estado import render_estado
 def _datos():
     return {
         'generado': '2026-08-04 01:30',
-        'transforms': {'total': 39, 'por_tipo': {'dominio': 12, 'ip': 7}, 'con_key': ['abuseipdb']},
+        'transforms': {'total': 39, 'por_tipo': {'domain': 12, 'ip': 7}, 'con_key': ['abuseipdb']},
         'herramientas': {'dig': True, 'nuclei': False},
         'keys': ['github', 'abuseipdb'],
         'ia': {'disponible': True, 'modelo': 'qwen2.5:3b'},
@@ -20,7 +20,7 @@ def _datos():
 
 def test_render_muestra_datos():
     html = render_estado(_datos())
-    for txt in ('system status', '39', 'dominio', 'qwen2.5:3b', 'github', 'abuseipdb', 'dig'):
+    for txt in ('system status', '39', 'domain', 'qwen2.5:3b', 'github', 'abuseipdb', 'dig'):
         assert txt in html, f'missing: {txt}'
 
 

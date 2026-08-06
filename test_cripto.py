@@ -75,7 +75,7 @@ def test_riesgo_wallet_y_regla(monkeypatch):
     prod, e, alm = _correr('riesgo_wallet', 'wallet', '1BadRansomAddr')
     assert 'ransomware' in e.tags
     h = correlate(alm)
-    assert any(x.regla == 'wallet-ransomware' and x.severidad == 'critical' for x in h)
+    assert any(x.rule == 'wallet-ransomware' and x.severity == 'critical' for x in h)
 
 
 def test_riesgo_wallet_limpia(monkeypatch):

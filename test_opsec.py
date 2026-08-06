@@ -8,7 +8,7 @@ Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_opsec.py -q
 def test_gestor_personas(tmp_path):
     from core.personas import PersonaManager
     g = PersonaManager(str(tmp_path / 'p.json'))
-    g.create('juan_investigador', {'email': 'juan@proton.me', 'usuario': 'juanx'})
+    g.create('juan_investigador', {'email': 'juan@proton.me', 'user': 'juanx'})
     assert 'juan_investigador' in g.list_ws()
     p = g.get('juan_investigador')
     assert p['email'] == 'juan@proton.me' and 'created' in p
@@ -116,6 +116,6 @@ def test_registrar_huella():
     ob._HUELLA.clear()
     ob._OPSEC['anonimo'] = False
     ob._PROXIES['pool'] = []
-    ob._registrar_huella('crtsh', 'dominio', 'x.com')
+    ob._registrar_huella('crtsh', 'domain', 'x.com')
     assert ob._HUELLA[0]['transform'] == 'crtsh' and ob._HUELLA[0]['anonimo'] is False
-    assert ob._HUELLA[0]['objetivo'] == 'dominio:x.com'
+    assert ob._HUELLA[0]['target'] == 'domain:x.com'

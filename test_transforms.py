@@ -23,17 +23,17 @@ def _registro_aislado():
 
 # ── contract + registry + decorator (steps 26, 27) ──────────────────────────
 def test_decorator_registra():
-    @tr.transform(entrada='dominio', salidas=('ip',), nombre='dns')
+    @tr.transform(entrada='domain', salidas=('ip',), nombre='dns')
     def _f(entidad, ctx):
         pass
     assert tr.REGISTRO.by_name('dns') is not None
-    assert tr.REGISTRO.applicable('dominio')[0].nombre == 'dns'
+    assert tr.REGISTRO.applicable('domain')[0].nombre == 'dns'
 
 def test_tipo_entrada_o_salida_invalido_falla():
     with pytest.raises(ValueError):
         tr.Transform(nombre='x', entrada='inventado')
     with pytest.raises(ValueError):
-        tr.Transform(nombre='y', entrada='dominio', salidas=('inventado',))
+        tr.Transform(nombre='y', entrada='domain', salidas=('inventado',))
 
 def test_no_duplicar_nombre():
     tr.Transform  # noqa
@@ -46,13 +46,13 @@ def test_no_duplicar_nombre():
 
 # ── execution: input → outputs, related and with provenance (step 28) ──────
 def test_ejecutar_emite_relaciona_y_anota_procedencia():
-    @tr.transform(entrada='dominio', salidas=('ip', 'subdominio'), nombre='dns')
+    @tr.transform(entrada='domain', salidas=('ip', 'subdomain'), nombre='dns')
     def _dns(entidad, ctx):
         ctx.emitir('ip', '93.184.216.34', label='A')
-        ctx.emitir('subdominio', 'www.' + entidad.value, label='subdominio')
+        ctx.emitir('subdomain', 'www.' + entidad.value, label='subdomain')
 
     alm = Store()
-    dom = alm.create('dominio', 'example.com')
+    dom = alm.create('domain', 'example.com')
     producidas = tr.run_by_name('dns', dom, alm)
 
     assert len(producidas) == 2
@@ -64,7 +64,7 @@ def test_ejecutar_emite_relaciona_y_anota_procedencia():
     assert len(alm.relations) == 2
 
 def test_ejecutar_valida_tipo_de_entrada():
-    @tr.transform(entrada='dominio', nombre='solo_dominio')
+    @tr.transform(entrada='domain', nombre='solo_dominio')
     def _f(entidad, ctx): pass
     alm = Store()
     ip = alm.create('ip', '8.8.8.8')
@@ -74,25 +74,25 @@ def test_ejecutar_valida_tipo_de_entrada():
 
 # ── failure isolation (step 38) ─────────────────────────────────────────────
 def test_transform_que_revienta_no_propaga():
-    @tr.transform(entrada='dominio', salidas=('ip',), nombre='medio_roto')
+    @tr.transform(entrada='domain', salidas=('ip',), nombre='medio_roto')
     def _f(entidad, ctx):
         ctx.emitir('ip', '1.1.1.1')       # this does get through
         raise RuntimeError("boom")         # crashes afterwards
 
     alm = Store()
-    dom = alm.create('dominio', 'example.com')
+    dom = alm.create('domain', 'example.com')
     producidas = tr.run_by_name('medio_roto', dom, alm)   # does NOT raise
     assert len(producidas) == 1
     assert alm.buscar('ip', '1.1.1.1') is not None
 
 def test_emitir_valor_basura_se_ignora():
-    @tr.transform(entrada='dominio', salidas=('ip',), nombre='sucio')
+    @tr.transform(entrada='domain', salidas=('ip',), nombre='sucio')
     def _f(entidad, ctx):
         assert ctx.emitir('ip', '   ') is None   # empty value -> None, no crash
         ctx.emitir('ip', '8.8.8.8')
 
     alm = Store()
-    dom = alm.create('dominio', 'example.com')
+    dom = alm.create('domain', 'example.com')
     producidas = tr.run_by_name('sucio', dom, alm)
     assert len(producidas) == 1
 
@@ -103,12 +103,12 @@ def test_transform_dispara_eventos_del_bus():
     bus = Bus()
     bus.suscribir(ENTIDAD_NUEVA, lambda e: nuevas.append(e))
 
-    @tr.transform(entrada='dominio', salidas=('ip',), nombre='dns')
+    @tr.transform(entrada='domain', salidas=('ip',), nombre='dns')
     def _f(entidad, ctx):
         ctx.emitir('ip', '9.9.9.9')
 
     alm = Store(bus=bus)
-    dom = alm.create('dominio', 'example.com')   # 1 event
+    dom = alm.create('domain', 'example.com')   # 1 event
     tr.run_by_name('dns', dom, alm)     # +1 event (the ip)
     assert len(nuevas) == 2
 
@@ -116,13 +116,13 @@ def test_transform_dispara_eventos_del_bus():
 # ── cache: do not repeat the same (transform, entity) -- step 41 ────────────
 def test_corredor_cachea():
     corridas = []
-    @tr.transform(entrada='dominio', salidas=('ip',), nombre='dns')
+    @tr.transform(entrada='domain', salidas=('ip',), nombre='dns')
     def _f(entidad, ctx):
         corridas.append(1)
         ctx.emitir('ip', '8.8.8.8')
 
     alm = Store()
-    dom = alm.create('dominio', 'example.com')
+    dom = alm.create('domain', 'example.com')
     corr = tr.Runner(alm)
     corr.run('dns', dom)
     corr.run('dns', dom)      # second time: cache, does not re-run
@@ -131,22 +131,22 @@ def test_corredor_cachea():
 
 # ── Machine: chain that cascades from one type to the next -- step 39 ───────
 def test_machine_cascada():
-    @tr.transform(entrada='dominio', salidas=('ip',), nombre='dns')
+    @tr.transform(entrada='domain', salidas=('ip',), nombre='dns')
     def _dns(entidad, ctx):
         ctx.emitir('ip', '93.184.216.34', label='A')
 
-    @tr.transform(entrada='ip', salidas=('puerto',), nombre='ports')
+    @tr.transform(entrada='ip', salidas=('port',), nombre='ports')
     def _ports(entidad, ctx):
-        ctx.emitir('puerto', '443', label='open')
+        ctx.emitir('port', '443', label='open')
 
     alm = Store()
-    dom = alm.create('dominio', 'example.com')
+    dom = alm.create('domain', 'example.com')
     receta = tr.Machine(nombre='recon', pasos=('dns', 'ports'))
     producidas = tr.Runner(alm).run_machine(receta, dom)
 
     tipos = sorted(e.type for e in producidas)
-    assert tipos == ['ip', 'puerto']              # cascade: domain→ip→port
-    assert alm.buscar('puerto', '443') is not None
+    assert tipos == ['ip', 'port']              # cascade: domain→ip→port
+    assert alm.buscar('port', '443') is not None
 
 
 # ── plugins: load transforms from a directory -- step 42 ────────────────────
@@ -154,7 +154,7 @@ def test_cargar_plugins(tmp_path):
     plugin = tmp_path / "mi_transform.py"
     plugin.write_text(
         "import core.transforms as tr\n"
-        "@tr.transform(entrada='dominio', salidas=('ip',), nombre='plugin_dns')\n"
+        "@tr.transform(entrada='domain', salidas=('ip',), nombre='plugin_dns')\n"
         "def f(entidad, ctx):\n"
         "    ctx.emitir('ip', '1.2.3.4')\n"
     )

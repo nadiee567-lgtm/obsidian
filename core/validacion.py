@@ -14,8 +14,8 @@ _SHELL_PELIGROSOS = set(' \t\n\r;&|`$<>(){}[]!*?~"\'\\')
 
 # A module -> which target type it expects (to validate with the right pattern).
 _MODULO_TIPO = {
-    'usuario': 'usuario', 'dominio': 'dominio', 'ip': 'ip', 'email': 'email',
-    'ssl': 'dominio', 'typosquatting': 'dominio', 'takeover': 'dominio',
+    'user': 'user', 'domain': 'domain', 'ip': 'ip', 'email': 'email',
+    'ssl': 'domain', 'typosquatting': 'domain', 'takeover': 'domain',
 }
 
 _RE_DOMINIO = re.compile(r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$')
@@ -37,9 +37,9 @@ def _validar(arg, type):
     arg = (arg or '').strip()
     if not arg or len(arg) > 253:
         return False
-    if type == 'dominio':  return bool(_RE_DOMINIO.match(arg))
+    if type == 'domain':  return bool(_RE_DOMINIO.match(arg))
     if type == 'ip':       return _es_ip(arg)
-    if type == 'usuario':  return bool(_RE_USUARIO.match(arg))
+    if type == 'user':  return bool(_RE_USUARIO.match(arg))
     if type == 'email':    return bool(_RE_EMAIL.match(arg))
     # unknown type -> generic check
     return _objetivo_seguro(arg)

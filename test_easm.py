@@ -25,24 +25,24 @@ def _cliente_con(alm, monkeypatch):
 # ── 144: asset inventory ────────────────────────────────────────────────────
 def test_inventario(monkeypatch):
     alm = Store()
-    alm.create('dominio', 'x.com')
+    alm.create('domain', 'x.com')
     alm.create('ip', '1.2.3.4')
-    alm.create('puerto', '1.2.3.4:443')
+    alm.create('port', '1.2.3.4:443')
     alm.create('email', 'a@x.com')                # NOT an internet-facing asset
     c = _cliente_con(alm, monkeypatch)
     d = c.get('/api/v2/inventario').get_json()
     assert d['total_activos'] == 3               # domain+ip+port, not the email
-    assert set(d['inventario']) == {'dominio', 'ip', 'puerto'}
+    assert set(d['inventario']) == {'domain', 'ip', 'port'}
 
 
 # ── 145 + 146: continuous discovery + change detection (via the monitor) ─────
 def test_descubrimiento_y_cambios_via_monitor():
     from core.monitor import snapshot, diff
     alm = Store()
-    d = alm.create('dominio', 'x.com', properties={'cert_expira': '2027'})
+    d = alm.create('domain', 'x.com', properties={'cert_expira': '2027'})
     antes = snapshot(alm)
-    alm.create('subdominio', 'nuevo.x.com')       # new asset (145)
-    alm.create('puerto', '1.2.3.4:22')            # new port (146)
+    alm.create('subdomain', 'nuevo.x.com')       # new asset (145)
+    alm.create('port', '1.2.3.4:22')            # new port (146)
     d.properties['cert_expira'] = '2020'        # cert changed (146)
     cambios = diff(antes, snapshot(alm))
     valores = {e['value'] for e in cambios.nuevas_entidades}
@@ -54,18 +54,18 @@ def test_descubrimiento_y_cambios_via_monitor():
 def test_infra_compartida():
     from core.correlacion import correlate
     alm = Store()
-    alm.create('dominio', 'a.com', properties={'favicon_hash': '123456'})
-    alm.create('dominio', 'b.com', properties={'favicon_hash': '123456'})   # same favicon
-    alm.create('dominio', 'c.com', properties={'favicon_hash': '999'})       # different
-    r = [x for x in correlate(alm) if x.regla == 'infra-compartida']
+    alm.create('domain', 'a.com', properties={'favicon_hash': '123456'})
+    alm.create('domain', 'b.com', properties={'favicon_hash': '123456'})   # same favicon
+    alm.create('domain', 'c.com', properties={'favicon_hash': '999'})       # different
+    r = [x for x in correlate(alm) if x.rule == 'infra-compartida']
     assert len(r) == 1 and len(r[0].entities) == 2                          # a.com and b.com
 
 
 def test_infra_compartida_sin_grupo():
     from core.correlacion import correlate
     alm = Store()
-    alm.create('dominio', 'solo.com', properties={'favicon_hash': '111'})
-    assert not [x for x in correlate(alm) if x.regla == 'infra-compartida']
+    alm.create('domain', 'solo.com', properties={'favicon_hash': '111'})
+    assert not [x for x in correlate(alm) if x.rule == 'infra-compartida']
 
 
 # ── 148: tech -> CVE map (cve_lookup, with anti-noise CPE filter) ────────────
@@ -88,17 +88,17 @@ def test_score_exposicion():
     from core.correlacion import exposure_score
     assert exposure_score({}, 0) == 0
     # surface: 10 subdom + 3 ports(*2) = 16 ; risk 40//2 = 20 -> 36
-    assert exposure_score({'subdominio': 10, 'puerto': 3}, 40) == 36
-    assert exposure_score({'subdominio': 999}, 100) == 100          # caps at 100
+    assert exposure_score({'subdomain': 10, 'port': 3}, 40) == 36
+    assert exposure_score({'subdomain': 999}, 100) == 100          # caps at 100
 
 
 def test_exposicion_endpoint(monkeypatch):
     alm = Store()
     for i in range(5):
-        alm.create('subdominio', f's{i}.x.com')
+        alm.create('subdomain', f's{i}.x.com')
     c = _cliente_con(alm, monkeypatch)
     d = c.get('/api/v2/exposicion').get_json()
-    assert d['superficie']['subdominio'] == 5 and 0 <= d['exposicion'] <= 100
+    assert d['superficie']['subdomain'] == 5 and 0 <= d['exposicion'] <= 100
 
 
 # ── 150: Shadow IT / forgotten assets ───────────────────────────────────────
@@ -106,10 +106,10 @@ def test_shadow_it():
     from core.correlacion import correlate
     alm = Store()
     alm.create('bucket', 'acme-backups').tag('publico')           # open storage
-    alm.create('subdominio', 'viejo.acme.com', properties={'http_status': 503})  # broken
-    alm.create('subdominio', 'vivo.acme.com', properties={'http_status': 200})   # healthy
-    r = [x for x in correlate(alm) if x.regla == 'shadow-it']
-    sev = {x.severidad for x in r}
+    alm.create('subdomain', 'viejo.acme.com', properties={'http_status': 503})  # broken
+    alm.create('subdomain', 'vivo.acme.com', properties={'http_status': 200})   # healthy
+    r = [x for x in correlate(alm) if x.rule == 'shadow-it']
+    sev = {x.severity for x in r}
     assert len(r) == 2 and sev == {'high', 'medium'}                    # bucket + broken subdom
 
 
@@ -119,10 +119,10 @@ def test_diff_historico(tmp_path):
     g = Manager(str(tmp_path))
     g.create('caso')
     alm = Store()
-    alm.create('subdominio', 'a.x.com')
+    alm.create('subdomain', 'a.x.com')
     g.guardar('caso', alm)
     sid = g.snapshot('caso')                     # historical snapshot: 1 asset
-    alm.create('subdominio', 'b.x.com')           # a new asset appeared
+    alm.create('subdomain', 'b.x.com')           # a new asset appeared
     g.guardar('caso', alm)
     viejo = g.load_snapshot('caso', sid)
     assert len(viejo) == 1

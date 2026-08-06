@@ -75,10 +75,63 @@ def _migrar_esquema(con) -> None:
                 con.execute(f"ALTER TABLE {tabla} RENAME COLUMN {viejo} TO {nuevo}")
 
 
+# Spanish entity-type VALUES stored in old cases -> English (Phase B3, step 2).
+# Changing a type value changes the entity id (id = sha1("type:value")), so the
+# ids must be recomputed and every relation endpoint remapped. Idempotent.
+_TYPE_VALUE_RENAME = {
+    'dominio': 'domain', 'subdominio': 'subdomain', 'usuario': 'user',
+    'telefono': 'phone', 'plataforma': 'platform', 'credencial': 'credential',
+    'archivo': 'file', 'imagen': 'image', 'puerto': 'port', 'pais': 'country',
+    'persona': 'person', 'objetivo': 'target',
+}
+
+
+def _sha1_id(base: str) -> str:
+    import hashlib
+    return hashlib.sha1(base.encode('utf-8')).hexdigest()[:16]
+
+
+def _migrar_valores_tipo(con) -> None:
+    """Rewrites legacy Spanish type values to English, recomputing entity ids and
+    remapping relation endpoints. Runs at raw-SQL level, before the model (which
+    would reject the old type values) ever sees the rows. No-op if already English."""
+    try:
+        tipos = {r[0] for r in con.execute("SELECT DISTINCT type FROM entities")}
+    except sqlite3.OperationalError:
+        return                                   # fresh DB, no entities table yet
+    if not (tipos & set(_TYPE_VALUE_RENAME)):
+        return                                   # nothing legacy -> done
+    rows = con.execute(
+        "SELECT id,type,value,properties,sources,tags,provenance,confidence,created FROM entities"
+    ).fetchall()
+    idmap = {}                                   # old entity id -> new entity id
+    nuevas = []
+    for (eid, type_, value, props, srcs, tags, prov, conf, created) in rows:
+        ntype = _TYPE_VALUE_RENAME.get(type_, type_)
+        nid = _sha1_id(f"{ntype}:{value}")
+        idmap[eid] = nid
+        nuevas.append((nid, ntype, value, props, srcs, tags, prov, conf, created))
+    rels = con.execute("SELECT id,source,target,label FROM relations").fetchall()
+    nrels = []
+    for (_rid, src, tgt, label) in rels:
+        ns, nt = idmap.get(src, src), idmap.get(tgt, tgt)
+        nrels.append((_sha1_id(f"{ns}>{nt}:{label or ''}"), ns, nt, label))
+    with con:
+        con.execute("DELETE FROM entities")
+        con.executemany(
+            "INSERT OR REPLACE INTO entities "
+            "(id,type,value,properties,sources,tags,provenance,confidence,created) "
+            "VALUES (?,?,?,?,?,?,?,?,?)", nuevas)
+        con.execute("DELETE FROM relations")
+        con.executemany(
+            "INSERT OR REPLACE INTO relations (id,source,target,label) VALUES (?,?,?,?)", nrels)
+
+
 def _conectar(db_path):
     con = sqlite3.connect(db_path)
-    _migrar_esquema(con)          # bring any legacy schema up to date first
-    con.executescript(_SCHEMA)    # then create tables if this is a fresh DB
+    _migrar_esquema(con)          # 1) legacy Spanish tables/columns -> English
+    con.executescript(_SCHEMA)    # 2) create tables if this is a fresh DB
+    _migrar_valores_tipo(con)     # 3) legacy Spanish type VALUES -> English (+ reindex ids)
     return con
 
 

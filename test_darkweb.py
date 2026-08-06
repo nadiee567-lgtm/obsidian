@@ -44,14 +44,14 @@ def test_haystak(monkeypatch):
         text = 'resultados: abcdefghij234567.onion y zzzz2233abcdefgh.onion'
     monkeypatch.setattr(ob, '_tor_disponible', lambda: True)
     monkeypatch.setattr(ob, '_fetch_tor', lambda url, **k: R())
-    prod, _ = _correr('haystak', 'persona', 'objetivo')
+    prod, _ = _correr('haystak', 'person', 'target')
     onions = {x.value for x in prod if x.type == 'url'}
     assert any('.onion' in o for o in onions) and len(onions) == 2
 
 
 def test_haystak_sin_tor(monkeypatch):
     monkeypatch.setattr(ob, '_tor_disponible', lambda: False)
-    prod, e = _correr('haystak', 'persona', 'objetivo')
+    prod, e = _correr('haystak', 'person', 'target')
     assert prod == [] and 'requires Tor' in e.properties.get('haystak', '')
 
 
@@ -59,14 +59,14 @@ def test_haystak_sin_tor(monkeypatch):
 def test_telegram_sin_credenciales(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('TELEGRAM_API', '')
-    prod, e = _correr('telegram', 'usuario', 'durov')
+    prod, e = _correr('telegram', 'user', 'durov')
     assert prod == [] and 'api_id:api_hash' in e.properties.get('telegram', '')
 
 
 def test_telegram_sin_sesion(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: '123:abchash')
     monkeypatch.setattr(ob.os.path, 'exists', lambda p: not str(p).endswith('telegram.session'))
-    prod, e = _correr('telegram', 'usuario', 'durov')
+    prod, e = _correr('telegram', 'user', 'durov')
     assert prod == [] and 'login' in e.properties.get('telegram', '')
 
 
@@ -79,15 +79,15 @@ def test_coincidencias_leak():
 def test_canal_leaks(monkeypatch):
     textos = ['combolist fresca de acme.com', 'admin@acme.com filtrado en breach', 'gatitos']
     monkeypatch.setattr(ob, '_tg_mensajes', lambda u, limite=100: (True, (123, textos)))
-    prod, e = _correr('canal_leaks', 'usuario', 'canal_ru')
+    prod, e = _correr('canal_leaks', 'user', 'canal_ru')
     assert 'canal-leaks' in e.tags and e.properties.get('leaks_menciones') == 2
-    assert 'acme.com' in {x.value for x in prod if x.type == 'dominio'}
+    assert 'acme.com' in {x.value for x in prod if x.type == 'domain'}
     assert 'admin@acme.com' in {x.value for x in prod if x.type == 'email'}
 
 
 def test_canal_leaks_sin_creds(monkeypatch):
     monkeypatch.setattr(ob, '_tg_mensajes', lambda u, limite=100: (False, 'falta api_id:api_hash ...'))
-    prod, e = _correr('canal_leaks', 'usuario', 'x')
+    prod, e = _correr('canal_leaks', 'user', 'x')
     assert prod == [] and 'api_id' in e.properties.get('canal_leaks', '')
 
 
@@ -102,7 +102,7 @@ class _RjD:
 def test_stealer_dominio(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _RjD({'data': {'employees': 12, 'users': 340}}))
-    _, e = _correr('stealer_dominio', 'dominio', 'acme.com')
+    _, e = _correr('stealer_dominio', 'domain', 'acme.com')
     assert 'stealer-expuesto' in e.tags
     assert e.properties.get('stealer_empleados') == 12 and e.properties.get('stealer_usuarios') == 340
 
@@ -110,7 +110,7 @@ def test_stealer_dominio(monkeypatch):
 def test_stealer_dominio_limpio(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _RjD({'data': {'employees': 0, 'users': 0}}))
-    _, e = _correr('stealer_dominio', 'dominio', 'acme.com')
+    _, e = _correr('stealer_dominio', 'domain', 'acme.com')
     assert 'stealer-expuesto' not in e.tags
 
 

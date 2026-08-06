@@ -15,7 +15,7 @@ def _correr(nombre, type, value):
 
 # ── 33: phone ───────────────────────────────────────────────────────────────
 def test_telefono_dorks_keyless():
-    prod, _, _ = _correr('telefono_dorks', 'telefono', '+14155552671')
+    prod, _, _ = _correr('telefono_dorks', 'phone', '+14155552671')
     dorks = {p.properties.get('dork') for p in prod if p.type == 'url'}
     assert dorks == {'truecaller', 'whitepages', 'messaging', 'general'}
     assert all(p.type == 'url' for p in prod)      # no key: only dorks, no country
@@ -24,8 +24,8 @@ def test_telefono_dorks_keyless():
 # ── 34: typosquatting / buckets / takeover / passivedns ─────────────────────
 def test_typosquatting(monkeypatch):
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: '1.2.3.4\n')   # everything "resolves"
-    prod, _, _ = _correr('typosquatting', 'dominio', 'google.com')
-    assert prod and all(p.type == 'dominio' and 'typosquat' in p.tags for p in prod)
+    prod, _, _ = _correr('typosquatting', 'domain', 'google.com')
+    assert prod and all(p.type == 'domain' and 'typosquat' in p.tags for p in prod)
 
 
 def test_buckets(monkeypatch):
@@ -46,7 +46,7 @@ def test_takeover(monkeypatch):
             return [{'name_value': 'abandonado.ejemplo.com'}]
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: Rj())
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: 'user.github.io.\n')  # orphan CNAME
-    prod, _, _ = _correr('takeover', 'dominio', 'ejemplo.com')
+    prod, _, _ = _correr('takeover', 'domain', 'ejemplo.com')
     vulns = [p for p in prod if 'takeover' in p.tags]
     assert vulns and vulns[0].value == 'abandonado.ejemplo.com'
 
@@ -57,14 +57,14 @@ def test_passivedns(monkeypatch):
         def json(self):
             return {'data': [{'attributes': {'ip_address': '9.9.9.9', 'date': 1600000000}}]}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: R())
-    prod, _, _ = _correr('passivedns', 'dominio', 'ejemplo.com')
+    prod, _, _ = _correr('passivedns', 'domain', 'ejemplo.com')
     assert {p.value for p in prod if p.type == 'ip'} == {'9.9.9.9'}
 
 
 def test_passivedns_sin_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('VT_API_KEY', '')
-    prod, _, _ = _correr('passivedns', 'dominio', 'ejemplo.com')
+    prod, _, _ = _correr('passivedns', 'domain', 'ejemplo.com')
     assert prod == []
 
 
@@ -89,23 +89,23 @@ def test_github_sec_y_regla(monkeypatch):
         return _Rj([])
     monkeypatch.setattr(ob._boveda, 'get', lambda s: '')
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
-    prod, _, alm = _correr('github_sec', 'usuario', 'user')
-    creds = [p for p in prod if p.type == 'credencial']
+    prod, _, alm = _correr('github_sec', 'user', 'user')
+    creds = [p for p in prod if p.type == 'credential']
     assert creds and 'secreto-github' in creds[0].tags
     h = correlate(alm)
-    assert any(x.regla == 'secreto-github' and x.severidad == 'critical' for x in h)
+    assert any(x.rule == 'secreto-github' and x.severity == 'critical' for x in h)
 
 
 # ── 56: exposed login/panel + credential ────────────────────────────────────
 def test_login_expuesto_regla():
     from core.correlacion import correlate
     alm = Store()
-    alm.create('dominio', 'admin.x.com').tag('panel-login')
-    r = [x for x in correlate(alm) if x.regla == 'login-expuesto']
-    assert r and r[0].severidad == 'high'
+    alm.create('domain', 'admin.x.com').tag('panel-login')
+    r = [x for x in correlate(alm) if x.rule == 'login-expuesto']
+    assert r and r[0].severity == 'high'
     alm.create('email', 'a@x.com').tag('filtrado')     # login + credential
-    r2 = [x for x in correlate(alm) if x.regla == 'login-expuesto']
-    assert r2 and r2[0].severidad == 'critical'
+    r2 = [x for x in correlate(alm) if x.rule == 'login-expuesto']
+    assert r2 and r2[0].severity == 'critical'
 
 
 def test_http_probe_detecta_panel_login(monkeypatch):
@@ -115,7 +115,7 @@ def test_http_probe_detecta_panel_login(monkeypatch):
         headers = {}
         text = '<html><title>Admin</title><input type="password" name="pw"></html>'
     monkeypatch.setattr(ob, '_fetch_seguro', lambda *a, **k: R())
-    _, e, _ = _correr('http_probe', 'dominio', 'admin.x.com')
+    _, e, _ = _correr('http_probe', 'domain', 'admin.x.com')
     assert 'panel-login' in e.tags
 
 
@@ -124,58 +124,58 @@ def test_leak_login():
     from core.correlacion import correlate
     alm = Store()
     e = alm.create('email', 'admin@acme.com'); e.tag('filtrado')
-    p = alm.create('subdominio', 'panel.acme.com'); p.tag('panel-login')
-    r = [x for x in correlate(alm) if x.regla == 'leak-login']
-    assert r and r[0].severidad == 'critical'
+    p = alm.create('subdomain', 'panel.acme.com'); p.tag('panel-login')
+    r = [x for x in correlate(alm) if x.rule == 'leak-login']
+    assert r and r[0].severity == 'critical'
     assert e.id in r[0].entities and p.id in r[0].entities   # names both
 
 
 def test_leak_login_sin_filtrado():
     from core.correlacion import correlate
     alm = Store()
-    alm.create('subdominio', 'panel.acme.com').tag('panel-login')   # panel but no credential
-    assert not [x for x in correlate(alm) if x.regla == 'leak-login']
+    alm.create('subdomain', 'panel.acme.com').tag('panel-login')   # panel but no credential
+    assert not [x for x in correlate(alm) if x.rule == 'leak-login']
 
 
 # ── 59: platform pivot ──────────────────────────────────────────────────────
 def test_pivote_plataformas():
     from core.correlacion import correlate
     alm = Store()
-    u = alm.create('usuario', 'nadiee')
+    u = alm.create('user', 'nadiee')
     for i in range(6):
-        p = alm.create('plataforma', f'plat{i}')
+        p = alm.create('platform', f'plat{i}')
         alm.relate(u.id, p.id, 'presente')
-    r = [x for x in correlate(alm) if x.regla == 'pivote-plataformas']
-    assert r and '6 platforms' in r[0].mensaje
+    r = [x for x in correlate(alm) if x.rule == 'pivote-plataformas']
+    assert r and '6 platforms' in r[0].message
 
 
 def test_pivote_plataformas_pocas_no_dispara():
     from core.correlacion import correlate
     alm = Store()
-    u = alm.create('usuario', 'x')
+    u = alm.create('user', 'x')
     for i in range(3):                                   # <5 → no finding
-        alm.relate(u.id, alm.create('plataforma', f'p{i}').id, 'presente')
-    assert not [x for x in correlate(alm) if x.regla == 'pivote-plataformas']
+        alm.relate(u.id, alm.create('platform', f'p{i}').id, 'presente')
+    assert not [x for x in correlate(alm) if x.rule == 'pivote-plataformas']
 
 
 # ── 63: user YAML rule loader ───────────────────────────────────────────────
 def test_reglas_yaml():
     from core.correlacion import load_yaml_rules, correlate
     yaml_txt = """
-- nombre: puerto-ftp
-  severidad: high
-  mensaje: "FTP en {value}"
-  cuando:
-    type: puerto
-    valor_contiene: ":21"
+- name: puerto-ftp
+  severity: high
+  message: "FTP en {value}"
+  when:
+    type: port
+    value_contains: ":21"
 """
     try:
         assert load_yaml_rules(yaml_txt) == 1
         alm = Store()
-        alm.create('puerto', '1.2.3.4:21')
-        alm.create('puerto', '1.2.3.4:443')              # does not match
-        r = [x for x in correlate(alm) if x.regla == 'puerto-ftp']
-        assert len(r) == 1 and r[0].severidad == 'high' and r[0].mensaje == 'FTP en 1.2.3.4:21'
+        alm.create('port', '1.2.3.4:21')
+        alm.create('port', '1.2.3.4:443')              # does not match
+        r = [x for x in correlate(alm) if x.rule == 'puerto-ftp']
+        assert len(r) == 1 and r[0].severity == 'high' and r[0].message == 'FTP en 1.2.3.4:21'
     finally:
         load_yaml_rules('')                          # clears the global
 
@@ -183,8 +183,8 @@ def test_reglas_yaml():
 def test_reglas_yaml_severidad_invalida_se_normaliza():
     from core.correlacion import load_yaml_rules, _REGLAS_YAML
     try:
-        load_yaml_rules("- nombre: x\n  severidad: URGENTISIMO\n  cuando: {tag: y}\n")
-        assert _REGLAS_YAML[0]['severidad'] == 'medium'  # invalid severity → medio
+        load_yaml_rules("- name: x\n  severity: URGENTISIMO\n  when: {tag: y}\n")
+        assert _REGLAS_YAML[0]['severity'] == 'medium'  # invalid severity → medio
     finally:
         load_yaml_rules('')
 
@@ -202,7 +202,7 @@ def test_rate_limit_concurrencia():
 
     estado, lock = {'activos': 0, 'max': 0}, threading.Lock()
 
-    @transform(entrada='dominio', salidas=(), nombre='_test_rl')
+    @transform(entrada='domain', salidas=(), nombre='_test_rl')
     def _rl(entidad, ctx):
         with lock:
             estado['activos'] += 1
@@ -215,7 +215,7 @@ def test_rate_limit_concurrencia():
     try:
         def run():
             alm = Store()
-            run_by_name('_test_rl', alm.create('dominio', 'x.com'), alm)
+            run_by_name('_test_rl', alm.create('domain', 'x.com'), alm)
         ths = [threading.Thread(target=run) for _ in range(4)]
         for t in ths:
             t.start()
@@ -271,7 +271,7 @@ def test_ejecutar_lote_progreso():
 def test_persona(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _Rj({'AbstractText': 'Person bio.'}))
-    prod, e, _ = _correr('persona', 'persona', 'Juan Perez')
+    prod, e, _ = _correr('person', 'person', 'Juan Perez')
     assert {p.properties.get('dork') for p in prod} == {'linkedin', 'x', 'contact', 'pdf', 'github', 'facebook'}
     assert e.properties.get('resumen') == 'Person bio.'
 
@@ -281,7 +281,7 @@ def test_darkweb_ahmia(monkeypatch):
     class R:
         text = html
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: R())
-    prod, _, _ = _correr('darkweb', 'persona', 'algo')
+    prod, _, _ = _correr('darkweb', 'person', 'algo')
     urls = {p.value for p in prod if p.type == 'url'}
     assert urls == {'http://abc.onion', 'http://xyz.onion'}   # normalizer strips the trailing /
 
@@ -300,14 +300,14 @@ def test_render_js_bloquea_ssrf(monkeypatch):
 
 
 def test_yara_bulk_carpeta_invalida():
-    prod, _, _ = _correr('yara_bulk', 'archivo', '/does/not/exist/xyz')
+    prod, _, _ = _correr('yara_bulk', 'file', '/does/not/exist/xyz')
     assert prod == []
 
 
 def test_wordlist_ia(monkeypatch):
     monkeypatch.setattr(ob.ia, 'disponible', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'juan2024\npassword123\nperez.juan\nabc')
-    _, e, _ = _correr('wordlist', 'persona', 'Juan')
+    _, e, _ = _correr('wordlist', 'person', 'Juan')
     palabras = e.properties.get('wordlist')
     assert 'juan2024' in palabras and 'abc' not in palabras   # filters <6 chars
 

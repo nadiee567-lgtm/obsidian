@@ -15,8 +15,8 @@ def _correr(nombre, type, value):
 
 # ── 171: regional social platforms ──────────────────────────────────────────
 def test_plataformas_regionales():
-    prod, _ = _correr('plataformas_regionales', 'usuario', 'nadiee')
-    plats = {p.properties.get('plataforma') for p in prod if p.type == 'url'}
+    prod, _ = _correr('plataformas_regionales', 'user', 'nadiee')
+    plats = {p.properties.get('platform') for p in prod if p.type == 'url'}
     assert {'vk', 'ok', 'weibo', 'douyin', 'telegram'} == plats
 
 
@@ -28,8 +28,8 @@ def test_transliterar_funciones():
 
 
 def test_transliterar_transform():
-    prod, _ = _correr('transliterar', 'persona', 'Иван')
-    variantes = {p.value for p in prod if p.type == 'persona'}
+    prod, _ = _correr('transliterar', 'person', 'Иван')
+    variantes = {p.value for p in prod if p.type == 'person'}
     assert 'ivan' in variantes                    # latin variant
 
 
@@ -42,7 +42,7 @@ def test_registros_regionales():
 
 # ── 174: local engines ──────────────────────────────────────────────────────
 def test_motores_locales():
-    prod, _ = _correr('motores_locales', 'persona', 'Ivan Petrov')
+    prod, _ = _correr('motores_locales', 'person', 'Ivan Petrov')
     motores = {p.properties.get('motor') for p in prod if p.type == 'url'}
     assert {'yandex', 'baidu', 'sogou'} == motores
 
@@ -71,7 +71,7 @@ def test_dorks_por_idioma():
 
 
 def test_dorks_idioma_transform():
-    prod, _ = _correr('dorks_idioma', 'persona', 'Иван Петров')   # cyrillic -> ru
+    prod, _ = _correr('dorks_idioma', 'person', 'Иван Петров')   # cyrillic -> ru
     idiomas = {p.properties.get('idioma') for p in prod if p.type == 'url'}
     assert idiomas == {'ru'}
 

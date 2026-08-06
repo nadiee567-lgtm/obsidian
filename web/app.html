@@ -197,12 +197,12 @@ input[type=text]::placeholder{color:#55555f}
     <div class="card">
       <div class="card-title">OSINT Modules</div>
       <div class="mod-grid">
-        <div class="mod-btn" onclick="selMod('persona')"><span class="icon">👤</span><div class="name">Persona</div><div class="cat">OSINT</div></div>
-        <div class="mod-btn" onclick="selMod('usuario')"><span class="icon">🏷️</span><div class="name">Username</div><div class="cat">400+ platforms</div></div>
-        <div class="mod-btn" onclick="selMod('dominio')"><span class="icon">🌐</span><div class="name">Domain</div><div class="cat">Full Recon</div></div>
+        <div class="mod-btn" onclick="selMod('person')"><span class="icon">👤</span><div class="name">Persona</div><div class="cat">OSINT</div></div>
+        <div class="mod-btn" onclick="selMod('user')"><span class="icon">🏷️</span><div class="name">Username</div><div class="cat">400+ platforms</div></div>
+        <div class="mod-btn" onclick="selMod('domain')"><span class="icon">🌐</span><div class="name">Domain</div><div class="cat">Full Recon</div></div>
         <div class="mod-btn" onclick="selMod('ip')"><span class="icon">📡</span><div class="name">IP</div><div class="cat">Geo · Ports · ASN</div></div>
         <div class="mod-btn" onclick="selMod('email')"><span class="icon">📧</span><div class="name">Email</div><div class="cat">Breach · SPF · DMARC</div></div>
-        <div class="mod-btn" onclick="selMod('telefono')"><span class="icon">📱</span><div class="name">Phone</div><div class="cat">Carrier · Social</div></div>
+        <div class="mod-btn" onclick="selMod('phone')"><span class="icon">📱</span><div class="name">Phone</div><div class="cat">Carrier · Social</div></div>
       </div>
       <div class="input-row">
         <input type="text" id="mod-arg" placeholder="Enter target..." onkeydown="if(event.key==='Enter')ejecutar()">
@@ -693,7 +693,7 @@ async function ejecutarKali() {
               append(out, res.output + '\n');
             }
           } else if (d.status === 'error') {
-            append(out, '❌ Error: ' + d.mensaje + '\n', 'error');
+            append(out, '❌ Error: ' + d.message + '\n', 'error');
           }
         } catch(e) {}
       }
@@ -773,7 +773,7 @@ async function ejecutarParrot() {
             if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
             else append(out, res.output + '\n');
           } else if (d.status === 'error') {
-            append(out, '❌ Error: ' + d.mensaje + '\n', 'error');
+            append(out, '❌ Error: ' + d.message + '\n', 'error');
           }
         } catch(e) {}
       }
@@ -853,7 +853,7 @@ async function ejecutarRemnux() {
             if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
             else append(out, res.output + '\n');
           } else if (d.status === 'error') {
-            append(out, '❌ Error: ' + d.mensaje + '\n', 'error');
+            append(out, '❌ Error: ' + d.message + '\n', 'error');
           }
         } catch(e) {}
       }
@@ -933,7 +933,7 @@ async function ejecutarBlackarch() {
             if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
             else append(out, res.output + '\n');
           } else if (d.status === 'error') {
-            append(out, '❌ Error: ' + d.mensaje + '\n', 'error');
+            append(out, '❌ Error: ' + d.message + '\n', 'error');
           }
         } catch(e) {}
       }
@@ -1046,7 +1046,7 @@ async function cargarTimeline() {
     const d = await r.json();
     const evs = d.eventos || [];
     if (!evs.length) { cont.innerHTML = '<div style="color:#55555f;font-size:.8rem">No timeline data yet.</div>'; return; }
-    const COLORS = {ejecucion:'#d99a4e',dominio:'#5b9bd5',ip:'#d9564b',usuario:'#cc9a3c',email:'#6fae7c',darkweb:'#d9564b'};
+    const COLORS = {ejecucion:'#d99a4e',domain:'#5b9bd5',ip:'#d9564b',user:'#cc9a3c',email:'#6fae7c',darkweb:'#d9564b'};
     cont.innerHTML = '<div style="position:absolute;left:10px;top:0;bottom:0;width:2px;background:#26262f"></div>' +
       evs.map(e => {
         const color = COLORS[e.modulo] || '#8b8b98';
@@ -1063,7 +1063,7 @@ async function cargarTimeline() {
 async function iniciarMonitor() {
   const obj = document.getElementById('mon-obj').value.trim() || '';
   const intervalo = parseInt(document.getElementById('mon-interval').value);
-  const r = await fetch('/api/monitor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({objetivo:obj,intervalo})});
+  const r = await fetch('/api/monitor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:obj,intervalo})});
   const d = await r.json();
   toast(d.ok ? 'Monitor started ✓' : 'Already active');
   refreshMonitor();
@@ -1081,14 +1081,14 @@ async function refreshMonitor() {
     const d = await r.json();
     const st = document.getElementById('mon-status');
     st.innerHTML = d.activo
-      ? `<span style="color:#6fae7c">● ACTIVE</span> — target: <b>${d.objetivo||'active case'}</b> · interval: ${d.intervalo/60}min`
+      ? `<span style="color:#6fae7c">● ACTIVE</span> — target: <b>${d.target||'active case'}</b> · interval: ${d.intervalo/60}min`
       : '<span style="color:#55555f">● INACTIVE</span>';
     const out = document.getElementById('output-monitor');
     if (d.alertas && d.alertas.length) {
       out.innerHTML = '';
       d.alertas.forEach(a => {
         append(out, `[${a.ts}] `, 'info');
-        append(out, a.mensaje + '\n', 'warn');
+        append(out, a.message + '\n', 'warn');
       });
     }
   } catch(e) {}
@@ -1265,7 +1265,7 @@ async function ejecutar() {
             await refreshStatus();
             if (grafoNet) cargarGrafo();
           }
-          else if (d.status === 'error') { append(out, '❌ Error: ' + d.mensaje + '\n', 'error'); }
+          else if (d.status === 'error') { append(out, '❌ Error: ' + d.message + '\n', 'error'); }
         } catch(e) {}
       }
     }
@@ -1307,10 +1307,10 @@ async function runSim(mod) {
 
 async function nuevoCaso() {
   const nombre = document.getElementById('caso-nombre').value.trim() || 'case1';
-  const objetivo = document.getElementById('caso-obj').value.trim();
-  if (!objetivo) { toast('Enter the target'); return; }
+  const target = document.getElementById('caso-obj').value.trim();
+  if (!target) { toast('Enter the target'); return; }
   await fetch('/api/caso', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({nombre, objetivo})});
+    body: JSON.stringify({nombre, target})});
   await refreshStatus();
   toast('Case started: ' + nombre);
 }
@@ -1359,7 +1359,7 @@ async function buscarEnCasos() {
     if (!res.length) { append(out, 'No matches in any saved case.\n', 'info'); return; }
     append(out, `${res.length} case(s) matched:\n\n`, 'ok');
     res.forEach(r2 => {
-      append(out, `[${r2.caso}] target: ${r2.objetivo || '?'} · updated ${r2.actualizado}\n`, 'info');
+      append(out, `[${r2.caso}] target: ${r2.target || '?'} · updated ${r2.actualizado}\n`, 'info');
       append(out, `  modules: ${r2.modulos_con_match.join(', ') || '?'}\n\n`);
     });
   } catch(e) { document.getElementById('output-buscar-casos').innerHTML = '<span class="error">'+e.message+'</span>'; }
@@ -1374,7 +1374,7 @@ async function refreshStatus() {
     window.casoActivo = !!d.caso;
     const ci = document.getElementById('caso-info');
     if (d.caso) {
-      ci.innerHTML = `<b>${d.caso}</b> · target: <b>${d.objetivo}</b> · <span class="badge p">${d.modulos} modules</span>`;
+      ci.innerHTML = `<b>${d.caso}</b> · target: <b>${d.target}</b> · <span class="badge p">${d.modulos} modules</span>`;
     } else {
       ci.textContent = 'No active case — create one above';
     }

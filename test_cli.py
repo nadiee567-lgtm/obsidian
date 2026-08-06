@@ -6,8 +6,8 @@ import obsidian_cli as cli
 
 
 def test_parser_run():
-    a = cli.construir_parser().parse_args(['run', 'dominio', 'x.com', 'dns_a', '-w', 'c1'])
-    assert a.type == 'dominio' and a.value == 'x.com' and a.transform == 'dns_a'
+    a = cli.construir_parser().parse_args(['run', 'domain', 'x.com', 'dns_a', '-w', 'c1'])
+    assert a.type == 'domain' and a.value == 'x.com' and a.transform == 'dns_a'
     assert a.workspace == 'c1' and a.fn is cli.cmd_run
 
 
@@ -17,7 +17,7 @@ def test_parser_recon_con_keys():
 
 
 def test_transforms_lista(capsys):
-    assert cli.main(['transforms', 'dominio']) == 0
+    assert cli.main(['transforms', 'domain']) == 0
     out = capsys.readouterr().out
     assert 'dns_a' in out and '→' in out
 

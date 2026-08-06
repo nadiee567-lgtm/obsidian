@@ -26,7 +26,7 @@ def test_persistencia_aislada(tmp_path):
     """Each workspace stores its own, without mixing with another."""
     g = Manager(str(tmp_path))
     a = g.create('caso_a')
-    a.create('dominio', 'example.com', sources={'whois'})
+    a.create('domain', 'example.com', sources={'whois'})
     g.guardar('caso_a', a)
 
     b = g.create('caso_b')
@@ -36,10 +36,10 @@ def test_persistencia_aislada(tmp_path):
     # reload each one: sees only its own
     ra = g.cargar('caso_a')
     rb = g.cargar('caso_b')
-    assert ra.buscar('dominio', 'example.com') is not None
+    assert ra.buscar('domain', 'example.com') is not None
     assert ra.buscar('ip', '8.8.8.8') is None       # isolated
     assert rb.buscar('ip', '8.8.8.8') is not None
-    assert rb.buscar('dominio', 'example.com') is None
+    assert rb.buscar('domain', 'example.com') is None
 
 
 def test_sobrevive_recarga(tmp_path):

@@ -20,64 +20,64 @@ MOTORES = {
     'shodan': {
         'label': 'Shodan', 'requiere_key': True, 'cn': False, 'join': ' ',
         'campos': {
-            'ip': 'ip:{v}', 'dominio': 'hostname:{v}', 'favicon': 'http.favicon.hash:{v}',
-            'cert': 'ssl.cert.subject.cn:{v}', 'puerto': 'port:{v}', 'producto': 'product:{v}',
-            'org': 'org:"{v}"', 'pais': 'country:{v}', 'titulo': 'http.title:"{v}"', 'asn': 'asn:{v}',
+            'ip': 'ip:{v}', 'domain': 'hostname:{v}', 'favicon': 'http.favicon.hash:{v}',
+            'cert': 'ssl.cert.subject.cn:{v}', 'port': 'port:{v}', 'producto': 'product:{v}',
+            'org': 'org:"{v}"', 'country': 'country:{v}', 'titulo': 'http.title:"{v}"', 'asn': 'asn:{v}',
         }},
     'censys': {
         'label': 'Censys', 'requiere_key': True, 'cn': False, 'join': ' and ',
         'campos': {
-            'ip': 'ip:{v}', 'dominio': 'names:{v}',
+            'ip': 'ip:{v}', 'domain': 'names:{v}',
             'cert': 'services.tls.certificates.leaf_data.subject.common_name:{v}',
-            'puerto': 'services.port:{v}', 'producto': 'services.software.product:{v}',
-            'pais': 'location.country_code:{v}', 'asn': 'autonomous_system.asn:{v}',
+            'port': 'services.port:{v}', 'producto': 'services.software.product:{v}',
+            'country': 'location.country_code:{v}', 'asn': 'autonomous_system.asn:{v}',
         }},
     'zoomeye': {
         'label': 'ZoomEye', 'requiere_key': True, 'cn': True, 'join': ' ',
         'campos': {
-            'ip': 'ip:"{v}"', 'dominio': 'hostname:{v}', 'favicon': 'iconhash:"{v}"',
-            'cert': 'ssl:"{v}"', 'puerto': 'port:{v}', 'producto': 'app:"{v}"',
-            'pais': 'country:"{v}"', 'titulo': 'title:"{v}"', 'asn': 'asn:{v}',
+            'ip': 'ip:"{v}"', 'domain': 'hostname:{v}', 'favicon': 'iconhash:"{v}"',
+            'cert': 'ssl:"{v}"', 'port': 'port:{v}', 'producto': 'app:"{v}"',
+            'country': 'country:"{v}"', 'titulo': 'title:"{v}"', 'asn': 'asn:{v}',
         }},
     'fofa': {
         'label': 'FOFA', 'requiere_key': True, 'cn': True, 'join': ' && ',
         'campos': {
-            'ip': 'ip="{v}"', 'dominio': 'domain="{v}"', 'favicon': 'icon_hash="{v}"',
-            'cert': 'cert="{v}"', 'puerto': 'port="{v}"', 'producto': 'app="{v}"',
-            'org': 'org="{v}"', 'pais': 'country="{v}"', 'titulo': 'title="{v}"', 'asn': 'asn="{v}"',
+            'ip': 'ip="{v}"', 'domain': 'domain="{v}"', 'favicon': 'icon_hash="{v}"',
+            'cert': 'cert="{v}"', 'port': 'port="{v}"', 'producto': 'app="{v}"',
+            'org': 'org="{v}"', 'country': 'country="{v}"', 'titulo': 'title="{v}"', 'asn': 'asn="{v}"',
         }},
     'quake': {
         'label': 'Quake', 'requiere_key': True, 'cn': True, 'join': ' AND ',
         'campos': {
-            'ip': 'ip:"{v}"', 'dominio': 'domain:"{v}"', 'favicon': 'favicon:"{v}"',
-            'cert': 'cert:"{v}"', 'puerto': 'port:"{v}"', 'producto': 'app:"{v}"',
-            'pais': 'country:"{v}"', 'titulo': 'title:"{v}"',
+            'ip': 'ip:"{v}"', 'domain': 'domain:"{v}"', 'favicon': 'favicon:"{v}"',
+            'cert': 'cert:"{v}"', 'port': 'port:"{v}"', 'producto': 'app:"{v}"',
+            'country': 'country:"{v}"', 'titulo': 'title:"{v}"',
         }},
     'hunter': {
         'label': 'Hunter.how', 'requiere_key': True, 'cn': True, 'join': '&&',
         'campos': {
-            'ip': 'ip="{v}"', 'dominio': 'domain="{v}"', 'favicon': 'favicon.hash="{v}"',
-            'cert': 'cert="{v}"', 'puerto': 'port="{v}"', 'producto': 'product="{v}"',
-            'pais': 'country="{v}"', 'titulo': 'web.title="{v}"',
+            'ip': 'ip="{v}"', 'domain': 'domain="{v}"', 'favicon': 'favicon.hash="{v}"',
+            'cert': 'cert="{v}"', 'port': 'port="{v}"', 'producto': 'product="{v}"',
+            'country': 'country="{v}"', 'titulo': 'web.title="{v}"',
         }},
     'netlas': {
         'label': 'Netlas', 'requiere_key': True, 'cn': False, 'join': ' AND ',
         'campos': {
-            'ip': 'ip:{v}', 'dominio': 'domain:{v}',
-            'cert': 'certificate.subject.common_name:{v}', 'puerto': 'port:{v}',
-            'pais': 'geo.country:{v}', 'titulo': 'http.title:{v}',
+            'ip': 'ip:{v}', 'domain': 'domain:{v}',
+            'cert': 'certificate.subject.common_name:{v}', 'port': 'port:{v}',
+            'country': 'geo.country:{v}', 'titulo': 'http.title:{v}',
         }},
     'criminalip': {
         'label': 'Criminal IP', 'requiere_key': True, 'cn': False, 'join': ' ',
-        'campos': {'ip': 'ip: {v}', 'puerto': 'open_port: {v}', 'producto': 'product: {v}',
-                   'pais': 'country: {v}', 'titulo': 'title: {v}'}},
+        'campos': {'ip': 'ip: {v}', 'port': 'open_port: {v}', 'producto': 'product: {v}',
+                   'country': 'country: {v}', 'titulo': 'title: {v}'}},
     'binaryedge': {
         'label': 'BinaryEdge', 'requiere_key': True, 'cn': False, 'join': ' ',
-        'campos': {'ip': 'ip:{v}', 'puerto': 'port:{v}', 'producto': 'product:{v}',
-                   'pais': 'country:{v}'}},
+        'campos': {'ip': 'ip:{v}', 'port': 'port:{v}', 'producto': 'product:{v}',
+                   'country': 'country:{v}'}},
 }
 
-CAMPOS = ('ip', 'dominio', 'favicon', 'cert', 'puerto', 'producto', 'org', 'pais', 'titulo', 'asn')
+CAMPOS = ('ip', 'domain', 'favicon', 'cert', 'port', 'producto', 'org', 'country', 'titulo', 'asn')
 
 
 def motores_disponibles(cn=None) -> list:
