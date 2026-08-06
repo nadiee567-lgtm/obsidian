@@ -151,8 +151,8 @@ def _load_or_create_auth():
     auth = {'salt': salt.hex(), 'hash': _hash_password(pw, salt)}
     with open(AUTH_FILE, 'w') as f: json.dump(auth, f)
     os.chmod(AUTH_FILE, 0o600)
-    print(f"\n[OBSIDIAN] Contraseña generada: {pw}")
-    print(f"[OBSIDIAN] Guárdala — no se vuelve a mostrar. Para cambiarla: borra {AUTH_FILE} o usa OBSIDIAN_PASSWORD=tu_clave\n")
+    print(f"\n[OBSIDIAN] Generated password: {pw}")
+    print(f"[OBSIDIAN] Save it -- it is not shown again. To change it: delete {AUTH_FILE} or use OBSIDIAN_PASSWORD=your_key\n")
     return auth
 
 app.secret_key = _load_secret_key()
@@ -183,7 +183,7 @@ def login():
     now = time.time()
     intentos, bloqueado_hasta = _login_attempts.get(ip, [0, 0])
     if now < bloqueado_hasta:
-        err = f'<div class="err">Demasiados intentos. Esperá {int(bloqueado_hasta - now)}s.</div>'
+        err = f'<div class="err">Too many attempts. Wait {int(bloqueado_hasta - now)}s.</div>'
         return _LOGIN_HTML.format(error_html=err), 429
     if request.method == 'POST':
         pw = request.form.get('password', '')
@@ -201,7 +201,7 @@ def login():
         intentos += 1
         bloqueado_hasta = now + _LOCK_SECONDS if intentos >= _LOCK_THRESHOLD else 0
         _login_attempts[ip] = [intentos, bloqueado_hasta]
-        return _LOGIN_HTML.format(error_html='<div class="err">Contraseña incorrecta</div>'), 401
+        return _LOGIN_HTML.format(error_html='<div class="err">Incorrect password</div>'), 401
     return _LOGIN_HTML.format(error_html='')
 
 @app.route('/logout')
@@ -561,7 +561,7 @@ def _osint_phone(numero):
         if r.status_code == 200:
             d = r.json()
             datos['resultados']['info'] = {
-                'válido': d.get('valid', False),
+                'valid': d.get('valid', False),
                 'pais': d.get('country_name','?'),
                 'carrier': d.get('carrier','?'),
                 'tipo': d.get('line_type','?')
@@ -648,7 +648,7 @@ def _recon_favicon(dominio):
     try:
         import mmh3
     except ImportError:
-        datos['resultados']['error'] = "Falta la librería mmh3 — instalar con: pip install mmh3"
+        datos['resultados']['error'] = "Missing the mmh3 library -- install with: pip install mmh3"
         _guardar_dato(f'favicon_{dominio}', datos)
         return datos
     favicon_bytes = None
@@ -660,7 +660,7 @@ def _recon_favicon(dominio):
                 break
         except Exception as _e: log.debug("fuente no disponible: %s", _e)
     if not favicon_bytes:
-        datos['resultados']['error'] = 'No se encontró favicon.ico en el objetivo (probar con otra ruta manualmente)'
+        datos['resultados']['error'] = 'favicon.ico not found on the target (try another path manually)'
         _guardar_dato(f'favicon_{dominio}', datos)
         return datos
     favicon_b64 = base64.encodebytes(favicon_bytes)
@@ -896,11 +896,11 @@ def _recon_yara_bulk(carpeta):
     """Escanea todos los archivos de una carpeta con yara-rules — solo tiene sentido en PC."""
     datos = {'tipo':'yara_bulk','objetivo':carpeta,'resultados':{}}
     if not os.path.isdir(carpeta):
-        datos['resultados']['error'] = f'No es una carpeta válida: {carpeta}'
+        datos['resultados']['error'] = f'Not a valid folder: {carpeta}'
         _guardar_dato(f'yara_bulk_{carpeta}', datos)
         return datos
     if not _which('yara-rules'):
-        datos['resultados']['error'] = 'yara-rules no está instalado'
+        datos['resultados']['error'] = 'yara-rules is not installed'
         _guardar_dato(f'yara_bulk_{carpeta}', datos)
         return datos
     archivos = []
@@ -1141,7 +1141,7 @@ def _distrobox_run(distro, tool_dict, tool_id, arg):
     if not tool:
         return {'error': f'Unknown tool: {tool_id}'}
     if not _objetivo_seguro(arg):
-        return {'error': 'Argumento inválido: contiene caracteres no permitidos'}
+        return {'error': 'Invalid argument: contains disallowed characters'}
     cmd = tool['cmd'].replace('{arg}', arg.strip())
     resultado = _cmd(f'distrobox enter {distro} -- bash -c "{cmd}"', timeout=90)
     return {'tool': tool['nombre'], 'cmd': cmd, 'output': resultado}
@@ -1160,7 +1160,7 @@ def _kali_run(tool_id, arg):
 
     cmd_template = tool['cmd']
     if not _objetivo_seguro(arg):
-        return {'error': 'Argumento inválido: contiene caracteres no permitidos'}
+        return {'error': 'Invalid argument: contains disallowed characters'}
     cmd = cmd_template.replace('{arg}', arg.strip())
 
     full_cmd = f'distrobox enter kali -- bash -c "{cmd}"'
@@ -1445,8 +1445,8 @@ def _build_grafo():
                 ip_h = h.get('ip')
                 if not ip_h: continue
                 iid3 = nid('ip_'+ip_h)
-                add_node(iid3, ip_h, 'ip', f'IP histórica ({h.get("fecha","?")})')
-                add_edge(dom_id, iid3, f'resolvió {h.get("fecha","?")}')
+                add_node(iid3, ip_h, 'ip', f'historical IP ({h.get("fecha","?")})')
+                add_edge(dom_id, iid3, f'resolved {h.get("fecha","?")}')
 
         # ── IP ────────────────────────────────────────────────────
         elif tipo == 'ip':
@@ -1657,7 +1657,7 @@ def _shodan_search(query):
                 else:
                     datos['resultados']['nota'] = 'Add Shodan API key for full search results'
             except Exception as e2:
-                datos['resultados']['error'] = f'Shodan no disponible: {e2}. (Con una API key gratis en shodan.io tienes búsqueda completa.)'
+                datos['resultados']['error'] = f'Shodan unavailable: {e2}. (With a free API key at shodan.io you get full search.)'
         # Banner grab manual de IPs encontradas
         ips = []
         for modulo in case['datos'].values():
@@ -1889,7 +1889,7 @@ def api_caso():
     if request.method == 'POST':
         slug = _slug_caso(d.get('nombre','caso1'))
         if not slug:
-            return jsonify({'error':'Nombre de caso inválido'}), 400
+            return jsonify({'error':'Invalid case name'}), 400
         with case_lock:
             case.update({'nombre':slug, 'objetivo':d.get('objetivo',''),
                          'datos':{}, 'historial':[], 'iniciado':datetime.datetime.now().isoformat()})
@@ -1903,7 +1903,7 @@ def api_caso():
 def api_guardar():
     if not case['nombre']: return jsonify({'error':'No active case'}), 400
     path = _ruta_caso_segura(case['nombre'])
-    if not path: return jsonify({'error':'Nombre de caso inválido'}), 400
+    if not path: return jsonify({'error':'Invalid case name'}), 400
     with open(path,'w') as f: json.dump(case, f, ensure_ascii=False, indent=2, default=str)
     _db_guardar_caso(case)
     return jsonify({'ok':True, 'path':path})
@@ -1911,14 +1911,14 @@ def api_guardar():
 @app.route('/api/buscar')
 def api_buscar():
     termino = request.args.get('q','').strip()
-    if not termino: return jsonify({'error':'Sin término de búsqueda'}), 400
+    if not termino: return jsonify({'error':'No search term'}), 400
     return jsonify({'resultados': _db_buscar(termino)})
 
 @app.route('/api/caso/cargar', methods=['POST'])
 def api_cargar():
     nombre = (request.json or {}).get('nombre','')
     path = _ruta_caso_segura(nombre)
-    if not path: return jsonify({'error':'Nombre de caso inválido'}), 400
+    if not path: return jsonify({'error':'Invalid case name'}), 400
     if not os.path.exists(path): return jsonify({'error':'No encontrado'}), 404
     with open(path) as f: data = json.load(f)
     with case_lock: case.update(data)
@@ -1970,7 +1970,7 @@ def api_run():
     if not arg and mod not in ('wordlist','escenario','superficie','analizar'):
         return jsonify({'error': 'Argument required'}), 400
     if mod in _MODULO_TIPO and not _validar(arg, _MODULO_TIPO[mod]):
-        return jsonify({'error': f'Objetivo inválido: no tiene forma de {_MODULO_TIPO[mod]}'}), 400
+        return jsonify({'error': f'Invalid target: not shaped like {_MODULO_TIPO[mod]}'}), 400
 
     def _run_stream():
         yield f"data: {json.dumps({'status':'iniciando','modulo':mod})}\n\n"
@@ -2167,7 +2167,7 @@ def _t_wayback(entidad, ctx):
             host = (urlparse(fila[0] if isinstance(fila, list) else fila).hostname or '').lstrip('*.')
             if host.endswith(entidad.valor) and host != entidad.valor and host not in vistos:
                 vistos.add(host)
-                ctx.emitir('subdominio', host, etiqueta='histórico (wayback)')
+                ctx.emitir('subdominio', host, etiqueta='historical (wayback)')
     except Exception as _e:
         log.debug("wayback cdx: %s", _e)
 
@@ -2387,7 +2387,7 @@ def _t_stealer(entidad, ctx):
         msg = (r.json() or {}).get('message', '')
         if 'infected by an info-stealer' in msg:
             entidad.etiquetar('stealer-infectado')
-            entidad.propiedades['stealer'] = 'sí (HudsonRock)'
+            entidad.propiedades['stealer'] = 'yes (HudsonRock)'
     except Exception as _e:
         log.debug("hudsonrock no disponible: %s", _e)
 
@@ -2652,7 +2652,7 @@ def _t_cve_lookup(entidad, ctx):
         # afectado), no solo mencionada de pasada en la descripción.
         cpes = json.dumps(cve.get('configurations', [])).lower()
         if f':{kw.lower()}:' in cpes:
-            e = ctx.emitir('cve', cid, etiqueta='CVE crítico')
+            e = ctx.emitir('cve', cid, etiqueta='critical CVE')
             if e:
                 e.etiquetar('sin-verificar-version')
 
@@ -2988,7 +2988,7 @@ def _t_telefono_dorks(entidad, ctx):
                 entidad.propiedades['carrier'] = d.get('carrier', '')
                 entidad.propiedades['tipo_linea'] = d.get('line_type', '')
                 if d.get('country_name'):
-                    ctx.emitir('pais', d['country_name'], etiqueta='país')
+                    ctx.emitir('pais', d['country_name'], etiqueta='country')
         except Exception as _e:
             log.debug("numverify no disponible: %s", _e)
 
@@ -3122,7 +3122,7 @@ def _t_passivedns(entidad, ctx):
                 fecha = attr.get('date')
                 visto = (datetime.datetime.fromtimestamp(fecha, datetime.timezone.utc)
                          .strftime('%Y-%m-%d')) if fecha else ''
-                ctx.emitir('ip', ip, etiqueta='pdns-histórico', visto=visto)
+                ctx.emitir('ip', ip, etiqueta='pdns-historical', visto=visto)
     except Exception as _e:
         log.debug("passivedns no disponible: %s", _e)
 
@@ -3405,7 +3405,7 @@ def _tg_mensajes(usuario, limite=30):
     transforms de Telegram (paso 130, 131)."""
     cred = _boveda.obtener('telegram') or os.environ.get('TELEGRAM_API', '')
     if not cred or ':' not in cred:
-        return False, 'falta api_id:api_hash (gratis en my.telegram.org) en la bóveda'
+        return False, 'missing api_id:api_hash (free at my.telegram.org) in the vault'
     if not os.path.exists(_TG_SESION):
         return False, 'falta login una vez: python telegram_login.py'
     api_id, api_hash = cred.split(':', 1)
@@ -3425,7 +3425,7 @@ def _tg_mensajes(usuario, limite=30):
 
         res = asyncio.run(_run())
         if not res:
-            return False, 'sesión no autorizada — re-login'
+            return False, 'unauthorized session -- re-login'
         return True, res
     except Exception as e:
         return False, f'error: {e}'
@@ -4829,7 +4829,7 @@ def api_shodan():
     d = request.json or {}
     if d.get('ip'):
         if not _objetivo_seguro(d['ip']):
-            return jsonify({'error': 'IP inválida: caracteres no permitidos'}), 400
+            return jsonify({'error': 'Invalid IP: disallowed characters'}), 400
         return jsonify(_shodan_ip(d['ip']))
     q = d.get('query','')
     if not q: return jsonify({'error':'Sin query'}), 400
