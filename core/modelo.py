@@ -80,7 +80,7 @@ def normalize(type: str, value: str) -> str:
     return v
 
 
-def _ahora() -> str:
+def _now() -> str:
     return datetime.datetime.now().isoformat(timespec='seconds')
 
 
@@ -97,7 +97,7 @@ class Entity:
     provenance: list = field(default_factory=list)  # step 18: [{transform, input}]
     tags: set = field(default_factory=set)          # step 23: interesting/suspicious/...
     confidence: float = 1.0                          # 0..1
-    created: str = field(default_factory=_ahora)
+    created: str = field(default_factory=_now)
     id: str = field(default='', init=False)
 
     def __post_init__(self):
@@ -139,21 +139,21 @@ class Entity:
         tv = _TIPO_VALIDACION.get(self.type)
         return True if tv is None else _validate(self.value, tv)
 
-    def merge(self, otra: 'Entity') -> None:
+    def merge(self, other: 'Entity') -> None:
         """Absorbs another entity of the same id (step 17): merges origins and
         properties, raises confidence, keeps the oldest date."""
-        if otra.id != self.id:
+        if other.id != self.id:
             raise ValueError("cannot merge entities of different id")
-        self.sources |= otra.sources
-        self.tags |= otra.tags
-        for p in otra.provenance:
+        self.sources |= other.sources
+        self.tags |= other.tags
+        for p in other.provenance:
             if p not in self.provenance:
                 self.provenance.append(p)
-        for k, v in otra.properties.items():
+        for k, v in other.properties.items():
             if v not in (None, '', [], {}):
                 self.properties[k] = v
-        self.confidence = max(self.confidence, otra.confidence)
-        self.created = min(self.created, otra.created)
+        self.confidence = max(self.confidence, other.confidence)
+        self.created = min(self.created, other.created)
 
     # ── Step 21: serialization ──
     def to_dict(self) -> dict:
@@ -207,22 +207,22 @@ class Store:
         self._by_type: dict[str, set] = {}     # type -> {id, ...}
         self._bus = bus
 
-    def _publish(self, evento, *args):
+    def _publish(self, event, *args):
         if self._bus is not None:
-            self._bus.publish(evento, *args)
+            self._bus.publish(event, *args)
 
     # -- entities --
-    def add(self, ent: Entity) -> Entity:
+    def add(self, entity: Entity) -> Entity:
         """Adds or merges. Returns the live entity in the store (step 17)."""
-        existente = self._entities.get(ent.id)
-        if existente:
-            existente.merge(ent)
-            self._publish('entity_updated', existente)
-            return existente
-        self._entities[ent.id] = ent
-        self._by_type.setdefault(ent.type, set()).add(ent.id)
-        self._publish('entity_new', ent)
-        return ent
+        existing = self._entities.get(entity.id)
+        if existing:
+            existing.merge(entity)
+            self._publish('entity_updated', existing)
+            return existing
+        self._entities[entity.id] = entity
+        self._by_type.setdefault(entity.type, set()).add(entity.id)
+        self._publish('entity_new', entity)
+        return entity
 
     def create(self, type, value, **kw) -> Entity:
         """Shortcut: builds an Entity and adds it (deduplicating)."""
@@ -271,10 +271,10 @@ class Store:
 
     @classmethod
     def from_dict(cls, d: dict) -> 'Store':
-        alm = cls()
+        store = cls()
         for ed in d.get('entities', []):
-            alm.add(Entity.from_dict(ed))
+            store.add(Entity.from_dict(ed))
         for rd in d.get('relations', []):
             r = Relation.from_dict(rd)
-            alm._relations[r.id] = r
-        return alm
+            store._relations[r.id] = r
+        return store
