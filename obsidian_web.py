@@ -157,7 +157,7 @@ def _load_or_create_auth():
 app.secret_key = _load_secret_key()
 app.permanent_session_lifetime = datetime.timedelta(days=7)
 _AUTH = _load_or_create_auth()
-_login_attempts = {}   # ip -> [intentos, bloqueado_hasta_ts]
+_login_attempts = {}   # ip -> [attempts, locked_until_ts]
 _LOCK_THRESHOLD = 5
 _LOCK_SECONDS   = 300
 _PUBLIC_PATHS   = {'/login', '/manifest.json', '/sw.js', '/cert.pem'}
@@ -172,8 +172,8 @@ def _require_auth():
     if session.get('auth'):
         return
     if request.path.startswith('/api/'):
-        return jsonify({'error': 'No autenticado'}), 401
-    session['next'] = request.path   # recordar a dónde iba, para volver tras el login
+        return jsonify({'error': 'Not authenticated'}), 401
+    session['next'] = request.path   # remember where they were headed, to return after login
     return redirect('/login')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -193,7 +193,7 @@ def login():
             session['auth'] = True
             session.permanent = True
             _login_attempts.pop(ip, None)
-            # solo rutas internas (anti open-redirect)
+            # internal routes only (anti open-redirect)
             if not dest.startswith('/') or dest.startswith('//'):
                 dest = '/'
             return redirect(dest)
@@ -208,25 +208,25 @@ def logout():
     session.clear()
     return redirect('/login')
 
-# ── OBSIDIAN es libre y gratuito — sin licencias, tiers ni candados ───────────
+# ── OBSIDIAN is free and open -- no licenses, tiers or locks ──────────────────
 
 SESSION = requests.Session()
 SESSION.headers.update({'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0'})
 
-# Estado global de investigación
+# Global investigation state
 case = {'nombre': None, 'objetivo': None, 'datos': {}, 'historial': [], 'iniciado': None}
 case_lock = threading.Lock()
 
-# Modelo tipado de la sesión (F2, integración del motor de transforms).
-# Convive con `case` mientras migramos; los endpoints /api/v2/* usan esto.
+# Typed session model (F2, transform-engine integration).
+# Coexists with `case` during migration; the /api/v2/* endpoints use this.
 _almacen = Almacen()
 
-# F3: gestor de workspaces (casos aislados en SQLite). _ws_activo = None -> modo
-# efímero (no se guarda); si hay uno activo, cada transform hace autosave.
+# F3: workspace manager (isolated SQLite cases). _ws_activo = None -> ephemeral
+# mode (not saved); if one is active, each transform autosaves.
 _gestor = Gestor(WORKSPACES_DIR)
 _ws_activo = None
 
-# F3 paso 51: bóveda de API keys cifrada (Fernet).
+# F3 step 51: encrypted API-key vault (Fernet).
 _boveda = Boveda(os.path.join(HOME, '.obsidian'))
 
 SYSTEM = """You are OBSIDIAN AI, an OSINT intelligence analysis engine.
@@ -234,54 +234,54 @@ ROLE: Expert analyst. Correlate data, find patterns, generate actionable conclus
 RULES: NEVER fabricate data. Be direct and technical. Use [!] critical, [+] positive, [-] negative.
 Always respond in English."""
 
-# ── Utilidades ────────────────────────────────────────────────────────────────
+# ── Utilities ─────────────────────────────────────────────────────────────────
 
 def _cmd(cmd, timeout=25):
     try:
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
                           timeout=timeout, cwd=HOME, env={**os.environ,'HOME':HOME})
-        return (r.stdout + r.stderr).strip() or '(sin salida)'
+        return (r.stdout + r.stderr).strip() or '(no output)'
     except subprocess.TimeoutExpired:
         return f'[Timeout {timeout}s]'
     except Exception as e:
         return f'[Error: {e}]'
 
 def run_tool(argv, timeout=25, stdin=None):
-    """Ejecuta una herramienta SIN shell: argv es una lista, no un string.
-    Cierra la inyección por metacaracteres (;, |, `, $()...) porque nunca
-    pasa por un intérprete de shell. Para cerrar TAMBIÉN la argument
-    injection (un valor que empieza con '-' se interpreta como flag),
-    validar el objetivo por tipo con _validar() ANTES de llamar aquí.
-    Preferir esta función sobre _cmd para todo lo que interpole datos del
-    usuario. _cmd queda solo para pipelines internos con valores ya validados."""
+    """Runs a tool WITHOUT a shell: argv is a list, not a string. Closes
+    metacharacter injection (;, |, `, $()...) because it never passes through a
+    shell interpreter. To ALSO close argument injection (a value starting with
+    '-' is read as a flag), validate the target by type with _validar() BEFORE
+    calling here. Prefer this function over _cmd for anything that interpolates
+    user data. _cmd is left only for internal pipelines with already-validated
+    values."""
     try:
         r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
                            cwd=HOME, env={**os.environ, 'HOME': HOME}, input=stdin)
-        return (r.stdout + r.stderr).strip() or '(sin salida)'
+        return (r.stdout + r.stderr).strip() or '(no output)'
     except subprocess.TimeoutExpired:
         return f'[Timeout {timeout}s]'
     except FileNotFoundError:
-        return f'[Error: {argv[0] if argv else "?"} no encontrado]'
+        return f'[Error: {argv[0] if argv else "?"} not found]'
     except Exception as e:
         return f'[Error: {e}]'
 
-# ── Seguridad: fetch anti-SSRF (usa _url_publica de core.validacion + SESSION) ─
+# ── Security: anti-SSRF fetch (uses _url_publica from core.validacion + SESSION) ─
 def _fetch_seguro(url, timeout=10, stream=False, max_redirs=3):
-    """GET que cierra SSRF: valida que CADA hop apunte a IP pública. Sigue los
-    redirects a mano y revalida cada uno (un sitio público puede redirigir a
-    169.254.169.254). Lanza ValueError si algún destino es interno.
-    Nota: no cubre DNS rebinding (TOCTOU); vector avanzado, pendiente futuro."""
+    """GET that closes SSRF: validates that EVERY hop points to a public IP. It
+    follows redirects manually and revalidates each one (a public site can
+    redirect to 169.254.169.254). Raises ValueError if any destination is
+    internal. Note: does not cover DNS rebinding (TOCTOU); advanced vector, future work."""
     if '://' not in url:
         url = 'https://' + url
     for _ in range(max_redirs + 1):
         if not _url_publica(url):
-            raise ValueError('URL bloqueada (SSRF): red interna/privada o esquema no permitido')
+            raise ValueError('URL blocked (SSRF): internal/private network or disallowed scheme')
         r = SESSION.get(url, timeout=timeout, stream=stream, allow_redirects=False)
         if r.status_code in (301, 302, 303, 307, 308) and r.headers.get('Location'):
             url = urljoin(url, r.headers['Location'])
             continue
         return r
-    raise ValueError('Demasiados redirects')
+    raise ValueError('Too many redirects')
 
 def _which(cmd):
     return subprocess.run(['which',cmd], capture_output=True).returncode == 0
@@ -308,7 +308,7 @@ def _ai_stream(prompt):
                     if chunk.get('done'): break
                 except Exception: continue
     except Exception as e:
-        yield f'[Error IA: {e}]'
+        yield f'[AI error: {e}]'
 
 def _ai(prompt):
     return ''.join(_ai_stream(prompt))
@@ -323,7 +323,7 @@ def _get_local_ip():
     except Exception: return '127.0.0.1'
 
 def _tailscale_ip():
-    """IP de Tailscale (100.64.0.0/10) si la malla está arriba, si no None."""
+    """Tailscale IP (100.64.0.0/10) if the mesh is up, else None."""
     try:
         out = subprocess.run(['tailscale', 'ip', '-4'], capture_output=True,
                              text=True, timeout=3)
@@ -332,7 +332,7 @@ def _tailscale_ip():
     except Exception:
         return None
 
-# ── Módulos OSINT ─────────────────────────────────────────────────────────────
+# ── OSINT modules ─────────────────────────────────────────────────────────────
 
 def _osint_persona(nombre):
     datos = {'tipo':'persona','objetivo':nombre,'resultados':{}}
@@ -344,7 +344,7 @@ def _osint_persona(nombre):
             datos['resultados']['resumen'] = d['AbstractText'][:400]
         topics = [t['Text'][:200] for t in d.get('RelatedTopics',[])[:5] if isinstance(t,dict) and t.get('Text')]
         if topics: datos['resultados']['temas'] = topics
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
+    except Exception as _e: log.debug("source unavailable: %s", _e)
     # Dorks
     datos['resultados']['dorks'] = [
         f'"{nombre}" site:linkedin.com',
@@ -352,15 +352,15 @@ def _osint_persona(nombre):
         f'"{nombre}" email OR phone OR address',
         f'"{nombre}" filetype:pdf',
         f'"{nombre}" site:github.com',
-        f'"{nombre}" "fecha de nacimiento" OR "birthday"',
+        f'"{nombre}" "date of birth" OR "birthday"',
         f'"{nombre}" site:facebook.com',
     ]
     # HIBP check
     try:
         r = SESSION.get(f"https://haveibeenpwned.com/unifiedsearch/{requests.utils.quote(nombre)}",
                        timeout=6, headers={'User-Agent':'OSINT-Research'})
-        datos['resultados']['hibp'] = 'Posible presencia en HIBP' if r.status_code==200 else 'No encontrado en HIBP'
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
+        datos['resultados']['hibp'] = 'Possible presence in HIBP' if r.status_code==200 else 'Not found in HIBP'
+    except Exception as _e: log.debug("source unavailable: %s", _e)
     _guardar_dato(f'persona_{nombre}', datos)
     return datos
 
@@ -384,7 +384,7 @@ def _osint_usuario(username):
             r = SESSION.get(url, timeout=5, allow_redirects=True)
             if r.status_code == 200 and 'not found' not in r.text.lower()[:300]:
                 encontrados.append({'plataforma':plat,'url':url})
-        except Exception as _e: log.debug("fuente no disponible: %s", _e)
+        except Exception as _e: log.debug("source unavailable: %s", _e)
     ths = [threading.Thread(target=_check, args=(p,u)) for p,u in plataformas.items()]
     for t in ths: t.start()
     for t in ths: t.join(timeout=8)
@@ -396,22 +396,22 @@ def _osint_usuario(username):
             datos['resultados']['github'] = {
                 'nombre': gh.get('name','?'), 'bio': gh.get('bio','?'),
                 'repos': gh.get('public_repos',0), 'seguidores': gh.get('followers',0),
-                'ubicacion': gh.get('location','?'), 'email': gh.get('email','oculto'),
+                'ubicacion': gh.get('location','?'), 'email': gh.get('email','hidden'),
                 'web': gh.get('blog','?'), 'creado': gh.get('created_at','?')
             }
-            # Repos públicos
+            # Public repos
             repos_r = SESSION.get(f'https://api.github.com/users/{username}/repos?per_page=10&sort=updated', timeout=8)
             if repos_r.status_code == 200:
                 repos = [{'nombre':r['name'],'url':r['html_url'],'stars':r['stargazers_count'],
                           'lenguaje':r.get('language','?')} for r in repos_r.json()]
                 datos['resultados']['github_repos'] = repos
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
+    except Exception as _e: log.debug("source unavailable: %s", _e)
     # Sherlock
     if _which('sherlock'):
         out = _cmd(f'sherlock {username} --timeout 5 --print-found 2>/dev/null', timeout=60)
         encontrados_sh = [l.strip() for l in out.splitlines() if '[+]' in l]
         datos['resultados']['sherlock'] = encontrados_sh
-    # Maigret — más cobertura de plataformas que Sherlock
+    # Maigret -- more platform coverage than Sherlock
     if _which('maigret'):
         with tempfile.TemporaryDirectory() as tmpdir:
             _cmd(f'maigret {username} --timeout 8 -J ndjson -fo {tmpdir} 2>/dev/null', timeout=90)
@@ -450,7 +450,7 @@ def _osint_dominio(dominio):
         if out.strip() and 'error' not in out.lower():
             dns[rtype] = out.strip()
     datos['resultados']['dns'] = dns
-    # Subdominios crt.sh
+    # Subdomains crt.sh
     try:
         r = SESSION.get(f'https://crt.sh/?q=%.{dominio}&output=json', timeout=12)
         subs = set()
@@ -459,8 +459,8 @@ def _osint_dominio(dominio):
                 s = s.strip().lstrip('*.')
                 if s.endswith(dominio) and s != dominio: subs.add(s)
         datos['resultados']['subdominios'] = sorted(list(subs))[:30]
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
-    # Headers / Tecnologías
+    except Exception as _e: log.debug("source unavailable: %s", _e)
+    # Headers / Technologies
     try:
         import urllib3; urllib3.disable_warnings()
         r = SESSION.get(f'https://{dominio}', timeout=8, verify=False)
@@ -470,7 +470,7 @@ def _osint_dominio(dominio):
                                     'X-Frame-Options','X-Content-Type-Options'] if k not in h]
         datos['resultados']['tecnologias'] = tech
         datos['resultados']['headers_faltantes'] = missing_sec
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
+    except Exception as _e: log.debug("source unavailable: %s", _e)
     # theHarvester
     if _which('theHarvester'):
         out = _cmd(f'theHarvester -d {dominio} -b duckduckgo -l 50 2>/dev/null', timeout=45)
@@ -483,7 +483,7 @@ def _osint_dominio(dominio):
         r = SESSION.get(f'http://archive.org/wayback/available?url={dominio}', timeout=8)
         snap = r.json().get('archived_snapshots',{}).get('closest',{})
         if snap.get('url'): datos['resultados']['wayback'] = snap
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
+    except Exception as _e: log.debug("source unavailable: %s", _e)
     _guardar_dato(f'dominio_{dominio}', datos)
     return datos
 
@@ -494,8 +494,8 @@ def _osint_ip(ip):
         r = SESSION.get(f'http://ip-api.com/json/{ip}?fields=status,country,regionName,city,isp,org,as,lat,lon,mobile,proxy,hosting', timeout=8)
         d = r.json()
         if d.get('status') == 'success': datos['resultados']['geo'] = d
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
-    # Puertos
+    except Exception as _e: log.debug("source unavailable: %s", _e)
+    # Ports
     if _which('nmap'):
         out = run_tool(['nmap','-T4','--top-ports','20','-sV','--open',ip], timeout=60)
         puertos = [l.strip() for l in out.splitlines() if '/tcp' in l or '/udp' in l]
@@ -507,7 +507,7 @@ def _osint_ip(ip):
     try:
         r = SESSION.get(f'https://api.hackertarget.com/aslookup/?q={ip}', timeout=8)
         datos['resultados']['asn'] = r.text.strip()
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
+    except Exception as _e: log.debug("source unavailable: %s", _e)
     _guardar_dato(f'ip_{ip}', datos)
     return datos
 
@@ -520,7 +520,7 @@ def _osint_email(email):
                        timeout=8, headers={'X-RapidAPI-Key':'demo','X-RapidAPI-Host':'breachdirectory.p.rapidapi.com'})
         if r.status_code == 200:
             datos['resultados']['breach'] = r.json()
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
+    except Exception as _e: log.debug("source unavailable: %s", _e)
     # HIBP
     try:
         r = SESSION.get(f'https://haveibeenpwned.com/api/v3/breachedaccount/{requests.utils.quote(email)}',
@@ -530,17 +530,17 @@ def _osint_email(email):
             datos['resultados']['hibp_breaches'] = breaches
         elif r.status_code == 404:
             datos['resultados']['hibp_breaches'] = []
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
-    # SPF/DKIM/DMARC del dominio
+    except Exception as _e: log.debug("source unavailable: %s", _e)
+    # SPF/DKIM/DMARC of the domain
     if dominio:
         spf   = _cmd(f'dig {dominio} TXT +short 2>/dev/null')
         dmarc = _cmd(f'dig _dmarc.{dominio} TXT +short 2>/dev/null')
         dkim  = _cmd(f'dig default._domainkey.{dominio} TXT +short 2>/dev/null')
         spoofable = not any('v=spf1' in spf.lower() for _ in [1])
         datos['resultados']['email_sec'] = {
-            'spf': spf.strip()[:200] or 'NO CONFIGURADO',
-            'dmarc': dmarc.strip()[:200] or 'NO CONFIGURADO',
-            'dkim': dkim.strip()[:200] or 'NO CONFIGURADO',
+            'spf': spf.strip()[:200] or 'NOT CONFIGURED',
+            'dmarc': dmarc.strip()[:200] or 'NOT CONFIGURED',
+            'dkim': dkim.strip()[:200] or 'NOT CONFIGURED',
             'spoofable': spoofable
         }
     _guardar_dato(f'email_{email}', datos)
@@ -549,12 +549,12 @@ def _osint_email(email):
 def _osint_phone(numero):
     datos = {'tipo':'telefono','objetivo':numero,'resultados':{}}
     numero_limpio = re.sub(r'[^\d+]','',numero)
-    # API pública básica
+    # Basic public API
     try:
         r = SESSION.get(f'https://api.hackertarget.com/ipgeo/?q={numero_limpio}', timeout=8)
         datos['resultados']['raw'] = r.text.strip()
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
-    # NumVerify (sin key — básico)
+    except Exception as _e: log.debug("source unavailable: %s", _e)
+    # NumVerify (no key -- basic)
     try:
         r = SESSION.get(f'http://apilayer.net/api/validate?number={numero_limpio}', timeout=8)
         if r.status_code == 200:
@@ -565,8 +565,8 @@ def _osint_phone(numero):
                 'carrier': d.get('carrier','?'),
                 'tipo': d.get('line_type','?')
             }
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
-    # Buscar en redes
+    except Exception as _e: log.debug("source unavailable: %s", _e)
+    # Search social networks
     datos['resultados']['busquedas'] = [
         f'"{numero}" site:truecaller.com',
         f'"{numero}" site:whitepages.com',
@@ -594,7 +594,7 @@ def _recon_github_secrets(username_or_org):
         hallazgos = []
         for repo in repos[:10]:
             repo_name = repo.get('full_name','')
-            # Buscar en commits recientes
+            # Search recent commits
             commits_r = SESSION.get(f'https://api.github.com/repos/{repo_name}/commits?per_page=5', timeout=8)
             if commits_r.status_code != 200: continue
             for commit in commits_r.json()[:3]:
@@ -622,26 +622,26 @@ def _recon_github_secrets(username_or_org):
 def _recon_ssl(dominio):
     datos = {'tipo':'ssl','objetivo':dominio,'resultados':{}}
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
-    # Info básica
+    # Basic info
     cert_info = _cmd(f'echo | openssl s_client -connect {dominio}:443 -servername {dominio} 2>/dev/null | openssl x509 -noout -subject -issuer -dates -fingerprint 2>/dev/null')
     datos['resultados']['certificado'] = cert_info
-    # Cipher suites vulnerables
+    # Vulnerable cipher suites
     for cipher, vuln in [('RC4','OBSOLETE'),('DES','VULNERABLE'),('NULL','CRITICAL'),('EXPORT','CRITICAL')]:
         out = _cmd(f'openssl s_client -connect {dominio}:443 -cipher {cipher} 2>/dev/null | head -3')
         if 'Cipher' in out and 'NONE' not in out:
-            datos['resultados'][f'cipher_{cipher}'] = f'VULNERABLE — {vuln}'
+            datos['resultados'][f'cipher_{cipher}'] = f'VULNERABLE -- {vuln}'
     # HSTS
     try:
         import urllib3; urllib3.disable_warnings()
         r = SESSION.get(f'https://{dominio}', timeout=8, verify=False)
-        datos['resultados']['hsts'] = r.headers.get('Strict-Transport-Security','NO CONFIGURADO')
-        datos['resultados']['ocsp'] = 'Verificar manualmente'
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
+        datos['resultados']['hsts'] = r.headers.get('Strict-Transport-Security','NOT CONFIGURED')
+        datos['resultados']['ocsp'] = 'Verify manually'
+    except Exception as _e: log.debug("source unavailable: %s", _e)
     _guardar_dato(f'ssl_{dominio}', datos)
     return datos
 
 def _recon_favicon(dominio):
-    """Hash mmh3 del favicon (algoritmo Shodan) — pivotea a infraestructura relacionada."""
+    """mmh3 hash of the favicon (Shodan algorithm) -- pivots to related infrastructure."""
     datos = {'tipo':'favicon','objetivo':dominio,'resultados':{}}
     dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
     try:
@@ -657,7 +657,7 @@ def _recon_favicon(dominio):
             if r.status_code == 200 and r.content:
                 favicon_bytes = r.content
                 break
-        except Exception as _e: log.debug("fuente no disponible: %s", _e)
+        except Exception as _e: log.debug("source unavailable: %s", _e)
     if not favicon_bytes:
         datos['resultados']['error'] = 'favicon.ico not found on the target (try another path manually)'
         _guardar_dato(f'favicon_{dominio}', datos)
@@ -740,7 +740,7 @@ def _recon_buckets(empresa):
                         'status': r.status_code,
                         'publico': r.status_code == 200
                     })
-            except Exception as _e: log.debug("fuente no disponible: %s", _e)
+            except Exception as _e: log.debug("source unavailable: %s", _e)
     ths = [threading.Thread(target=_check, args=(b,)) for b in variantes]
     for t in ths: t.start()
     for t in ths: t.join(timeout=15)
@@ -1231,7 +1231,7 @@ def _check_url(url):
                 if malicious > 0:
                     flags.append(f'VirusTotal: {malicious} motores lo marcan como MALICIOSO')
                     score += 50
-        except Exception as _e: log.debug("fuente no disponible: %s", _e)
+        except Exception as _e: log.debug("source unavailable: %s", _e)
 
     # AbuseIPDB para la IP del dominio
     try:
@@ -1251,7 +1251,7 @@ def _check_url(url):
                     score += 30
         else:
             datos['resultados']['ip_dominio'] = ip_check
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
+    except Exception as _e: log.debug("source unavailable: %s", _e)
 
     score = min(score, 100)
     nivel = 'CRITICAL' if score >= 70 else 'HIGH' if score >= 40 else 'MEDIUM' if score >= 20 else 'LOW'
@@ -1583,7 +1583,7 @@ def _darkweb_search(query):
             pastes = r.json().get('data', [])[:10]
             datos['resultados']['pastes'] = [{'id': p.get('id'), 'title': p.get('title','?'),
                                                'url': f"https://pastebin.com/{p.get('id')}"} for p in pastes]
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
+    except Exception as _e: log.debug("source unavailable: %s", _e)
 
     # IntelligenceX (sin API key — búsqueda básica)
     try:
@@ -1592,7 +1592,7 @@ def _darkweb_search(query):
             headers={'x-key': 'PUBLIC'}, timeout=10)
         if r.status_code == 200:
             datos['resultados']['intelx_id'] = r.json().get('id','')
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
+    except Exception as _e: log.debug("source unavailable: %s", _e)
 
     _guardar_dato(f'darkweb_{query}', datos)
     return datos
@@ -1735,7 +1735,7 @@ def _build_timeline():
                         'modulo': tipo, 'objetivo': objetivo,
                         'descripcion': f'{tipo}: {objetivo or clave}'
                     })
-                except Exception as _e: log.debug("fuente no disponible: %s", _e)
+                except Exception as _e: log.debug("source unavailable: %s", _e)
     # Agregar historial de módulos ejecutados
     for h in case.get('historial', []):
         ts = h.get('ts', 0)
@@ -1775,7 +1775,7 @@ def _monitor_loop():
                         'mensaje': f'Cambio detectado en {objetivo}',
                         'nuevo': nuevo
                     })
-        except Exception as _e: log.debug("fuente no disponible: %s", _e)
+        except Exception as _e: log.debug("source unavailable: %s", _e)
         time.sleep(monitor_state['intervalo'])
 
 def _monitor_start(objetivo, intervalo=3600):
@@ -1852,7 +1852,7 @@ def icon(size):
                               input=svg.encode(), capture_output=True, timeout=5)
         if result.returncode == 0:
             return Response(result.stdout, mimetype='image/png')
-    except Exception as _e: log.debug("fuente no disponible: %s", _e)
+    except Exception as _e: log.debug("source unavailable: %s", _e)
     return Response(svg.encode(), mimetype='image/svg+xml')
 
 @app.route('/sw.js')
