@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Login interactivo de Telegram para OBSIDIAN — F10 paso 130.
+"""Interactive Telegram login for OBSIDIAN -- F10 step 130.
 
-Se corre UNA vez para crear la sesión que usa el transform 'telegram'. Pide tu
-teléfono y el código que te llega. Necesitas api_id:api_hash (gratis en
-https://my.telegram.org → API development tools).
+Run ONCE to create the session used by the 'telegram' transform. It asks for your
+phone and the code you receive. You need api_id:api_hash (free at
+https://my.telegram.org -> API development tools).
 
-Uso:
+Usage:
     OBSIDIAN_API_ID=12345 OBSIDIAN_API_HASH=abc... python telegram_login.py
-o, si ya guardaste 'telegram' = 'api_id:api_hash' en la bóveda de OBSIDIAN, se lee
-de ahí automáticamente.
+or, if you already saved 'telegram' = 'api_id:api_hash' in OBSIDIAN's vault, it is
+read from there automatically.
 
-La sesión se guarda en ~/.obsidian/telegram.session (local, tuya, no se sube a nada).
+The session is saved to ~/.obsidian/telegram.session (local, yours, not uploaded anywhere).
 """
 import os
 
@@ -42,16 +42,16 @@ def _cred():
 def main():
     api_id, api_hash = _cred()
     if not api_id or not api_hash:
-        print("Falta api_id/api_hash. Sácalos en https://my.telegram.org y corre:\n"
+        print("Missing api_id/api_hash. Get them at https://my.telegram.org and run:\n"
               "  OBSIDIAN_API_ID=... OBSIDIAN_API_HASH=... python telegram_login.py")
         return 1
     from telethon.sync import TelegramClient
     os.makedirs(os.path.dirname(SESION), exist_ok=True)
     with TelegramClient(SESION, int(api_id), api_hash) as cli:
-        cli.start()   # pide teléfono + código de forma interactiva
+        cli.start()   # asks for phone + code interactively
         yo = cli.get_me()
-        print(f"✓ Sesión creada para @{getattr(yo, 'username', None) or yo.id}")
-        print(f"  Guardada en {SESION}. Ya puedes usar el transform 'telegram' en OBSIDIAN.")
+        print(f"✓ Session created for @{getattr(yo, 'username', None) or yo.id}")
+        print(f"  Saved to {SESION}. You can now use the 'telegram' transform in OBSIDIAN.")
     return 0
 
 

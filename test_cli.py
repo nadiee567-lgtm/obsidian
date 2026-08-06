@@ -12,8 +12,8 @@ def test_parser_run():
 
 
 def test_parser_recon_con_keys():
-    a = cli.construir_parser().parse_args(['recon', 'ip', '1.1.1.1', '--con-keys'])
-    assert a.con_keys is True and a.fn is cli.cmd_recon
+    a = cli.construir_parser().parse_args(['recon', 'ip', '1.1.1.1', '--with-keys'])
+    assert a.with_keys is True and a.fn is cli.cmd_recon
 
 
 def test_transforms_lista(capsys):
