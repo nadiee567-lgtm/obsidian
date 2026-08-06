@@ -11,18 +11,18 @@ def _almacen_demo():
     alm = Store()
     d = alm.create('domain', 'objetivo.com', properties={'org': 'ACME'})
     ip = alm.create('ip', '93.184.216.34', properties={'country': 'US'})
-    ip.tag('listado-amenaza')
+    ip.tag('threat-listed')
     alm.relate(d.id, ip.id, 'resuelve')
     return alm, d, ip
 
 
 def test_reporte_tiene_secciones():
     alm, d, ip = _almacen_demo()
-    h = [Finding('ip-listada', 'high', 'IP en feed de amenazas', [ip.id])]
+    h = [Finding('ip-listed', 'high', 'IP en feed de amenazas', [ip.id])]
     html = generar_reporte(alm, hallazgos=h, score=20,
                            meta={'workspace': 'caso-1', 'target': 'objetivo.com'})
     for txt in ('Risk summary', 'Findings', 'Entity inventory',
-                'objetivo.com', '93.184.216.34', 'ip-listada', '20/100', 'caso-1'):
+                'objetivo.com', '93.184.216.34', 'ip-listed', '20/100', 'caso-1'):
         assert txt in html, f'missing from the report: {txt}'
 
 

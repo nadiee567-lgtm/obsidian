@@ -29,7 +29,7 @@ def test_onion_fetch(monkeypatch):
     assert 'contacto@vendor.com' in {x.value for x in prod if x.type == 'email'}
     assert any('.onion' in x.value for x in prod if x.type == 'url')
     assert e.properties.get('onion_titulo') == 'Dark Market'
-    assert 'onion-vivo' in e.tags
+    assert 'onion-live' in e.tags
 
 
 def test_onion_fetch_tor_caido(monkeypatch):
@@ -80,7 +80,7 @@ def test_canal_leaks(monkeypatch):
     textos = ['combolist fresca de acme.com', 'admin@acme.com filtrado en breach', 'gatitos']
     monkeypatch.setattr(ob, '_tg_mensajes', lambda u, limite=100: (True, (123, textos)))
     prod, e = _correr('canal_leaks', 'user', 'canal_ru')
-    assert 'canal-leaks' in e.tags and e.properties.get('leaks_menciones') == 2
+    assert 'leaks-channel' in e.tags and e.properties.get('leaks_menciones') == 2
     assert 'acme.com' in {x.value for x in prod if x.type == 'domain'}
     assert 'admin@acme.com' in {x.value for x in prod if x.type == 'email'}
 
@@ -103,7 +103,7 @@ def test_stealer_dominio(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _RjD({'data': {'employees': 12, 'users': 340}}))
     _, e = _correr('stealer_dominio', 'domain', 'acme.com')
-    assert 'stealer-expuesto' in e.tags
+    assert 'stealer-exposed' in e.tags
     assert e.properties.get('stealer_empleados') == 12 and e.properties.get('stealer_usuarios') == 340
 
 
@@ -111,7 +111,7 @@ def test_stealer_dominio_limpio(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _RjD({'data': {'employees': 0, 'users': 0}}))
     _, e = _correr('stealer_dominio', 'domain', 'acme.com')
-    assert 'stealer-expuesto' not in e.tags
+    assert 'stealer-exposed' not in e.tags
 
 
 # ── 133: paste monitoring (psbdmp + keyless dorks) ──────────────────────────
@@ -166,11 +166,11 @@ def test_breaches_agrega_y_dedup(monkeypatch):
     prod, e = _correr('breaches', 'email', 'a@b.com')
     orgs = {x.value for x in prod if x.type == 'org'}
     assert orgs == {'Adobe', 'LinkedIn', 'Canva'}    # unified and deduped (Adobe once)
-    assert 'filtrado' in e.tags
+    assert 'leaked' in e.tags
 
 
 def test_breaches_limpio(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _RjD({}))
     prod, e = _correr('breaches', 'email', 'nadie@limpio.com')
-    assert prod == [] and 'filtrado' not in e.tags
+    assert prod == [] and 'leaked' not in e.tags

@@ -102,7 +102,7 @@ def _mig_email(alm, raiz, value, res, source):
     if sec.get('spoofable'):
         e.tag('spoofable')
     if breaches:
-        e.tag('filtrado')
+        e.tag('leaked')
     _rel(alm, raiz, e, 'email')
 
 
@@ -111,9 +111,9 @@ def _mig_buckets(alm, raiz, value, res, source):
         if not b.get('bucket'):
             continue
         e = alm.create('bucket', b['bucket'], sources={source},
-                      properties={'url': b.get('url', ''), 'publico': b.get('publico', False)})
-        if b.get('publico'):
-            e.tag('publico')
+                      properties={'url': b.get('url', ''), 'public': b.get('public', False)})
+        if b.get('public'):
+            e.tag('public')
         _rel(alm, raiz, e, 'bucket')
 
 
@@ -144,7 +144,7 @@ def _mig_github_secrets(alm, raiz, value, res, source):
         e = alm.create('credential', h['value'], sources={source},
                       properties={'tipo_secreto': h.get('type'), 'repo': h.get('repo'),
                                    'commit': h.get('commit')})
-        e.tag('expuesto')
+        e.tag('exposed')
         _rel(alm, raiz, e, 'exposed secret')
 
 
@@ -162,7 +162,7 @@ def _mig_favicon(alm, raiz, value, res, source):
         if m.get('ip'):
             e = alm.create('ip', m['ip'], sources={source},
                           properties={'org': m.get('org')})
-            e.tag('favicon-compartido')
+            e.tag('shared-favicon')
             _rel(alm, raiz, e, 'shared favicon')
 
 

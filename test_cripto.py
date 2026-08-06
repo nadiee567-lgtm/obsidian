@@ -58,7 +58,7 @@ def test_cluster_wallets(monkeypatch):
     prod, _, _ = _correr('cluster_wallets', 'wallet', _GENESIS)
     hermanas = [e for e in prod if e.type == 'wallet']
     assert {e.value for e in hermanas} == {'hermana1'}          # co-input, not the destination
-    assert 'mismo-dueño' in hermanas[0].tags
+    assert 'same-owner' in hermanas[0].tags
 
 
 # ── 140: exchange attribution (links to tools) ──────────────────────────────

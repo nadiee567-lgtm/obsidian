@@ -57,7 +57,7 @@ def test_infra_compartida():
     alm.create('domain', 'a.com', properties={'favicon_hash': '123456'})
     alm.create('domain', 'b.com', properties={'favicon_hash': '123456'})   # same favicon
     alm.create('domain', 'c.com', properties={'favicon_hash': '999'})       # different
-    r = [x for x in correlate(alm) if x.rule == 'infra-compartida']
+    r = [x for x in correlate(alm) if x.rule == 'shared-infra']
     assert len(r) == 1 and len(r[0].entities) == 2                          # a.com and b.com
 
 
@@ -65,7 +65,7 @@ def test_infra_compartida_sin_grupo():
     from core.correlacion import correlate
     alm = Store()
     alm.create('domain', 'solo.com', properties={'favicon_hash': '111'})
-    assert not [x for x in correlate(alm) if x.rule == 'infra-compartida']
+    assert not [x for x in correlate(alm) if x.rule == 'shared-infra']
 
 
 # ── 148: tech -> CVE map (cve_lookup, with anti-noise CPE filter) ────────────
@@ -105,7 +105,7 @@ def test_exposicion_endpoint(monkeypatch):
 def test_shadow_it():
     from core.correlacion import correlate
     alm = Store()
-    alm.create('bucket', 'acme-backups').tag('publico')           # open storage
+    alm.create('bucket', 'acme-backups').tag('public')           # open storage
     alm.create('subdomain', 'viejo.acme.com', properties={'http_status': 503})  # broken
     alm.create('subdomain', 'vivo.acme.com', properties={'http_status': 200})   # healthy
     r = [x for x in correlate(alm) if x.rule == 'shadow-it']

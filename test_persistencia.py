@@ -10,7 +10,7 @@ def _almacen_ejemplo():
     alm = Store()
     d = alm.create('domain', 'example.com', sources={'whois'},
                   properties={'registrar': 'GoDaddy'})
-    d.tag('interesante')
+    d.tag('interesting')
     i = alm.create('ip', '93.184.216.34', sources={'dns'})
     i.note_provenance('transform_dns', input_id=d.id)
     alm.relate(d, i, 'resuelve_a')
@@ -29,7 +29,7 @@ def test_guardar_y_cargar_roundtrip(tmp_path):
     d = cargado.buscar('domain', 'example.com')
     assert d.sources == {'whois'}
     assert d.properties == {'registrar': 'GoDaddy'}
-    assert d.tags == {'interesante'}
+    assert d.tags == {'interesting'}
 
     i = cargado.buscar('ip', '93.184.216.34')
     assert {'transform': 'transform_dns', 'input': d.id} in i.provenance

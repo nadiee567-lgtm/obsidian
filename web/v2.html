@@ -292,7 +292,7 @@ function mostrarDetalle(id){
   }
   // quick analyst tags (feedback loop)
   const tb=el('div','tagbar');
-  [['interesante','#9ece6a'],['sospechoso','#ff9e64'],['descartado','#6b7488'],['falso-positivo','#7dcfff']].forEach(([tg,col])=>{
+  [['interesting','#9ece6a'],['suspicious','#ff9e64'],['discarded','#6b7488'],['false-positive','#7dcfff']].forEach(([tg,col])=>{
     const b=el('button','tagbtn'); b.textContent=tg;
     if((e.tags||[]).includes(tg)) b.style.cssText='background:'+col+';color:#0b0d12';
     b.onclick=()=>toggleTag(e.id,tg); tb.appendChild(b);

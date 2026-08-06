@@ -738,7 +738,7 @@ def _recon_buckets(empresa):
                     encontrados.append({
                         'bucket': bucket, 'url': url,
                         'status': r.status_code,
-                        'publico': r.status_code == 200
+                        'public': r.status_code == 200
                     })
             except Exception as _e: log.debug("source unavailable: %s", _e)
     ths = [threading.Thread(target=_check, args=(b,)) for b in variantes]
@@ -1225,7 +1225,7 @@ def _check_url(url):
                 malicious = stats.get('malicious', 0)
                 suspicious = stats.get('suspicious', 0)
                 datos['resultados']['virustotal'] = {
-                    'malicioso': malicious, 'sospechoso': suspicious,
+                    'malicious': malicious, 'suspicious': suspicious,
                     'limpio': stats.get('undetected', 0)
                 }
                 if malicious > 0:
@@ -1519,7 +1519,7 @@ def _build_grafo():
         elif type == 'buckets':
             for bucket in res.get('buckets',[]):
                 bid2 = nid('bucket_'+bucket['bucket'])
-                label = ('🔓 ' if bucket['publico'] else '🔒 ') + bucket['bucket']
+                label = ('🔓 ' if bucket['public'] else '🔒 ') + bucket['bucket']
                 add_node(bid2, label, 'bucket', bucket['url'])
                 add_edge(obj_id, bid2, 'bucket')
 
@@ -2045,7 +2045,7 @@ def _t_metadata(entidad, ctx):
                     ctx.emitir('person', interesantes[kk], label=kk.lower())
             gps = interesantes.get('GPS Position') or interesantes.get('GPS Latitude')
             if gps:
-                entidad.tag('tiene-gps')
+                entidad.tag('has-gps')
                 ctx.emitir('url', f'https://www.google.com/maps/search/?api=1&query={_q(gps)}',
                            label='gps', gps=gps)
     finally:
@@ -2082,7 +2082,7 @@ def _t_wallet_balance(entidad, ctx):
         entidad.properties['btc_tx'] = d.get('n_tx', 0)
         entidad.properties['btc_recibido'] = round(d.get('total_received', 0) / 1e8, 8)
         if d.get('n_tx'):
-            entidad.tag('wallet-activa')
+            entidad.tag('active-wallet')
     except Exception as _e:
         log.debug("wallet_balance unavailable: %s", _e)
 
@@ -2141,7 +2141,7 @@ def _t_favicon_pivote(entidad, ctx):
     if entidad.properties.get('tipo_hash') != 'favicon':
         return
     for ip in _pivote_ips({'favicon': entidad.value}):
-        ctx.emitir('ip', ip, label='mismo-favicon')
+        ctx.emitir('ip', ip, label='same-favicon')
 
 @transform(entrada='domain', salidas=('subdomain',), nombre='wayback',
            descripcion='Historical snapshot + old subdomains of the domain (Wayback Machine)')
@@ -2153,7 +2153,7 @@ def _t_wayback(entidad, ctx):
         if snap.get('available'):
             entidad.properties['wayback_desde'] = (snap.get('timestamp', '') or '')[:8]
             entidad.properties['wayback_url'] = snap.get('url')
-            entidad.tag('archivado')
+            entidad.tag('archived')
     except Exception as _e:
         log.debug("wayback available: %s", _e)
     # 2. historical subdomains (CDX; may be blocked in some environments)
@@ -2326,7 +2326,7 @@ def _t_email_breaches(entidad, ctx):
                 nombre = b.get('Name')
                 if nombre:
                     ctx.emitir('org', nombre, label='leaked in')
-            entidad.tag('filtrado')
+            entidad.tag('leaked')
     except Exception as _e:
         log.debug("hibp unavailable: %s", _e)
 
@@ -2345,7 +2345,7 @@ def _pastes_github(entidad):
         n = d.get('total_count')
         if n:
             entidad.properties['github_menciones'] = n
-            entidad.tag('mencionado-github')
+            entidad.tag('github-mentioned')
     except Exception as _e:
         log.debug("pastes_github unavailable: %s", _e)
 
@@ -2373,7 +2373,7 @@ def _t_breaches_xon(entidad, ctx):
             if nombre:
                 ctx.emitir('org', str(nombre), label='leaked in')
         if lista:
-            entidad.tag('filtrado')
+            entidad.tag('leaked')
     except Exception as _e:
         log.debug("xposedornot unavailable: %s", _e)
 
@@ -2385,7 +2385,7 @@ def _t_stealer(entidad, ctx):
                         params={'email': entidad.value}, timeout=10)
         msg = (r.json() or {}).get('message', '')
         if 'infected by an info-stealer' in msg:
-            entidad.tag('stealer-infectado')
+            entidad.tag('stealer-infected')
             entidad.properties['stealer'] = 'yes (HudsonRock)'
     except Exception as _e:
         log.debug("hudsonrock unavailable: %s", _e)
@@ -2421,7 +2421,7 @@ def _t_breaches(entidad, ctx):
         except Exception as _e:
             log.debug("breaches hibp: %s", _e)
     if fuentes:
-        entidad.tag('filtrado')
+        entidad.tag('leaked')
         entidad.properties['brechas'] = sorted(fuentes)
         for f in sorted(fuentes)[:30]:
             ctx.emitir('org', f, label='breach')
@@ -2483,7 +2483,7 @@ def _t_stealer_dominio(entidad, ctx):
         if emp or usr:
             entidad.properties['stealer_empleados'] = emp
             entidad.properties['stealer_usuarios'] = usr
-            entidad.tag('stealer-expuesto')
+            entidad.tag('stealer-exposed')
     except Exception as _e:
         log.debug("stealer_dominio unavailable: %s", _e)
 
@@ -2520,7 +2520,7 @@ def _screenshot(entidad):
             pagina.screenshot(path=os.path.join(shots, archivo))
             navegador.close()
         entidad.properties['screenshot'] = '/static/screenshots/' + archivo
-        entidad.tag('con-screenshot')
+        entidad.tag('has-screenshot')
     except Exception as _e:
         log.debug("screenshot failed: %s", _e)
 
@@ -2584,7 +2584,7 @@ def _http_probe(entidad):
         pass
     if str(r.url).rstrip('/') not in (f'https://{entidad.value}', f'http://{entidad.value}'):
         entidad.properties['http_redirect'] = str(r.url)
-    entidad.tag('http-vivo')
+    entidad.tag('http-live')
     # login/admin panel detection (step 56)
     cuerpo = (r.text[:8000] or '').lower()
     titulo = (entidad.properties.get('http_title', '') or '').lower()
@@ -2592,7 +2592,7 @@ def _http_probe(entidad):
                'wp-admin', 'phpmyadmin', 'authentication', 'panel')
     if (any(s in titulo for s in señales)
             or 'type="password"' in cuerpo or "type='password'" in cuerpo):
-        entidad.tag('panel-login')
+        entidad.tag('login-panel')
 
 def _tech_detect(entidad):
     """Lightweight technology fingerprint from the HTTP response (server,
@@ -2653,7 +2653,7 @@ def _t_cve_lookup(entidad, ctx):
         if f':{kw.lower()}:' in cpes:
             e = ctx.emitir('cve', cid, label='critical CVE')
             if e:
-                e.tag('sin-verificar-version')
+                e.tag('version-unverified')
 
 @transform(entrada='domain', salidas=(), nombre='http_probe',
            descripcion='HTTP probe: status, title, server, redirect (httpx-style)')
@@ -2725,7 +2725,7 @@ def _t_reputacion_ip(entidad, ctx):
         if d.get('hosting'):
             entidad.tag('hosting')
         if d.get('mobile'):
-            entidad.tag('movil')
+            entidad.tag('mobile')
         entidad.properties['proxy'] = bool(d.get('proxy'))
         entidad.properties['hosting'] = bool(d.get('hosting'))
     except Exception as _e:
@@ -2746,7 +2746,7 @@ def _t_abuseipdb(entidad, ctx):
         if score is not None:
             entidad.properties['abuse_score'] = score
             if score >= 50:
-                entidad.tag('abusiva')
+                entidad.tag('abusive')
     except Exception as _e:
         log.debug("abuseipdb unavailable: %s", _e)
 
@@ -3045,7 +3045,7 @@ def _t_buckets(entidad, ctx):
                 r = SESSION.get(url, timeout=5)
                 if r.status_code in (200, 403):
                     with lock:
-                        hallados[bucket] = {'url': url, 'publico': r.status_code == 200}
+                        hallados[bucket] = {'url': url, 'public': r.status_code == 200}
                     return
             except Exception:
                 pass
@@ -3055,9 +3055,9 @@ def _t_buckets(entidad, ctx):
     for t in ths:
         t.join(timeout=15)
     for bucket, info in hallados.items():
-        b = ctx.emitir('bucket', bucket, label='bucket', url=info['url'], publico=info['publico'])
-        if b and info['publico']:
-            b.tag('publico')
+        b = ctx.emitir('bucket', bucket, label='bucket', url=info['url'], publico=info['public'])
+        if b and info['public']:
+            b.tag('public')
 
 _TAKEOVER_FP = {
     'github.io': "There isn't a GitHub Pages site here", 'herokuapp.com': 'No such app',
@@ -3168,7 +3168,7 @@ def _t_github_sec(entidad, ctx):
                                            tipo_secreto=nombre_pat, repo=full,
                                            commit=sha[:8], archivo=f.get('filename', '?'))
                             if c:
-                                c.tag('secreto-github')
+                                c.tag('github-secret')
     except Exception as _e:
         log.debug("github_sec unavailable: %s", _e)
 
@@ -3215,7 +3215,7 @@ def _t_url_check(entidad, ctx):
                          data={'url': entidad.value}, timeout=8).json() or {}
         if d.get('query_status') == 'ok':
             entidad.properties['urlhaus'] = d.get('threat', 'listed')
-            entidad.tag('url-maliciosa')
+            entidad.tag('malicious-url')
     except Exception as _e:
         log.debug("url_check urlhaus: %s", _e)
 
@@ -3349,7 +3349,7 @@ def _t_ocr(entidad, ctx):
             texto = (run_tool(['tesseract', fn, 'stdout'], timeout=25) or '').strip()
         if texto:
             entidad.properties['ocr'] = texto[:1000]
-            entidad.tag('tiene-texto')
+            entidad.tag('has-text')
     finally:
         try:
             os.unlink(fn)
@@ -3394,7 +3394,7 @@ def _t_onion_fetch(entidad, ctx):
         ctx.emitir('email', em, label='in-onion')
     for on in list(set(re.findall(r'[a-z2-7]{16,56}\.onion', r.text)))[:15]:
         ctx.emitir('url', 'http://' + on, label='onion-link')
-    entidad.tag('onion-vivo')
+    entidad.tag('onion-live')
 
 _TG_SESION = os.path.join(HOME, '.obsidian', 'telegram.session')
 
@@ -3471,7 +3471,7 @@ def _t_canal_leaks(entidad, ctx):
     hits = coincidencias_leak(textos)
     if not hits:
         return
-    entidad.tag('canal-leaks')
+    entidad.tag('leaks-channel')
     entidad.properties['leaks_menciones'] = len(hits)
     entidad.properties['leaks_muestra'] = [h['texto'] for h in hits[:5]]
     unido = '\n'.join(h['texto'] for h in hits)
@@ -3524,9 +3524,9 @@ def _t_ela(entidad, ctx):
         if max_diff is not None:
             entidad.properties['ela_img'] = f'/static/ela/{nombre_img}'
             entidad.properties['ela_max_diff'] = max_diff
-            entidad.tag('ela-generado')
+            entidad.tag('ela-generated')
             if max_diff >= 50:                       # heuristic: review visually
-                entidad.tag('revisar-edicion')
+                entidad.tag('review-edit')
     finally:
         try:
             os.unlink(fn)
@@ -3651,9 +3651,9 @@ def _t_cluster_wallets(entidad, ctx):
         if addr in inputs:                           # the seed spent alongside these -> same owner
             mismo.update(a for a in inputs if a != addr)
     for a in list(mismo)[:30]:
-        w = ctx.emitir('wallet', a, label='mismo-dueño', cadena='btc')
+        w = ctx.emitir('wallet', a, label='same-owner', cadena='btc')
         if w:
-            w.tag('mismo-dueño')
+            w.tag('same-owner')
 
 @transform(entrada='url', salidas=('wallet',), nombre='extraer_wallets',
            descripcion='Extracts BTC/ETH addresses from a page (F11 step 137)')
@@ -3739,7 +3739,7 @@ def _t_ip_blocklist(entidad, ctx):
         return
     for red, fuente in _cargar_blocklist():
         if ip in red:
-            entidad.tag('listado-amenaza')   # signal, NOT a 'malicious' verdict
+            entidad.tag('threat-listed')   # signal, NOT a 'malicious' verdict
             entidad.properties['amenaza_fuente'] = fuente
             return
 
@@ -3752,16 +3752,16 @@ def _t_greynoise(entidad, ctx):
             return
         d = r.json()
         if d.get('noise'):
-            entidad.tag('escaneando-internet')
+            entidad.tag('internet-scanning')
         if d.get('riot'):
-            entidad.tag('servicio-conocido')
+            entidad.tag('known-service')
             if d.get('name'):
                 ctx.emitir('org', d['name'], label='greynoise')
         clasif = d.get('classification')
         if clasif:
             entidad.properties['greynoise'] = clasif
             if clasif == 'malicious':
-                entidad.tag('malicioso')
+                entidad.tag('malicious')
     except Exception as _e:
         log.debug("greynoise unavailable: %s", _e)
 
@@ -3809,7 +3809,7 @@ def _t_cert_pivote(entidad, ctx):
     if not cn:
         return
     for ip in _pivote_ips({'cert': cn}):
-        ctx.emitir('ip', ip, label='mismo-cert')
+        ctx.emitir('ip', ip, label='same-cert')
 
 
 @app.route('/api/v2/transforms/<type>')

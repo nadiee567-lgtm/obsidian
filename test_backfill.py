@@ -35,7 +35,7 @@ def test_buckets(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: R())
     prod, _, _ = _correr('buckets', 'org', 'ACME Corp')
     assert prod and all(p.type == 'bucket' for p in prod)
-    assert any('publico' in p.tags for p in prod)
+    assert any('public' in p.tags for p in prod)
 
 
 def test_takeover(monkeypatch):
@@ -91,20 +91,20 @@ def test_github_sec_y_regla(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
     prod, _, alm = _correr('github_sec', 'user', 'user')
     creds = [p for p in prod if p.type == 'credential']
-    assert creds and 'secreto-github' in creds[0].tags
+    assert creds and 'github-secret' in creds[0].tags
     h = correlate(alm)
-    assert any(x.rule == 'secreto-github' and x.severity == 'critical' for x in h)
+    assert any(x.rule == 'github-secret' and x.severity == 'critical' for x in h)
 
 
 # ── 56: exposed login/panel + credential ────────────────────────────────────
 def test_login_expuesto_regla():
     from core.correlacion import correlate
     alm = Store()
-    alm.create('domain', 'admin.x.com').tag('panel-login')
-    r = [x for x in correlate(alm) if x.rule == 'login-expuesto']
+    alm.create('domain', 'admin.x.com').tag('login-panel')
+    r = [x for x in correlate(alm) if x.rule == 'login-exposed']
     assert r and r[0].severity == 'high'
-    alm.create('email', 'a@x.com').tag('filtrado')     # login + credential
-    r2 = [x for x in correlate(alm) if x.rule == 'login-expuesto']
+    alm.create('email', 'a@x.com').tag('leaked')     # login + credential
+    r2 = [x for x in correlate(alm) if x.rule == 'login-exposed']
     assert r2 and r2[0].severity == 'critical'
 
 
@@ -116,15 +116,15 @@ def test_http_probe_detecta_panel_login(monkeypatch):
         text = '<html><title>Admin</title><input type="password" name="pw"></html>'
     monkeypatch.setattr(ob, '_fetch_seguro', lambda *a, **k: R())
     _, e, _ = _correr('http_probe', 'domain', 'admin.x.com')
-    assert 'panel-login' in e.tags
+    assert 'login-panel' in e.tags
 
 
 # ── 136: leak -> login correlation ──────────────────────────────────────────
 def test_leak_login():
     from core.correlacion import correlate
     alm = Store()
-    e = alm.create('email', 'admin@acme.com'); e.tag('filtrado')
-    p = alm.create('subdomain', 'panel.acme.com'); p.tag('panel-login')
+    e = alm.create('email', 'admin@acme.com'); e.tag('leaked')
+    p = alm.create('subdomain', 'panel.acme.com'); p.tag('login-panel')
     r = [x for x in correlate(alm) if x.rule == 'leak-login']
     assert r and r[0].severity == 'critical'
     assert e.id in r[0].entities and p.id in r[0].entities   # names both
@@ -133,7 +133,7 @@ def test_leak_login():
 def test_leak_login_sin_filtrado():
     from core.correlacion import correlate
     alm = Store()
-    alm.create('subdomain', 'panel.acme.com').tag('panel-login')   # panel but no credential
+    alm.create('subdomain', 'panel.acme.com').tag('login-panel')   # panel but no credential
     assert not [x for x in correlate(alm) if x.rule == 'leak-login']
 
 
@@ -145,7 +145,7 @@ def test_pivote_plataformas():
     for i in range(6):
         p = alm.create('platform', f'plat{i}')
         alm.relate(u.id, p.id, 'presente')
-    r = [x for x in correlate(alm) if x.rule == 'pivote-plataformas']
+    r = [x for x in correlate(alm) if x.rule == 'platform-pivot']
     assert r and '6 platforms' in r[0].message
 
 
@@ -155,7 +155,7 @@ def test_pivote_plataformas_pocas_no_dispara():
     u = alm.create('user', 'x')
     for i in range(3):                                   # <5 → no finding
         alm.relate(u.id, alm.create('platform', f'p{i}').id, 'presente')
-    assert not [x for x in correlate(alm) if x.rule == 'pivote-plataformas']
+    assert not [x for x in correlate(alm) if x.rule == 'platform-pivot']
 
 
 # ── 63: user YAML rule loader ───────────────────────────────────────────────
@@ -290,7 +290,7 @@ def test_url_check_urlhaus(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'post',
                         lambda *a, **k: _Rj({'query_status': 'ok', 'threat': 'malware_download'}))
     _, e, _ = _correr('url_check', 'url', 'http://malo.com/x')
-    assert 'url-maliciosa' in e.tags and e.properties.get('urlhaus') == 'malware_download'
+    assert 'malicious-url' in e.tags and e.properties.get('urlhaus') == 'malware_download'
 
 
 def test_render_js_bloquea_ssrf(monkeypatch):

@@ -15,14 +15,14 @@ def _demo():
     alm = Store()
     d = alm.create('domain', 'objetivo.com', properties={'org': 'ACME'})
     ip = alm.create('ip', '93.184.216.34')
-    ip.tag('listado-amenaza')
+    ip.tag('threat-listed')
     alm.relate(d.id, ip.id, 'resuelve')
     return alm, d, ip
 
 
 def test_json_reimportable():
     alm, d, ip = _demo()
-    h = [Finding('ip-listada', 'high', 'x', [ip.id])]
+    h = [Finding('ip-listed', 'high', 'x', [ip.id])]
     txt = exportar_json(alm, h, score=20, meta={'workspace': 'c1'})
     obj = json.loads(txt)
     assert obj['meta']['workspace'] == 'c1'

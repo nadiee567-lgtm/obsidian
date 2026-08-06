@@ -46,13 +46,13 @@ def test_sobrevive_recarga(tmp_path):
     """State persists (does not live only in memory)."""
     g1 = Manager(str(tmp_path))
     a = g1.create('caso1')
-    a.create('email', 'a@b.com', tags={'interesante'})
+    a.create('email', 'a@b.com', tags={'interesting'})
     g1.guardar('caso1', a)
     # new Manager (simulates a server restart)
     g2 = Manager(str(tmp_path))
     r = g2.cargar('caso1')
     e = r.buscar('email', 'a@b.com')
-    assert e is not None and 'interesante' in e.tags
+    assert e is not None and 'interesting' in e.tags
 
 
 def test_borrar_y_renombrar(tmp_path):

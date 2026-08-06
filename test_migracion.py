@@ -59,7 +59,7 @@ def test_migracion_dedup_email_entre_modulos():
 def test_migracion_tags_y_props():
     alm = migrate_case(CASE_VIEJO)
     e = alm.buscar('email', 'admin@example.com')
-    assert 'spoofable' in e.tags and 'filtrado' in e.tags
+    assert 'spoofable' in e.tags and 'leaked' in e.tags
     assert e.properties.get('hibp_breaches') == ['LinkedIn']
     sub = alm.buscar('subdomain', 'old.example.com')
     assert 'takeover' in sub.tags

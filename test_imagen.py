@@ -71,7 +71,7 @@ def test_metadata_exif_como_entidades(monkeypatch):
     assert 'Apple iPhone 12' in techs and '14.2' in techs
     assert 'Jane Doe' in personas
     assert urls and 'maps' in urls[0].value          # GPS -> link de mapa pivotable
-    assert 'tiene-gps' in e.tags
+    assert 'has-gps' in e.tags
 
 
 # ── F9 121-125: geo/imagen ───────────────────────────────────────────────────
@@ -165,4 +165,4 @@ def test_ela_transform(monkeypatch):
     alm = Store()
     u = alm.create('url', 'https://x.com/a.jpg')
     run_by_name('ela', u, alm)
-    assert 'ela-generado' in u.tags and u.properties.get('ela_img')
+    assert 'ela-generated' in u.tags and u.properties.get('ela_img')

@@ -101,13 +101,13 @@ def test_roundtrip_almacen():
 # ── analyst tags (step 23) ──────────────────────────────────────────────────
 def test_tags():
     e = Entity('ip', '8.8.8.8')
-    e.tag('interesante', 'revisar')
-    assert e.tags == {'interesante', 'revisar'}
+    e.tag('interesting', 'revisar')
+    assert e.tags == {'interesting', 'revisar'}
     e.untag('revisar')
-    assert e.tags == {'interesante'}
+    assert e.tags == {'interesting'}
     # tags survive serialization
-    assert set(e.to_dict()['tags']) == {'interesante'}
-    assert Entity.from_dict(e.to_dict()).tags == {'interesante'}
+    assert set(e.to_dict()['tags']) == {'interesting'}
+    assert Entity.from_dict(e.to_dict()).tags == {'interesting'}
 
 def test_tags_se_fusionan():
     a = Entity('ip', '8.8.8.8', tags={'a'})
