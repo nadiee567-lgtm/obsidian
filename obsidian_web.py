@@ -3858,7 +3858,7 @@ def api_v2_run():
     except (KeyError, ValueError) as e:
         return _error(str(e), 400)
     return jsonify({'producidas': [e.to_dict() for e in producidas],
-                    'total_entidades': len(_almacen), 'workspace': _ws_activo})
+                    'total_entities': len(_almacen), 'workspace': _ws_activo})
 
 def _estado_datos():
     """Collects system health (touches disk/processes)."""
@@ -3963,7 +3963,7 @@ def api_v2_recon():
                 _gestor.guardar(_ws_activo, _almacen)
             except Exception as _e:
                 log.warning("autosave recon failed: %s", _e)
-    return jsonify({'resultados': res, 'total_entidades': len(_almacen), 'workspace': _ws_activo})
+    return jsonify({'resultados': res, 'total_entities': len(_almacen), 'workspace': _ws_activo})
 
 _tareas = TaskManager()
 
@@ -3995,7 +3995,7 @@ def api_v2_recon_async():
                     _gestor.guardar(_ws_activo, _almacen)
                 except Exception as _e:
                     log.warning("autosave recon_async: %s", _e)
-        return {'resultados': res, 'total_entidades': len(_almacen)}
+        return {'resultados': res, 'total_entities': len(_almacen)}
 
     return jsonify({'job_id': _tareas.create(trabajo)})
 
@@ -4108,7 +4108,7 @@ def api_v2_workspace_abrir():
         return _error('workspace not found', 404)
     _ws_activo = _slug_caso(nombre)
     _aplicar_perfil_opsec(_ws_activo)                # non-attribution mode (157)
-    return jsonify({'ok': True, 'activo': _ws_activo, 'total_entidades': len(_almacen)})
+    return jsonify({'ok': True, 'activo': _ws_activo, 'total_entities': len(_almacen)})
 
 @app.route('/api/v2/workspaces/historial')
 def api_v2_ws_historial():

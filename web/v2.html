@@ -230,7 +230,7 @@ async function pintarGrafo(){
     const nodo={id:e.id,label:e.value.length>26?e.value.slice(0,26)+'…':e.value,
       color:{background:COLOR[e.type]||'#8b8b98',border:'#0b0d12'},shape:SHAPE[e.type]||'dot',
       title:e.type+': '+e.value};
-    if(e.tags&&e.tags.length) nodo.color.border=SEVCOLOR.critical;   // resaltar entidades con tags
+    if(e.tags&&e.tags.length) nodo.color.border=SEVCOLOR.critical;   // highlight entities that have tags
     nodo.hidden=tiposOcultos.has(e.type);
     nodes.update(nodo);
   });
@@ -380,7 +380,7 @@ async function correr(type,value,nombre,requiereKey){
     if(!r.ok){ setStatus('error: '+(d.error||r.status),'err'); return; }
     const n=d.producidas?d.producidas.length:0;
     if(n===0 && requiereKey){ setStatus('⚿ '+nombre+' returned nothing — needs an API key. Open it in 🔑 API keys (top). Without a key, use the modules without ⚿ (free).','err'); }
-    else setStatus('✓ '+nombre+': +'+n+' entidades (total '+d.total_entidades+')');
+    else setStatus('✓ '+nombre+': +'+n+' entities (total '+d.total_entities+')');
     await pintarGrafo();
   }catch(e){ setStatus('error: '+e.message,'err'); }
 }
