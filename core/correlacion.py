@@ -325,3 +325,13 @@ def r_nuclei_vuln(alm):
                 n = len(e.properties.get('nuclei', []))
                 yield Finding('vuln-nuclei', 'high',
                                f'{e.value}: {n} nuclei finding(s) (high+ severity)', [e.id])
+
+@rule
+def r_software_eol(alm):
+    """Technology past end-of-life = no more security patches (F16, Phase C)."""
+    for t in alm.of_type('tech'):
+        if 'eol' in t.tags:
+            desde = t.properties.get('eol_since', '')
+            yield Finding('software-eol', 'high',
+                           f'{t.value} is end-of-life (no security patches)'
+                           + (f' since {desde}' if desde else ''), [t.id])

@@ -2655,6 +2655,59 @@ def _t_cve_lookup(entidad, ctx):
             if e:
                 e.tag('version-unverified')
 
+@transform(input='tech', outputs=(), name='eol',
+           description='End-of-life status of the technology (endoflife.date, keyless) (F16 step 179)')
+def _t_eol(entidad, ctx):
+    """Is this software past its support window? EOL = no security patches = risk.
+    Flags 'eol' only when a known version falls in an EOL cycle, or when even the
+    newest release is already EOL -- honest, no false positives."""
+    slug = re.sub(r'[^a-z0-9.+-]', '', (entidad.value or '').lower().split(' ')[0])
+    if not slug:
+        return
+    try:
+        r = SESSION.get(f'https://endoflife.date/api/{slug}.json', timeout=10)
+        if r.status_code != 200:
+            return
+        cycles = r.json()
+    except Exception as _e:
+        log.debug("endoflife unavailable: %s", _e)
+        return
+    if not isinstance(cycles, list) or not cycles:
+        return
+    entidad.properties['eol_tracked'] = True
+    hoy = datetime.date.today().isoformat()
+    def _es_eol(c):
+        e = c.get('eol')
+        return e is True or (isinstance(e, str) and e < hoy)
+    ver = str(entidad.properties.get('version', '')).strip()
+    if ver:
+        for c in cycles:
+            if ver.startswith(str(c.get('cycle', '\0'))):
+                if _es_eol(c):
+                    entidad.tag('eol')
+                    entidad.properties['eol_since'] = c.get('eol')
+                return
+    if _es_eol(cycles[0]):          # no version: only flag if even the newest is EOL
+        entidad.tag('eol')
+        entidad.properties['eol_since'] = cycles[0].get('eol')
+
+@transform(input='email', outputs=(), name='comb',
+           description='Email in the COMB compilation -- breach count (ProxyNova, keyless) (F16 step 180)')
+def _t_comb(entidad, ctx):
+    """Does the email appear in the COMB (Compilation of Many Breaches)? Stores only
+    the COUNT and tags 'leaked' -- deliberately NOT the plaintext passwords."""
+    try:
+        d = SESSION.get('https://api.proxynova.com/comb',
+                        params={'query': entidad.value, 'limit': 25}, timeout=10).json() or {}
+    except Exception as _e:
+        log.debug("comb unavailable: %s", _e)
+        return
+    lines = d.get('lines') or []
+    hits = [l for l in lines if str(l).lower().startswith(entidad.value.lower() + ':')]
+    if hits:
+        entidad.tag('leaked')                    # reuses the r_email_leaked correlation rule
+        entidad.properties['comb_count'] = d.get('count', len(hits))
+
 @transform(input='domain', outputs=(), name='http_probe',
            description='HTTP probe: status, title, server, redirect (httpx-style)')
 def _t_http_probe_dom(entidad, ctx):
