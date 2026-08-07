@@ -2708,6 +2708,100 @@ def _t_comb(entidad, ctx):
         entidad.tag('leaked')                    # reuses the r_email_leaked correlation rule
         entidad.properties['comb_count'] = d.get('count', len(hits))
 
+@transform(input='email', outputs=('person', 'url'), name='gravatar',
+           description='Public Gravatar profile of the email: name + linked accounts (keyless) (F16 step 181)')
+def _t_gravatar(entidad, ctx):
+    """If the email has a public Gravatar profile, pull the name and linked social
+    accounts -- a strong identity pivot. 404 = no profile = clean no-op."""
+    h = hashlib.md5(entidad.value.strip().lower().encode()).hexdigest()
+    try:
+        r = SESSION.get(f'https://gravatar.com/{h}.json', timeout=8, headers={'User-Agent': 'OBSIDIAN'})
+        if r.status_code != 200:
+            return
+        prof = ((r.json() or {}).get('entry') or [{}])[0]
+    except Exception as _e:
+        log.debug("gravatar unavailable: %s", _e)
+        return
+    name = (prof.get('displayName') or (prof.get('name') or {}).get('formatted') or '').strip()
+    if name:
+        ctx.emit('person', name, label='gravatar')
+        entidad.tag('has-gravatar')
+    for acc in prof.get('accounts', [])[:15]:
+        if acc.get('url'):
+            ctx.emit('url', acc['url'], label='account:' + (acc.get('shortname') or acc.get('domain') or '?'))
+    for u in prof.get('urls', [])[:10]:
+        if u.get('value'):
+            ctx.emit('url', u['value'], label='link')
+
+@transform(input='ip', outputs=('org',), name='ip_rdap',
+           description='Network owner + abuse contact of the IP (RDAP, keyless) (F16 step 182)')
+def _t_ip_rdap(entidad, ctx):
+    try:
+        r = SESSION.get(f'https://rdap.org/ip/{entidad.value}', timeout=12,
+                        headers={'Accept': 'application/rdap+json'})
+        if r.status_code != 200:
+            return
+        d = r.json() or {}
+    except Exception as _e:
+        log.debug("ip_rdap unavailable: %s", _e)
+        return
+    if d.get('name'):
+        entidad.properties['net_name'] = d['name']
+    if d.get('startAddress') and d.get('endAddress'):
+        entidad.properties['net_range'] = f"{d['startAddress']}-{d['endAddress']}"
+    for ent in d.get('entities', []):
+        roles = ent.get('roles') or []
+        fn, vc = None, ent.get('vcardArray')
+        if vc and len(vc) > 1:
+            for campo in vc[1]:
+                if campo and campo[0] == 'fn':
+                    fn = campo[3]
+        if fn and 'registrant' in roles:
+            ctx.emit('org', fn, label='net owner')
+        if fn and 'abuse' in roles:
+            entidad.properties['abuse_contact'] = fn
+
+@transform(input='ip', outputs=('asn',), name='ripe_netinfo',
+           description='Announcing ASN + prefix of the IP (RIPEstat, keyless) (F16 step 183)')
+def _t_ripe_netinfo(entidad, ctx):
+    try:
+        d = (SESSION.get('https://stat.ripe.net/data/network-info/data.json',
+                         params={'resource': entidad.value}, timeout=12).json() or {}).get('data', {})
+    except Exception as _e:
+        log.debug("ripestat unavailable: %s", _e)
+        return
+    if d.get('prefix'):
+        entidad.properties['prefix'] = d['prefix']
+    for asn in (d.get('asns') or [])[:5]:
+        ctx.emit('asn', f'AS{asn}', label='announces')
+
+@transform(input='domain', outputs=('domain',), name='dnstwister',
+           description='Registered typosquats via DNSTwister permutations (keyless) (F16 step 184)')
+def _t_dnstwister(entidad, ctx):
+    hexdom = entidad.value.encode().hex()
+    try:
+        d = SESSION.get(f'https://dnstwister.report/api/fuzz/{hexdom}', timeout=12).json() or {}
+    except Exception as _e:
+        log.debug("dnstwister unavailable: %s", _e)
+        return
+    perms = [f['domain'] for f in d.get('fuzzy_domains', [])
+             if f.get('domain') and f['domain'] != entidad.value][:40]
+    registrados, lock = {}, threading.Lock()
+    def _chk(dom):
+        out = run_tool(['dig', dom, 'A', '+short'], timeout=4)
+        ip = next((l.strip() for l in out.splitlines()
+                   if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', l.strip())), None)
+        if ip:
+            with lock:
+                registrados[dom] = ip
+    ths = [threading.Thread(target=_chk, args=(p,)) for p in perms]
+    for t in ths: t.start()
+    for t in ths: t.join(timeout=8)
+    for dom, ip in registrados.items():
+        e = ctx.emit('domain', dom, label='typosquat', resolves=ip)
+        if e:
+            e.tag('typosquat')
+
 @transform(input='domain', outputs=(), name='http_probe',
            description='HTTP probe: status, title, server, redirect (httpx-style)')
 def _t_http_probe_dom(entidad, ctx):

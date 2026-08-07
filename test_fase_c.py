@@ -60,3 +60,58 @@ def test_comb_clean_email(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data={'count': 0, 'lines': []}))
     _, e, _ = _run('comb', 'email', 'clean@nowhere.com')
     assert 'leaked' not in e.tags
+
+
+# ── Gravatar (email -> person + accounts) ────────────────────────────────────
+def test_gravatar_profile(monkeypatch):
+    prof = {'entry': [{'displayName': 'Jane Dev',
+                       'accounts': [{'url': 'https://github.com/jane', 'shortname': 'github'}],
+                       'urls': [{'value': 'https://jane.dev'}]}]}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=prof))
+    prod, e, _ = _run('gravatar', 'email', 'jane@dev.com')
+    assert 'has-gravatar' in e.tags
+    assert 'Jane Dev' in {x.value for x in prod if x.type == 'person'}
+    assert 'https://github.com/jane' in {x.value for x in prod if x.type == 'url'}
+
+
+def test_gravatar_no_profile(monkeypatch):
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data='User not found', code=404))
+    prod, e, _ = _run('gravatar', 'email', 'nobody@nowhere.com')
+    assert prod == [] and 'has-gravatar' not in e.tags
+
+
+# ── IP-RDAP (ip -> net owner + abuse) ────────────────────────────────────────
+def test_ip_rdap(monkeypatch):
+    d = {'name': 'GOOGLE', 'startAddress': '8.8.8.0', 'endAddress': '8.8.8.255',
+         'entities': [{'roles': ['registrant'],
+                       'vcardArray': ['vcard', [['fn', {}, 'text', 'Google LLC']]]},
+                      {'roles': ['abuse'],
+                       'vcardArray': ['vcard', [['fn', {}, 'text', 'Google Abuse']]]}]}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=d))
+    prod, e, _ = _run('ip_rdap', 'ip', '8.8.8.8')
+    assert e.properties.get('net_name') == 'GOOGLE'
+    assert e.properties.get('abuse_contact') == 'Google Abuse'
+    assert 'Google LLC' in {x.value for x in prod if x.type == 'org'}
+
+
+# ── RIPEstat (ip -> ASN + prefix) ────────────────────────────────────────────
+def test_ripe_netinfo(monkeypatch):
+    d = {'data': {'prefix': '8.8.8.0/24', 'asns': ['15169']}}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=d))
+    prod, e, _ = _run('ripe_netinfo', 'ip', '8.8.8.8')
+    assert e.properties.get('prefix') == '8.8.8.0/24'
+    assert 'AS15169' in {x.value for x in prod if x.type == 'asn'}
+
+
+# ── DNSTwister (domain -> registered typosquats) ─────────────────────────────
+def test_dnstwister(monkeypatch):
+    fuzz = {'fuzzy_domains': [{'domain': 'github.com'}, {'domain': 'gitbub.com'},
+                              {'domain': 'guthub.com'}]}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=fuzz))
+    # only gitbub.com "resolves"
+    monkeypatch.setattr(ob, 'run_tool',
+                        lambda argv, **k: '1.2.3.4\n' if 'gitbub.com' in argv else '')
+    prod, _, _ = _run('dnstwister', 'domain', 'github.com')
+    squats = {x.value for x in prod if x.type == 'domain'}
+    assert 'gitbub.com' in squats and 'guthub.com' not in squats
+    assert all('typosquat' in x.tags for x in prod if x.value == 'gitbub.com')
