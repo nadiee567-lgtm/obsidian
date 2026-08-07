@@ -76,19 +76,19 @@ def test_coincidencias_leak():
     assert len(hits) == 2 and {h['keyword'] for h in hits} == {'database', 'ransomware'}
 
 
-def test_canal_leaks(monkeypatch):
+def test_channel_leaks(monkeypatch):
     textos = ['combolist fresca de acme.com', 'admin@acme.com filtrado en breach', 'gatitos']
     monkeypatch.setattr(ob, '_tg_mensajes', lambda u, limite=100: (True, (123, textos)))
-    prod, e = _run_one('canal_leaks', 'user', 'canal_ru')
+    prod, e = _run_one('channel_leaks', 'user', 'canal_ru')
     assert 'leaks-channel' in e.tags and e.properties.get('leaks_mentions') == 2
     assert 'acme.com' in {x.value for x in prod if x.type == 'domain'}
     assert 'admin@acme.com' in {x.value for x in prod if x.type == 'email'}
 
 
-def test_canal_leaks_sin_creds(monkeypatch):
+def test_channel_leaks_sin_creds(monkeypatch):
     monkeypatch.setattr(ob, '_tg_mensajes', lambda u, limite=100: (False, 'falta api_id:api_hash ...'))
-    prod, e = _run_one('canal_leaks', 'user', 'x')
-    assert prod == [] and 'api_id' in e.properties.get('canal_leaks', '')
+    prod, e = _run_one('channel_leaks', 'user', 'x')
+    assert prod == [] and 'api_id' in e.properties.get('channel_leaks', '')
 
 
 # ── 132: domain-level stealer logs (keyless, Hudson Rock) ────────────────────

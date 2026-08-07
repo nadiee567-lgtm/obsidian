@@ -7,18 +7,18 @@ from urllib.parse import quote
 import obsidian_web as ob
 from core.modelo import Store
 from core.transforms import run_by_name
-from core.imagen import enlaces_reverse, enlaces_facial
+from core.imagen import reverse_links, facial_links
 
 
-def test_enlaces_reverse_todos_los_motores():
-    d = enlaces_reverse('https://x.com/a.jpg')
+def test_reverse_links_todos_los_motores():
+    d = reverse_links('https://x.com/a.jpg')
     assert set(d) == {'yandex', 'google', 'tineye', 'bing'}
     assert all(u.startswith('https://') for u in d.values())
 
 
-def test_enlaces_reverse_urlencode():
+def test_reverse_links_urlencode():
     src = 'https://x.com/a b.jpg?p=1&q=2'
-    d = enlaces_reverse(src)
+    d = reverse_links(src)
     assert ' ' not in d['yandex']                       # sin espacios crudos
     assert quote(src, safe='') in d['yandex']           # url completa urlencodeada
 
@@ -31,8 +31,8 @@ def test_reverse_image_transform():
     assert all(p.type == 'url' for p in prod)
 
 
-def test_enlaces_facial():
-    d = enlaces_facial('https://x.com/cara.jpg')
+def test_facial_links():
+    d = facial_links('https://x.com/cara.jpg')
     assert set(d) == {'yandex', 'facecheck', 'pimeyes'}
     assert d['yandex']['modo'] == 'url' and 'yandex.com' in d['yandex']['url']
     assert d['facecheck']['modo'] == 'upload'          # honesto: es por subida manual
@@ -91,11 +91,11 @@ def test_cronolocalizacion(monkeypatch):
     assert any('40' in p.value for p in prod)         # coords en el link
 
 
-def test_satelital_requiere_gps():
+def test_satellite_requiere_gps():
     from core.transforms import run_by_name
     store = Store()
     u = store.create('url', 'https://x.com/f.jpg')       # sin GPS
-    assert run_by_name('satelital', u, store) == []
+    assert run_by_name('satellite', u, store) == []
 
 
 def test_landmarks():

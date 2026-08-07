@@ -24,7 +24,7 @@ def parse_gps(text: str):
     return (round(dec(*m[0]), 6), round(dec(*m[1]), 6))
 
 
-def enlaces_cronolocalizacion(lat=None, lon=None) -> dict:
+def chronolocation_links(lat=None, lon=None) -> dict:
     """Sun/shadow tools (Bellingcat technique). With coords if known."""
     if lat is not None and lon is not None:
         return {'suncalc': f'https://www.suncalc.org/#/{lat},{lon},15',
@@ -32,7 +32,7 @@ def enlaces_cronolocalizacion(lat=None, lon=None) -> dict:
     return {'suncalc': 'https://www.suncalc.org/', 'shadowmap': 'https://shadowmap.org/'}
 
 
-def enlaces_satelital(lat, lon) -> dict:
+def satellite_links(lat, lon) -> dict:
     """Satellite/aerial views to verify a location."""
     return {
         'google_earth': f'https://earth.google.com/web/@{lat},{lon},0a,1000d',
@@ -41,7 +41,7 @@ def enlaces_satelital(lat, lon) -> dict:
     }
 
 
-def enlaces_landmark(url_imagen: str) -> dict:
+def landmark_links(url_imagen: str) -> dict:
     """Landmark recognition (buildings/signs) by image."""
     u = quote(url_imagen, safe='')
     return {'google_lens': f'https://lens.google.com/uploadbyurl?url={u}',
@@ -90,7 +90,7 @@ def ela(ruta: str, salida: str, calidad: int = 90):
     return max_diff
 
 
-def enlaces_reverse(url_imagen: str) -> dict:
+def reverse_links(url_imagen: str) -> dict:
     """{engine: reverse_search_url} for the given image."""
     u = quote(url_imagen, safe='')
     return {
@@ -111,7 +111,7 @@ _FACE = {
 }
 
 
-def enlaces_facial(url_imagen: str) -> dict:
+def facial_links(url_imagen: str) -> dict:
     """{engine: {'url', 'modo'}} for facial search. Yandex is the best free one
     (especially Eastern Europe) and works by URL; FaceCheck/PimEyes are manual
     upload -- their landing page is returned so the analyst uploads the image."""

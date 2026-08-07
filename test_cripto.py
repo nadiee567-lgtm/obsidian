@@ -22,11 +22,11 @@ def _run_one(name, type, value):
 
 
 # ── 137: wallet extraction ──────────────────────────────────────────────────
-def test_extraer_wallets(monkeypatch):
+def test_extract_wallets(monkeypatch):
     eth = '0x' + 'a' * 40
     txt = f'donate to 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa or to {eth} thanks'
     monkeypatch.setattr(ob, '_fetch_seguro', lambda *a, **k: _R(text=txt))
-    prod, _, _ = _run_one('extraer_wallets', 'url', 'https://x.com')
+    prod, _, _ = _run_one('extract_wallets', 'url', 'https://x.com')
     ws = {e.value for e in prod if e.type == 'wallet'}
     assert '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa' in ws and eth in ws
 
@@ -39,13 +39,13 @@ def test_tx_graph(monkeypatch):
     tx_json = {'txs': [{'inputs': [{'prev_out': {'addr': 'inp111'}}],
                         'out': [{'addr': 'out222'}, {'addr': _GENESIS}]}]}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=tx_json))
-    prod, _, _ = _run_one('tx_grafo', 'wallet', _GENESIS)
+    prod, _, _ = _run_one('tx_graph', 'wallet', _GENESIS)
     ws = {e.value for e in prod if e.type == 'wallet'}
     assert ws == {'inp111', 'out222'}                # counterparties, without itself
 
 
 def test_tx_graph_ignores_non_btc():
-    prod, _, _ = _run_one('tx_grafo', 'wallet', '0x' + 'a' * 40)   # ETH -> not applicable yet
+    prod, _, _ = _run_one('tx_graph', 'wallet', '0x' + 'a' * 40)   # ETH -> not applicable yet
     assert prod == []
 
 
@@ -69,18 +69,18 @@ def test_exchange_attrib():
 
 
 # ── 141: risk scoring (ransomware) + rule ───────────────────────────────────
-def test_riesgo_wallet_y_regla(monkeypatch):
+def test_wallet_risk_y_regla(monkeypatch):
     from core.correlacion import correlate
     monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
-    prod, e, store = _run_one('riesgo_wallet', 'wallet', '1BadRansomAddr')
+    prod, e, store = _run_one('wallet_risk', 'wallet', '1BadRansomAddr')
     assert 'ransomware' in e.tags
     h = correlate(store)
     assert any(x.rule == 'wallet-ransomware' and x.severity == 'critical' for x in h)
 
 
-def test_riesgo_wallet_limpia(monkeypatch):
+def test_wallet_risk_limpia(monkeypatch):
     monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
-    _, e, _ = _run_one('riesgo_wallet', 'wallet', _GENESIS)   # not in the list
+    _, e, _ = _run_one('wallet_risk', 'wallet', _GENESIS)   # not in the list
     assert 'ransomware' not in e.tags
 
 

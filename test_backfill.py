@@ -14,8 +14,8 @@ def _run_one(name, type, value):
 
 
 # ── 33: phone ───────────────────────────────────────────────────────────────
-def test_telefono_dorks_keyless():
-    prod, _, _ = _run_one('telefono_dorks', 'phone', '+14155552671')
+def test_phone_dorks_keyless():
+    prod, _, _ = _run_one('phone_dorks', 'phone', '+14155552671')
     dorks = {p.properties.get('dork') for p in prod if p.type == 'url'}
     assert dorks == {'truecaller', 'whitepages', 'messaging', 'general'}
     assert all(p.type == 'url' for p in prod)      # no key: only dorks, no country

@@ -19,7 +19,7 @@ def test_extraer_entidades():
     assert '999.1.1.1' not in vals               # invalid octet discarded
 
 
-def test_extraer_wallets_de_texto():
+def test_extract_wallets_de_texto():
     from core.extraccion import extract_entities
     txt = 'pay to 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
     tipos = {t for t, _ in extract_entities(txt)}

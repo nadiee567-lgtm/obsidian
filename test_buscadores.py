@@ -153,7 +153,7 @@ def test_criminalip_binaryedge_sin_key(monkeypatch):
 
 
 # ── Favicon pivot (114) ─────────────────────────────────────────────────────
-def test_favicon_pivote(monkeypatch):
+def test_favicon_pivot(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get',
                         lambda s: {'fofa': 'a@b.com:k', 'shodan': 'sk'}.get(s))
     def fake_get(url, *a, **k):
@@ -163,20 +163,20 @@ def test_favicon_pivote(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
     store = Store()
     h = store.create('hash', '123456', properties={'hash_type': 'favicon'})
-    prod = run_by_name('favicon_pivote', h, store)
+    prod = run_by_name('favicon_pivot', h, store)
     ips = {e.value for e in prod if e.type == 'ip'}
     assert ips == {'9.9.9.9', '8.8.8.8', '7.7.7.7'}   # cross-engine dedup of 9.9.9.9
 
 
-def test_favicon_pivote_ignora_hash_no_favicon(monkeypatch):
+def test_favicon_pivot_ignora_hash_no_favicon(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'a@b.com:k')
     store = Store()
     h = store.create('hash', 'abc', properties={'hash_type': 'sha1'})
-    assert run_by_name('favicon_pivote', h, store) == []
+    assert run_by_name('favicon_pivot', h, store) == []
 
 
 # ── TLS certificate pivot (115) ─────────────────────────────────────────────
-def test_cert_pivote(monkeypatch):
+def test_cert_pivot(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get',
                         lambda s: {'fofa': 'a@b.com:k', 'shodan': 'sk'}.get(s))
     def fake_get(url, *a, **k):
@@ -186,7 +186,7 @@ def test_cert_pivote(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
     store = Store()
     d = store.create('domain', 'ejemplo.com', properties={'cert_cn': '*.ejemplo.com'})
-    prod = run_by_name('cert_pivote', d, store)
+    prod = run_by_name('cert_pivot', d, store)
     assert {e.value for e in prod if e.type == 'ip'} == {'5.5.5.5', '6.6.6.6'}
 
 

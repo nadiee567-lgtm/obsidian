@@ -26,8 +26,8 @@ from core.tasks import TaskManager
 from core.personas import PersonaManager
 from core.extraccion import extract_entities
 from core import multiidioma as _ml
-from core.imagen import (enlaces_reverse, enlaces_facial, parse_gps,
-                         enlaces_cronolocalizacion, enlaces_satelital, enlaces_landmark,
+from core.imagen import (reverse_links, facial_links, parse_gps,
+                         chronolocation_links, satellite_links, landmark_links,
                          phash as _phash, ela as _ela)
 import core.ia as ia
 
@@ -2105,7 +2105,7 @@ def _t_favicon_hash(entity, ctx):
     except Exception as _e:
         log.debug("favicon_hash unavailable: %s", _e)
 
-def _pivote_ips(campos):
+def _pivot_ips(campos):
     """Searches FOFA + Shodan by unified `campos` and returns the set of matching
     IPs. Basis of the pivots (favicon, cert). Free cross-engine dedup (set)."""
     ips = set()
@@ -2135,12 +2135,12 @@ def _pivote_ips(campos):
             log.debug("pivote shodan: %s", _e)
     return ips
 
-@transform(input='hash', outputs=('ip',), name='favicon_pivote', requires_key=True,
+@transform(input='hash', outputs=('ip',), name='favicon_pivot', requires_key=True,
            description='Enumerates IPs serving this favicon (FOFA/Shodan) -- without touching the target (F8)')
-def _t_favicon_pivote(entity, ctx):
+def _t_favicon_pivot(entity, ctx):
     if entity.properties.get('hash_type') != 'favicon':
         return
-    for ip in _pivote_ips({'favicon': entity.value}):
+    for ip in _pivot_ips({'favicon': entity.value}):
         ctx.emit('ip', ip, label='same-favicon')
 
 @transform(input='domain', outputs=('subdomain',), name='wayback',
@@ -2276,7 +2276,7 @@ def _t_github(entity, ctx):
 
 @transform(input='ip', outputs=('port',), name='ports',
            description='Open ports and services (nmap top-20)')
-def _t_puertos(entity, ctx):
+def _t_ports(entity, ctx):
     if not _which('nmap'):
         return
     out = run_tool(['nmap', '-T4', '--top-ports', '20', '-sV', '--open', entity.value], timeout=60)
@@ -2859,9 +2859,9 @@ def _t_rdap(entity, ctx):
     except Exception as _e:
         log.debug("rdap unavailable: %s", _e)
 
-@transform(input='ip', outputs=(), name='reputacion_ip',
+@transform(input='ip', outputs=(), name='ip_reputation',
            description='IP reputation: proxy/VPN, hosting/datacenter, mobile (ip-api, keyless)')
-def _t_reputacion_ip(entity, ctx):
+def _t_ip_reputation(entity, ctx):
     try:
         d = SESSION.get(f'http://ip-api.com/json/{entity.value}?fields=status,proxy,hosting,mobile',
                         timeout=8).json()
@@ -2876,7 +2876,7 @@ def _t_reputacion_ip(entity, ctx):
         entity.properties['proxy'] = bool(d.get('proxy'))
         entity.properties['hosting'] = bool(d.get('hosting'))
     except Exception as _e:
-        log.debug("reputacion_ip unavailable: %s", _e)
+        log.debug("ip_reputation unavailable: %s", _e)
 
 @transform(input='ip', outputs=(), name='abuseipdb',
            description='Abuse score of the IP (AbuseIPDB, free key in the vault)')
@@ -3101,16 +3101,16 @@ def _t_binaryedge(entity, ctx):
 @transform(input='url', outputs=('url',), name='reverse_image',
            description='Reverse image search in Yandex/Google/TinEye/Bing (F9, keyless)')
 def _t_reverse_image(entity, ctx):
-    for motor, enlace in enlaces_reverse(entity.value).items():
+    for motor, enlace in reverse_links(entity.value).items():
         ctx.emit('url', enlace, label=f'reverse:{motor}', engine=motor)
 
 @transform(input='url', outputs=('url',), name='facial_search',
            description='Facial recognition: Yandex (by URL) + FaceCheck/PimEyes (manual upload) (F9)')
 def _t_busqueda_facial(entity, ctx):
-    for motor, info in enlaces_facial(entity.value).items():
+    for motor, info in facial_links(entity.value).items():
         ctx.emit('url', info['url'], label=f'facial:{motor}', engine=motor, mode=info['modo'])
 
-@transform(input='phone', outputs=('url', 'country'), name='telefono_dorks',
+@transform(input='phone', outputs=('url', 'country'), name='phone_dorks',
            description='Phone search dorks (Truecaller/messaging) + carrier if key (F2 step 33)')
 def _t_phone_dorks(entity, ctx):
     from urllib.parse import quote as _q
@@ -3453,25 +3453,25 @@ def _t_wordlist(entity, ctx):
 
 @transform(input='url', outputs=('url',), name='chronolocation',
            description='Chronolocation by shadows: SunCalc/ShadowMap (Bellingcat technique) (F9 step 121)')
-def _t_cronolocalizacion(entity, ctx):
+def _t_chronolocation(entity, ctx):
     coords = parse_gps(entity.properties.get('gps', ''))
-    enlaces = enlaces_cronolocalizacion(*(coords if coords else (None, None)))
+    enlaces = chronolocation_links(*(coords if coords else (None, None)))
     for herr, url in enlaces.items():
         ctx.emit('url', url, label=f'sun:{herr}', tool=herr)
 
-@transform(input='url', outputs=('url',), name='satelital',
+@transform(input='url', outputs=('url',), name='satellite',
            description='Satellite cross-check of the location (Google Earth/Sentinel/Bing) -- requires GPS (F9 step 122)')
-def _t_satelital(entity, ctx):
+def _t_satellite(entity, ctx):
     coords = parse_gps(entity.properties.get('gps', ''))
     if not coords:
         return
-    for herr, url in enlaces_satelital(*coords).items():
+    for herr, url in satellite_links(*coords).items():
         ctx.emit('url', url, label=f'satellite:{herr}', tool=herr)
 
 @transform(input='url', outputs=('url',), name='landmarks',
            description='Landmark matching by image (Google Lens/Mapillary/Wikimapia) (F9 step 123)')
 def _t_landmarks(entity, ctx):
-    for herr, url in enlaces_landmark(entity.value).items():
+    for herr, url in landmark_links(entity.value).items():
         ctx.emit('url', url, label=f'landmark:{herr}', tool=herr)
 
 @transform(input='url', outputs=(), name='ocr',
@@ -3606,13 +3606,13 @@ def leak_matches(textos, keywords=None):
             hits.append({'keyword': kw, 'text': t[:200]})
     return hits
 
-@transform(input='user', outputs=('domain', 'email'), name='canal_leaks',
+@transform(input='user', outputs=('domain', 'email'), name='channel_leaks',
            requires_key=True,
            description='Watches a Telegram channel for mentions of leaks/breaches/ransomware (F10 step 131)')
-def _t_canal_leaks(entity, ctx):
+def _t_channel_leaks(entity, ctx):
     ok, res = _tg_mensajes(entity.value, limite=100)
     if not ok:
-        entity.properties['canal_leaks'] = res
+        entity.properties['channel_leaks'] = res
         return
     _tid, textos = res
     hits = leak_matches(textos)
@@ -3704,7 +3704,7 @@ _WALLET_RE = {
 
 _ES_BTC = re.compile(r'(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\Z')
 
-@transform(input='wallet', outputs=('wallet',), name='tx_grafo',
+@transform(input='wallet', outputs=('wallet',), name='tx_graph',
            description='Transaction counterparties of a BTC wallet (blockchain.info, keyless) (F11 step 138)')
 def _t_tx_graph(entity, ctx):
     addr = entity.value
@@ -3714,7 +3714,7 @@ def _t_tx_graph(entity, ctx):
         d = SESSION.get(f'https://blockchain.info/rawaddr/{addr}',
                         params={'limit': 5}, timeout=12).json() or {}
     except Exception as _e:
-        log.debug("tx_grafo unavailable: %s", _e)
+        log.debug("tx_graph unavailable: %s", _e)
         return
     contrapartes = set()
     for tx in d.get('txs', [])[:5]:
@@ -3760,9 +3760,9 @@ def _ransom_addrs():
         log.debug("ransomwhere unavailable: %s", _e)
     return _RANSOM['addrs'] or set()
 
-@transform(input='wallet', outputs=(), name='riesgo_wallet',
+@transform(input='wallet', outputs=(), name='wallet_risk',
            description='Address risk: linked to ransomware? (Ransomwhere, CC0, keyless) (F11 step 141)')
-def _t_riesgo_wallet(entity, ctx):
+def _t_wallet_risk(entity, ctx):
     if entity.value in _ransom_addrs():
         entity.tag('ransomware')
         entity.properties['risk'] = 'linked to ransomware (Ransomwhere)'
@@ -3802,9 +3802,9 @@ def _t_cluster_wallets(entity, ctx):
         if w:
             w.tag('same-owner')
 
-@transform(input='url', outputs=('wallet',), name='extraer_wallets',
+@transform(input='url', outputs=('wallet',), name='extract_wallets',
            description='Extracts BTC/ETH addresses from a page (F11 step 137)')
-def _t_extraer_wallets(entity, ctx):
+def _t_extract_wallets(entity, ctx):
     try:
         r = _fetch_seguro(entity.value, timeout=10, stream=False)
     except Exception:
@@ -3940,9 +3940,9 @@ def _t_ssl(entity, ctx):
     except Exception as _e:
         log.debug("ssl unavailable: %s", _e)
 
-@transform(input='domain', outputs=('ip',), name='cert_pivote', requires_key=True,
+@transform(input='domain', outputs=('ip',), name='cert_pivot', requires_key=True,
            description='IPs with the same TLS cert (CN) across FOFA/Shodan -- same infra (F8)')
-def _t_cert_pivote(entity, ctx):
+def _t_cert_pivot(entity, ctx):
     cn = entity.properties.get('cert_cn')
     if not cn:                                            # if ssl did not run, get the CN now
         try:
@@ -3955,7 +3955,7 @@ def _t_cert_pivote(entity, ctx):
             cn = None
     if not cn:
         return
-    for ip in _pivote_ips({'cert': cn}):
+    for ip in _pivot_ips({'cert': cn}):
         ctx.emit('ip', ip, label='same-cert')
 
 
