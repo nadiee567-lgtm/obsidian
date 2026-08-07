@@ -11,8 +11,8 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass, field, asdict
 
-SEVERIDADES = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
-_PESO = {'critical': 40, 'high': 20, 'medium': 8, 'low': 3}
+SEVERITIES = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
+_WEIGHT = {'critical': 40, 'high': 20, 'medium': 8, 'low': 3}
 
 
 @dataclass
@@ -27,16 +27,16 @@ class Finding:
         return asdict(self)
 
 
-_REGLAS = []
+_RULES = []
 
 
 def rule(fn):
     """Registers a rule function: receives the Store and yields Hallazgos."""
-    _REGLAS.append(fn)
+    _RULES.append(fn)
     return fn
 
 
-_SUPRIMIR = {'discarded', 'false-positive'}
+_SUPPRESS = {'discarded', 'false-positive'}
 
 # ── User YAML rules (step 63) ────────────────────────────────────────────────
 # The user defines their own rules in YAML without touching Python. They are
@@ -49,7 +49,7 @@ _SUPRIMIR = {'discarded', 'false-positive'}
 #       tag: ftp-anon            # required tag (optional)
 #       value_contains: ":21"    # substring in the value (optional)
 #       property: {name: service, value: ftp}   # prop == value (optional)
-_REGLAS_YAML = []
+_YAML_RULES = []
 
 
 def _yaml_matches(ent, when) -> bool:
@@ -64,30 +64,30 @@ def _yaml_matches(ent, when) -> bool:
     return True
 
 
-def load_yaml_rules(texto: str) -> int:
+def load_yaml_rules(text: str) -> int:
     """Parses YAML rules (text) and activates them. Returns how many loaded.
     Ignores invalid entries (does not break correlation)."""
     import yaml
     try:
-        data = yaml.safe_load(texto) or []
+        data = yaml.safe_load(text) or []
     except Exception:
         return 0
     specs = []
     for s in (data if isinstance(data, list) else []):
         if isinstance(s, dict) and s.get('name'):
-            if s.get('severity', 'medium') not in SEVERIDADES:
+            if s.get('severity', 'medium') not in SEVERITIES:
                 s['severity'] = 'medium'
             specs.append(s)
-    _REGLAS_YAML[:] = specs           # mutate in place: external references see it
+    _YAML_RULES[:] = specs           # mutate in place: external references see it
     return len(specs)
 
 
-def _evaluate_yaml(almacen) -> list:
+def _evaluate_yaml(store) -> list:
     out = []
-    for spec in _REGLAS_YAML:
+    for spec in _YAML_RULES:
         when = spec.get('when', {}) or {}
         type = when.get('type')
-        ents = almacen.of_type(type) if type else almacen.entities
+        ents = store.of_type(type) if type else store.entities
         for e in ents:
             if _yaml_matches(e, when):
                 msg = str(spec.get('message', spec['name'])).replace('{value}', e.value)
@@ -95,68 +95,68 @@ def _evaluate_yaml(almacen) -> list:
     return out
 
 
-def correlate(almacen) -> list:
+def correlate(store) -> list:
     """Runs all rules (built-in + user YAML) and returns the findings ordered by
     severity. Honors analyst feedback: if ALL entities of a finding are tagged
     'discarded'/'false-positive', the finding is suppressed (feedback loop --
     learns from human corrections)."""
     out = []
-    for fn in _REGLAS:
+    for fn in _RULES:
         try:
-            out.extend(fn(almacen) or [])
+            out.extend(fn(store) or [])
         except Exception:
             pass   # a broken rule does not take down correlation
     try:
-        out.extend(_evaluate_yaml(almacen))
+        out.extend(_evaluate_yaml(store))
     except Exception:
         pass
-    idx = {e.id: e for e in almacen.entities}
-    def suprimido(h):
+    idx = {e.id: e for e in store.entities}
+    def suppressed(h):
         ids = [eid for eid in h.entities if eid in idx]
-        return bool(ids) and all(_SUPRIMIR & idx[eid].tags for eid in ids)
-    out = [h for h in out if not suprimido(h)]
-    out.sort(key=lambda h: -SEVERIDADES.get(h.severity, 0))
+        return bool(ids) and all(_SUPPRESS & idx[eid].tags for eid in ids)
+    out = [h for h in out if not suppressed(h)]
+    out.sort(key=lambda h: -SEVERITIES.get(h.severity, 0))
     return out
 
 
-def risk_score(hallazgos) -> int:
+def risk_score(findings) -> int:
     """Score 0-100 aggregating severities (step 64)."""
-    return min(100, sum(_PESO.get(h.severity, 0) for h in hallazgos))
+    return min(100, sum(_WEIGHT.get(h.severity, 0) for h in findings))
 
 
-def exposure_score(conteos: dict, riesgo: int) -> int:
+def exposure_score(counts: dict, risk: int) -> int:
     """Exposure score 0-100 (step 149): combines the SIZE of the surface (how many
     internet-facing assets) with the RISK (findings). More surface + more risk =
     more exposed."""
-    superficie = min(50, conteos.get('subdomain', 0) * 1 + conteos.get('ip', 0) * 2
-                     + conteos.get('port', 0) * 2 + conteos.get('bucket', 0) * 5
-                     + conteos.get('url', 0))
-    return min(100, superficie + riesgo // 2)
+    surface = min(50, counts.get('subdomain', 0) * 1 + counts.get('ip', 0) * 2
+                     + counts.get('port', 0) * 2 + counts.get('bucket', 0) * 5
+                     + counts.get('url', 0))
+    return min(100, surface + risk // 2)
 
 
 # ════════════════════════════════════════════════════════════════════════════
 # Built-in rules (they fire on data the transforms already produce)
 # ════════════════════════════════════════════════════════════════════════════
 
-_PUERTOS_SENSIBLES = {
+_SENSITIVE_PORTS = {
     '21': 'FTP', '23': 'Telnet', '445': 'SMB', '1433': 'MSSQL', '3306': 'MySQL',
     '3389': 'RDP', '5432': 'PostgreSQL', '5900': 'VNC', '6379': 'Redis', '27017': 'MongoDB',
 }
 
 @rule
-def r_puerto_sensible(alm):
+def r_sensitive_port(store):
     """Administrative/database port exposed to the internet (step 58)."""
-    for p in alm.of_type('port'):
+    for p in store.of_type('port'):
         num = p.value.split(':')[-1]
-        if num in _PUERTOS_SENSIBLES:
+        if num in _SENSITIVE_PORTS:
             yield Finding('sensitive-port', 'high',
-                           f'Port {num} ({_PUERTOS_SENSIBLES[num]}) exposed: {p.value}', [p.id])
+                           f'Port {num} ({_SENSITIVE_PORTS[num]}) exposed: {p.value}', [p.id])
 
 @rule
-def r_cert_vencido(alm):
+def r_cert_expired(store):
     """Expired TLS certificate on a domain (step 61)."""
-    ahora = datetime.datetime.now()
-    for d in alm.of_type('domain'):
+    now = datetime.datetime.now()
+    for d in store.of_type('domain'):
         exp = d.properties.get('cert_expires')
         if not exp:
             continue
@@ -164,83 +164,83 @@ def r_cert_vencido(alm):
             date = datetime.datetime.strptime(exp.replace(' GMT', ''), '%b %d %H:%M:%S %Y')
         except ValueError:
             continue
-        if date < ahora:
+        if date < now:
             yield Finding('cert-expired', 'medium',
                            f'Expired TLS certificate on {d.value} ({exp})', [d.id])
 
 @rule
-def r_ip_maliciosa(alm):
+def r_ip_malicious(store):
     """IP classified malicious by real threat intel (GreyNoise). Step 57."""
-    for ip in alm.of_type('ip'):
+    for ip in store.of_type('ip'):
         if 'malicious' in ip.tags:
             yield Finding('ip-malicious', 'critical',
                            f'IP {ip.value} classified as malicious (GreyNoise)', [ip.id])
 
 @rule
-def r_ip_listada(alm):
+def r_ip_listed(store):
     """IP present in a threat feed. A SIGNAL with source, to verify -- not a
     verdict (feeds have false positives)."""
-    for ip in alm.of_type('ip'):
+    for ip in store.of_type('ip'):
         if 'threat-listed' in ip.tags:
-            fuente = ip.properties.get('threat_source', 'threat feed')
+            source = ip.properties.get('threat_source', 'threat feed')
             yield Finding('ip-listed', 'high',
-                           f'IP {ip.value} listed in {fuente} -- verify (possible false positive)', [ip.id])
+                           f'IP {ip.value} listed in {source} -- verify (possible false positive)', [ip.id])
 
 @rule
-def r_email_filtrado(alm):
+def r_email_leaked(store):
     """Email that appeared in data breaches (part of 56)."""
-    for e in alm.of_type('email'):
+    for e in store.of_type('email'):
         if 'leaked' in e.tags:
             yield Finding('email-leaked', 'high',
                            f'{e.value} appeared in data breaches', [e.id])
 
 @rule
-def r_stealer(alm):
+def r_stealer(store):
     """Email coming from an infostealer-infected machine = compromised credentials."""
-    for e in alm.of_type('email'):
+    for e in store.of_type('email'):
         if 'stealer-infected' in e.tags:
             yield Finding('stealer-infected', 'critical',
                            f'{e.value} came from an infostealer machine: compromised credentials', [e.id])
 
 @rule
-def r_email_spoofable(alm):
+def r_email_spoofable(store):
     """Email domain without SPF -> spoofing possible."""
-    for e in alm.of_type('email'):
+    for e in store.of_type('email'):
         if 'spoofable' in e.tags:
             yield Finding('email-spoofable', 'medium',
                            f'The domain of {e.value} has no SPF: spoofing possible', [e.id])
 
 @rule
-def r_takeover(alm):
+def r_takeover(store):
     """Subdomain marked as vulnerable to takeover (step 55)."""
-    for s in alm.of_type('subdomain'):
+    for s in store.of_type('subdomain'):
         if 'takeover' in s.tags:
             yield Finding('subdomain-takeover', 'high',
                            f'Subdomain vulnerable to takeover: {s.value}', [s.id])
 
 @rule
-def r_shadow_it(alm):
+def r_shadow_it(store):
     """Shadow IT / forgotten assets (step 150): public buckets (exposed storage)
     and broken subdomains (HTTP 5xx = forgotten/badly maintained)."""
-    for b in alm.of_type('bucket'):
+    for b in store.of_type('bucket'):
         if 'public' in b.tags:
             yield Finding('shadow-it', 'high',
                            f'Public bucket -- exposed storage: {b.value}', [b.id])
-    for s in alm.of_type('subdomain'):
+    for s in store.of_type('subdomain'):
         st = s.properties.get('http_status')
         if isinstance(st, int) and st >= 500:
             yield Finding('shadow-it', 'medium',
                            f'Broken/forgotten subdomain (HTTP {st}): {s.value}', [s.id])
 
 @rule
-def r_infra_compartida(alm):
+def r_shared_infra(store):
     """Assets sharing a favicon or cert = probably the same organization (step 147).
     Groups domains/subdomains/ips by shared attribute."""
     from collections import defaultdict
     for campo, label in (('favicon_hash', 'favicon'), ('cert_cn', 'cert')):
         grupos = defaultdict(list)
         for type in ('domain', 'subdomain', 'ip'):
-            for e in alm.of_type(type):
+            for e in store.of_type(type):
                 v = e.properties.get(campo)
                 if v:
                     grupos[str(v)].append(e)
@@ -252,23 +252,23 @@ def r_infra_compartida(alm):
                                [e.id for e in ents])
 
 @rule
-def r_wallet_ransomware(alm):
+def r_wallet_ransomware(store):
     """Wallet linked to ransomware (step 141)."""
-    for w in alm.of_type('wallet'):
+    for w in store.of_type('wallet'):
         if 'ransomware' in w.tags:
             yield Finding('wallet-ransomware', 'critical',
                            f'Wallet linked to ransomware: {w.value}', [w.id])
 
 @rule
-def r_leak_login(alm):
+def r_leak_login(store):
     """Leaked credential + exposed login panel = probable access path (step 136).
     Explicitly pairs each 'leaked' email with each 'login-panel' in the case,
     naming both -- the concrete attack vector."""
-    filtrados = [e for e in alm.of_type('email') if 'leaked' in e.tags]
+    filtrados = [e for e in store.of_type('email') if 'leaked' in e.tags]
     if not filtrados:
         return
     paneles = [e for type in ('domain', 'subdomain')
-               for e in alm.of_type(type) if 'login-panel' in e.tags]
+               for e in store.of_type(type) if 'login-panel' in e.tags]
     for panel in paneles:
         for cred in filtrados[:3]:
             yield Finding('leak-login', 'critical',
@@ -276,30 +276,30 @@ def r_leak_login(alm):
                            f'= possible account access', [cred.id, panel.id])
 
 @rule
-def r_pivote_plataformas(alm):
+def r_platform_pivot(store):
     """A user present on many platforms = strong pivot to cross identity (step 59).
     Counts the platforms linked to each user."""
-    usuarios = {e.id: e for e in alm.of_type('user')}
-    ids_plat = {e.id for e in alm.of_type('platform')}
-    conteo = {}
-    for r in alm.relations:
+    usuarios = {e.id: e for e in store.of_type('user')}
+    ids_plat = {e.id for e in store.of_type('platform')}
+    counts = {}
+    for r in store.relations:
         if r.source in usuarios and r.target in ids_plat:
-            conteo[r.source] = conteo.get(r.source, 0) + 1
-    for uid, n in conteo.items():
+            counts[r.source] = counts.get(r.source, 0) + 1
+    for uid, n in counts.items():
         if n >= 5:
             yield Finding('platform-pivot', 'low',
                            f'{usuarios[uid].value} present on {n} platforms -- strong pivot to cross identity',
                            [uid])
 
 @rule
-def r_login_expuesto(alm):
+def r_login_exposed(store):
     """Accessible login/admin panel (step 56). High on its own; CRITICAL if there are
     also leaked credentials in the case -- login + credential = probable access."""
     hay_cred = (any('leaked' in e.tags or 'stealer-infected' in e.tags
-                    for e in alm.of_type('email'))
-                or bool(alm.of_type('credential')))
+                    for e in store.of_type('email'))
+                or bool(store.of_type('credential')))
     for type in ('domain', 'subdomain'):
-        for e in alm.of_type(type):
+        for e in store.of_type(type):
             if 'login-panel' in e.tags:
                 sev = 'critical' if hay_cred else 'high'
                 extra = ' + there are leaked credentials in the case' if hay_cred else ''
@@ -307,9 +307,9 @@ def r_login_expuesto(alm):
                                f'Login/admin panel exposed: {e.value}{extra}', [e.id])
 
 @rule
-def r_secreto_github(alm):
+def r_secreto_github(store):
     """Hardcoded credential/secret found in a GitHub commit (step 60)."""
-    for c in alm.of_type('credential'):
+    for c in store.of_type('credential'):
         if 'github-secret' in c.tags:
             type = c.properties.get('secret_type', 'secret')
             repo = c.properties.get('repo', '?')
@@ -317,21 +317,21 @@ def r_secreto_github(alm):
                            f'{type} exposed in a commit of {repo}', [c.id])
 
 @rule
-def r_nuclei_vuln(alm):
+def r_nuclei_vuln(store):
     """Host with high+ severity nuclei findings."""
     for type in ('domain', 'subdomain'):
-        for e in alm.of_type(type):
+        for e in store.of_type(type):
             if 'vulnerable' in e.tags:
                 n = len(e.properties.get('nuclei', []))
                 yield Finding('vuln-nuclei', 'high',
                                f'{e.value}: {n} nuclei finding(s) (high+ severity)', [e.id])
 
 @rule
-def r_software_eol(alm):
+def r_software_eol(store):
     """Technology past end-of-life = no more security patches (F16, Phase C)."""
-    for t in alm.of_type('tech'):
+    for t in store.of_type('tech'):
         if 'eol' in t.tags:
-            desde = t.properties.get('eol_since', '')
+            since = t.properties.get('eol_since', '')
             yield Finding('software-eol', 'high',
                            f'{t.value} is end-of-life (no security patches)'
-                           + (f' since {desde}' if desde else ''), [t.id])
+                           + (f' since {since}' if since else ''), [t.id])

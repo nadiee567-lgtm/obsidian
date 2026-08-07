@@ -19,9 +19,9 @@ class FakeResp:
 
 
 def _run_one(name, type, value):
-    alm = Store()
-    e = alm.create(type, value)
-    return run_by_name(name, e, alm)
+    store = Store()
+    e = store.create(type, value)
+    return run_by_name(name, e, store)
 
 
 def _con_key(monkeypatch, resp, key='fakekey'):
@@ -161,18 +161,18 @@ def test_favicon_pivote(monkeypatch):
             return FakeResp({'error': False, 'results': [['9.9.9.9'], ['8.8.8.8']]})
         return FakeResp({'matches': [{'ip_str': '7.7.7.7'}, {'ip_str': '9.9.9.9'}]})
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
-    alm = Store()
-    h = alm.create('hash', '123456', properties={'hash_type': 'favicon'})
-    prod = run_by_name('favicon_pivote', h, alm)
+    store = Store()
+    h = store.create('hash', '123456', properties={'hash_type': 'favicon'})
+    prod = run_by_name('favicon_pivote', h, store)
     ips = {e.value for e in prod if e.type == 'ip'}
     assert ips == {'9.9.9.9', '8.8.8.8', '7.7.7.7'}   # cross-engine dedup of 9.9.9.9
 
 
 def test_favicon_pivote_ignora_hash_no_favicon(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'a@b.com:k')
-    alm = Store()
-    h = alm.create('hash', 'abc', properties={'hash_type': 'sha1'})
-    assert run_by_name('favicon_pivote', h, alm) == []
+    store = Store()
+    h = store.create('hash', 'abc', properties={'hash_type': 'sha1'})
+    assert run_by_name('favicon_pivote', h, store) == []
 
 
 # ── TLS certificate pivot (115) ─────────────────────────────────────────────
@@ -184,9 +184,9 @@ def test_cert_pivote(monkeypatch):
             return FakeResp({'error': False, 'results': [['5.5.5.5']]})
         return FakeResp({'matches': [{'ip_str': '6.6.6.6'}]})
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
-    alm = Store()
-    d = alm.create('domain', 'ejemplo.com', properties={'cert_cn': '*.ejemplo.com'})
-    prod = run_by_name('cert_pivote', d, alm)
+    store = Store()
+    d = store.create('domain', 'ejemplo.com', properties={'cert_cn': '*.ejemplo.com'})
+    prod = run_by_name('cert_pivote', d, store)
     assert {e.value for e in prod if e.type == 'ip'} == {'5.5.5.5', '6.6.6.6'}
 
 
@@ -194,19 +194,19 @@ def test_cert_pivote(monkeypatch):
 def test_dedup_cross_engine(monkeypatch):
     """Same host/port reported by 2 engines = 1 entity with 2 sources."""
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'id:secret')
-    alm = Store()
-    ip = alm.create('ip', '1.2.3.4')
+    store = Store()
+    ip = store.create('ip', '1.2.3.4')
     # Shodan sees port 443
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: FakeResp({'data': [{'port': 443, 'product': 'nginx'}]}))
-    run_by_name('shodan', ip, alm)
+    run_by_name('shodan', ip, store)
     # Censys sees the SAME port 443
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: FakeResp({'result': {'services': [{'port': 443, 'service_name': 'HTTP'}]}}))
-    run_by_name('censys', ip, alm)
-    puertos = [e for e in alm.entities if e.type == 'port' and e.value == '1.2.3.4:443']
-    assert len(puertos) == 1                              # ONE single entity (deterministic id)
-    assert {'shodan', 'censys'} <= puertos[0].sources    # with BOTH sources
+    run_by_name('censys', ip, store)
+    ports = [e for e in store.entities if e.type == 'port' and e.value == '1.2.3.4:443']
+    assert len(ports) == 1                              # ONE single entity (deterministic id)
+    assert {'shodan', 'censys'} <= ports[0].sources    # with BOTH sources
 
 
 def test_todos_los_motores_registrados():

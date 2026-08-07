@@ -21,13 +21,13 @@ _RX = [
 ]
 
 
-def extract_entities(texto: str) -> list:
+def extract_entities(text: str) -> list:
     """Returns [(type, value), ...] without duplicates. Domains that are clearly
     file names (known extension) are discarded."""
-    texto = texto or ''
-    out, vistos = [], set()
+    text = text or ''
+    out, seen = [], set()
     for type, rx in _RX:
-        for m in rx.findall(texto):
+        for m in rx.findall(text):
             v = m.strip().rstrip('.,);:')
             if type == 'ip':
                 if any(int(o) > 255 for o in v.split('.')):
@@ -35,7 +35,7 @@ def extract_entities(texto: str) -> list:
             if type == 'domain' and v.rsplit('.', 1)[-1].lower() in _NO_TLD:
                 continue                         # it's a file, not a domain
             key = (type, v.lower())
-            if v and key not in vistos:
-                vistos.add(key)
+            if v and key not in seen:
+                seen.add(key)
                 out.append((type, v))
     return out

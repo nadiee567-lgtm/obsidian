@@ -15,9 +15,9 @@ class _R:
 
 
 def _run(name, type, value, **props):
-    alm = Store()
-    e = alm.create(type, value, properties=props)
-    return run_by_name(name, e, alm), e, alm
+    store = Store()
+    e = store.create(type, value, properties=props)
+    return run_by_name(name, e, store), e, store
 
 
 # ── endoflife.date (tech -> EOL) ─────────────────────────────────────────────
@@ -25,11 +25,11 @@ def test_eol_flags_dead_version(monkeypatch):
     # nginx 1.18 whose cycle is EOL in the past
     cycles = [{'cycle': '1.25', 'eol': False}, {'cycle': '1.18', 'eol': '2020-01-01'}]
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=cycles))
-    _, e, alm = _run('eol', 'tech', 'nginx', version='1.18.0')
+    _, e, store = _run('eol', 'tech', 'nginx', version='1.18.0')
     assert 'eol' in e.tags and e.properties.get('eol_since') == '2020-01-01'
     # correlation rule fires
     from core.correlacion import correlate
-    h = correlate(alm)
+    h = correlate(store)
     assert any(x.rule == 'software-eol' and x.severity == 'high' for x in h)
 
 

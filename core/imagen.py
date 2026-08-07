@@ -11,11 +11,11 @@ import re
 from urllib.parse import quote
 
 
-def parse_gps(texto: str):
+def parse_gps(text: str):
     """Converts exiftool GPS (DMS, '40 deg 26\\' 46\" N, 79 deg 58\\' 56\" W')
     to decimal (lat, lon). Returns None if it can't."""
     m = re.findall(r"(\d+(?:\.\d+)?)\s*deg\s*(\d+(?:\.\d+)?)'?\s*(\d+(?:\.\d+)?)?\"?\s*([NSEW])",
-                   texto or '')
+                   text or '')
     if len(m) < 2:
         return None
     def dec(d, mi, s, h):

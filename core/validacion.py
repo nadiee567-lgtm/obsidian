@@ -10,16 +10,16 @@ from urllib.parse import urlparse
 from core.config import CASES_DIR
 
 # Shell metacharacters -- used by the generic _safe_target check.
-_SHELL_PELIGROSOS = set(' \t\n\r;&|`$<>(){}[]!*?~"\'\\')
+_SHELL_DANGEROUS = set(' \t\n\r;&|`$<>(){}[]!*?~"\'\\')
 
 # A module -> which target type it expects (to validate with the right pattern).
-_MODULO_TIPO = {
+_MODULE_TYPE = {
     'user': 'user', 'domain': 'domain', 'ip': 'ip', 'email': 'email',
     'ssl': 'domain', 'typosquatting': 'domain', 'takeover': 'domain',
 }
 
-_RE_DOMINIO = re.compile(r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$')
-_RE_USUARIO = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,38}$')
+_RE_DOMAIN = re.compile(r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$')
+_RE_USER = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,38}$')
 _RE_EMAIL   = re.compile(r'^[A-Za-z0-9._%+-]{1,64}@(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})+$')
 
 
@@ -37,9 +37,9 @@ def _validate(arg, type):
     arg = (arg or '').strip()
     if not arg or len(arg) > 253:
         return False
-    if type == 'domain':  return bool(_RE_DOMINIO.match(arg))
+    if type == 'domain':  return bool(_RE_DOMAIN.match(arg))
     if type == 'ip':       return _is_ip(arg)
-    if type == 'user':  return bool(_RE_USUARIO.match(arg))
+    if type == 'user':  return bool(_RE_USER.match(arg))
     if type == 'email':    return bool(_RE_EMAIL.match(arg))
     # unknown type -> generic check
     return _safe_target(arg)
@@ -51,7 +51,7 @@ def _safe_target(arg):
     arg = (arg or '').strip()
     if not arg or arg.startswith('-'):
         return False
-    return not any(c in _SHELL_PELIGROSOS for c in arg)
+    return not any(c in _SHELL_DANGEROUS for c in arg)
 
 
 def _case_slug(name):

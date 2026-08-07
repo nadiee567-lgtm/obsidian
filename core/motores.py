@@ -8,7 +8,7 @@ This module is PURE (registry + translator). The real calls with a key and the
 parsing of each response are wired per engine in steps 107-113.
 
 Unified fields OBSIDIAN understands:
-    ip, dominio, favicon (mmh3 hash), cert (CN/subject), puerto,
+    ip, domain, favicon (mmh3 hash), cert (CN/subject), port,
     producto (software), org, pais (ISO code), titulo, asn
 Each engine supports a subset; `traducir` ignores the fields that don't apply.
 """

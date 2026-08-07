@@ -18,8 +18,8 @@ from dataclasses import dataclass, field, asdict
 from core.validacion import _validate   # step 25: a single source of truth
 
 # Entity type -> core.validacion validation type (the ones with a strict shape).
-# The rest (persona, org, hash...) are not validated by shape.
-_TIPO_VALIDACION = {
+# The rest (person, org, hash...) are not validated by shape.
+_TYPE_VALIDATION = {
     'ip': 'ip', 'domain': 'domain', 'subdomain': 'domain',
     'email': 'email', 'user': 'user',
 }
@@ -28,7 +28,7 @@ _TIPO_VALIDACION = {
 # ── Step 13: entity type catalog ─────────────────────────────────────────────
 # Single source of truth for which types exist and how they look (the graph will
 # read from here in F6). label = readable name; color = palette used in the graph.
-TIPOS = {
+TYPES = {
     'target':   {'label': 'Target',       'color': '#d99a4e'},
     'domain':    {'label': 'Domain',       'color': '#5b9bd5'},
     'subdomain': {'label': 'Subdomain',    'color': '#7fb8d9'},
@@ -56,7 +56,7 @@ TIPOS = {
 
 
 def valid_type(type: str) -> bool:
-    return type in TIPOS
+    return type in TYPES
 
 
 # ── Step 22: per-type normalizers (for stable dedup) ─────────────────────────
@@ -133,10 +133,10 @@ class Entity:
 
     def well_formed(self) -> bool:
         """True if the value is well-formed for its type, using the SAME security
-        validators (step 25). Types without a strict shape (persona, org, hash...)
+        validators (step 25). Types without a strict shape (person, org, hash...)
         return True. Not enforced at construction: it's an optional check so
         transforms can filter junk before adding."""
-        tv = _TIPO_VALIDACION.get(self.type)
+        tv = _TYPE_VALIDATION.get(self.type)
         return True if tv is None else _validate(self.value, tv)
 
     def merge(self, other: 'Entity') -> None:

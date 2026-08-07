@@ -24,7 +24,7 @@ def _registro_aislado():
 # ── contract + registry + decorator (steps 26, 27) ──────────────────────────
 def test_decorator_registra():
     @tr.transform(input='domain', outputs=('ip',), name='dns')
-    def _f(entidad, ctx):
+    def _f(entity, ctx):
         pass
     assert tr.REGISTRO.by_name('dns') is not None
     assert tr.REGISTRO.applicable('domain')[0].name == 'dns'
@@ -38,63 +38,63 @@ def test_invalid_input_or_output_type_fails():
 def test_no_duplicate_name():
     tr.Transform  # noqa
     @tr.transform(input='ip', name='dup')
-    def _a(entidad, ctx): pass
+    def _a(entity, ctx): pass
     with pytest.raises(ValueError):
         @tr.transform(input='ip', name='dup')
-        def _b(entidad, ctx): pass
+        def _b(entity, ctx): pass
 
 
 # ── execution: input → outputs, related and with provenance (step 28) ──────
 def test_run_emits_relates_notes_provenance():
     @tr.transform(input='domain', outputs=('ip', 'subdomain'), name='dns')
-    def _dns(entidad, ctx):
+    def _dns(entity, ctx):
         ctx.emit('ip', '93.184.216.34', label='A')
-        ctx.emit('subdomain', 'www.' + entidad.value, label='subdomain')
+        ctx.emit('subdomain', 'www.' + entity.value, label='subdomain')
 
-    alm = Store()
-    dom = alm.create('domain', 'example.com')
-    producidas = tr.run_by_name('dns', dom, alm)
+    store = Store()
+    dom = store.create('domain', 'example.com')
+    produced = tr.run_by_name('dns', dom, store)
 
-    assert len(producidas) == 2
-    ip = alm.find('ip', '93.184.216.34')
+    assert len(produced) == 2
+    ip = store.find('ip', '93.184.216.34')
     assert ip is not None
     # provenance recorded
     assert any(p['transform'] == 'dns' and p['input'] == dom.id for p in ip.provenance)
     # relation created domain -> ip
-    assert len(alm.relations) == 2
+    assert len(store.relations) == 2
 
 def test_run_validates_input_type():
     @tr.transform(input='domain', name='domain_only')
-    def _f(entidad, ctx): pass
-    alm = Store()
-    ip = alm.create('ip', '8.8.8.8')
+    def _f(entity, ctx): pass
+    store = Store()
+    ip = store.create('ip', '8.8.8.8')
     with pytest.raises(ValueError):
-        tr.run_by_name('domain_only', ip, alm)
+        tr.run_by_name('domain_only', ip, store)
 
 
 # ── failure isolation (step 38) ─────────────────────────────────────────────
 def test_transform_que_revienta_no_propaga():
     @tr.transform(input='domain', outputs=('ip',), name='medio_roto')
-    def _f(entidad, ctx):
+    def _f(entity, ctx):
         ctx.emit('ip', '1.1.1.1')       # this does get through
         raise RuntimeError("boom")         # crashes afterwards
 
-    alm = Store()
-    dom = alm.create('domain', 'example.com')
-    producidas = tr.run_by_name('medio_roto', dom, alm)   # does NOT raise
-    assert len(producidas) == 1
-    assert alm.find('ip', '1.1.1.1') is not None
+    store = Store()
+    dom = store.create('domain', 'example.com')
+    produced = tr.run_by_name('medio_roto', dom, store)   # does NOT raise
+    assert len(produced) == 1
+    assert store.find('ip', '1.1.1.1') is not None
 
 def test_emitir_valor_basura_se_ignora():
     @tr.transform(input='domain', outputs=('ip',), name='sucio')
-    def _f(entidad, ctx):
+    def _f(entity, ctx):
         assert ctx.emit('ip', '   ') is None   # empty value -> None, no crash
         ctx.emit('ip', '8.8.8.8')
 
-    alm = Store()
-    dom = alm.create('domain', 'example.com')
-    producidas = tr.run_by_name('sucio', dom, alm)
-    assert len(producidas) == 1
+    store = Store()
+    dom = store.create('domain', 'example.com')
+    produced = tr.run_by_name('sucio', dom, store)
+    assert len(produced) == 1
 
 
 # ── the engine fires the bus events (integration with step 19) ──────────────
@@ -104,49 +104,49 @@ def test_transform_dispara_eventos_del_bus():
     bus.subscribe(ENTITY_NEW, lambda e: nuevas.append(e))
 
     @tr.transform(input='domain', outputs=('ip',), name='dns')
-    def _f(entidad, ctx):
+    def _f(entity, ctx):
         ctx.emit('ip', '9.9.9.9')
 
-    alm = Store(bus=bus)
-    dom = alm.create('domain', 'example.com')   # 1 event
-    tr.run_by_name('dns', dom, alm)     # +1 event (the ip)
+    store = Store(bus=bus)
+    dom = store.create('domain', 'example.com')   # 1 event
+    tr.run_by_name('dns', dom, store)     # +1 event (the ip)
     assert len(nuevas) == 2
 
 
 # ── cache: do not repeat the same (transform, entity) -- step 41 ────────────
 def test_corredor_cachea():
-    corridas = []
+    runs = []
     @tr.transform(input='domain', outputs=('ip',), name='dns')
-    def _f(entidad, ctx):
-        corridas.append(1)
+    def _f(entity, ctx):
+        runs.append(1)
         ctx.emit('ip', '8.8.8.8')
 
-    alm = Store()
-    dom = alm.create('domain', 'example.com')
-    corr = tr.Runner(alm)
+    store = Store()
+    dom = store.create('domain', 'example.com')
+    corr = tr.Runner(store)
     corr.run('dns', dom)
     corr.run('dns', dom)      # second time: cache, does not re-run
-    assert len(corridas) == 1
+    assert len(runs) == 1
 
 
 # ── Machine: chain that cascades from one type to the next -- step 39 ───────
 def test_machine_cascada():
     @tr.transform(input='domain', outputs=('ip',), name='dns')
-    def _dns(entidad, ctx):
+    def _dns(entity, ctx):
         ctx.emit('ip', '93.184.216.34', label='A')
 
     @tr.transform(input='ip', outputs=('port',), name='ports')
-    def _ports(entidad, ctx):
+    def _ports(entity, ctx):
         ctx.emit('port', '443', label='open')
 
-    alm = Store()
-    dom = alm.create('domain', 'example.com')
-    receta = tr.Machine(name='recon', pasos=('dns', 'ports'))
-    producidas = tr.Runner(alm).run_machine(receta, dom)
+    store = Store()
+    dom = store.create('domain', 'example.com')
+    recipe = tr.Machine(name='recon', steps=('dns', 'ports'))
+    produced = tr.Runner(store).run_machine(recipe, dom)
 
-    tipos = sorted(e.type for e in producidas)
+    tipos = sorted(e.type for e in produced)
     assert tipos == ['ip', 'port']              # cascade: domain→ip→port
-    assert alm.find('port', '443') is not None
+    assert store.find('port', '443') is not None
 
 
 # ── plugins: load transforms from a directory -- step 42 ────────────────────
@@ -155,7 +155,7 @@ def test_load_plugins(tmp_path):
     plugin.write_text(
         "import core.transforms as tr\n"
         "@tr.transform(input='domain', outputs=('ip',), name='plugin_dns')\n"
-        "def f(entidad, ctx):\n"
+        "def f(entity, ctx):\n"
         "    ctx.emit('ip', '1.2.3.4')\n"
     )
     cargados = tr.load_plugins(str(tmp_path))

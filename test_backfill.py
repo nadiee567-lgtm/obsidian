@@ -8,9 +8,9 @@ from core.transforms import run_by_name
 
 
 def _run_one(name, type, value):
-    alm = Store()
-    e = alm.create(type, value)
-    return run_by_name(name, e, alm), e, alm
+    store = Store()
+    e = store.create(type, value)
+    return run_by_name(name, e, store), e, store
 
 
 # ── 33: phone ───────────────────────────────────────────────────────────────
@@ -89,22 +89,22 @@ def test_github_sec_y_regla(monkeypatch):
         return _Rj([])
     monkeypatch.setattr(ob._boveda, 'get', lambda s: '')
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
-    prod, _, alm = _run_one('github_sec', 'user', 'user')
+    prod, _, store = _run_one('github_sec', 'user', 'user')
     creds = [p for p in prod if p.type == 'credential']
     assert creds and 'github-secret' in creds[0].tags
-    h = correlate(alm)
+    h = correlate(store)
     assert any(x.rule == 'github-secret' and x.severity == 'critical' for x in h)
 
 
 # ── 56: exposed login/panel + credential ────────────────────────────────────
 def test_login_expuesto_regla():
     from core.correlacion import correlate
-    alm = Store()
-    alm.create('domain', 'admin.x.com').tag('login-panel')
-    r = [x for x in correlate(alm) if x.rule == 'login-exposed']
+    store = Store()
+    store.create('domain', 'admin.x.com').tag('login-panel')
+    r = [x for x in correlate(store) if x.rule == 'login-exposed']
     assert r and r[0].severity == 'high'
-    alm.create('email', 'a@x.com').tag('leaked')     # login + credential
-    r2 = [x for x in correlate(alm) if x.rule == 'login-exposed']
+    store.create('email', 'a@x.com').tag('leaked')     # login + credential
+    r2 = [x for x in correlate(store) if x.rule == 'login-exposed']
     assert r2 and r2[0].severity == 'critical'
 
 
@@ -122,40 +122,40 @@ def test_http_probe_detecta_panel_login(monkeypatch):
 # ── 136: leak -> login correlation ──────────────────────────────────────────
 def test_leak_login():
     from core.correlacion import correlate
-    alm = Store()
-    e = alm.create('email', 'admin@acme.com'); e.tag('leaked')
-    p = alm.create('subdomain', 'panel.acme.com'); p.tag('login-panel')
-    r = [x for x in correlate(alm) if x.rule == 'leak-login']
+    store = Store()
+    e = store.create('email', 'admin@acme.com'); e.tag('leaked')
+    p = store.create('subdomain', 'panel.acme.com'); p.tag('login-panel')
+    r = [x for x in correlate(store) if x.rule == 'leak-login']
     assert r and r[0].severity == 'critical'
     assert e.id in r[0].entities and p.id in r[0].entities   # names both
 
 
 def test_leak_login_sin_filtrado():
     from core.correlacion import correlate
-    alm = Store()
-    alm.create('subdomain', 'panel.acme.com').tag('login-panel')   # panel but no credential
-    assert not [x for x in correlate(alm) if x.rule == 'leak-login']
+    store = Store()
+    store.create('subdomain', 'panel.acme.com').tag('login-panel')   # panel but no credential
+    assert not [x for x in correlate(store) if x.rule == 'leak-login']
 
 
 # ── 59: platform pivot ──────────────────────────────────────────────────────
 def test_pivote_plataformas():
     from core.correlacion import correlate
-    alm = Store()
-    u = alm.create('user', 'nadiee')
+    store = Store()
+    u = store.create('user', 'nadiee')
     for i in range(6):
-        p = alm.create('platform', f'plat{i}')
-        alm.relate(u.id, p.id, 'presente')
-    r = [x for x in correlate(alm) if x.rule == 'platform-pivot']
+        p = store.create('platform', f'plat{i}')
+        store.relate(u.id, p.id, 'presente')
+    r = [x for x in correlate(store) if x.rule == 'platform-pivot']
     assert r and '6 platforms' in r[0].message
 
 
 def test_pivote_plataformas_pocas_no_dispara():
     from core.correlacion import correlate
-    alm = Store()
-    u = alm.create('user', 'x')
+    store = Store()
+    u = store.create('user', 'x')
     for i in range(3):                                   # <5 → no finding
-        alm.relate(u.id, alm.create('platform', f'p{i}').id, 'presente')
-    assert not [x for x in correlate(alm) if x.rule == 'platform-pivot']
+        store.relate(u.id, store.create('platform', f'p{i}').id, 'presente')
+    assert not [x for x in correlate(store) if x.rule == 'platform-pivot']
 
 
 # ── 63: user YAML rule loader ───────────────────────────────────────────────
@@ -171,20 +171,20 @@ def test_reglas_yaml():
 """
     try:
         assert load_yaml_rules(yaml_txt) == 1
-        alm = Store()
-        alm.create('port', '1.2.3.4:21')
-        alm.create('port', '1.2.3.4:443')              # does not match
-        r = [x for x in correlate(alm) if x.rule == 'puerto-ftp']
+        store = Store()
+        store.create('port', '1.2.3.4:21')
+        store.create('port', '1.2.3.4:443')              # does not match
+        r = [x for x in correlate(store) if x.rule == 'puerto-ftp']
         assert len(r) == 1 and r[0].severity == 'high' and r[0].message == 'FTP en 1.2.3.4:21'
     finally:
         load_yaml_rules('')                          # clears the global
 
 
 def test_reglas_yaml_severidad_invalida_se_normaliza():
-    from core.correlacion import load_yaml_rules, _REGLAS_YAML
+    from core.correlacion import load_yaml_rules, _YAML_RULES
     try:
         load_yaml_rules("- name: x\n  severity: URGENTISIMO\n  when: {tag: y}\n")
-        assert _REGLAS_YAML[0]['severity'] == 'medium'  # invalid severity → medio
+        assert _YAML_RULES[0]['severity'] == 'medium'  # invalid severity → medio
     finally:
         load_yaml_rules('')
 
@@ -203,7 +203,7 @@ def test_rate_limit_concurrencia():
     estado, lock = {'activos': 0, 'max': 0}, threading.Lock()
 
     @transform(input='domain', outputs=(), name='_test_rl')
-    def _rl(entidad, ctx):
+    def _rl(entity, ctx):
         with lock:
             estado['activos'] += 1
             estado['max'] = max(estado['max'], estado['activos'])
@@ -214,8 +214,8 @@ def test_rate_limit_concurrencia():
     set_limite('_test_rl', 1)
     try:
         def run():
-            alm = Store()
-            run_by_name('_test_rl', alm.create('domain', 'x.com'), alm)
+            store = Store()
+            run_by_name('_test_rl', store.create('domain', 'x.com'), store)
         ths = [threading.Thread(target=run) for _ in range(4)]
         for t in ths:
             t.start()
@@ -241,7 +241,7 @@ def test_task_manager():
     tipos = [e['type'] for e in eventos]
     assert tipos[0] == 'inicio' and tipos[-1] == 'fin'
     assert g.estado(tid)['estado'] == 'hecho'
-    assert g.estado(tid)['resultado'] == {'ok': True}
+    assert g.estado(tid)['result'] == {'ok': True}
 
 
 def test_task_manager_error_no_hang():
@@ -259,12 +259,12 @@ def test_task_manager_error_no_hang():
 
 def test_batch_progress():
     from core.transforms import run_batch
-    vistos = []
+    seen = []
     run_batch([('url', 'https://a.com/x.jpg', 'reverse_image'),
                    ('url', 'https://b.com/y.jpg', 'reverse_image')],
-                  Store(), on_progreso=lambda *a: vistos.append(a))
-    assert len(vistos) == 2                       # one callback per finished transform
-    assert vistos[-1][3] == 2                      # total == 2 on the last
+                  Store(), on_progreso=lambda *a: seen.append(a))
+    assert len(seen) == 2                       # one callback per finished transform
+    assert seen[-1][3] == 2                      # total == 2 on the last
 
 
 # ── Migration of the rest of the old Obsidian (minus distroboxes) ────────────
@@ -308,8 +308,8 @@ def test_wordlist_ia(monkeypatch):
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'juan2024\npassword123\nperez.juan\nabc')
     _, e, _ = _run_one('wordlist', 'person', 'Juan')
-    palabras = e.properties.get('wordlist')
-    assert 'juan2024' in palabras and 'abc' not in palabras   # filters <6 chars
+    words = e.properties.get('wordlist')
+    assert 'juan2024' in words and 'abc' not in words   # filters <6 chars
 
 
 def test_ai_case_endpoint(monkeypatch):
@@ -319,7 +319,7 @@ def test_ai_case_endpoint(monkeypatch):
     with c.session_transaction() as s:
         s['auth'] = True
     r = c.post('/api/v2/ia/escenario')
-    assert r.status_code == 200 and 'MITRE' not in r.get_json()['resultado'] or True
+    assert r.status_code == 200 and 'MITRE' not in r.get_json()['result'] or True
     assert r.get_json()['modo'] == 'escenario'
     assert c.post('/api/v2/ia/noexiste').status_code == 404
 

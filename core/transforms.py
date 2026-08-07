@@ -7,7 +7,7 @@ Design copied from REAL, proven contracts, not invented:
     (produces) / handleEvent (logic).
 
 Here: @transform(input=<type>, outputs=(<types>)) registers a function
-fn(entidad, ctx). The Context (ctx) is the ergonomic API for the author: emit
+fn(entity, ctx). The Context (ctx) is the ergonomic API for the author: emit
 output entities that are added to the store, related to the input and get
 their provenance recorded -- automatic.
 
@@ -77,7 +77,7 @@ def transform(input: str, outputs=(), name=None, requires_key=False, description
     """Decorator that registers a function as a transform.
 
     @transform(input='domain', outputs=('ip','subdomain'))
-    def resolver(entidad, ctx):
+    def resolver(entity, ctx):
         ctx.emit('ip', '1.2.3.4', label='A')
     """
     def deco(fn):
@@ -93,8 +93,8 @@ class Context:
     """API the transform author receives. `emit` creates an output entity, adds
     it to the store (dedup + events), relates it to the input and sets its
     provenance -- all automatic."""
-    def __init__(self, almacen: Store, input: Entity, nombre_transform: str):
-        self.almacen = almacen
+    def __init__(self, store: Store, input: Entity, nombre_transform: str):
+        self.store = store
         self.input = input
         self._nombre = nombre_transform
         self.emitidas: list = []
@@ -104,9 +104,9 @@ class Context:
             ent = Entity(type=type, value=value, properties=properties)
         except ValueError:
             return None   # garbage value: ignored, does not break the transform
-        viva = self.almacen.add(ent)
+        viva = self.store.add(ent)
         viva.note_provenance(self._nombre, input_id=self.input.id)
-        self.almacen.relate(self.input, viva, label)
+        self.store.relate(self.input, viva, label)
         self.emitidas.append(viva)
         return viva
 
@@ -136,38 +136,38 @@ def limites() -> dict:
     return dict(_LIMITES)
 
 
-def run(t: Transform, entidad: Entity, almacen: Store) -> list:
+def run(t: Transform, entity: Entity, store: Store) -> list:
     """Runs a transform on an entity (step 28). Returns the produced entities.
     ISOLATES failures (step 38): if the transform crashes, it does not propagate
     -- it returns whatever it managed to emit. Honors the transform's rate limit
     (step 40)."""
-    if entidad.type != t.input:
-        raise ValueError(f"{t.name} expects '{t.input}', got '{entidad.type}'")
-    ctx = Context(almacen, entidad, t.name)
+    if entity.type != t.input:
+        raise ValueError(f"{t.name} expects '{t.input}', got '{entity.type}'")
+    ctx = Context(store, entity, t.name)
     sem = _SEMAFOROS.get(t.name)
     try:
         if sem is not None:
             with sem:                       # no more than N concurrent of this transform
-                t.fn(entidad, ctx)
+                t.fn(entity, ctx)
         else:
-            t.fn(entidad, ctx)
+            t.fn(entity, ctx)
     except Exception:
         pass   # a transform failure does not take down the case
     return ctx.emitidas
 
 
-def run_by_name(name: str, entidad: Entity, almacen: Store) -> list:
+def run_by_name(name: str, entity: Entity, store: Store) -> list:
     t = REGISTRO.by_name(name)
     if t is None:
         raise KeyError(f"transform not registered: {name}")
-    return run(t, entidad, almacen)
+    return run(t, entity, store)
 
 
-def run_batch(tasks, almacen: Store, max_workers: int = 8, lock=None,
+def run_batch(tasks, store: Store, max_workers: int = 8, lock=None,
                   on_progreso=None) -> list:
     """Runs several transforms IN PARALLEL (step 102). Transforms are I/O-bound
     (network), so they are launched concurrently -- each in an ISOLATED Store, no
-    shared state during the fetch. When done, results are merged into `almacen`
+    shared state during the fetch. When done, results are merged into `store`
     (dedup by deterministic id). If `lock` is passed, the merge runs under it.
 
     on_progreso(name, n, hechas, total): optional callback called as EACH
@@ -187,8 +187,8 @@ def run_batch(tasks, almacen: Store, max_workers: int = 8, lock=None,
         local = Store()
         n = 0
         try:
-            semilla = local.create(type, value)
-            n = len(run_by_name(name, semilla, local))
+            seed = local.create(type, value)
+            n = len(run_by_name(name, seed, local))
         except Exception:
             pass
         return name, n, local
@@ -210,9 +210,9 @@ def run_batch(tasks, almacen: Store, max_workers: int = 8, lock=None,
     with ctx:                                    # serialized merge (consistent dedup)
         for local in locales:
             for e in local.entities:
-                almacen.add(e)
+                store.add(e)
             for r in local.relations:
-                almacen.relate(r.source, r.target, r.label)
+                store.relate(r.source, r.target, r.label)
     return results
 
 
@@ -222,7 +222,7 @@ class Machine:
     """A recipe: transforms in order that cascade from one type to the next.
     E.g. ['dns_resolver','port_scan'] -> domain->ips, then ips->ports."""
     name: str
-    pasos: tuple = ()
+    steps: tuple = ()
     description: str = ''
 
 
@@ -230,32 +230,32 @@ class Machine:
 class Runner:
     """Runs transforms/machines over a store, remembering which
     (transform, entity) pairs already ran to avoid repeating them in the same session."""
-    def __init__(self, almacen: Store):
-        self.almacen = almacen
+    def __init__(self, store: Store):
+        self.store = store
         self._hechos: set = set()   # {(transform_name, entity_id)}
 
-    def run(self, name: str, entidad: Entity) -> list:
-        key = (name, entidad.id)
+    def run(self, name: str, entity: Entity) -> list:
+        key = (name, entity.id)
         if key in self._hechos:
             return []               # cache: already ran on this entity
         self._hechos.add(key)
-        return run_by_name(name, entidad, self.almacen)
+        return run_by_name(name, entity, self.store)
 
-    def run_machine(self, machine: Machine, semilla: Entity) -> list:
+    def run_machine(self, machine: Machine, seed: Entity) -> list:
         """Runs the recipe: each step runs on the entities of the type it
         expects (seed + what was produced before). The cache avoids re-running."""
-        pool = {semilla.id: semilla}
-        producidas = []
-        for paso in machine.pasos:
-            t = REGISTRO.by_name(paso)
+        pool = {seed.id: seed}
+        produced = []
+        for step in machine.steps:
+            t = REGISTRO.by_name(step)
             if t is None:
                 continue
-            objetivos = [e for e in list(pool.values()) if e.type == t.input]
-            for ent in objetivos:
-                for nueva in self.run(paso, ent):
-                    pool[nueva.id] = nueva
-                    producidas.append(nueva)
-        return producidas
+            targets = [e for e in list(pool.values()) if e.type == t.input]
+            for ent in targets:
+                for new_one in self.run(step, ent):
+                    pool[new_one.id] = new_one
+                    produced.append(new_one)
+        return produced
 
 
 # ── Step 42: load transforms from plugins (without touching the core) ────────

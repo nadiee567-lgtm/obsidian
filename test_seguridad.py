@@ -51,7 +51,7 @@ def test_bordes():
 # ── the module→type map covers every module that touches the shell ──────────
 def test_modulos_shell_tienen_tipo():
     for mod in ('user', 'domain', 'ip', 'email', 'ssl', 'typosquatting', 'takeover'):
-        assert mod in ob._MODULO_TIPO
+        assert mod in ob._MODULE_TYPE
 
 
 # ── SSRF (step 5): internal URLs blocked, public ones allowed ───────────────

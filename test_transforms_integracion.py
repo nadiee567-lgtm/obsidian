@@ -16,9 +16,9 @@ class FakeResp:
 
 
 def _run_one(name, type, value):
-    alm = Store()
-    e = alm.create(type, value)
-    return run_by_name(name, e, alm)
+    store = Store()
+    e = store.create(type, value)
+    return run_by_name(name, e, store)
 
 
 def test_dns_a(monkeypatch):
@@ -76,10 +76,10 @@ def test_shodan(monkeypatch):
         {'port': 8443, 'product': 'nginx'}]}       # nginx repeated → a single tech
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: FakeResp(host))
     prod = _run_one('shodan', 'ip', '1.2.3.4')
-    puertos = {e.value for e in prod if e.type == 'port'}
+    ports = {e.value for e in prod if e.type == 'port'}
     techs = {e.value for e in prod if e.type == 'tech'}
     orgs = {e.value for e in prod if e.type == 'org'}
-    assert puertos == {'1.2.3.4:443', '1.2.3.4:22', '1.2.3.4:8443'}
+    assert ports == {'1.2.3.4:443', '1.2.3.4:22', '1.2.3.4:8443'}
     assert techs == {'nginx', 'OpenSSH'}
     assert orgs == {'ACME Corp'}
 

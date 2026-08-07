@@ -21,17 +21,17 @@ class TaskManager:
     def create(self, trabajo) -> str:
         """Launches `trabajo(emit)` in a thread. Returns the task id."""
         tid = uuid.uuid4().hex[:12]
-        est = {'id': tid, 'estado': 'corriendo', 'eventos': queue.Queue(), 'resultado': None}
+        est = {'id': tid, 'estado': 'corriendo', 'eventos': queue.Queue(), 'result': None}
         with self._lock:
             self._tareas[tid] = est
 
         def _run():
             try:
-                est['resultado'] = trabajo(lambda ev: est['eventos'].put(ev))
+                est['result'] = trabajo(lambda ev: est['eventos'].put(ev))
                 est['estado'] = 'hecho'
             except Exception as e:              # noqa: BLE001
                 est['estado'] = 'error'
-                est['resultado'] = {'error': str(e)}
+                est['result'] = {'error': str(e)}
             finally:
                 est['eventos'].put({'type': 'fin', 'estado': est['estado']})
 

@@ -57,29 +57,29 @@ _COLUMN_RENAME = {
 
 def _migrate_schema(con) -> None:
     """Renames legacy Spanish tables/columns to English, in place (SQLite >= 3.25)."""
-    tablas = {r[0] for r in con.execute(
+    tables = {r[0] for r in con.execute(
         "SELECT name FROM sqlite_master WHERE type='table'")}
     # 1) rename tables (only if the old exists and the new does not)
-    for viejo, nuevo in _TABLE_RENAME.items():
-        if viejo in tablas and nuevo not in tablas:
-            con.execute(f"ALTER TABLE {viejo} RENAME TO {nuevo}")
-            tablas.discard(viejo)
-            tablas.add(nuevo)
+    for old, new in _TABLE_RENAME.items():
+        if old in tables and new not in tables:
+            con.execute(f"ALTER TABLE {old} RENAME TO {new}")
+            tables.discard(old)
+            tables.add(new)
     # 2) rename columns within each (now-English) table
-    for tabla, cols in _COLUMN_RENAME.items():
-        if tabla not in tablas:
+    for table, cols in _COLUMN_RENAME.items():
+        if table not in tables:
             continue
-        actuales = {r[1] for r in con.execute(f"PRAGMA table_info({tabla})")}
-        for viejo, nuevo in cols.items():
-            if viejo in actuales and nuevo not in actuales:
-                con.execute(f"ALTER TABLE {tabla} RENAME COLUMN {viejo} TO {nuevo}")
+        current = {r[1] for r in con.execute(f"PRAGMA table_info({table})")}
+        for old, new in cols.items():
+            if old in current and new not in current:
+                con.execute(f"ALTER TABLE {table} RENAME COLUMN {old} TO {new}")
 
 
 # Spanish entity-type VALUES stored in old cases -> English (Phase B3, step 2).
 # Changing a type value changes the entity id (id = sha1("type:value")), so the
 # ids must be recomputed and every relation endpoint remapped. Idempotent.
 _TYPE_VALUE_RENAME = {
-    'dominio': 'domain', 'subdominio': 'subdomain', 'usuario': 'user',
+    'domain': 'domain', 'subdominio': 'subdomain', 'username': 'user',
     'telefono': 'phone', 'plataforma': 'platform', 'credencial': 'credential',
     'archivo': 'file', 'imagen': 'image', 'puerto': 'port', 'pais': 'country',
     'persona': 'person', 'target': 'target',
@@ -135,11 +135,11 @@ def _connect(db_path):
     return con
 
 
-def save_store(almacen: Store, db_path: str) -> None:
+def save_store(store: Store, db_path: str) -> None:
     """Dumps the full store to the DB (upsert by id)."""
     con = _connect(db_path)
     with con:
-        for e in almacen.entities:
+        for e in store.entities:
             con.execute(
                 "INSERT OR REPLACE INTO entities "
                 "(id,type,value,properties,sources,tags,provenance,confidence,created) "
@@ -151,7 +151,7 @@ def save_store(almacen: Store, db_path: str) -> None:
                  json.dumps(e.provenance, default=str),
                  e.confidence, e.created),
             )
-        for r in almacen.relations:
+        for r in store.relations:
             con.execute(
                 "INSERT OR REPLACE INTO relations (id,source,target,label) VALUES (?,?,?,?)",
                 (r.id, r.source, r.target, r.label),
@@ -163,7 +163,7 @@ def load_store(db_path: str) -> Store:
     """Rebuilds a Store from the DB. SILENT load (no bus): does not fire events,
     because loading from disk is not 'discovering' new data."""
     con = _connect(db_path)
-    alm = Store()   # no bus -> add() does not publish
+    store = Store()   # no bus -> add() does not publish
     for row in con.execute(
         "SELECT type,value,properties,sources,tags,provenance,confidence,created FROM entities"
     ):
@@ -177,11 +177,11 @@ def load_store(db_path: str) -> Store:
             confidence=conf if conf is not None else 1.0,
         )
         e.created = created or e.created
-        alm.add(e)
+        store.add(e)
     for row in con.execute("SELECT source,target,label FROM relations"):
-        alm.relate(row[0], row[1], row[2] or '')
+        store.relate(row[0], row[1], row[2] or '')
     con.close()
-    return alm
+    return store
 
 
 # ── Per-case history / audit (F3 step 48) ────────────────────────────────────
@@ -200,9 +200,9 @@ def read_history(db_path: str, limite: int = 100) -> list:
     """Case history, most recent first."""
     con = _connect(db_path)
     con.row_factory = sqlite3.Row
-    filas = con.execute(
+    rows = con.execute(
         "SELECT ts,transform,input,outputs FROM history ORDER BY id DESC LIMIT ?",
         (limite,),
     ).fetchall()
     con.close()
-    return [dict(f) for f in filas]
+    return [dict(f) for f in rows]

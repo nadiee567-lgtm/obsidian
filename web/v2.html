@@ -193,7 +193,7 @@ const SHAPE={target:'star',ip:'diamond',email:'triangle',user:'hexagon',org:'box
 const SEVCOLOR={critical:'#f7768e',high:'#ff9e64',medium:'#e0af68',low:'#7dcfff'};
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
-let entMap={};   // id -> entidad
+let entMap={};   // id -> entity
 let tiposOcultos=new Set();
 
 const nodes=new vis.DataSet(), edges=new vis.DataSet();
@@ -511,7 +511,7 @@ $('#btnKeys').onclick=(e)=>{ e.preventDefault(); panelKeys(); };
 async function iaCaso(modo){
   const out=$('#iaResumen'); out.innerHTML='<div class="iaresumen">AI ('+esc(modo)+') analyzing the case…</div>';
   try{ const r=await fetch('/api/v2/ia/'+modo,{method:'POST'}); const d=await r.json();
-    out.innerHTML='<div class="iaresumen">'+esc(d.resultado||d.error||'no response')+'</div>'; }
+    out.innerHTML='<div class="iaresumen">'+esc(d.result||d.error||'no response')+'</div>'; }
   catch(e){ out.textContent='Error: '+e.message; }
 }
 

@@ -113,9 +113,9 @@ def test_key_rotativa(monkeypatch):
 # ── 160: logging your own footprint ─────────────────────────────────────────
 def test_record_footprint():
     import obsidian_web as ob
-    ob._HUELLA.clear()
+    ob._FOOTPRINT.clear()
     ob._OPSEC['anonimo'] = False
     ob._PROXIES['pool'] = []
     ob._record_footprint('crtsh', 'domain', 'x.com')
-    assert ob._HUELLA[0]['transform'] == 'crtsh' and ob._HUELLA[0]['anonimo'] is False
-    assert ob._HUELLA[0]['target'] == 'domain:x.com'
+    assert ob._FOOTPRINT[0]['transform'] == 'crtsh' and ob._FOOTPRINT[0]['anonimo'] is False
+    assert ob._FOOTPRINT[0]['target'] == 'domain:x.com'

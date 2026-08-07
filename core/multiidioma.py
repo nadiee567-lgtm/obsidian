@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from urllib.parse import quote
 
-_PAIS_PREFIJO = {'MX': '52', 'US': '1', 'RU': '7', 'CN': '86', 'ES': '34',
+_COUNTRY_PREFIX = {'MX': '52', 'US': '1', 'RU': '7', 'CN': '86', 'ES': '34',
                  'AR': '54', 'CO': '57', 'BR': '55', 'PE': '51', 'CL': '56'}
 
 
@@ -16,13 +16,13 @@ def normalize_phone(numero: str, pais: str = 'US') -> str:
     d = re.sub(r'\D', '', numero or '')
     if not d:
         return ''
-    pref = _PAIS_PREFIJO.get((pais or '').upper(), '')
+    pref = _COUNTRY_PREFIX.get((pais or '').upper(), '')
     if pref and not d.startswith(pref):
         d = pref + d.lstrip('0')
     return '+' + d
 
 
-_PAIS_TZ = {
+_COUNTRY_TZ = {
     'MX': 'America/Mexico_City', 'US': 'America/New_York', 'RU': 'Europe/Moscow',
     'CN': 'Asia/Shanghai', 'ES': 'Europe/Madrid', 'AR': 'America/Argentina/Buenos_Aires',
     'BR': 'America/Sao_Paulo', 'CO': 'America/Bogota', 'PE': 'America/Lima',
@@ -34,7 +34,7 @@ _PAIS_TZ = {
 def time_zone(pais: str) -> dict:
     """Country time zone and local time, for chrono-location (step 178)."""
     import datetime
-    tz = _PAIS_TZ.get((pais or '').upper(), 'UTC')
+    tz = _COUNTRY_TZ.get((pais or '').upper(), 'UTC')
     hora = None
     try:
         from zoneinfo import ZoneInfo
@@ -44,15 +44,15 @@ def time_zone(pais: str) -> dict:
     return {'tz': tz, 'hora_local': hora}
 
 
-def regional_profiles(usuario: str) -> dict:
+def regional_profiles(username: str) -> dict:
     """User profiles/searches on regional platforms (step 171)."""
-    u = quote(usuario)
+    u = quote(username)
     return {
-        'vk': f'https://vk.com/{usuario}',
-        'ok': f'https://ok.ru/{usuario}',
+        'vk': f'https://vk.com/{username}',
+        'ok': f'https://ok.ru/{username}',
         'weibo': f'https://s.weibo.com/user?q={u}',
         'douyin': f'https://www.douyin.com/search/{u}',
-        'telegram': f'https://t.me/{usuario}',
+        'telegram': f'https://t.me/{username}',
     }
 
 
@@ -71,12 +71,12 @@ _LAT_CIR1 = {'a': 'а', 'b': 'б', 'v': 'в', 'g': 'г', 'd': 'д', 'e': 'е', '
              'p': 'п', 'r': 'р', 's': 'с', 't': 'т', 'u': 'у', 'f': 'ф'}
 
 
-def cyrillic_to_latin(texto: str) -> str:
-    return ''.join(_CIR_LAT.get(c, _CIR_LAT.get(c.lower(), c)) for c in texto)
+def cyrillic_to_latin(text: str) -> str:
+    return ''.join(_CIR_LAT.get(c, _CIR_LAT.get(c.lower(), c)) for c in text)
 
 
-def latin_to_cyrillic(texto: str) -> str:
-    t = texto.lower()
+def latin_to_cyrillic(text: str) -> str:
+    t = text.lower()
     out, i = [], 0
     while i < len(t):
         for k in ('shch', 'zh', 'kh', 'ts', 'ch', 'sh', 'yu', 'ya'):
@@ -129,21 +129,21 @@ def local_engines(consulta: str) -> dict:
             'sogou': f'https://www.sogou.com/web?query={q}'}
 
 
-def detect_language(texto: str) -> str:
+def detect_language(text: str) -> str:
     """Likely language by the dominant Unicode range. Keyless, no libraries."""
-    conteo = {'ru': 0, 'zh': 0, 'ar': 0, 'ja': 0, 'ko': 0, 'es_en': 0}
-    for c in texto or '':
+    counts = {'ru': 0, 'zh': 0, 'ar': 0, 'ja': 0, 'ko': 0, 'es_en': 0}
+    for c in text or '':
         o = ord(c)
         if 0x0400 <= o <= 0x04FF:
-            conteo['ru'] += 1
+            counts['ru'] += 1
         elif 0x4E00 <= o <= 0x9FFF:
-            conteo['zh'] += 1
+            counts['zh'] += 1
         elif 0x0600 <= o <= 0x06FF:
-            conteo['ar'] += 1
+            counts['ar'] += 1
         elif 0x3040 <= o <= 0x30FF:
-            conteo['ja'] += 1
+            counts['ja'] += 1
         elif 0xAC00 <= o <= 0xD7A3:
-            conteo['ko'] += 1
+            counts['ko'] += 1
         elif c.isalpha():
-            conteo['es_en'] += 1
-    return max(conteo, key=conteo.get) if any(conteo.values()) else 'es_en'
+            counts['es_en'] += 1
+    return max(counts, key=counts.get) if any(counts.values()) else 'es_en'

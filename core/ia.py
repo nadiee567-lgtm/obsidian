@@ -19,7 +19,7 @@ NEXO = os.environ.get('OBSIDIAN_NEXO', '')       # '1' enables NEXO-style routin
 _S = requests.Session()
 
 # NEXO-style routing (step 168): classifies the task by keywords -> local model.
-_RUTEO = {
+_ROUTING = {
     'seguridad': (['exploit', 'vuln', 'cve', 'attack', 'malware', 'ransomware',
                    'payload', 'pentest', 'shell', 'takeover'], 'dolphin-llama3'),
     'osint': (['osint', 'domain', 'subdomain', 'whois', 'dns', 'recon', 'wallet',
@@ -28,15 +28,15 @@ _RUTEO = {
 }
 
 
-def pick_model(texto):
+def pick_model(text):
     """Picks the local model based on the task (NEXO-style router). An explicit IP
     leans toward security; with no signals, a fast model by default."""
-    t = (texto or '').lower()
-    puntajes = {cat: sum(t.count(k) for k in kws) for cat, (kws, _) in _RUTEO.items()}
+    t = (text or '').lower()
+    puntajes = {cat: sum(t.count(k) for k in kws) for cat, (kws, _) in _ROUTING.items()}
     if re.search(r'\b\d{1,3}(?:\.\d{1,3}){3}\b', t):
         puntajes['seguridad'] += 2
     cat = max(puntajes, key=puntajes.get)
-    return _RUTEO[cat][1] if puntajes[cat] > 0 else 'qwen2.5:1.5b'
+    return _ROUTING[cat][1] if puntajes[cat] > 0 else 'qwen2.5:1.5b'
 
 
 def available():

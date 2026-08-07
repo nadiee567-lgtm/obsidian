@@ -9,32 +9,32 @@ from core.transforms import transform, run_batch
 
 
 @transform(input='domain', outputs=('ip',), name='_test_lote_a')
-def _fake_a(entidad, ctx):
+def _fake_a(entity, ctx):
     ctx.emit('ip', '10.0.0.1')
     ctx.emit('ip', '10.0.0.2')
 
 
 @transform(input='domain', outputs=('subdomain',), name='_test_lote_b')
-def _fake_b(entidad, ctx):
-    ctx.emit('subdomain', 'x.' + entidad.value)
+def _fake_b(entity, ctx):
+    ctx.emit('subdomain', 'x.' + entity.value)
 
 
 def test_batch_merges_results():
-    alm = Store()
+    store = Store()
     res = run_batch([('domain', 'ejemplo.com', '_test_lote_a'),
-                         ('domain', 'ejemplo.com', '_test_lote_b')], alm)
+                         ('domain', 'ejemplo.com', '_test_lote_b')], store)
     assert dict(res) == {'_test_lote_a': 2, '_test_lote_b': 1}
     # shared seed (dedup) + 2 ip + 1 subdomain = 4
-    assert len(alm) == 4
-    assert {e.type for e in alm.entities} == {'domain', 'ip', 'subdomain'}
+    assert len(store) == 4
+    assert {e.type for e in store.entities} == {'domain', 'ip', 'subdomain'}
     # the seed→output relations were merged too
-    assert len(alm.relations) == 3
+    assert len(store.relations) == 3
 
 
 def test_batch_with_lock():
-    alm = Store()
-    run_batch([('domain', 'a.com', '_test_lote_a')], alm, lock=threading.RLock())
-    assert len(alm.of_type('ip')) == 2
+    store = Store()
+    run_batch([('domain', 'a.com', '_test_lote_a')], store, lock=threading.RLock())
+    assert len(store.of_type('ip')) == 2
 
 
 def test_batch_empty():
@@ -42,17 +42,17 @@ def test_batch_empty():
 
 
 def test_batch_missing_transform_ok():
-    alm = Store()
-    res = run_batch([('domain', 'a.com', 'no_existe_zzz')], alm)
+    store = Store()
+    res = run_batch([('domain', 'a.com', 'no_existe_zzz')], store)
     assert res == [('no_existe_zzz', 0)]
-    assert len(alm) == 1          # only the seed
+    assert len(store) == 1          # only the seed
 
 
 def test_batch_no_data_loss_parallel():
     """Many concurrent tasks: no output is lost in the merge."""
-    alm = Store()
+    store = Store()
     tasks = [('domain', f'sitio{i}.com', '_test_lote_a') for i in range(20)]
-    run_batch(tasks, alm, max_workers=8)
+    run_batch(tasks, store, max_workers=8)
     # 20 distinct seeds + 2 shared ips (10.0.0.1/2) = 22
-    assert len(alm.of_type('domain')) == 20
-    assert len(alm.of_type('ip')) == 2
+    assert len(store.of_type('domain')) == 20
+    assert len(store.of_type('ip')) == 2

@@ -10,9 +10,9 @@ without starting the server. The CLI uses the core directly (Store, transforms,
 report, export, workspaces) -- zero logic duplication.
 
 Examples:
-    obsidian_cli.py transforms dominio
-    obsidian_cli.py run dominio github.com dns_a
-    obsidian_cli.py recon dominio github.com -w case-1
+    obsidian_cli.py transforms domain
+    obsidian_cli.py run domain github.com dns_a
+    obsidian_cli.py recon domain github.com -w case-1
     obsidian_cli.py report -w case-1 -o report.html
     obsidian_cli.py export json -w case-1 -o case.json
     obsidian_cli.py workspaces
@@ -26,7 +26,7 @@ from core.modelo import Store, valid_type
 from core.transforms import REGISTRO, run_by_name, run_batch
 from core.correlacion import correlate, risk_score
 from core.reporte import generate_report
-from core.exportar import exportar_json, exportar_csv
+from core.exportar import export_json, export_csv
 from core.workspaces import Manager
 from core.config import WORKSPACES_DIR, STATIC_DIR, VIS_FILE
 
@@ -39,11 +39,11 @@ def _store(ws):
     return Store()
 
 
-def _save(ws, alm):
+def _save(ws, store):
     if ws:
         if not _gestor.exists(ws):
             _gestor.create(ws)
-        _gestor.save(ws, alm)
+        _gestor.save(ws, store)
 
 
 def _err(msg):
@@ -65,15 +65,15 @@ def cmd_transforms(a):
 def cmd_run(a):
     if not valid_type(a.type):
         return _err(f"invalid type: {a.type}")
-    alm = _store(a.workspace)
+    store = _store(a.workspace)
     try:
-        semilla = alm.create(a.type, a.value)
-        producidas = run_by_name(a.transform, semilla, alm)
+        seed = store.create(a.type, a.value)
+        produced = run_by_name(a.transform, seed, store)
     except (KeyError, ValueError) as e:
         return _err(str(e))
-    _save(a.workspace, alm)
-    print(f"✓ {a.transform} → +{len(producidas)} entity(ies) (total {len(alm)})")
-    for e in producidas:
+    _save(a.workspace, store)
+    print(f"✓ {a.transform} → +{len(produced)} entity(ies) (total {len(store)})")
+    for e in produced:
         print(f"    {e.type:12} {e.value}")
     return 0
 
@@ -83,17 +83,17 @@ def cmd_recon(a):
     import time
     if not valid_type(a.type):
         return _err(f"invalid type: {a.type}")
-    alm = _store(a.workspace)
-    alm.create(a.type, a.value)
+    store = _store(a.workspace)
+    store.create(a.type, a.value)
     ts = [t for t in REGISTRO.applicable(a.type) if a.with_keys or not t.requires_key]
     tasks = [(a.type, a.value, t.name) for t in ts]
     print(f"recon on {a.type} {a.value} -- {len(tasks)} transform(s) in parallel")
     t0 = time.time()
-    for name, n in sorted(run_batch(tasks, alm)):
+    for name, n in sorted(run_batch(tasks, store)):
         print(f"  {name:22} +{n}")
-    _save(a.workspace, alm)
-    h = correlate(alm)
-    print(f"total: {len(alm)} entities · {len(h)} finding(s) · "
+    _save(a.workspace, store)
+    h = correlate(store)
+    print(f"total: {len(store)} entities · {len(h)} finding(s) · "
           f"risk {risk_score(h)}/100 · {time.time() - t0:.1f}s")
     return 0
 
@@ -107,11 +107,11 @@ def _vis_js():
 
 
 def cmd_report(a):
-    alm = _store(a.workspace)
-    if not len(alm):
+    store = _store(a.workspace)
+    if not len(store):
         return _err("empty or nonexistent workspace")
-    h = correlate(alm)
-    html = generate_report(alm, h, risk_score(h),
+    h = correlate(store)
+    html = generate_report(store, h, risk_score(h),
                            meta={'workspace': a.workspace},
                            vis_js=None if a.no_graph else _vis_js())
     if a.output:
@@ -124,14 +124,14 @@ def cmd_report(a):
 
 
 def cmd_export(a):
-    alm = _store(a.workspace)
-    if not len(alm):
+    store = _store(a.workspace)
+    if not len(store):
         return _err("empty or nonexistent workspace")
     if a.formato == 'json':
-        h = correlate(alm)
-        data = exportar_json(alm, h, risk_score(h), {'workspace': a.workspace})
+        h = correlate(store)
+        data = export_json(store, h, risk_score(h), {'workspace': a.workspace})
     else:
-        data = exportar_csv(alm)
+        data = export_csv(store)
     if a.output:
         with open(a.output, 'w', encoding='utf-8') as f:
             f.write(data)
@@ -146,8 +146,8 @@ def cmd_workspaces(a):
     if not ws:
         print("(no workspaces)")
     for w in ws:
-        alm = _gestor.load(w)
-        print(f"  {w:24} {len(alm)} entity(ies)")
+        store = _gestor.load(w)
+        print(f"  {w:24} {len(store)} entity(ies)")
     return 0
 
 

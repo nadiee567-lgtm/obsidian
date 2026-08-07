@@ -18,7 +18,7 @@ def _client():
 
 def test_transforms_reales_registrados():
     nombres = {t.name for t in REGISTRO.all_transforms()}
-    assert {'dns_a', 'ptr', 'crtsh', 'geo_ip', 'github_user', 'puertos', 'dns_mx',
+    assert {'dns_a', 'ptr', 'crtsh', 'geo_ip', 'github_user', 'ports', 'dns_mx',
             'dns_ns', 'email_breaches', 'email_spoofable', 'rdap', 'greynoise',
             'dns_txt', 'ssl', 'subdomains_ht', 'http_probe', 'http_probe_sub',
             'screenshot', 'nuclei', 'breaches_xon', 'stealer_hudsonrock',
@@ -27,11 +27,11 @@ def test_transforms_reales_registrados():
 
 def test_transforms_aplicables_por_tipo():
     ip = {t.name for t in REGISTRO.applicable('ip')}
-    assert {'ptr', 'geo_ip', 'puertos'} <= ip
-    dominio = {t.name for t in REGISTRO.applicable('domain')}
-    assert {'dns_a', 'crtsh', 'dns_mx', 'dns_ns'} <= dominio
-    usuario = {t.name for t in REGISTRO.applicable('user')}
-    assert 'github_user' in usuario
+    assert {'ptr', 'geo_ip', 'ports'} <= ip
+    domain = {t.name for t in REGISTRO.applicable('domain')}
+    assert {'dns_a', 'crtsh', 'dns_mx', 'dns_ns'} <= domain
+    username = {t.name for t in REGISTRO.applicable('user')}
+    assert 'github_user' in username
 
 
 def test_endpoints_viejos_intactos():

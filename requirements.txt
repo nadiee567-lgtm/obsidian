@@ -1,7 +1,7 @@
-# OBSIDIAN — dependencias de ejecución
-# Instalar todo de un jalón:  pip install -r requirements.txt
+# OBSIDIAN — runtime dependencies
+# Install everything at once:  pip install -r requirements.txt
 #
-# Versiones pinneadas a lo probado (Python 3.14, venv del lab).
+# Versions pinned to what was tested (Python 3.14).
 
 Flask==3.1.3
 Werkzeug==3.1.8
@@ -9,18 +9,18 @@ requests==2.34.2
 beautifulsoup4==4.15.0
 cryptography==50.0.0
 
-# ── Opcional (transforms de screenshots / render_js) ─────────────────────────
-# Descomenta y además corre:  playwright install chromium
+# ── Optional (screenshot / render_js transforms) ─────────────────────────────
+# Uncomment and also run:  playwright install chromium
 # playwright==1.55.0
 
-# ── Herramientas del sistema (NO son pip — instalar con el gestor del SO) ─────
-# Los transforms las usan por línea de comandos. En Debian/Ubuntu/Mint:
+# ── System tools (NOT pip — install with your OS package manager) ─────────────
+# The transforms call them from the command line. On Debian/Ubuntu/Mint:
 #   sudo apt install dnsutils nmap whois libimage-exiftool-perl
 #   (dig = dnsutils; exiftool = libimage-exiftool-perl)
-# nuclei (escaneo de vulns): binario de github.com/projectdiscovery/nuclei/releases
-#   luego:  nuclei -update-templates
-# Opcionales para OSINT de usuario:  pipx install sherlock-project maigret
+# nuclei (vulnerability scanning): binary from github.com/projectdiscovery/nuclei/releases
+#   then:  nuclei -update-templates
+# Optional for username OSINT:  pipx install sherlock-project maigret
 mmh3==5.2.1
-Pillow==12.3.0        # opcional: ELA (126) + pHash (127) de imágenes
-PySocks==1.7.1        # opcional: ruteo .onion por Tor (F10)
-telethon==1.44.0      # opcional: scraping de Telegram (F10, requiere tu api_id/api_hash)
+Pillow==12.3.0        # optional: image ELA (126) + pHash (127)
+PySocks==1.7.1        # optional: .onion routing over Tor (F10)
+telethon==1.44.0      # optional: Telegram scraping (F10, needs your api_id/api_hash)

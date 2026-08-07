@@ -7,17 +7,17 @@ from flask import Flask, request, jsonify, Response, stream_with_context, send_f
 from werkzeug.exceptions import HTTPException
 
 from core.config import HOME, HOME_INIT, CASES_DIR, STATIC_DIR, CASES_DB, PORT, WORKSPACES_DIR, VIS_FILE as _VIS
-from core.validacion import (_SHELL_PELIGROSOS, _MODULO_TIPO, _is_ip, _validate,
+from core.validacion import (_SHELL_DANGEROUS, _MODULE_TYPE, _is_ip, _validate,
                              _safe_target, _case_slug, _safe_case_path, _public_url)
 from core.registro import get_logger
-from core.modelo import Store, Entity, valid_type, TIPOS
+from core.modelo import Store, Entity, valid_type, TYPES
 from core.transforms import transform, REGISTRO, run_by_name, run_batch
 from core.migracion import migrate_case
 from core.workspaces import Manager
 from core.boveda import Vault
 from core.correlacion import correlate, risk_score, load_yaml_rules, exposure_score
 from core.reporte import generate_report
-from core.exportar import exportar_json, exportar_csv
+from core.exportar import export_json, export_csv
 from core.monitor import Monitor, snapshot as _snap_estado
 from core.notificar import send_ntfy, build_ntfy
 from core.estado import render_estado
@@ -88,13 +88,13 @@ def _db_find(termino):
     """Searches a term (email, domain, username...) across all saved cases."""
     con = sqlite3.connect(CASES_DB)
     con.row_factory = sqlite3.Row
-    filas = con.execute(
+    rows = con.execute(
         "SELECT name, target, actualizado, datos_json FROM casos WHERE datos_json LIKE ? OR target LIKE ?",
         (f'%{termino}%', f'%{termino}%')
     ).fetchall()
     con.close()
     results = []
-    for fila in filas:
+    for fila in rows:
         try:
             data = json.loads(fila['datos_json'])
         except Exception:
@@ -378,17 +378,17 @@ def _osint_user(username):
         'Medium':    f'https://medium.com/@{username}',
         'Dev.to':    f'https://dev.to/{username}',
     }
-    encontrados = []
+    found_list = []
     def _check(plat, url):
         try:
             r = SESSION.get(url, timeout=5, allow_redirects=True)
             if r.status_code == 200 and 'not found' not in r.text.lower()[:300]:
-                encontrados.append({'platform':plat,'url':url})
+                found_list.append({'platform':plat,'url':url})
         except Exception as _e: log.debug("source unavailable: %s", _e)
     ths = [threading.Thread(target=_check, args=(p,u)) for p,u in plataformas.items()]
     for t in ths: t.start()
     for t in ths: t.join(timeout=8)
-    data['results']['plataformas'] = encontrados
+    data['results']['plataformas'] = found_list
     # GitHub API
     try:
         gh = SESSION.get(f'https://api.github.com/users/{username}', timeout=8).json()
@@ -435,35 +435,35 @@ def _osint_user(username):
     _save_datum(f'usuario_{username}', data)
     return data
 
-def _osint_domain(dominio):
-    dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
-    data = {'type':'domain','target':dominio,'results':{}}
+def _osint_domain(domain):
+    domain = domain.replace('https://','').replace('http://','').split('/')[0]
+    data = {'type':'domain','target':domain,'results':{}}
     # WHOIS
-    whois_raw = _cmd(f'whois {dominio} 2>/dev/null')
+    whois_raw = _cmd(f'whois {domain} 2>/dev/null')
     whois_lines = [l.strip() for l in whois_raw.splitlines()
                    if any(k in l.lower() for k in ['registr','creat','expir','name server','email','org','status'])]
     data['results']['whois'] = whois_lines[:20]
     # DNS
     dns = {}
     for rtype in ['A','AAAA','MX','NS','TXT','CNAME']:
-        out = _cmd(f'dig {dominio} {rtype} +short 2>/dev/null')
+        out = _cmd(f'dig {domain} {rtype} +short 2>/dev/null')
         if out.strip() and 'error' not in out.lower():
             dns[rtype] = out.strip()
     data['results']['dns'] = dns
     # Subdomains crt.sh
     try:
-        r = SESSION.get(f'https://crt.sh/?q=%.{dominio}&output=json', timeout=12)
+        r = SESSION.get(f'https://crt.sh/?q=%.{domain}&output=json', timeout=12)
         subs = set()
         for cert in r.json():
             for s in cert.get('name_value','').split('\n'):
                 s = s.strip().lstrip('*.')
-                if s.endswith(dominio) and s != dominio: subs.add(s)
+                if s.endswith(domain) and s != domain: subs.add(s)
         data['results']['subdominios'] = sorted(list(subs))[:30]
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # Headers / Technologies
     try:
         import urllib3; urllib3.disable_warnings()
-        r = SESSION.get(f'https://{dominio}', timeout=8, verify=False)
+        r = SESSION.get(f'https://{domain}', timeout=8, verify=False)
         h = r.headers
         tech = {k:h[k] for k in ['Server','X-Powered-By','X-Generator','X-Framework'] if k in h}
         missing_sec = [k for k in ['Strict-Transport-Security','Content-Security-Policy',
@@ -473,18 +473,18 @@ def _osint_domain(dominio):
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # theHarvester
     if _which('theHarvester'):
-        out = _cmd(f'theHarvester -d {dominio} -b duckduckgo -l 50 2>/dev/null', timeout=45)
+        out = _cmd(f'theHarvester -d {domain} -b duckduckgo -l 50 2>/dev/null', timeout=45)
         emails = list(set(re.findall(r'[\w\.-]+@[\w\.-]+', out)))
-        hosts  = list(set(re.findall(r'[\w\.-]+\.'+re.escape(dominio), out)))
+        hosts  = list(set(re.findall(r'[\w\.-]+\.'+re.escape(domain), out)))
         data['results']['emails']  = emails[:15]
         data['results']['hosts']   = hosts[:15]
     # Wayback
     try:
-        r = SESSION.get(f'http://archive.org/wayback/available?url={dominio}', timeout=8)
+        r = SESSION.get(f'http://archive.org/wayback/available?url={domain}', timeout=8)
         snap = r.json().get('archived_snapshots',{}).get('closest',{})
         if snap.get('url'): data['results']['wayback'] = snap
     except Exception as _e: log.debug("source unavailable: %s", _e)
-    _save_datum(f'dominio_{dominio}', data)
+    _save_datum(f'dominio_{domain}', data)
     return data
 
 def _osint_ip(ip):
@@ -498,8 +498,8 @@ def _osint_ip(ip):
     # Ports
     if _which('nmap'):
         out = run_tool(['nmap','-T4','--top-ports','20','-sV','--open',ip], timeout=60)
-        puertos = [l.strip() for l in out.splitlines() if '/tcp' in l or '/udp' in l]
-        data['results']['puertos'] = puertos
+        ports = [l.strip() for l in out.splitlines() if '/tcp' in l or '/udp' in l]
+        data['results']['ports'] = ports
     # PTR
     ptr = _cmd(f'dig -x {ip} +short 2>/dev/null').strip()
     if ptr: data['results']['ptr'] = ptr
@@ -513,7 +513,7 @@ def _osint_ip(ip):
 
 def _osint_email(email):
     data = {'type':'email','target':email,'results':{}}
-    dominio = email.split('@')[1] if '@' in email else ''
+    domain = email.split('@')[1] if '@' in email else ''
     # Breach check
     try:
         r = SESSION.get(f'https://breachdirectory.p.rapidapi.com/?func=auto&term={email}',
@@ -532,10 +532,10 @@ def _osint_email(email):
             data['results']['hibp_breaches'] = []
     except Exception as _e: log.debug("source unavailable: %s", _e)
     # SPF/DKIM/DMARC of the domain
-    if dominio:
-        spf   = _cmd(f'dig {dominio} TXT +short 2>/dev/null')
-        dmarc = _cmd(f'dig _dmarc.{dominio} TXT +short 2>/dev/null')
-        dkim  = _cmd(f'dig default._domainkey.{dominio} TXT +short 2>/dev/null')
+    if domain:
+        spf   = _cmd(f'dig {domain} TXT +short 2>/dev/null')
+        dmarc = _cmd(f'dig _dmarc.{domain} TXT +short 2>/dev/null')
+        dkim  = _cmd(f'dig default._domainkey.{domain} TXT +short 2>/dev/null')
         spoofable = not any('v=spf1' in spf.lower() for _ in [1])
         data['results']['email_sec'] = {
             'spf': spf.strip()[:200] or 'NOT CONFIGURED',
@@ -591,7 +591,7 @@ def _recon_github_secrets(username_or_org):
         if repos_r.status_code != 200:
             repos_r = SESSION.get(f'https://api.github.com/orgs/{username_or_org}/repos?per_page=20', timeout=8)
         repos = repos_r.json()
-        hallazgos = []
+        findings = []
         for repo in repos[:10]:
             repo_name = repo.get('full_name','')
             # Search recent commits
@@ -607,60 +607,60 @@ def _recon_github_secrets(username_or_org):
                     for nombre_pat, patron in patrones:
                         matches = re.findall(patron, patch, re.IGNORECASE)
                         for m in matches:
-                            hallazgos.append({
+                            findings.append({
                                 'repo': repo_name, 'type': nombre_pat,
                                 'value': m[:50]+'...' if len(m)>50 else m,
                                 'commit': sha[:8], 'file': f.get('filename','?')
                             })
-        data['results']['hallazgos'] = hallazgos
+        data['results']['findings'] = findings
         data['results']['repos_analizados'] = len(repos[:10])
     except Exception as e:
         data['results']['error'] = str(e)
     _save_datum(f'github_secrets_{username_or_org}', data)
     return data
 
-def _recon_ssl(dominio):
-    data = {'type':'ssl','target':dominio,'results':{}}
-    dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
+def _recon_ssl(domain):
+    data = {'type':'ssl','target':domain,'results':{}}
+    domain = domain.replace('https://','').replace('http://','').split('/')[0]
     # Basic info
-    cert_info = _cmd(f'echo | openssl s_client -connect {dominio}:443 -servername {dominio} 2>/dev/null | openssl x509 -noout -subject -issuer -dates -fingerprint 2>/dev/null')
+    cert_info = _cmd(f'echo | openssl s_client -connect {domain}:443 -servername {domain} 2>/dev/null | openssl x509 -noout -subject -issuer -dates -fingerprint 2>/dev/null')
     data['results']['certificado'] = cert_info
     # Vulnerable cipher suites
     for cipher, vuln in [('RC4','OBSOLETE'),('DES','VULNERABLE'),('NULL','CRITICAL'),('EXPORT','CRITICAL')]:
-        out = _cmd(f'openssl s_client -connect {dominio}:443 -cipher {cipher} 2>/dev/null | head -3')
+        out = _cmd(f'openssl s_client -connect {domain}:443 -cipher {cipher} 2>/dev/null | head -3')
         if 'Cipher' in out and 'NONE' not in out:
             data['results'][f'cipher_{cipher}'] = f'VULNERABLE -- {vuln}'
     # HSTS
     try:
         import urllib3; urllib3.disable_warnings()
-        r = SESSION.get(f'https://{dominio}', timeout=8, verify=False)
+        r = SESSION.get(f'https://{domain}', timeout=8, verify=False)
         data['results']['hsts'] = r.headers.get('Strict-Transport-Security','NOT CONFIGURED')
         data['results']['ocsp'] = 'Verify manually'
     except Exception as _e: log.debug("source unavailable: %s", _e)
-    _save_datum(f'ssl_{dominio}', data)
+    _save_datum(f'ssl_{domain}', data)
     return data
 
-def _recon_favicon(dominio):
+def _recon_favicon(domain):
     """mmh3 hash of the favicon (Shodan algorithm) -- pivots to related infrastructure."""
-    data = {'type':'favicon','target':dominio,'results':{}}
-    dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
+    data = {'type':'favicon','target':domain,'results':{}}
+    domain = domain.replace('https://','').replace('http://','').split('/')[0]
     try:
         import mmh3
     except ImportError:
         data['results']['error'] = "Missing the mmh3 library -- install with: pip install mmh3"
-        _save_datum(f'favicon_{dominio}', data)
+        _save_datum(f'favicon_{domain}', data)
         return data
     favicon_bytes = None
     for esquema in ('https', 'http'):
         try:
-            r = SESSION.get(f'{esquema}://{dominio}/favicon.ico', timeout=8, verify=False)
+            r = SESSION.get(f'{esquema}://{domain}/favicon.ico', timeout=8, verify=False)
             if r.status_code == 200 and r.content:
                 favicon_bytes = r.content
                 break
         except Exception as _e: log.debug("source unavailable: %s", _e)
     if not favicon_bytes:
         data['results']['error'] = 'favicon.ico not found on the target (try another path manually)'
-        _save_datum(f'favicon_{dominio}', data)
+        _save_datum(f'favicon_{domain}', data)
         return data
     favicon_b64 = base64.encodebytes(favicon_bytes)
     hash_mmh3 = mmh3.hash(favicon_b64)
@@ -680,51 +680,51 @@ def _recon_favicon(dominio):
             data['results']['error_shodan'] = str(e)
     else:
         data['results']['nota'] = f'Computed hash: {hash_mmh3}. Add a Shodan API key (free at shodan.io) to search related infrastructure, or paste the hash manually into shodan.io/search?query=http.favicon.hash:{hash_mmh3}'
-    _save_datum(f'favicon_{dominio}', data)
+    _save_datum(f'favicon_{domain}', data)
     return data
 
-def _recon_typosquatting(dominio):
-    data = {'type':'typosquatting','target':dominio,'results':{}}
-    name, ext = dominio.rsplit('.',1) if '.' in dominio else (dominio,'com')
-    variantes = set()
+def _recon_typosquatting(domain):
+    data = {'type':'typosquatting','target':domain,'results':{}}
+    name, ext = domain.rsplit('.',1) if '.' in domain else (domain,'com')
+    variants = set()
     # Common substitutions
     subs = {'a':'4','e':'3','i':'1','o':'0','s':'5','l':'1'}
     for i, c in enumerate(name):
         if c in subs:
             v = name[:i]+subs[c]+name[i+1:]
-            variantes.add(f'{v}.{ext}')
+            variants.add(f'{v}.{ext}')
     # Keyboard typos
     teclado = {'q':'w','w':'e','e':'r','r':'t','t':'y','a':'s','s':'d','d':'f',
                'f':'g','g':'h','z':'x','x':'c','c':'v','v':'b'}
     for i, c in enumerate(name.lower()):
         if c in teclado:
             v = name[:i]+teclado[c]+name[i+1:]
-            variantes.add(f'{v}.{ext}')
+            variants.add(f'{v}.{ext}')
     # Letter omission/duplication
     for i in range(len(name)):
-        variantes.add(f'{name[:i]+name[i+1:]}.{ext}')
-        variantes.add(f'{name[:i]+name[i]*2+name[i:]}.{ext}')
+        variants.add(f'{name[:i]+name[i+1:]}.{ext}')
+        variants.add(f'{name[:i]+name[i]*2+name[i:]}.{ext}')
     # Check which exist
-    registrados = []
+    registered = []
     def _check_domain(v):
         out = _cmd(f'dig {v} A +short 2>/dev/null', timeout=3)
         if out.strip() and not 'error' in out.lower():
-            registrados.append({'domain':v,'ip':out.strip()})
-    ths = [threading.Thread(target=_check_domain, args=(v,)) for v in list(variantes)[:25]]
+            registered.append({'domain':v,'ip':out.strip()})
+    ths = [threading.Thread(target=_check_domain, args=(v,)) for v in list(variants)[:25]]
     for t in ths: t.start()
     for t in ths: t.join(timeout=10)
-    data['results']['variantes_totales'] = len(variantes)
-    data['results']['registrados'] = registrados
-    _save_datum(f'typosquatting_{dominio}', data)
+    data['results']['variantes_totales'] = len(variants)
+    data['results']['registered'] = registered
+    _save_datum(f'typosquatting_{domain}', data)
     return data
 
 def _recon_buckets(empresa):
     data = {'type':'buckets','target':empresa,'results':{}}
     name = empresa.lower().replace(' ','-').replace('_','-')
-    variantes = [name, f'{name}-backup', f'{name}-dev', f'{name}-prod',
+    variants = [name, f'{name}-backup', f'{name}-dev', f'{name}-prod',
                  f'{name}-staging', f'{name}-assets', f'{name}-media',
                  f'backup-{name}', f'dev-{name}', f'assets-{name}']
-    encontrados = []
+    found_list = []
     def _check(bucket):
         urls = [
             f'https://{bucket}.s3.amazonaws.com',
@@ -735,29 +735,29 @@ def _recon_buckets(empresa):
             try:
                 r = SESSION.get(url, timeout=5)
                 if r.status_code in [200, 403]:
-                    encontrados.append({
+                    found_list.append({
                         'bucket': bucket, 'url': url,
                         'status': r.status_code,
                         'public': r.status_code == 200
                     })
             except Exception as _e: log.debug("source unavailable: %s", _e)
-    ths = [threading.Thread(target=_check, args=(b,)) for b in variantes]
+    ths = [threading.Thread(target=_check, args=(b,)) for b in variants]
     for t in ths: t.start()
     for t in ths: t.join(timeout=15)
-    data['results']['buckets'] = encontrados
-    data['results']['variantes_probadas'] = variantes
+    data['results']['buckets'] = found_list
+    data['results']['variantes_probadas'] = variants
     _save_datum(f'buckets_{empresa}', data)
     return data
 
-def _recon_subdomain_takeover(dominio):
-    data = {'type':'subdomain_takeover','target':dominio,'results':{}}
+def _recon_subdomain_takeover(domain):
+    data = {'type':'subdomain_takeover','target':domain,'results':{}}
     try:
-        r = SESSION.get(f'https://crt.sh/?q=%.{dominio}&output=json', timeout=12)
+        r = SESSION.get(f'https://crt.sh/?q=%.{domain}&output=json', timeout=12)
         subs = set()
         for cert in r.json():
             for s in cert.get('name_value','').split('\n'):
                 s = s.strip().lstrip('*.')
-                if s.endswith(dominio) and s != dominio: subs.add(s)
+                if s.endswith(domain) and s != domain: subs.add(s)
     except Exception:
         subs = set()
     # Services vulnerable to takeover
@@ -789,20 +789,20 @@ def _recon_subdomain_takeover(dominio):
     for t in ths: t.join(timeout=20)
     data['results']['subdominios_analizados'] = len(list(subs)[:20])
     data['results']['vulnerables'] = vulnerables
-    _save_datum(f'takeover_{dominio}', data)
+    _save_datum(f'takeover_{domain}', data)
     return data
 
-def _recon_passivedns(dominio):
+def _recon_passivedns(domain):
     """History of IPs the domain has resolved to, via VirusTotal (reuses the Analyze key)."""
-    data = {'type':'passivedns','target':dominio,'results':{}}
-    dominio = dominio.replace('https://','').replace('http://','').split('/')[0]
+    data = {'type':'passivedns','target':domain,'results':{}}
+    domain = domain.replace('https://','').replace('http://','').split('/')[0]
     vt_key = os.environ.get('VT_API_KEY','')
     if not vt_key:
         data['results']['nota'] = 'Add a VirusTotal API key (free, Analyze tab) to see the IP history'
-        _save_datum(f'passivedns_{dominio}', data)
+        _save_datum(f'passivedns_{domain}', data)
         return data
     try:
-        r = SESSION.get(f'https://www.virustotal.com/api/v3/domains/{dominio}/resolutions',
+        r = SESSION.get(f'https://www.virustotal.com/api/v3/domains/{domain}/resolutions',
                        headers={'x-apikey': vt_key}, params={'limit': 20}, timeout=12)
         d = r.json()
         history = []
@@ -817,7 +817,7 @@ def _recon_passivedns(dominio):
         data['results']['total'] = len(history)
     except Exception as e:
         data['results']['error'] = str(e)
-    _save_datum(f'passivedns_{dominio}', data)
+    _save_datum(f'passivedns_{domain}', data)
     return data
 
 def _recon_metadata(url):
@@ -891,24 +891,24 @@ def _recon_render_js(url):
     _save_datum(f'render_{url[:50]}', data)
     return data
 
-def _recon_yara_bulk(carpeta):
+def _recon_yara_bulk(folder):
     """Scans every file in a folder with yara-rules -- only makes sense on a full PC."""
-    data = {'type':'yara_bulk','target':carpeta,'results':{}}
-    if not os.path.isdir(carpeta):
-        data['results']['error'] = f'Not a valid folder: {carpeta}'
-        _save_datum(f'yara_bulk_{carpeta}', data)
+    data = {'type':'yara_bulk','target':folder,'results':{}}
+    if not os.path.isdir(folder):
+        data['results']['error'] = f'Not a valid folder: {folder}'
+        _save_datum(f'yara_bulk_{folder}', data)
         return data
     if not _which('yara-rules'):
         data['results']['error'] = 'yara-rules is not installed'
-        _save_datum(f'yara_bulk_{carpeta}', data)
+        _save_datum(f'yara_bulk_{folder}', data)
         return data
     archivos = []
-    for root, _dirs, files in os.walk(carpeta):
+    for root, _dirs, files in os.walk(folder):
         for f in files:
             archivos.append(os.path.join(root, f))
             if len(archivos) >= 200: break
         if len(archivos) >= 200: break
-    hallazgos = []
+    findings = []
     for archivo in archivos:
         try:
             if os.path.getsize(archivo) > 50_000_000: continue
@@ -924,11 +924,11 @@ def _recon_yara_bulk(carpeta):
             log.warning("yara error: %s", _e)
             continue
         if salida and 'no rules matched' not in salida.lower():
-            hallazgos.append({'file': archivo, 'resultado': salida[:500]})
-            if len(hallazgos) >= 50: break
+            findings.append({'file': archivo, 'result': salida[:500]})
+            if len(findings) >= 50: break
     data['results']['total_escaneados'] = len(archivos)
-    data['results']['con_coincidencias'] = hallazgos
-    _save_datum(f'yara_bulk_{carpeta}', data)
+    data['results']['con_coincidencias'] = findings
+    _save_datum(f'yara_bulk_{folder}', data)
     return data
 
 def _gen_wordlist(target):
@@ -1142,8 +1142,8 @@ def _distrobox_run(distro, tool_dict, tool_id, arg):
     if not _safe_target(arg):
         return {'error': 'Invalid argument: contains disallowed characters'}
     cmd = tool['cmd'].replace('{arg}', arg.strip())
-    resultado = _cmd(f'distrobox enter {distro} -- bash -c "{cmd}"', timeout=90)
-    return {'tool': tool['name'], 'cmd': cmd, 'output': resultado}
+    result = _cmd(f'distrobox enter {distro} -- bash -c "{cmd}"', timeout=90)
+    return {'tool': tool['name'], 'cmd': cmd, 'output': result}
 
 def _kali_run(tool_id, arg):
     """Runs a Kali tool inside the distrobox container"""
@@ -1163,11 +1163,11 @@ def _kali_run(tool_id, arg):
     cmd = cmd_template.replace('{arg}', arg.strip())
 
     full_cmd = f'distrobox enter kali -- bash -c "{cmd}"'
-    resultado = _cmd(full_cmd, timeout=60)
+    result = _cmd(full_cmd, timeout=60)
     return {
         'tool': tool['name'],
         'cmd': cmd,
-        'output': resultado
+        'output': result
     }
 
 def _check_url(url):
@@ -1184,8 +1184,8 @@ def _check_url(url):
             flags.append(f'Possible phishing of {marca} (brand in URL but different domain)')
             score += 30
 
-    sospechosos = ['login','secure','verify','account','update','confirm','signin','banking','wallet','password']
-    for kw in sospechosos:
+    suspicious = ['login','secure','verify','account','update','confirm','signin','banking','wallet','password']
+    for kw in suspicious:
         if kw in u:
             flags.append(f'Suspicious keyword: {kw}')
             score += 10
@@ -1235,8 +1235,8 @@ def _check_url(url):
 
     # AbuseIPDB for the domain's IP
     try:
-        dominio = re.sub(r'^https?://', '', url).split('/')[0].split(':')[0]
-        ip_check = socket.gethostbyname(dominio)
+        domain = re.sub(r'^https?://', '', url).split('/')[0].split(':')[0]
+        ip_check = socket.gethostbyname(domain)
         abuse_key = os.environ.get('ABUSEIPDB_KEY','')
         if abuse_key:
             r = SESSION.get('https://api.abuseipdb.com/api/v2/check',
@@ -1533,7 +1533,7 @@ def _build_graph():
 
         # ── TYPOSQUATTING ─────────────────────────────────────────
         elif type == 'typosquatting':
-            for dom2 in res.get('registrados',[]):
+            for dom2 in res.get('registered',[]):
                 tid2 = nid('typo_'+dom2['domain'])
                 add_node(tid2, '🎭 '+dom2['domain'], 'subdomain',
                          f"IP: {dom2['ip']}")
@@ -1541,7 +1541,7 @@ def _build_graph():
 
         # ── GITHUB SECRETS ────────────────────────────────────────
         elif type == 'github_secrets':
-            for h in res.get('hallazgos',[])[:8]:
+            for h in res.get('findings',[])[:8]:
                 hid = nid('secret_'+h['repo']+h['type'])
                 add_node(hid, f"🔑 {h['type']}", 'cve',
                          f"{h['repo']} @{h['commit']}: {h['value']}")
@@ -1698,7 +1698,7 @@ def _shodan_ip(ip):
             d = r.json()
             data['results'] = {
                 'org': d.get('org'), 'country': d.get('country_name'),
-                'puertos': d.get('ports', []),
+                'ports': d.get('ports', []),
                 'vulns': list(d.get('vulns', {}).keys()),
                 'servicios': [{'port': s.get('port'), 'banner': s.get('data','')[:150]}
                               for s in d.get('data', [])[:10]]
@@ -1719,11 +1719,11 @@ def _build_timeline():
         r'(\d{4}\d{2}\d{2})',
     ]
     for key, value in case['data'].items():
-        texto = json.dumps(value, default=str)
+        text = json.dumps(value, default=str)
         type  = value.get('type', key) if isinstance(value, dict) else key
         target = value.get('target', '') if isinstance(value, dict) else ''
         for pat in DATE_PATTERNS:
-            for date in re.findall(pat, texto):
+            for date in re.findall(pat, text):
                 try:
                     if len(date) == 8:
                         fecha_fmt = f"{date[:4]}-{date[4:6]}-{date[6:]}"
@@ -1744,12 +1744,12 @@ def _build_timeline():
             'timestamp': ts, 'module': 'ejecucion',
             'target': h.get('key',''), 'description': f"Module run: {h.get('key','')}"
         })
-    vistos = set()
+    seen = set()
     unicos = []
     for e in eventos:
         k = e['date'] + e['description']
-        if k not in vistos:
-            vistos.add(k)
+        if k not in seen:
+            seen.add(k)
             unicos.append(e)
     return sorted(unicos, key=lambda x: x['timestamp'])
 
@@ -1766,14 +1766,14 @@ def _monitor_loop():
         try:
             type = 'domain' if re.match(r'^[\w\.-]+\.[a-z]{2,}$', target) else 'person'
             if type == 'domain':
-                nuevo = _osint_domain(target)
+                new = _osint_domain(target)
                 viejo = case['data'].get(f'dominio_{target}', {})
-                if str(nuevo) != str(viejo):
+                if str(new) != str(viejo):
                     monitor_state['alerts'].append({
                         'ts': datetime.datetime.now().isoformat(),
                         'type': 'cambio_dominio',
                         'message': f'Change detected on {target}',
-                        'nuevo': nuevo
+                        'new': new
                     })
         except Exception as _e: log.debug("source unavailable: %s", _e)
         time.sleep(monitor_state['interval'])
@@ -1955,7 +1955,7 @@ def api_run():
         'render_js':  lambda: _recon_render_js(arg),
         'cve':        lambda: {'type':'cve','results':{'analisis':_cve_correlation(arg)}},
         'escenario':  lambda: {'type':'escenario','results':{'analisis':_sim_scenario(arg or case.get('target',''))}},
-        'superficie': lambda: {'type':'superficie','results':{'analisis':_sim_surface(arg or case.get('target',''))}},
+        'surface': lambda: {'type':'surface','results':{'analisis':_sim_surface(arg or case.get('target',''))}},
         'analizar':   lambda: {'type':'analisis','results':{'analisis':_analizar_todo()}},
         'darkweb':    lambda: _darkweb_search(arg),
         'shodan':     lambda: _shodan_search(arg),
@@ -1966,16 +1966,16 @@ def api_run():
 
     if mod not in MODULOS:
         return jsonify({'error': f'Unknown module: {mod}'}), 400
-    if not arg and mod not in ('wordlist','escenario','superficie','analizar'):
+    if not arg and mod not in ('wordlist','escenario','surface','analizar'):
         return jsonify({'error': 'Argument required'}), 400
-    if mod in _MODULO_TIPO and not _validate(arg, _MODULO_TIPO[mod]):
-        return jsonify({'error': f'Invalid target: not shaped like {_MODULO_TIPO[mod]}'}), 400
+    if mod in _MODULE_TYPE and not _validate(arg, _MODULE_TYPE[mod]):
+        return jsonify({'error': f'Invalid target: not shaped like {_MODULE_TYPE[mod]}'}), 400
 
     def _run_stream():
         yield f"data: {json.dumps({'status':'starting','module':mod})}\n\n"
         try:
-            resultado = MODULOS[mod]()
-            yield f"data: {json.dumps({'status':'completed','resultado':resultado})}\n\n"
+            result = MODULOS[mod]()
+            yield f"data: {json.dumps({'status':'completed','result':result})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'status':'error','message':str(e)})}\n\n"
 
@@ -1989,8 +1989,8 @@ def api_run():
 
 @transform(input='domain', outputs=('ip',), name='dns_a',
            description='A records of the domain (dig)')
-def _t_dns_a(entidad, ctx):
-    out = run_tool(['dig', entidad.value, 'A', '+short'], timeout=10)
+def _t_dns_a(entity, ctx):
+    out = run_tool(['dig', entity.value, 'A', '+short'], timeout=10)
     for linea in out.splitlines():
         linea = linea.strip()
         if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', linea):
@@ -1998,8 +1998,8 @@ def _t_dns_a(entidad, ctx):
 
 @transform(input='ip', outputs=('domain',), name='ptr',
            description='PTR / reverse DNS (dig -x)')
-def _t_ptr(entidad, ctx):
-    out = run_tool(['dig', '-x', entidad.value, '+short'], timeout=10)
+def _t_ptr(entity, ctx):
+    out = run_tool(['dig', '-x', entity.value, '+short'], timeout=10)
     for linea in out.splitlines():
         linea = linea.strip().rstrip('.')
         if linea and not linea.startswith(';'):
@@ -2007,11 +2007,11 @@ def _t_ptr(entidad, ctx):
 
 @transform(input='url', outputs=('tech', 'person', 'url'), name='metadata',
            description='EXIF metadata as pivotable entities: GPS, device, software, author (F9)')
-def _t_metadata(entidad, ctx):
+def _t_metadata(entity, ctx):
     if not _which('exiftool'):
         return
     try:
-        r = _fetch_seguro(entidad.value, timeout=10, stream=True)   # anti-SSRF
+        r = _fetch_seguro(entity.value, timeout=10, stream=True)   # anti-SSRF
     except Exception:
         return
     with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as f:
@@ -2031,7 +2031,7 @@ def _t_metadata(entidad, ctx):
                                             'camera', 'make', 'model', 'artist')):
                 interesantes[k] = v[:100]
         if interesantes:
-            entidad.properties['metadata'] = interesantes
+            entity.properties['metadata'] = interesantes
             # ── EXIF as pivotable entities (step 120) ──
             from urllib.parse import quote as _q
             disp = (f"{interesantes.get('Make', '')} "
@@ -2045,7 +2045,7 @@ def _t_metadata(entidad, ctx):
                     ctx.emit('person', interesantes[kk], label=kk.lower())
             gps = interesantes.get('GPS Position') or interesantes.get('GPS Latitude')
             if gps:
-                entidad.tag('has-gps')
+                entity.tag('has-gps')
                 ctx.emit('url', f'https://www.google.com/maps/search/?api=1&query={_q(gps)}',
                            label='gps', gps=gps)
     finally:
@@ -2056,9 +2056,9 @@ def _t_metadata(entidad, ctx):
 
 @transform(input='domain', outputs=(), name='dorks',
            description='Generates useful Google dorks for the domain (files, panels, indexes, backups)')
-def _t_dorks(entidad, ctx):
+def _t_dorks(entity, ctx):
     from urllib.parse import quote_plus
-    d = entidad.value
+    d = entity.value
     plantillas = [
         ('Exposed files', f'site:{d} (filetype:pdf OR filetype:xls OR filetype:doc)'),
         ('Directory indexes', f'site:{d} intitle:"index of"'),
@@ -2067,40 +2067,40 @@ def _t_dorks(entidad, ctx):
         ('Subdomains', f'site:*.{d}'),
         ('Error messages', f'site:{d} ("stack trace" OR "sql syntax" OR "warning")'),
     ]
-    entidad.properties['dorks'] = [
+    entity.properties['dorks'] = [
         {'que': q, 'url': f'https://www.google.com/search?q={quote_plus(query)}'}
         for q, query in plantillas]
 
 @transform(input='wallet', outputs=(), name='wallet_balance',
            description='Balance and activity of a BTC wallet (blockchain.info, keyless)')
-def _t_wallet_balance(entidad, ctx):
-    if not re.fullmatch(r'[a-zA-Z0-9]{20,90}', entidad.value):   # BTC shape, no junk in the URL
+def _t_wallet_balance(entity, ctx):
+    if not re.fullmatch(r'[a-zA-Z0-9]{20,90}', entity.value):   # BTC shape, no junk in the URL
         return
     try:
-        d = SESSION.get(f'https://blockchain.info/rawaddr/{entidad.value}?limit=0', timeout=10).json()
-        entidad.properties['btc_balance'] = round(d.get('final_balance', 0) / 1e8, 8)
-        entidad.properties['btc_tx'] = d.get('n_tx', 0)
-        entidad.properties['btc_recibido'] = round(d.get('total_received', 0) / 1e8, 8)
+        d = SESSION.get(f'https://blockchain.info/rawaddr/{entity.value}?limit=0', timeout=10).json()
+        entity.properties['btc_balance'] = round(d.get('final_balance', 0) / 1e8, 8)
+        entity.properties['btc_tx'] = d.get('n_tx', 0)
+        entity.properties['btc_recibido'] = round(d.get('total_received', 0) / 1e8, 8)
         if d.get('n_tx'):
-            entidad.tag('active-wallet')
+            entity.tag('active-wallet')
     except Exception as _e:
         log.debug("wallet_balance unavailable: %s", _e)
 
 @transform(input='domain', outputs=('hash',), name='favicon_hash',
            description='mmh3 hash of the favicon -- pivotable node for Shodan/FOFA (F8)')
-def _t_favicon_hash(entidad, ctx):
+def _t_favicon_hash(entity, ctx):
     try:
         import mmh3
         import codecs
     except ImportError:
         return
     try:
-        r = _fetch_seguro(f'https://{entidad.value}/favicon.ico', timeout=8, stream=False)
+        r = _fetch_seguro(f'https://{entity.value}/favicon.ico', timeout=8, stream=False)
         if r.status_code != 200 or not r.content:
             return
         # standard Shodan/FOFA method: base64 (with line breaks) + mmh3
         h = mmh3.hash(codecs.encode(r.content, 'base64'))
-        entidad.properties['favicon_hash'] = h
+        entity.properties['favicon_hash'] = h
         ctx.emit('hash', str(h), label='favicon', hash_type='favicon')   # pivotable node
     except Exception as _e:
         log.debug("favicon_hash unavailable: %s", _e)
@@ -2137,99 +2137,99 @@ def _pivote_ips(campos):
 
 @transform(input='hash', outputs=('ip',), name='favicon_pivote', requires_key=True,
            description='Enumerates IPs serving this favicon (FOFA/Shodan) -- without touching the target (F8)')
-def _t_favicon_pivote(entidad, ctx):
-    if entidad.properties.get('hash_type') != 'favicon':
+def _t_favicon_pivote(entity, ctx):
+    if entity.properties.get('hash_type') != 'favicon':
         return
-    for ip in _pivote_ips({'favicon': entidad.value}):
+    for ip in _pivote_ips({'favicon': entity.value}):
         ctx.emit('ip', ip, label='same-favicon')
 
 @transform(input='domain', outputs=('subdomain',), name='wayback',
            description='Historical snapshot + old subdomains of the domain (Wayback Machine)')
-def _t_wayback(entidad, ctx):
+def _t_wayback(entity, ctx):
     # 1. is there a snapshot? ('available' endpoint, reliable)
     try:
-        snap = ((SESSION.get(f'http://archive.org/wayback/available?url={entidad.value}', timeout=8).json()
+        snap = ((SESSION.get(f'http://archive.org/wayback/available?url={entity.value}', timeout=8).json()
                  .get('archived_snapshots', {}) or {}).get('closest', {}))
         if snap.get('available'):
-            entidad.properties['wayback_since'] = (snap.get('timestamp', '') or '')[:8]
-            entidad.properties['wayback_url'] = snap.get('url')
-            entidad.tag('archived')
+            entity.properties['wayback_since'] = (snap.get('timestamp', '') or '')[:8]
+            entity.properties['wayback_url'] = snap.get('url')
+            entity.tag('archived')
     except Exception as _e:
         log.debug("wayback available: %s", _e)
     # 2. historical subdomains (CDX; may be blocked in some environments)
     try:
-        filas = SESSION.get('http://web.archive.org/cdx/search/cdx',
-                            params={'url': f'*.{entidad.value}', 'output': 'json', 'limit': 300,
+        rows = SESSION.get('http://web.archive.org/cdx/search/cdx',
+                            params={'url': f'*.{entity.value}', 'output': 'json', 'limit': 300,
                                     'collapse': 'urlkey', 'fl': 'original'}, timeout=15).json()
-        vistos = set()
-        for fila in (filas[1:] if isinstance(filas, list) else []):
+        seen = set()
+        for fila in (rows[1:] if isinstance(rows, list) else []):
             host = (urlparse(fila[0] if isinstance(fila, list) else fila).hostname or '').lstrip('*.')
-            if host.endswith(entidad.value) and host != entidad.value and host not in vistos:
-                vistos.add(host)
+            if host.endswith(entity.value) and host != entity.value and host not in seen:
+                seen.add(host)
                 ctx.emit('subdomain', host, label='historical (wayback)')
     except Exception as _e:
         log.debug("wayback cdx: %s", _e)
 
 @transform(input='domain', outputs=('subdomain', 'ip'), name='subdomains_ht',
            description='Subdomains (+ their IP) via HackerTarget hostsearch (keyless)')
-def _t_subdomains_ht(entidad, ctx):
+def _t_subdomains_ht(entity, ctx):
     try:
-        texto = SESSION.get(f'https://api.hackertarget.com/hostsearch/?q={entidad.value}', timeout=12).text
-        if 'API count exceeded' in texto or 'error' in texto.lower():
+        text = SESSION.get(f'https://api.hackertarget.com/hostsearch/?q={entity.value}', timeout=12).text
+        if 'API count exceeded' in text or 'error' in text.lower():
             return
-        for linea in texto.splitlines()[:150]:
+        for linea in text.splitlines()[:150]:
             if ',' not in linea:
                 continue
             sub, ip = (x.strip() for x in linea.split(',', 1))
-            if not sub.endswith(entidad.value) or sub == entidad.value:
+            if not sub.endswith(entity.value) or sub == entity.value:
                 continue
             sub_ent = ctx.emit('subdomain', sub, label='subdomain')
             if sub_ent and re.fullmatch(r'\d+\.\d+\.\d+\.\d+', ip):
-                ip_ent = ctx.almacen.create('ip', ip, sources={'subdomains_ht'})
+                ip_ent = ctx.store.create('ip', ip, sources={'subdomains_ht'})
                 ip_ent.note_provenance('subdomains_ht', input_id=sub_ent.id)
-                ctx.almacen.relate(sub_ent, ip_ent, 'A')
+                ctx.store.relate(sub_ent, ip_ent, 'A')
     except Exception as _e:
         log.debug("subdominios_ht unavailable: %s", _e)
 
 @transform(input='domain', outputs=('subdomain',), name='crtsh',
            description='Subdomains from crt.sh (Certificate Transparency)')
-def _t_crtsh(entidad, ctx):
+def _t_crtsh(entity, ctx):
     try:
-        r = SESSION.get(f'https://crt.sh/?q=%.{entidad.value}&output=json', timeout=12)
-        vistos = set()
+        r = SESSION.get(f'https://crt.sh/?q=%.{entity.value}&output=json', timeout=12)
+        seen = set()
         for cert in r.json():
             for s in cert.get('name_value', '').split('\n'):
                 s = s.strip().lstrip('*.')
-                if s.endswith(entidad.value) and s != entidad.value and s not in vistos:
-                    vistos.add(s)
+                if s.endswith(entity.value) and s != entity.value and s not in seen:
+                    seen.add(s)
                     ctx.emit('subdomain', s, label='subdomain')
     except Exception as _e:
         log.debug("crtsh unavailable: %s", _e)
 
 @transform(input='domain', outputs=('subdomain',), name='ct_certspotter',
            description='Subdomains from Certificate Transparency (certspotter, keyless)')
-def _t_ct_certspotter(entidad, ctx):
+def _t_ct_certspotter(entity, ctx):
     try:
         data = SESSION.get('https://api.certspotter.com/v1/issuances',
-                           params={'domain': entidad.value, 'include_subdomains': 'true',
+                           params={'domain': entity.value, 'include_subdomains': 'true',
                                    'expand': 'dns_names'}, timeout=12).json()
         if not isinstance(data, list):   # rate limit / error -> {message: ...}
             return
-        vistos = set()
+        seen = set()
         for cert in data:
             for name in cert.get('dns_names', []):
                 name = name.lstrip('*.')
-                if name.endswith(entidad.value) and name != entidad.value and name not in vistos:
-                    vistos.add(name)
+                if name.endswith(entity.value) and name != entity.value and name not in seen:
+                    seen.add(name)
                     ctx.emit('subdomain', name, label='subdomain')
     except Exception as _e:
         log.debug("certspotter unavailable: %s", _e)
 
 @transform(input='ip', outputs=('country', 'org', 'asn'), name='geo_ip',
            description='Geolocation and network info of the IP (ip-api.com)')
-def _t_geo_ip(entidad, ctx):
+def _t_geo_ip(entity, ctx):
     try:
-        r = SESSION.get(f'http://ip-api.com/json/{entidad.value}'
+        r = SESSION.get(f'http://ip-api.com/json/{entity.value}'
                         '?fields=status,country,org,isp,as', timeout=8)
         d = r.json()
         if d.get('status') != 'success':
@@ -2246,10 +2246,10 @@ def _t_geo_ip(entidad, ctx):
 
 @transform(input='user', outputs=('platform',), name='sherlock',
            description='User accounts across 400+ platforms (Sherlock)')
-def _t_sherlock(entidad, ctx):
+def _t_sherlock(entity, ctx):
     if not _which('sherlock'):
         return
-    out = run_tool(['sherlock', entidad.value, '--timeout', '5', '--print-found', '--no-color'], timeout=150)
+    out = run_tool(['sherlock', entity.value, '--timeout', '5', '--print-found', '--no-color'], timeout=150)
     for linea in out.splitlines():
         m = re.match(r'\[\+\]\s*(.+?):\s*(https?://\S+)', linea.strip())
         if m:
@@ -2257,14 +2257,14 @@ def _t_sherlock(entidad, ctx):
 
 @transform(input='user', outputs=('email', 'repo'), name='github_user',
            description='User email and public repos on GitHub')
-def _t_github(entidad, ctx):
+def _t_github(entity, ctx):
     try:
-        gh = SESSION.get(f'https://api.github.com/users/{entidad.value}', timeout=8).json()
+        gh = SESSION.get(f'https://api.github.com/users/{entity.value}', timeout=8).json()
         if not gh.get('login'):
             return
         if gh.get('email') and gh['email'] != 'hidden':
             ctx.emit('email', gh['email'], label='github email')
-        repos = SESSION.get(f'https://api.github.com/users/{entidad.value}/repos'
+        repos = SESSION.get(f'https://api.github.com/users/{entity.value}/repos'
                             '?per_page=10&sort=updated', timeout=8)
         if repos.status_code == 200:
             for repo in repos.json():
@@ -2274,12 +2274,12 @@ def _t_github(entidad, ctx):
     except Exception as _e:
         log.debug("github_usuario unavailable: %s", _e)
 
-@transform(input='ip', outputs=('port',), name='puertos',
+@transform(input='ip', outputs=('port',), name='ports',
            description='Open ports and services (nmap top-20)')
-def _t_puertos(entidad, ctx):
+def _t_puertos(entity, ctx):
     if not _which('nmap'):
         return
-    out = run_tool(['nmap', '-T4', '--top-ports', '20', '-sV', '--open', entidad.value], timeout=60)
+    out = run_tool(['nmap', '-T4', '--top-ports', '20', '-sV', '--open', entity.value], timeout=60)
     for linea in out.splitlines():
         if '/tcp' not in linea and '/udp' not in linea:
             continue
@@ -2289,12 +2289,12 @@ def _t_puertos(entidad, ctx):
             continue
         service = parts[2] if len(parts) > 2 else '?'
         # the value carries the IP: port 80 of two hosts != the same node
-        ctx.emit('port', f'{entidad.value}:{num}', label='open', service=service)
+        ctx.emit('port', f'{entity.value}:{num}', label='open', service=service)
 
 @transform(input='domain', outputs=('domain',), name='dns_mx',
            description='Mail servers of the domain (MX)')
-def _t_dns_mx(entidad, ctx):
-    out = run_tool(['dig', entidad.value, 'MX', '+short'], timeout=10)
+def _t_dns_mx(entity, ctx):
+    out = run_tool(['dig', entity.value, 'MX', '+short'], timeout=10)
     for linea in out.splitlines():
         linea = linea.strip().rstrip('.')
         if not linea:
@@ -2305,8 +2305,8 @@ def _t_dns_mx(entidad, ctx):
 
 @transform(input='domain', outputs=('domain',), name='dns_ns',
            description='Name servers of the domain (NS)')
-def _t_dns_ns(entidad, ctx):
-    out = run_tool(['dig', entidad.value, 'NS', '+short'], timeout=10)
+def _t_dns_ns(entity, ctx):
+    out = run_tool(['dig', entity.value, 'NS', '+short'], timeout=10)
     for linea in out.splitlines():
         host = linea.strip().rstrip('.')
         if host:
@@ -2314,11 +2314,11 @@ def _t_dns_ns(entidad, ctx):
 
 @transform(input='email', outputs=('org',), name='email_breaches',
            description='Breaches the email appeared in (HIBP; requires a real HIBP_API_KEY)')
-def _t_email_breaches(entidad, ctx):
+def _t_email_breaches(entity, ctx):
     try:
         hibp_key = _rotating_key('hibp') or os.environ.get('HIBP_API_KEY', '')
         r = SESSION.get(
-            f'https://haveibeenpwned.com/api/v3/breachedaccount/{requests.utils.quote(entidad.value)}',
+            f'https://haveibeenpwned.com/api/v3/breachedaccount/{requests.utils.quote(entity.value)}',
             timeout=8,
             headers={'hibp-api-key': hibp_key, 'User-Agent': 'OBSIDIAN-OSINT'})
         if r.status_code == 200:
@@ -2326,11 +2326,11 @@ def _t_email_breaches(entidad, ctx):
                 name = b.get('Name')
                 if name:
                     ctx.emit('org', name, label='leaked in')
-            entidad.tag('leaked')
+            entity.tag('leaked')
     except Exception as _e:
         log.debug("hibp unavailable: %s", _e)
 
-def _pastes_github(entidad):
+def _pastes_github(entity):
     """Target mentions + secret indicators in public GitHub code (where credentials
     really leak). psbdmp is dead; this is the real path, but it needs a free
     GitHub token (in the vault)."""
@@ -2339,31 +2339,31 @@ def _pastes_github(entidad):
         return
     try:
         d = SESSION.get('https://api.github.com/search/code',
-                        params={'q': f'"{entidad.value}" (password OR secret OR api_key OR token)', 'per_page': 10},
+                        params={'q': f'"{entity.value}" (password OR secret OR api_key OR token)', 'per_page': 10},
                         headers={'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json'},
                         timeout=12).json()
         n = d.get('total_count')
         if n:
-            entidad.properties['github_mentions'] = n
-            entidad.tag('github-mentioned')
+            entity.properties['github_mentions'] = n
+            entity.tag('github-mentioned')
     except Exception as _e:
         log.debug("pastes_github unavailable: %s", _e)
 
 @transform(input='domain', outputs=(), name='pastes_github',
            description='Domain mentions + secrets on GitHub (free token in the vault)')
-def _t_pastes_github_dom(entidad, ctx):
-    _pastes_github(entidad)
+def _t_pastes_github_dom(entity, ctx):
+    _pastes_github(entity)
 
 @transform(input='email', outputs=(), name='pastes_github_email',
            description='Email mentions in public GitHub code (free token in the vault)')
-def _t_pastes_github_email(entidad, ctx):
-    _pastes_github(entidad)
+def _t_pastes_github_email(entity, ctx):
+    _pastes_github(entity)
 
 @transform(input='email', outputs=('org',), name='breaches_xon',
            description='Breaches the email appeared in (XposedOrNot, keyless)')
-def _t_breaches_xon(entidad, ctx):
+def _t_breaches_xon(entity, ctx):
     try:
-        r = SESSION.get(f'https://api.xposedornot.com/v1/check-email/{requests.utils.quote(entidad.value)}',
+        r = SESSION.get(f'https://api.xposedornot.com/v1/check-email/{requests.utils.quote(entity.value)}',
                         timeout=10)
         if r.status_code != 200:
             return
@@ -2373,27 +2373,27 @@ def _t_breaches_xon(entidad, ctx):
             if name:
                 ctx.emit('org', str(name), label='leaked in')
         if lista:
-            entidad.tag('leaked')
+            entity.tag('leaked')
     except Exception as _e:
         log.debug("xposedornot unavailable: %s", _e)
 
 @transform(input='email', outputs=(), name='stealer_hudsonrock',
            description='Did the email come from an infostealer-infected machine? (HudsonRock, keyless)')
-def _t_stealer(entidad, ctx):
+def _t_stealer(entity, ctx):
     try:
         r = SESSION.get('https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email',
-                        params={'email': entidad.value}, timeout=10)
+                        params={'email': entity.value}, timeout=10)
         msg = (r.json() or {}).get('message', '')
         if 'infected by an info-stealer' in msg:
-            entidad.tag('stealer-infected')
-            entidad.properties['stealer'] = 'yes (HudsonRock)'
+            entity.tag('stealer-infected')
+            entity.properties['stealer'] = 'yes (HudsonRock)'
     except Exception as _e:
         log.debug("hudsonrock unavailable: %s", _e)
 
 @transform(input='email', outputs=('org',), name='breaches',
            description='Breach aggregator: XposedOrNot + LeakCheck (keyless) + HIBP (if key), unified (F10 step 135)')
-def _t_breaches(entidad, ctx):
-    email = entidad.value
+def _t_breaches(entity, ctx):
+    email = entity.value
     fuentes = set()
     try:                                             # XposedOrNot (keyless)
         d = SESSION.get(f'https://api.xposedornot.com/v1/check-email/{email}', timeout=10).json() or {}
@@ -2421,21 +2421,21 @@ def _t_breaches(entidad, ctx):
         except Exception as _e:
             log.debug("breaches hibp: %s", _e)
     if fuentes:
-        entidad.tag('leaked')
-        entidad.properties['breaches'] = sorted(fuentes)
+        entity.tag('leaked')
+        entity.properties['breaches'] = sorted(fuentes)
         for f in sorted(fuentes)[:30]:
             ctx.emit('org', f, label='breach')
 
 @transform(input='email', outputs=('url',), name='intelx', requires_key=True,
            description='Historical leak search by selector (Intelligence X, key in vault) (F10 step 134)')
-def _t_intelx(entidad, ctx):
+def _t_intelx(entity, ctx):
     key = _rotating_key('intelx') or os.environ.get('INTELX_KEY', '')
     if not key:
         return
     try:
         sid = (SESSION.post('https://2.intelx.io/intelligent/search',
                             headers={'x-key': key, 'Content-Type': 'application/json'},
-                            json={'term': entidad.value, 'maxresults': 20, 'media': 0,
+                            json={'term': entity.value, 'maxresults': 20, 'media': 0,
                                   'sort': 2, 'terminate': []}, timeout=12).json() or {}).get('id')
         if not sid:
             return
@@ -2452,15 +2452,15 @@ def _t_intelx(entidad, ctx):
 
 @transform(input='email', outputs=('url',), name='pastes',
            description='Paste monitoring: psbdmp + dorks to Pastebin/Ghostbin/etc (keyless) (F10 step 133)')
-def _t_pastes(entidad, ctx):
+def _t_pastes(entity, ctx):
     from urllib.parse import quote as _q
-    q = entidad.value
+    q = entity.value
     try:
         d = SESSION.get(f'https://psbdmp.ws/api/v3/search/{_q(q)}', timeout=8).json() or {}
         for p in (d.get('data') or [])[:10]:
             pid = p.get('id')
             if pid:
-                ctx.emit('url', f'https://pastebin.com/{pid}', label='paste', fuente='psbdmp')
+                ctx.emit('url', f'https://pastebin.com/{pid}', label='paste', source='psbdmp')
     except Exception as _e:
         log.debug("psbdmp unavailable: %s", _e)
     for sitio in ('pastebin.com', 'ghostbin.com', 'rentry.co', 'justpaste.it'):
@@ -2469,10 +2469,10 @@ def _t_pastes(entidad, ctx):
 
 @transform(input='domain', outputs=(), name='stealer_domain',
            description='Domain exposure in stealer logs (infected employees/users, HudsonRock keyless) (F10 step 132)')
-def _t_stealer_domain(entidad, ctx):
+def _t_stealer_domain(entity, ctx):
     try:
         d = SESSION.get('https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-domain',
-                        params={'domain': entidad.value}, timeout=10).json() or {}
+                        params={'domain': entity.value}, timeout=10).json() or {}
         data = d.get('data', d) or {}
         emp = data.get('employees') or data.get('total_employees') or 0
         usr = data.get('users') or data.get('total_users') or 0
@@ -2481,28 +2481,28 @@ def _t_stealer_domain(entidad, ctx):
         if isinstance(usr, dict):
             usr = usr.get('total', 0)
         if emp or usr:
-            entidad.properties['stealer_employees'] = emp
-            entidad.properties['stealer_users'] = usr
-            entidad.tag('stealer-exposed')
+            entity.properties['stealer_employees'] = emp
+            entity.properties['stealer_users'] = usr
+            entity.tag('stealer-exposed')
     except Exception as _e:
         log.debug("stealer_dominio unavailable: %s", _e)
 
 @transform(input='email', outputs=(), name='email_spoofable',
            description='Checks the SPF of the email domain (spoofing risk)')
-def _t_email_spoofable(entidad, ctx):
-    dominio = entidad.value.split('@')[-1]
-    if not dominio:
+def _t_email_spoofable(entity, ctx):
+    domain = entity.value.split('@')[-1]
+    if not domain:
         return
-    txt = run_tool(['dig', dominio, 'TXT', '+short'], timeout=10)
+    txt = run_tool(['dig', domain, 'TXT', '+short'], timeout=10)
     tiene_spf = 'v=spf1' in txt.lower()
-    entidad.properties['spf'] = 'configured' if tiene_spf else 'NOT CONFIGURED'
+    entity.properties['spf'] = 'configured' if tiene_spf else 'NOT CONFIGURED'
     if not tiene_spf:
-        entidad.tag('spoofable')
+        entity.tag('spoofable')
 
-def _screenshot(entidad):
+def _screenshot(entity):
     """Web capture with a headless browser (step 68). Does not capture internal
     hosts (_public_url). Saves the PNG in static and leaves the URL as a prop."""
-    if not _public_url('https://' + entidad.value):
+    if not _public_url('https://' + entity.value):
         return
     try:
         from playwright.sync_api import sync_playwright
@@ -2511,94 +2511,94 @@ def _screenshot(entidad):
         return
     shots = os.path.join(STATIC_DIR, 'screenshots')
     os.makedirs(shots, exist_ok=True)
-    archivo = hashlib.md5(entidad.value.encode()).hexdigest()[:12] + '.png'
+    archivo = hashlib.md5(entity.value.encode()).hexdigest()[:12] + '.png'
     try:
         with sync_playwright() as p:
             navegador = p.chromium.launch(headless=True)
             pagina = navegador.new_page(viewport={'width': 1280, 'height': 800})
-            pagina.goto('https://' + entidad.value, timeout=15000, wait_until='domcontentloaded')
+            pagina.goto('https://' + entity.value, timeout=15000, wait_until='domcontentloaded')
             pagina.screenshot(path=os.path.join(shots, archivo))
             navegador.close()
-        entidad.properties['screenshot'] = '/static/screenshots/' + archivo
-        entidad.tag('has-screenshot')
+        entity.properties['screenshot'] = '/static/screenshots/' + archivo
+        entity.tag('has-screenshot')
     except Exception as _e:
         log.debug("screenshot failed: %s", _e)
 
 @transform(input='domain', outputs=(), name='screenshot',
            description='Screenshot of the site (headless browser)')
-def _t_screenshot_dom(entidad, ctx):
-    _screenshot(entidad)
+def _t_screenshot_dom(entity, ctx):
+    _screenshot(entity)
 
 @transform(input='subdomain', outputs=(), name='screenshot_sub',
            description='Screenshot of the subdomain (headless)')
-def _t_screenshot_sub(entidad, ctx):
-    _screenshot(entidad)
+def _t_screenshot_sub(entity, ctx):
+    _screenshot(entity)
 
-def _nuclei(entidad):
+def _nuclei(entity):
     """Vulnerability scan with nuclei templates (step 69). Public hosts only.
     Runs via run_tool (argv, no shell); medium+ severity so it does not drag on."""
-    if not _which('nuclei') or not _public_url('https://' + entidad.value):
+    if not _which('nuclei') or not _public_url('https://' + entity.value):
         return
-    out = run_tool(['nuclei', '-u', 'https://' + entidad.value, '-jsonl', '-silent',
+    out = run_tool(['nuclei', '-u', 'https://' + entity.value, '-jsonl', '-silent',
                     '-severity', 'medium,high,critical', '-timeout', '5'], timeout=150)
-    hallados = []
+    found = []
     for linea in out.splitlines():
         try:
             j = json.loads(linea)
         except Exception:
             continue
         info = j.get('info', {}) or {}
-        hallados.append({'id': j.get('template-id'), 'sev': info.get('severity'), 'name': info.get('name')})
+        found.append({'id': j.get('template-id'), 'sev': info.get('severity'), 'name': info.get('name')})
         if info.get('severity') in ('high', 'critical'):
-            entidad.tag('vulnerable')
-    if hallados:
-        entidad.properties['nuclei'] = hallados[:20]
+            entity.tag('vulnerable')
+    if found:
+        entity.properties['nuclei'] = found[:20]
 
 @transform(input='domain', outputs=(), name='nuclei',
            description='Template-based vulnerability scan (nuclei)')
-def _t_nuclei_dom(entidad, ctx):
-    _nuclei(entidad)
+def _t_nuclei_dom(entity, ctx):
+    _nuclei(entity)
 
 @transform(input='subdomain', outputs=(), name='nuclei_sub',
            description='Subdomain vulnerability scan (nuclei)')
-def _t_nuclei_sub(entidad, ctx):
-    _nuclei(entidad)
+def _t_nuclei_sub(entity, ctx):
+    _nuclei(entity)
 
-def _http_probe(entidad):
+def _http_probe(entity):
     """Probes a host over HTTP and enriches the entity. Uses _fetch_seguro:
     does not probe internal IPs (SSRF) and revalidates redirects."""
     try:
-        r = _fetch_seguro(entidad.value, timeout=8, stream=False)
+        r = _fetch_seguro(entity.value, timeout=8, stream=False)
     except Exception:
         return
-    entidad.properties['http_status'] = r.status_code
-    entidad.properties['http_server'] = r.headers.get('Server', '?')
+    entity.properties['http_status'] = r.status_code
+    entity.properties['http_server'] = r.headers.get('Server', '?')
     powered = r.headers.get('X-Powered-By')
     if powered:
-        entidad.properties['http_tech'] = powered
+        entity.properties['http_tech'] = powered
     try:
         m = re.search(r'<title[^>]*>(.*?)</title>', r.text[:8000], re.I | re.S)
         if m:
-            entidad.properties['http_title'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
+            entity.properties['http_title'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
     except Exception:
         pass
-    if str(r.url).rstrip('/') not in (f'https://{entidad.value}', f'http://{entidad.value}'):
-        entidad.properties['http_redirect'] = str(r.url)
-    entidad.tag('http-live')
+    if str(r.url).rstrip('/') not in (f'https://{entity.value}', f'http://{entity.value}'):
+        entity.properties['http_redirect'] = str(r.url)
+    entity.tag('http-live')
     # login/admin panel detection (step 56)
     cuerpo = (r.text[:8000] or '').lower()
-    titulo = (entidad.properties.get('http_title', '') or '').lower()
+    titulo = (entity.properties.get('http_title', '') or '').lower()
     signals = ('login', 'log in', 'sign in', 'iniciar sesión', 'admin', 'dashboard',
                'wp-admin', 'phpmyadmin', 'authentication', 'panel')
     if (any(s in titulo for s in signals)
             or 'type="password"' in cuerpo or "type='password'" in cuerpo):
-        entidad.tag('login-panel')
+        entity.tag('login-panel')
 
-def _tech_detect(entidad):
+def _tech_detect(entity):
     """Lightweight technology fingerprint from the HTTP response (server,
     powered-by, meta generator, common hints). Not Wappalyzer, but it works."""
     try:
-        r = _fetch_seguro(entidad.value, timeout=8, stream=False)
+        r = _fetch_seguro(entity.value, timeout=8, stream=False)
     except Exception:
         return set()
     techs = set()
@@ -2621,20 +2621,20 @@ def _tech_detect(entidad):
 
 @transform(input='domain', outputs=('tech',), name='tech',
            description='Technologies the site uses (HTTP fingerprint)')
-def _t_tech_dom(entidad, ctx):
-    for t in _tech_detect(entidad):
+def _t_tech_dom(entity, ctx):
+    for t in _tech_detect(entity):
         ctx.emit('tech', t, label='uses')
 
 @transform(input='subdomain', outputs=('tech',), name='tech_sub',
            description='Subdomain technologies (HTTP fingerprint)')
-def _t_tech_sub(entidad, ctx):
-    for t in _tech_detect(entidad):
+def _t_tech_sub(entity, ctx):
+    for t in _tech_detect(entity):
         ctx.emit('tech', t, label='uses')
 
 @transform(input='tech', outputs=('cve',), name='cve_lookup',
            description='Critical CVEs associated with the technology (NVD). NO version -> verify applicability')
-def _t_cve_lookup(entidad, ctx):
-    kw = entidad.value
+def _t_cve_lookup(entity, ctx):
+    kw = entity.value
     try:
         d = SESSION.get('https://services.nvd.nist.gov/rest/json/cves/2.0',
                         params={'keywordSearch': kw, 'cvssV3Severity': 'CRITICAL', 'resultsPerPage': 8},
@@ -2657,11 +2657,11 @@ def _t_cve_lookup(entidad, ctx):
 
 @transform(input='tech', outputs=(), name='eol',
            description='End-of-life status of the technology (endoflife.date, keyless) (F16 step 179)')
-def _t_eol(entidad, ctx):
+def _t_eol(entity, ctx):
     """Is this software past its support window? EOL = no security patches = risk.
     Flags 'eol' only when a known version falls in an EOL cycle, or when even the
     newest release is already EOL -- honest, no false positives."""
-    slug = re.sub(r'[^a-z0-9.+-]', '', (entidad.value or '').lower().split(' ')[0])
+    slug = re.sub(r'[^a-z0-9.+-]', '', (entity.value or '').lower().split(' ')[0])
     if not slug:
         return
     try:
@@ -2674,46 +2674,46 @@ def _t_eol(entidad, ctx):
         return
     if not isinstance(cycles, list) or not cycles:
         return
-    entidad.properties['eol_tracked'] = True
-    hoy = datetime.date.today().isoformat()
+    entity.properties['eol_tracked'] = True
+    today = datetime.date.today().isoformat()
     def _es_eol(c):
         e = c.get('eol')
-        return e is True or (isinstance(e, str) and e < hoy)
-    ver = str(entidad.properties.get('version', '')).strip()
+        return e is True or (isinstance(e, str) and e < today)
+    ver = str(entity.properties.get('version', '')).strip()
     if ver:
         for c in cycles:
             if ver.startswith(str(c.get('cycle', '\0'))):
                 if _es_eol(c):
-                    entidad.tag('eol')
-                    entidad.properties['eol_since'] = c.get('eol')
+                    entity.tag('eol')
+                    entity.properties['eol_since'] = c.get('eol')
                 return
     if _es_eol(cycles[0]):          # no version: only flag if even the newest is EOL
-        entidad.tag('eol')
-        entidad.properties['eol_since'] = cycles[0].get('eol')
+        entity.tag('eol')
+        entity.properties['eol_since'] = cycles[0].get('eol')
 
 @transform(input='email', outputs=(), name='comb',
            description='Email in the COMB compilation -- breach count (ProxyNova, keyless) (F16 step 180)')
-def _t_comb(entidad, ctx):
+def _t_comb(entity, ctx):
     """Does the email appear in the COMB (Compilation of Many Breaches)? Stores only
     the COUNT and tags 'leaked' -- deliberately NOT the plaintext passwords."""
     try:
         d = SESSION.get('https://api.proxynova.com/comb',
-                        params={'query': entidad.value, 'limit': 25}, timeout=10).json() or {}
+                        params={'query': entity.value, 'limit': 25}, timeout=10).json() or {}
     except Exception as _e:
         log.debug("comb unavailable: %s", _e)
         return
     lines = d.get('lines') or []
-    hits = [l for l in lines if str(l).lower().startswith(entidad.value.lower() + ':')]
+    hits = [l for l in lines if str(l).lower().startswith(entity.value.lower() + ':')]
     if hits:
-        entidad.tag('leaked')                    # reuses the r_email_leaked correlation rule
-        entidad.properties['comb_count'] = d.get('count', len(hits))
+        entity.tag('leaked')                    # reuses the r_email_leaked correlation rule
+        entity.properties['comb_count'] = d.get('count', len(hits))
 
 @transform(input='email', outputs=('person', 'url'), name='gravatar',
            description='Public Gravatar profile of the email: name + linked accounts (keyless) (F16 step 181)')
-def _t_gravatar(entidad, ctx):
+def _t_gravatar(entity, ctx):
     """If the email has a public Gravatar profile, pull the name and linked social
     accounts -- a strong identity pivot. 404 = no profile = clean no-op."""
-    h = hashlib.md5(entidad.value.strip().lower().encode()).hexdigest()
+    h = hashlib.md5(entity.value.strip().lower().encode()).hexdigest()
     try:
         r = SESSION.get(f'https://gravatar.com/{h}.json', timeout=8, headers={'User-Agent': 'OBSIDIAN'})
         if r.status_code != 200:
@@ -2725,7 +2725,7 @@ def _t_gravatar(entidad, ctx):
     name = (prof.get('displayName') or (prof.get('name') or {}).get('formatted') or '').strip()
     if name:
         ctx.emit('person', name, label='gravatar')
-        entidad.tag('has-gravatar')
+        entity.tag('has-gravatar')
     for acc in prof.get('accounts', [])[:15]:
         if acc.get('url'):
             ctx.emit('url', acc['url'], label='account:' + (acc.get('shortname') or acc.get('domain') or '?'))
@@ -2735,9 +2735,9 @@ def _t_gravatar(entidad, ctx):
 
 @transform(input='ip', outputs=('org',), name='ip_rdap',
            description='Network owner + abuse contact of the IP (RDAP, keyless) (F16 step 182)')
-def _t_ip_rdap(entidad, ctx):
+def _t_ip_rdap(entity, ctx):
     try:
-        r = SESSION.get(f'https://rdap.org/ip/{entidad.value}', timeout=12,
+        r = SESSION.get(f'https://rdap.org/ip/{entity.value}', timeout=12,
                         headers={'Accept': 'application/rdap+json'})
         if r.status_code != 200:
             return
@@ -2746,9 +2746,9 @@ def _t_ip_rdap(entidad, ctx):
         log.debug("ip_rdap unavailable: %s", _e)
         return
     if d.get('name'):
-        entidad.properties['net_name'] = d['name']
+        entity.properties['net_name'] = d['name']
     if d.get('startAddress') and d.get('endAddress'):
-        entidad.properties['net_range'] = f"{d['startAddress']}-{d['endAddress']}"
+        entity.properties['net_range'] = f"{d['startAddress']}-{d['endAddress']}"
     for ent in d.get('entities', []):
         roles = ent.get('roles') or []
         fn, vc = None, ent.get('vcardArray')
@@ -2759,80 +2759,80 @@ def _t_ip_rdap(entidad, ctx):
         if fn and 'registrant' in roles:
             ctx.emit('org', fn, label='net owner')
         if fn and 'abuse' in roles:
-            entidad.properties['abuse_contact'] = fn
+            entity.properties['abuse_contact'] = fn
 
 @transform(input='ip', outputs=('asn',), name='ripe_netinfo',
            description='Announcing ASN + prefix of the IP (RIPEstat, keyless) (F16 step 183)')
-def _t_ripe_netinfo(entidad, ctx):
+def _t_ripe_netinfo(entity, ctx):
     try:
         d = (SESSION.get('https://stat.ripe.net/data/network-info/data.json',
-                         params={'resource': entidad.value}, timeout=12).json() or {}).get('data', {})
+                         params={'resource': entity.value}, timeout=12).json() or {}).get('data', {})
     except Exception as _e:
         log.debug("ripestat unavailable: %s", _e)
         return
     if d.get('prefix'):
-        entidad.properties['prefix'] = d['prefix']
+        entity.properties['prefix'] = d['prefix']
     for asn in (d.get('asns') or [])[:5]:
         ctx.emit('asn', f'AS{asn}', label='announces')
 
 @transform(input='domain', outputs=('domain',), name='dnstwister',
            description='Registered typosquats via DNSTwister permutations (keyless) (F16 step 184)')
-def _t_dnstwister(entidad, ctx):
-    hexdom = entidad.value.encode().hex()
+def _t_dnstwister(entity, ctx):
+    hexdom = entity.value.encode().hex()
     try:
         d = SESSION.get(f'https://dnstwister.report/api/fuzz/{hexdom}', timeout=12).json() or {}
     except Exception as _e:
         log.debug("dnstwister unavailable: %s", _e)
         return
     perms = [f['domain'] for f in d.get('fuzzy_domains', [])
-             if f.get('domain') and f['domain'] != entidad.value][:40]
-    registrados, lock = {}, threading.Lock()
+             if f.get('domain') and f['domain'] != entity.value][:40]
+    registered, lock = {}, threading.Lock()
     def _chk(dom):
         out = run_tool(['dig', dom, 'A', '+short'], timeout=4)
         ip = next((l.strip() for l in out.splitlines()
                    if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', l.strip())), None)
         if ip:
             with lock:
-                registrados[dom] = ip
+                registered[dom] = ip
     ths = [threading.Thread(target=_chk, args=(p,)) for p in perms]
     for t in ths: t.start()
     for t in ths: t.join(timeout=8)
-    for dom, ip in registrados.items():
+    for dom, ip in registered.items():
         e = ctx.emit('domain', dom, label='typosquat', resolves=ip)
         if e:
             e.tag('typosquat')
 
 @transform(input='domain', outputs=(), name='http_probe',
            description='HTTP probe: status, title, server, redirect (httpx-style)')
-def _t_http_probe_dom(entidad, ctx):
-    _http_probe(entidad)
+def _t_http_probe_dom(entity, ctx):
+    _http_probe(entity)
 
 @transform(input='subdomain', outputs=(), name='http_probe_sub',
            description='HTTP probe of the subdomain (httpx-style)')
-def _t_http_probe_sub(entidad, ctx):
-    _http_probe(entidad)
+def _t_http_probe_sub(entity, ctx):
+    _http_probe(entity)
 
 @transform(input='domain', outputs=('domain',), name='reverse_whois',
            description='Other domains of the same registrant (ViewDNS, free key in the vault). The only F5 one without a keyless option.')
-def _t_reverse_whois(entidad, ctx):
+def _t_reverse_whois(entity, ctx):
     key = _rotating_key('viewdns') or os.environ.get('VIEWDNS_KEY', '')
     if not key:
         return
     try:
         d = SESSION.get('https://api.viewdns.info/reversewhois/',
-                        params={'q': entidad.value, 'apikey': key, 'output': 'json'}, timeout=12).json()
+                        params={'q': entity.value, 'apikey': key, 'output': 'json'}, timeout=12).json()
         for reg in (d.get('response', {}) or {}).get('matches', [])[:50]:
             dom = reg.get('domain')
-            if dom and dom != entidad.value:
+            if dom and dom != entity.value:
                 ctx.emit('domain', dom, label='same registrant')
     except Exception as _e:
         log.debug("reverse_whois unavailable: %s", _e)
 
 @transform(input='domain', outputs=('domain', 'org'), name='rdap',
            description='Modern WHOIS (RDAP, no key): registrar, name servers, dates')
-def _t_rdap(entidad, ctx):
+def _t_rdap(entity, ctx):
     try:
-        r = SESSION.get(f'https://rdap.org/domain/{entidad.value}', timeout=12,
+        r = SESSION.get(f'https://rdap.org/domain/{entity.value}', timeout=12,
                         headers={'Accept': 'application/rdap+json'})
         if r.status_code != 200:
             return
@@ -2851,61 +2851,61 @@ def _t_rdap(entidad, ctx):
                 ctx.emit('domain', ns['ldhName'], label='NS')
         fechas = {e.get('eventAction'): (e.get('eventDate') or '')[:10] for e in d.get('events', [])}
         if fechas.get('registration'):
-            entidad.properties['created'] = fechas['registration']
+            entity.properties['created'] = fechas['registration']
         if fechas.get('expiration'):
-            entidad.properties['expira'] = fechas['expiration']
+            entity.properties['expira'] = fechas['expiration']
         if d.get('status'):
-            entidad.properties['status'] = d['status']
+            entity.properties['status'] = d['status']
     except Exception as _e:
         log.debug("rdap unavailable: %s", _e)
 
 @transform(input='ip', outputs=(), name='reputacion_ip',
            description='IP reputation: proxy/VPN, hosting/datacenter, mobile (ip-api, keyless)')
-def _t_reputacion_ip(entidad, ctx):
+def _t_reputacion_ip(entity, ctx):
     try:
-        d = SESSION.get(f'http://ip-api.com/json/{entidad.value}?fields=status,proxy,hosting,mobile',
+        d = SESSION.get(f'http://ip-api.com/json/{entity.value}?fields=status,proxy,hosting,mobile',
                         timeout=8).json()
         if d.get('status') != 'success':
             return
         if d.get('proxy'):
-            entidad.tag('proxy-vpn')
+            entity.tag('proxy-vpn')
         if d.get('hosting'):
-            entidad.tag('hosting')
+            entity.tag('hosting')
         if d.get('mobile'):
-            entidad.tag('mobile')
-        entidad.properties['proxy'] = bool(d.get('proxy'))
-        entidad.properties['hosting'] = bool(d.get('hosting'))
+            entity.tag('mobile')
+        entity.properties['proxy'] = bool(d.get('proxy'))
+        entity.properties['hosting'] = bool(d.get('hosting'))
     except Exception as _e:
         log.debug("reputacion_ip unavailable: %s", _e)
 
 @transform(input='ip', outputs=(), name='abuseipdb',
            description='Abuse score of the IP (AbuseIPDB, free key in the vault)')
-def _t_abuseipdb(entidad, ctx):
+def _t_abuseipdb(entity, ctx):
     key = _rotating_key('abuseipdb') or os.environ.get('ABUSEIPDB_KEY', '')
     if not key:
         return
     try:
         r = SESSION.get('https://api.abuseipdb.com/api/v2/check',
-                        params={'ipAddress': entidad.value, 'maxAgeInDays': 90},
+                        params={'ipAddress': entity.value, 'maxAgeInDays': 90},
                         headers={'Key': key, 'Accept': 'application/json'}, timeout=8)
         d = (r.json() or {}).get('data', {}) or {}
         score = d.get('abuseConfidenceScore')
         if score is not None:
-            entidad.properties['abuse_score'] = score
+            entity.properties['abuse_score'] = score
             if score >= 50:
-                entidad.tag('abusive')
+                entity.tag('abusive')
     except Exception as _e:
         log.debug("abuseipdb unavailable: %s", _e)
 
 @transform(input='ip', outputs=('port', 'org', 'tech'), name='shodan',
            requires_key=True,
            description='Ports/services/org of the IP (Shodan, key in the vault)')
-def _t_shodan(entidad, ctx):
+def _t_shodan(entity, ctx):
     key = _rotating_key('shodan') or os.environ.get('SHODAN_API_KEY', '')
     if not key:
         return
     try:
-        r = SESSION.get(f'https://api.shodan.io/shodan/host/{entidad.value}',
+        r = SESSION.get(f'https://api.shodan.io/shodan/host/{entity.value}',
                         params={'key': key}, timeout=12)
         d = r.json() or {}
         if d.get('org'):
@@ -2914,7 +2914,7 @@ def _t_shodan(entidad, ctx):
         for serv in d.get('data', []):
             port = serv.get('port')
             if port:
-                ctx.emit('port', f'{entidad.value}:{port}', label='shodan',
+                ctx.emit('port', f'{entity.value}:{port}', label='shodan',
                            service=serv.get('_shodan', {}).get('module') or serv.get('product', ''))
             prod = serv.get('product')
             if prod and prod not in vistos_prod:
@@ -2926,13 +2926,13 @@ def _t_shodan(entidad, ctx):
 @transform(input='ip', outputs=('port', 'org', 'tech', 'asn'), name='censys',
            requires_key=True,
            description='Services of the IP (Censys, key "id:secret" in the vault)')
-def _t_censys(entidad, ctx):
+def _t_censys(entity, ctx):
     cred = _rotating_key('censys') or os.environ.get('CENSYS_API', '')
     if not cred or ':' not in cred:
         return
     cid, secret = cred.split(':', 1)
     try:
-        r = SESSION.get(f'https://search.censys.io/api/v2/hosts/{entidad.value}',
+        r = SESSION.get(f'https://search.censys.io/api/v2/hosts/{entity.value}',
                         auth=(cid, secret), timeout=12)
         res = (r.json() or {}).get('result', {}) or {}
         aut = res.get('autonomous_system', {}) or {}
@@ -2940,15 +2940,15 @@ def _t_censys(entidad, ctx):
             ctx.emit('org', aut['name'], label='censys')
         if aut.get('asn'):
             ctx.emit('asn', f"AS{aut['asn']}", label='censys')
-        vistos = set()
+        seen = set()
         for s in res.get('services', []):
             p = s.get('port')
             if p:
-                ctx.emit('port', f"{entidad.value}:{p}", label='censys',
+                ctx.emit('port', f"{entity.value}:{p}", label='censys',
                            service=s.get('service_name', ''))
             prod = s.get('service_name')
-            if prod and prod not in vistos:
-                vistos.add(prod)
+            if prod and prod not in seen:
+                seen.add(prod)
                 ctx.emit('tech', prod, label='censys')
     except Exception as _e:
         log.debug("censys unavailable: %s", _e)
@@ -2956,19 +2956,19 @@ def _t_censys(entidad, ctx):
 @transform(input='ip', outputs=('port', 'tech'), name='zoomeye',
            requires_key=True,
            description='Services of the IP in ZoomEye (CN engine, key in the vault)')
-def _t_zoomeye(entidad, ctx):
+def _t_zoomeye(entity, ctx):
     key = _rotating_key('zoomeye') or os.environ.get('ZOOMEYE_KEY', '')
     if not key:
         return
     try:
         r = SESSION.get('https://api.zoomeye.org/host/search',
-                        params={'query': _motor_query('zoomeye', {'ip': entidad.value})},
+                        params={'query': _motor_query('zoomeye', {'ip': entity.value})},
                         headers={'API-KEY': key}, timeout=12)
         for m in (r.json() or {}).get('matches', []):
             pi = m.get('portinfo', {}) or {}
             p = pi.get('port') or m.get('port')
             if p:
-                ctx.emit('port', f"{entidad.value}:{p}", label='zoomeye',
+                ctx.emit('port', f"{entity.value}:{p}", label='zoomeye',
                            service=pi.get('service', ''))
             app = pi.get('app')
             if app:
@@ -2979,12 +2979,12 @@ def _t_zoomeye(entidad, ctx):
 @transform(input='ip', outputs=('port', 'domain'), name='fofa',
            requires_key=True,
            description='Hosts/domains in FOFA (CN engine, key "email:key" in the vault)')
-def _t_fofa(entidad, ctx):
+def _t_fofa(entity, ctx):
     cred = _rotating_key('fofa') or os.environ.get('FOFA_KEY', '')
     if not cred or ':' not in cred:
         return
     email, key = cred.split(':', 1)
-    q = _motor_query('fofa', {'ip': entidad.value})
+    q = _motor_query('fofa', {'ip': entity.value})
     qb = base64.b64encode(q.encode()).decode()
     try:
         r = SESSION.get('https://fofa.info/api/v1/search/all',
@@ -2997,7 +2997,7 @@ def _t_fofa(entidad, ctx):
             port = row[1] if len(row) > 1 else None
             dom = row[2] if len(row) > 2 else None
             if port:
-                ctx.emit('port', f"{entidad.value}:{port}", label='fofa')
+                ctx.emit('port', f"{entity.value}:{port}", label='fofa')
             if dom:
                 ctx.emit('domain', dom, label='fofa')
     except Exception as _e:
@@ -3006,20 +3006,20 @@ def _t_fofa(entidad, ctx):
 @transform(input='ip', outputs=('port', 'tech'), name='quake',
            requires_key=True,
            description='Services of the IP in Quake/360 (CN engine, key in the vault)')
-def _t_quake(entidad, ctx):
+def _t_quake(entity, ctx):
     key = _rotating_key('quake') or os.environ.get('QUAKE_KEY', '')
     if not key:
         return
     try:
         r = SESSION.post('https://quake.360.net/api/v3/search/quake_service',
                          headers={'X-QuakeToken': key, 'Content-Type': 'application/json'},
-                         json={'query': _motor_query('quake', {'ip': entidad.value}), 'size': 50},
+                         json={'query': _motor_query('quake', {'ip': entity.value}), 'size': 50},
                          timeout=12)
         for m in (r.json() or {}).get('data', []):
             p = m.get('port')
             name = (m.get('service', {}) or {}).get('name')
             if p:
-                ctx.emit('port', f"{entidad.value}:{p}", label='quake', service=name or '')
+                ctx.emit('port', f"{entity.value}:{p}", label='quake', service=name or '')
             if name:
                 ctx.emit('tech', name, label='quake')
     except Exception as _e:
@@ -3028,18 +3028,18 @@ def _t_quake(entidad, ctx):
 @transform(input='ip', outputs=('port', 'domain'), name='hunter',
            requires_key=True,
            description='Hosts/domains in Hunter.how (CN engine, key in the vault)')
-def _t_hunter(entidad, ctx):
+def _t_hunter(entity, ctx):
     key = _rotating_key('hunter') or os.environ.get('HUNTER_KEY', '')
     if not key:
         return
-    q = base64.urlsafe_b64encode(_motor_query('hunter', {'ip': entidad.value}).encode()).decode()
+    q = base64.urlsafe_b64encode(_motor_query('hunter', {'ip': entity.value}).encode()).decode()
     try:
         r = SESSION.get('https://api.hunter.how/search',
                         params={'api-key': key, 'query': q, 'page': 1, 'page_size': 20}, timeout=12)
         for m in ((r.json() or {}).get('data', {}) or {}).get('list', []):
             p, dom = m.get('port'), m.get('domain')
             if p:
-                ctx.emit('port', f"{entidad.value}:{p}", label='hunter')
+                ctx.emit('port', f"{entity.value}:{p}", label='hunter')
             if dom:
                 ctx.emit('domain', dom, label='hunter')
     except Exception as _e:
@@ -3048,35 +3048,35 @@ def _t_hunter(entidad, ctx):
 @transform(input='ip', outputs=('port',), name='netlas',
            requires_key=True,
            description='Responses of the IP in Netlas (key in the vault)')
-def _t_netlas(entidad, ctx):
+def _t_netlas(entity, ctx):
     key = _rotating_key('netlas') or os.environ.get('NETLAS_KEY', '')
     if not key:
         return
     try:
         r = SESSION.get('https://app.netlas.io/api/responses/',
-                        params={'q': _motor_query('netlas', {'ip': entidad.value})},
+                        params={'q': _motor_query('netlas', {'ip': entity.value})},
                         headers={'X-API-Key': key}, timeout=12)
         for it in (r.json() or {}).get('items', []):
             p = (it.get('data', {}) or {}).get('port')
             if p:
-                ctx.emit('port', f"{entidad.value}:{p}", label='netlas')
+                ctx.emit('port', f"{entity.value}:{p}", label='netlas')
     except Exception as _e:
         log.debug("netlas unavailable: %s", _e)
 
 @transform(input='ip', outputs=('port',), name='criminalip',
            requires_key=True,
            description='Ports/exposure of the IP (Criminal IP, key in the vault)')
-def _t_criminalip(entidad, ctx):
+def _t_criminalip(entity, ctx):
     key = _rotating_key('criminalip') or os.environ.get('CRIMINALIP_KEY', '')
     if not key:
         return
     try:
         r = SESSION.get('https://api.criminalip.io/v1/asset/ip/report',
-                        params={'ip': entidad.value}, headers={'x-api-key': key}, timeout=12)
+                        params={'ip': entity.value}, headers={'x-api-key': key}, timeout=12)
         for p in ((r.json() or {}).get('port', {}) or {}).get('data', []) or []:
             num = p.get('open_port_no') or p.get('port')
             if num:
-                ctx.emit('port', f"{entidad.value}:{num}", label='criminalip',
+                ctx.emit('port', f"{entity.value}:{num}", label='criminalip',
                            service=p.get('app_name', ''))
     except Exception as _e:
         log.debug("criminalip unavailable: %s", _e)
@@ -3084,37 +3084,37 @@ def _t_criminalip(entidad, ctx):
 @transform(input='ip', outputs=('port',), name='binaryedge',
            requires_key=True,
            description='Exposed ports of the IP (BinaryEdge, key in the vault)')
-def _t_binaryedge(entidad, ctx):
+def _t_binaryedge(entity, ctx):
     key = _rotating_key('binaryedge') or os.environ.get('BINARYEDGE_KEY', '')
     if not key:
         return
     try:
-        r = SESSION.get(f'https://api.binaryedge.io/v2/query/ip/{entidad.value}',
+        r = SESSION.get(f'https://api.binaryedge.io/v2/query/ip/{entity.value}',
                         headers={'X-Key': key}, timeout=12)
         for ev in (r.json() or {}).get('events', []):
             p = ev.get('port')
             if p:
-                ctx.emit('port', f"{entidad.value}:{p}", label='binaryedge')
+                ctx.emit('port', f"{entity.value}:{p}", label='binaryedge')
     except Exception as _e:
         log.debug("binaryedge unavailable: %s", _e)
 
 @transform(input='url', outputs=('url',), name='reverse_image',
            description='Reverse image search in Yandex/Google/TinEye/Bing (F9, keyless)')
-def _t_reverse_image(entidad, ctx):
-    for motor, enlace in enlaces_reverse(entidad.value).items():
+def _t_reverse_image(entity, ctx):
+    for motor, enlace in enlaces_reverse(entity.value).items():
         ctx.emit('url', enlace, label=f'reverse:{motor}', engine=motor)
 
 @transform(input='url', outputs=('url',), name='facial_search',
            description='Facial recognition: Yandex (by URL) + FaceCheck/PimEyes (manual upload) (F9)')
-def _t_busqueda_facial(entidad, ctx):
-    for motor, info in enlaces_facial(entidad.value).items():
+def _t_busqueda_facial(entity, ctx):
+    for motor, info in enlaces_facial(entity.value).items():
         ctx.emit('url', info['url'], label=f'facial:{motor}', engine=motor, mode=info['modo'])
 
 @transform(input='phone', outputs=('url', 'country'), name='telefono_dorks',
            description='Phone search dorks (Truecaller/messaging) + carrier if key (F2 step 33)')
-def _t_phone_dorks(entidad, ctx):
+def _t_phone_dorks(entity, ctx):
     from urllib.parse import quote as _q
-    num = entidad.value
+    num = entity.value
     limpio = re.sub(r'[^\d+]', '', num)
     dorks = {
         'truecaller': f'{num} site:truecaller.com',
@@ -3131,8 +3131,8 @@ def _t_phone_dorks(entidad, ctx):
                             params={'access_key': key, 'number': limpio}, timeout=8)
             d = r.json() or {}
             if d.get('valid'):
-                entidad.properties['carrier'] = d.get('carrier', '')
-                entidad.properties['line_type'] = d.get('line_type', '')
+                entity.properties['carrier'] = d.get('carrier', '')
+                entity.properties['line_type'] = d.get('line_type', '')
                 if d.get('country_name'):
                     ctx.emit('country', d['country_name'], label='country')
         except Exception as _e:
@@ -3140,50 +3140,50 @@ def _t_phone_dorks(entidad, ctx):
 
 @transform(input='domain', outputs=('domain',), name='typosquatting',
            description='Typosquat variants of the domain that ARE registered (F2 step 34)')
-def _t_typosquatting(entidad, ctx):
-    dom = entidad.value
+def _t_typosquatting(entity, ctx):
+    dom = entity.value
     name, ext = dom.rsplit('.', 1) if '.' in dom else (dom, 'com')
-    variantes = set()
+    variants = set()
     subs = {'a': '4', 'e': '3', 'i': '1', 'o': '0', 's': '5', 'l': '1'}
     for i, c in enumerate(name):
         if c in subs:
-            variantes.add(f'{name[:i] + subs[c] + name[i+1:]}.{ext}')
+            variants.add(f'{name[:i] + subs[c] + name[i+1:]}.{ext}')
     teclado = {'q': 'w', 'w': 'e', 'e': 'r', 'r': 't', 't': 'y', 'a': 's', 's': 'd',
                'd': 'f', 'f': 'g', 'g': 'h', 'z': 'x', 'x': 'c', 'c': 'v', 'v': 'b'}
     for i, c in enumerate(name.lower()):
         if c in teclado:
-            variantes.add(f'{name[:i] + teclado[c] + name[i+1:]}.{ext}')
+            variants.add(f'{name[:i] + teclado[c] + name[i+1:]}.{ext}')
     for i in range(len(name)):
-        variantes.add(f'{name[:i] + name[i+1:]}.{ext}')
-        variantes.add(f'{name[:i] + name[i]*2 + name[i:]}.{ext}')
-    variantes.discard(dom)
-    registrados, lock = {}, threading.Lock()
+        variants.add(f'{name[:i] + name[i+1:]}.{ext}')
+        variants.add(f'{name[:i] + name[i]*2 + name[i:]}.{ext}')
+    variants.discard(dom)
+    registered, lock = {}, threading.Lock()
     def _chk(v):
         out = run_tool(['dig', v, 'A', '+short'], timeout=4)
         ip = next((l.strip() for l in out.splitlines()
                    if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', l.strip())), None)
         if ip:
             with lock:
-                registrados[v] = ip
-    ths = [threading.Thread(target=_chk, args=(v,)) for v in list(variantes)[:25]]
+                registered[v] = ip
+    ths = [threading.Thread(target=_chk, args=(v,)) for v in list(variants)[:25]]
     for t in ths:
         t.start()
     for t in ths:
         t.join(timeout=12)
-    for v, ip in registrados.items():
+    for v, ip in registered.items():
         d = ctx.emit('domain', v, label='typosquat', resuelve=ip)
         if d:
             d.tag('typosquat')
 
 @transform(input='org', outputs=('bucket',), name='buckets',
            description='Public S3/GCS/Azure buckets by organization name (F2 step 34)')
-def _t_buckets(entidad, ctx):
-    base = re.sub(r'[^a-z0-9-]', '', entidad.value.lower().replace(' ', '-').replace('_', '-'))
+def _t_buckets(entity, ctx):
+    base = re.sub(r'[^a-z0-9-]', '', entity.value.lower().replace(' ', '-').replace('_', '-'))
     if not base:
         return
-    variantes = [base, f'{base}-backup', f'{base}-dev', f'{base}-prod', f'{base}-staging',
+    variants = [base, f'{base}-backup', f'{base}-dev', f'{base}-prod', f'{base}-staging',
                  f'{base}-assets', f'{base}-media', f'backup-{base}', f'dev-{base}', f'assets-{base}']
-    hallados, lock = {}, threading.Lock()
+    found, lock = {}, threading.Lock()
     def _chk(bucket):
         for url in (f'https://{bucket}.s3.amazonaws.com',
                     f'https://storage.googleapis.com/{bucket}',
@@ -3192,16 +3192,16 @@ def _t_buckets(entidad, ctx):
                 r = SESSION.get(url, timeout=5)
                 if r.status_code in (200, 403):
                     with lock:
-                        hallados[bucket] = {'url': url, 'public': r.status_code == 200}
+                        found[bucket] = {'url': url, 'public': r.status_code == 200}
                     return
             except Exception:
                 pass
-    ths = [threading.Thread(target=_chk, args=(b,)) for b in variantes]
+    ths = [threading.Thread(target=_chk, args=(b,)) for b in variants]
     for t in ths:
         t.start()
     for t in ths:
         t.join(timeout=15)
-    for bucket, info in hallados.items():
+    for bucket, info in found.items():
         b = ctx.emit('bucket', bucket, label='bucket', url=info['url'], publico=info['public'])
         if b and info['public']:
             b.tag('public')
@@ -3216,8 +3216,8 @@ _TAKEOVER_FP = {
 
 @transform(input='domain', outputs=('subdomain',), name='takeover',
            description='Orphaned subdomains vulnerable to takeover (CNAME to abandoned service) (F2 step 34)')
-def _t_takeover(entidad, ctx):
-    dom = entidad.value
+def _t_takeover(entity, ctx):
+    dom = entity.value
     try:
         r = SESSION.get(f'https://crt.sh/?q=%.{dom}&output=json', timeout=12)
         subs = {s.strip().lstrip('*.') for cert in r.json()
@@ -3254,12 +3254,12 @@ def _t_takeover(entidad, ctx):
 
 @transform(input='domain', outputs=('ip',), name='passivedns', requires_key=True,
            description='IP history of the domain (Passive DNS via VirusTotal, key in the vault) (F2 step 34)')
-def _t_passivedns(entidad, ctx):
+def _t_passivedns(entity, ctx):
     key = _rotating_key('virustotal') or os.environ.get('VT_API_KEY', '')
     if not key:
         return
     try:
-        r = SESSION.get(f'https://www.virustotal.com/api/v3/domains/{entidad.value}/resolutions',
+        r = SESSION.get(f'https://www.virustotal.com/api/v3/domains/{entity.value}/resolutions',
                         headers={'x-apikey': key}, params={'limit': 20}, timeout=12)
         for item in (r.json() or {}).get('data', []):
             attr = item.get('attributes', {}) or {}
@@ -3283,8 +3283,8 @@ _SECRET_PATTERNS = [
 
 @transform(input='user', outputs=('credential', 'repo'), name='github_sec',
            description='Hardcoded secrets in commits of the user public repos (F4 step 60)')
-def _t_github_sec(entidad, ctx):
-    user = entidad.value
+def _t_github_sec(entity, ctx):
+    user = entity.value
     tok = _rotating_key('github') or os.environ.get('GITHUB_TOKEN', '')
     hdr = {'Authorization': f'token {tok}'} if tok else {}
     try:
@@ -3321,15 +3321,15 @@ def _t_github_sec(entidad, ctx):
 
 @transform(input='person', outputs=('url',), name='person',
            description='OSINT on a person: summary (DuckDuckGo) + dorks (LinkedIn/X/GitHub...) (keyless)')
-def _t_person(entidad, ctx):
+def _t_person(entity, ctx):
     from urllib.parse import quote as _q
-    name = entidad.value
+    name = entity.value
     try:
         d = SESSION.get(f'https://api.duckduckgo.com/?q={_q(name)}&format=json&no_html=1', timeout=8).json()
         if d.get('AbstractText'):
-            entidad.properties['summary'] = d['AbstractText'][:400]
+            entity.properties['summary'] = d['AbstractText'][:400]
     except Exception as _e:
-        log.debug("persona ddg: %s", _e)
+        log.debug("person ddg: %s", _e)
     dorks = {'linkedin': f'"{name}" site:linkedin.com',
              'x': f'"{name}" site:twitter.com OR site:x.com',
              'contact': f'"{name}" email OR phone OR address',
@@ -3341,10 +3341,10 @@ def _t_person(entidad, ctx):
 
 @transform(input='person', outputs=('url',), name='darkweb',
            description='Dark web search (Ahmia, clearnet .onion index, no Tor) (keyless)')
-def _t_darkweb(entidad, ctx):
+def _t_darkweb(entity, ctx):
     from urllib.parse import quote as _q
     try:
-        r = SESSION.get(f'https://ahmia.fi/search/?q={_q(entidad.value)}', timeout=12)
+        r = SESSION.get(f'https://ahmia.fi/search/?q={_q(entity.value)}', timeout=12)
         n = 0
         for m in re.finditer(r'<h4[^>]*><a href="([^"]+)"[^>]*>([^<]+)</a>', r.text, re.DOTALL):
             ctx.emit('url', m.group(1), label='onion', titulo=m.group(2).strip()[:80])
@@ -3356,20 +3356,20 @@ def _t_darkweb(entidad, ctx):
 
 @transform(input='url', outputs=(), name='url_check',
            description='URL reputation in URLhaus (abuse.ch, CC0, keyless)')
-def _t_url_check(entidad, ctx):
+def _t_url_check(entity, ctx):
     try:
         d = SESSION.post('https://urlhaus-api.abuse.ch/v1/url/',
-                         data={'url': entidad.value}, timeout=8).json() or {}
+                         data={'url': entity.value}, timeout=8).json() or {}
         if d.get('query_status') == 'ok':
-            entidad.properties['urlhaus'] = d.get('threat', 'listed')
-            entidad.tag('malicious-url')
+            entity.properties['urlhaus'] = d.get('threat', 'listed')
+            entity.tag('malicious-url')
     except Exception as _e:
         log.debug("url_check urlhaus: %s", _e)
 
 @transform(input='url', outputs=('email',), name='render_js',
            description='Renders the page with a headless browser (playwright): emails from the final DOM')
-def _t_render_js(entidad, ctx):
-    url = entidad.value
+def _t_render_js(entity, ctx):
+    url = entity.value
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
     if not _public_url(url):                    # anti-SSRF: do not render internal hosts
@@ -3383,7 +3383,7 @@ def _t_render_js(entidad, ctx):
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={'width': 1280, 'height': 900})
             page.goto(url, timeout=20000, wait_until='networkidle')
-            entidad.properties['render_title'] = page.title()
+            entity.properties['render_title'] = page.title()
             html_render = page.content()
             browser.close()
         for em in list(set(re.findall(
@@ -3394,17 +3394,17 @@ def _t_render_js(entidad, ctx):
 
 @transform(input='file', outputs=(), name='yara_bulk',
            description='Scans a folder with yara-rules (local only)')
-def _t_yara_bulk(entidad, ctx):
-    carpeta = entidad.value
-    if not os.path.isdir(carpeta) or not _which('yara-rules'):
+def _t_yara_bulk(entity, ctx):
+    folder = entity.value
+    if not os.path.isdir(folder) or not _which('yara-rules'):
         return
     archivos = []
-    for root, _dirs, files in os.walk(carpeta):
+    for root, _dirs, files in os.walk(folder):
         for f in files:
             archivos.append(os.path.join(root, f))
         if len(archivos) >= 200:
             break
-    hallazgos = []
+    findings = []
     for archivo in archivos[:200]:
         try:
             if os.path.getsize(archivo) > 50_000_000:
@@ -3415,20 +3415,20 @@ def _t_yara_bulk(entidad, ctx):
         except Exception:
             continue
         if salida and 'no rules matched' not in salida.lower():
-            hallazgos.append({'file': archivo, 'resultado': salida[:300]})
-            if len(hallazgos) >= 50:
+            findings.append({'file': archivo, 'result': salida[:300]})
+            if len(findings) >= 50:
                 break
-    if hallazgos:
-        entidad.properties['yara_hallazgos'] = hallazgos[:20]
-        entidad.tag('yara-match')
+    if findings:
+        entity.properties['yara_hallazgos'] = findings[:20]
+        entity.tag('yara-match')
 
 @transform(input='person', outputs=(), name='wordlist',
            description='Likely password wordlist from the case via AI (Ollama)')
-def _t_wordlist(entidad, ctx):
+def _t_wordlist(entity, ctx):
     if not ia.available():
         return
-    contexto = json.dumps(ctx.almacen.to_dict(), default=str)[:3000]
-    prompt = (f'From the OSINT of the target "{entidad.value}", generate a wordlist of '
+    contexto = json.dumps(ctx.store.to_dict(), default=str)[:3000]
+    prompt = (f'From the OSINT of the target "{entity.value}", generate a wordlist of '
               f'likely passwords: names, dates, organization, combinations (name+year, '
               f'name+123), leet speak. 30-50 entries, one per line, passwords only.\n\n'
               f'Data:\n{contexto}')
@@ -3437,32 +3437,32 @@ def _t_wordlist(entidad, ctx):
     except Exception as _e:
         log.debug("wordlist ia: %s", _e)
         return
-    palabras = [w.strip() for w in resp.split('\n') if len(w.strip()) >= 6][:50]
-    if not palabras:
+    words = [w.strip() for w in resp.split('\n') if len(w.strip()) >= 6][:50]
+    if not words:
         return
-    entidad.properties['wordlist'] = palabras
-    entidad.properties['wordlist_total'] = len(palabras)
+    entity.properties['wordlist'] = words
+    entity.properties['wordlist_total'] = len(words)
     try:
-        slug = _case_slug(entidad.value.lower()) or 'target'
+        slug = _case_slug(entity.value.lower()) or 'target'
         ruta = os.path.join(CASES_DIR, f'wordlist_{slug}.txt')
         with open(ruta, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(palabras))
-        entidad.properties['wordlist_file'] = ruta
+            f.write('\n'.join(words))
+        entity.properties['wordlist_file'] = ruta
     except Exception as _e:
         log.debug("wordlist save: %s", _e)
 
 @transform(input='url', outputs=('url',), name='chronolocation',
            description='Chronolocation by shadows: SunCalc/ShadowMap (Bellingcat technique) (F9 step 121)')
-def _t_cronolocalizacion(entidad, ctx):
-    coords = parse_gps(entidad.properties.get('gps', ''))
+def _t_cronolocalizacion(entity, ctx):
+    coords = parse_gps(entity.properties.get('gps', ''))
     enlaces = enlaces_cronolocalizacion(*(coords if coords else (None, None)))
     for herr, url in enlaces.items():
         ctx.emit('url', url, label=f'sun:{herr}', tool=herr)
 
 @transform(input='url', outputs=('url',), name='satelital',
            description='Satellite cross-check of the location (Google Earth/Sentinel/Bing) -- requires GPS (F9 step 122)')
-def _t_satelital(entidad, ctx):
-    coords = parse_gps(entidad.properties.get('gps', ''))
+def _t_satelital(entity, ctx):
+    coords = parse_gps(entity.properties.get('gps', ''))
     if not coords:
         return
     for herr, url in enlaces_satelital(*coords).items():
@@ -3470,17 +3470,17 @@ def _t_satelital(entidad, ctx):
 
 @transform(input='url', outputs=('url',), name='landmarks',
            description='Landmark matching by image (Google Lens/Mapillary/Wikimapia) (F9 step 123)')
-def _t_landmarks(entidad, ctx):
-    for herr, url in enlaces_landmark(entidad.value).items():
+def _t_landmarks(entity, ctx):
+    for herr, url in enlaces_landmark(entity.value).items():
         ctx.emit('url', url, label=f'landmark:{herr}', tool=herr)
 
 @transform(input='url', outputs=(), name='ocr',
            description='Cyrillic/Chinese/Latin OCR of the image (tesseract, langs rus+chi_sim+eng) (F9 step 125)')
-def _t_ocr(entidad, ctx):
+def _t_ocr(entity, ctx):
     if not _which('tesseract'):
         return                                       # degrades: tesseract + langs missing
     try:
-        r = _fetch_seguro(entidad.value, timeout=10, stream=True)
+        r = _fetch_seguro(entity.value, timeout=10, stream=True)
     except Exception:
         return
     with tempfile.NamedTemporaryFile(delete=False, suffix='.img') as f:
@@ -3491,12 +3491,12 @@ def _t_ocr(entidad, ctx):
         fn = f.name
     try:
         out = run_tool(['tesseract', fn, 'stdout', '-l', 'rus+chi_sim+eng'], timeout=25)
-        texto = (out or '').strip()
-        if not texto:                                # langs not installed -> try eng only
-            texto = (run_tool(['tesseract', fn, 'stdout'], timeout=25) or '').strip()
-        if texto:
-            entidad.properties['ocr'] = texto[:1000]
-            entidad.tag('has-text')
+        text = (out or '').strip()
+        if not text:                                # langs not installed -> try eng only
+            text = (run_tool(['tesseract', fn, 'stdout'], timeout=25) or '').strip()
+        if text:
+            entity.properties['ocr'] = text[:1000]
+            entity.tag('has-text')
     finally:
         try:
             os.unlink(fn)
@@ -3520,14 +3520,14 @@ def _fetch_tor(url, timeout=25):
 
 @transform(input='url', outputs=('email', 'url'), name='onion_fetch',
            description='Opens a .onion site via Tor and extracts title, emails and .onion links (F10 step 128)')
-def _t_onion_fetch(entidad, ctx):
-    url = entidad.value
+def _t_onion_fetch(entity, ctx):
+    url = entity.value
     if '.onion' not in url:
         return                                       # .onion ONLY (no SSRF to internal IPs)
     if not url.startswith('http'):
         url = 'http://' + url
     if not _tor_disponible():
-        entidad.properties['tor'] = 'Tor unavailable (start the tor service)'
+        entity.properties['tor'] = 'Tor unavailable (start the tor service)'
         return
     try:
         r = _fetch_tor(url)
@@ -3536,23 +3536,23 @@ def _t_onion_fetch(entidad, ctx):
         return
     m = re.search(r'<title[^>]*>(.*?)</title>', r.text[:8000], re.I | re.S)
     if m:
-        entidad.properties['onion_title'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
+        entity.properties['onion_title'] = re.sub(r'\s+', ' ', m.group(1)).strip()[:120]
     for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', r.text)))[:15]:
         ctx.emit('email', em, label='in-onion')
     for on in list(set(re.findall(r'[a-z2-7]{16,56}\.onion', r.text)))[:15]:
         ctx.emit('url', 'http://' + on, label='onion-link')
-    entidad.tag('onion-live')
+    entity.tag('onion-live')
 
-_TG_SESION = os.path.join(HOME, '.obsidian', 'telegram.session')
+_TG_SESSION = os.path.join(HOME, '.obsidian', 'telegram.session')
 
-def _tg_mensajes(usuario, limite=30):
+def _tg_mensajes(username, limite=30):
     """Fetches the latest messages from a Telegram user/channel. Returns
     (True, (id, [texts])) or (False, failure_reason). Shared by the Telegram
     transforms (steps 130, 131)."""
     cred = _boveda.get('telegram') or os.environ.get('TELEGRAM_API', '')
     if not cred or ':' not in cred:
         return False, 'missing api_id:api_hash (free at my.telegram.org) in the vault'
-    if not os.path.exists(_TG_SESION):
+    if not os.path.exists(_TG_SESSION):
         return False, 'login once first: python telegram_login.py'
     api_id, api_hash = cred.split(':', 1)
     try:
@@ -3560,11 +3560,11 @@ def _tg_mensajes(usuario, limite=30):
         from telethon import TelegramClient
 
         async def _run():
-            cli = TelegramClient(_TG_SESION, int(api_id), api_hash)
+            cli = TelegramClient(_TG_SESSION, int(api_id), api_hash)
             await cli.connect()
             if not await cli.is_user_authorized():
                 return None
-            target = await cli.get_entity(usuario)
+            target = await cli.get_entity(username)
             textos = [m.text async for m in cli.iter_messages(target, limit=limite) if m.text]
             await cli.disconnect()
             return getattr(target, 'id', None), textos
@@ -3579,17 +3579,17 @@ def _tg_mensajes(usuario, limite=30):
 @transform(input='user', outputs=('email', 'url'), name='telegram',
            requires_key=True,
            description='Mentions/links of the user or channel in Telegram (Telethon) (F10 step 130)')
-def _t_telegram(entidad, ctx):
-    ok, res = _tg_mensajes(entidad.value)
+def _t_telegram(entity, ctx):
+    ok, res = _tg_mensajes(entity.value)
     if not ok:
-        entidad.properties['telegram'] = res
+        entity.properties['telegram'] = res
         return
     tid, textos = res
-    entidad.properties['telegram_id'] = tid
-    texto = '\n'.join(textos)
-    for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', texto)))[:15]:
+    entity.properties['telegram_id'] = tid
+    text = '\n'.join(textos)
+    for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', text)))[:15]:
         ctx.emit('email', em, label='in-telegram')
-    for u in list(set(re.findall(r'https?://[^\s"\'<>]+', texto)))[:15]:
+    for u in list(set(re.findall(r'https?://[^\s"\'<>]+', text)))[:15]:
         ctx.emit('url', u[:200], label='in-telegram')
 
 _LEAK_KW = ['leak', 'breach', 'database', 'combolist', 'stealer', 'ransomware',
@@ -3603,41 +3603,41 @@ def leak_matches(textos, keywords=None):
         tl = t.lower()
         kw = next((k for k in kws if k in tl), None)
         if kw:
-            hits.append({'keyword': kw, 'texto': t[:200]})
+            hits.append({'keyword': kw, 'text': t[:200]})
     return hits
 
 @transform(input='user', outputs=('domain', 'email'), name='canal_leaks',
            requires_key=True,
            description='Watches a Telegram channel for mentions of leaks/breaches/ransomware (F10 step 131)')
-def _t_canal_leaks(entidad, ctx):
-    ok, res = _tg_mensajes(entidad.value, limite=100)
+def _t_canal_leaks(entity, ctx):
+    ok, res = _tg_mensajes(entity.value, limite=100)
     if not ok:
-        entidad.properties['canal_leaks'] = res
+        entity.properties['canal_leaks'] = res
         return
     _tid, textos = res
     hits = leak_matches(textos)
     if not hits:
         return
-    entidad.tag('leaks-channel')
-    entidad.properties['leaks_mentions'] = len(hits)
-    entidad.properties['leaks_sample'] = [h['texto'] for h in hits[:5]]
-    unido = '\n'.join(h['texto'] for h in hits)
-    for dom in list(set(re.findall(r'\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b', unido.lower())))[:15]:
+    entity.tag('leaks-channel')
+    entity.properties['leaks_mentions'] = len(hits)
+    entity.properties['leaks_sample'] = [h['text'] for h in hits[:5]]
+    joined = '\n'.join(h['text'] for h in hits)
+    for dom in list(set(re.findall(r'\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b', joined.lower())))[:15]:
         ctx.emit('domain', dom, label='mentioned-in-leaks')
-    for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', unido)))[:15]:
+    for em in list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', joined)))[:15]:
         ctx.emit('email', em, label='mentioned-in-leaks')
 
 _HAYSTAK_ONION = ('http://haystak5njsmn2hqkewecpaxetahtwhsbsa64jom2k22z5afxhnpxfid.onion')
 
 @transform(input='person', outputs=('url',), name='haystak',
            description='Dark web search in Haystak (via Tor) -- .onion links (F10 step 129)')
-def _t_haystak(entidad, ctx):
+def _t_haystak(entity, ctx):
     if not _tor_disponible():
-        entidad.properties['haystak'] = 'requires Tor (start the tor service)'
+        entity.properties['haystak'] = 'requires Tor (start the tor service)'
         return
     from urllib.parse import quote as _q
     try:
-        r = _fetch_tor(f'{_HAYSTAK_ONION}/?q={_q(entidad.value)}', timeout=30)
+        r = _fetch_tor(f'{_HAYSTAK_ONION}/?q={_q(entity.value)}', timeout=30)
     except Exception as _e:
         log.debug("haystak: %s", _e)
         return
@@ -3659,21 +3659,21 @@ def _download_image(url):
 
 @transform(input='url', outputs=(), name='ela', requires_key=False,
            description='Edit detection via Error Level Analysis (generates ELA image) (F9 step 126)')
-def _t_ela(entidad, ctx):
-    fn = _download_image(entidad.value)
+def _t_ela(entity, ctx):
+    fn = _download_image(entity.value)
     if not fn:
         return
     try:
         salida_dir = os.path.join(STATIC_DIR, 'ela')
         os.makedirs(salida_dir, exist_ok=True)
-        nombre_img = f'{hashlib.md5(entidad.value.encode()).hexdigest()[:10]}.png'
+        nombre_img = f'{hashlib.md5(entity.value.encode()).hexdigest()[:10]}.png'
         max_diff = _ela(fn, os.path.join(salida_dir, nombre_img))
         if max_diff is not None:
-            entidad.properties['ela_img'] = f'/static/ela/{nombre_img}'
-            entidad.properties['ela_max_diff'] = max_diff
-            entidad.tag('ela-generated')
+            entity.properties['ela_img'] = f'/static/ela/{nombre_img}'
+            entity.properties['ela_max_diff'] = max_diff
+            entity.tag('ela-generated')
             if max_diff >= 50:                       # heuristic: review visually
-                entidad.tag('review-edit')
+                entity.tag('review-edit')
     finally:
         try:
             os.unlink(fn)
@@ -3682,14 +3682,14 @@ def _t_ela(entidad, ctx):
 
 @transform(input='url', outputs=('hash',), name='phash',
            description='Perceptual hash (dHash): groups the same image reused across profiles (F9 step 127)')
-def _t_phash(entidad, ctx):
-    fn = _download_image(entidad.value)
+def _t_phash(entity, ctx):
+    fn = _download_image(entity.value)
     if not fn:
         return
     try:
         h = _phash(fn)
         if h:
-            entidad.properties['phash'] = h
+            entity.properties['phash'] = h
             ctx.emit('hash', h, label='phash', hash_type='phash')
     finally:
         try:
@@ -3706,8 +3706,8 @@ _ES_BTC = re.compile(r'(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\Z'
 
 @transform(input='wallet', outputs=('wallet',), name='tx_grafo',
            description='Transaction counterparties of a BTC wallet (blockchain.info, keyless) (F11 step 138)')
-def _t_tx_graph(entidad, ctx):
-    addr = entidad.value
+def _t_tx_graph(entity, ctx):
+    addr = entity.value
     if not _ES_BTC.match(addr):
         return                                       # BTC only for now (keyless)
     try:
@@ -3733,16 +3733,16 @@ _ES_ETH = re.compile(r'0x[a-fA-F0-9]{40}\Z')
 
 @transform(input='wallet', outputs=(), name='eth_balance',
            description='Balance of an Ethereum wallet (public RPC cloudflare-eth, keyless) (F11 step 142)')
-def _t_eth_balance(entidad, ctx):
-    if not _ES_ETH.match(entidad.value):
+def _t_eth_balance(entity, ctx):
+    if not _ES_ETH.match(entity.value):
         return                                       # ETH addresses only
     try:
         d = SESSION.post('https://cloudflare-eth.com',
                          json={'jsonrpc': '2.0', 'method': 'eth_getBalance',
-                               'params': [entidad.value, 'latest'], 'id': 1}, timeout=10).json() or {}
+                               'params': [entity.value, 'latest'], 'id': 1}, timeout=10).json() or {}
         wei = int(d.get('result', '0x0'), 16)
-        entidad.properties['eth_balance'] = wei / 1e18
-        entidad.properties['cadena'] = 'eth'
+        entity.properties['eth_balance'] = wei / 1e18
+        entity.properties['cadena'] = 'eth'
     except Exception as _e:
         log.debug("eth_balance unavailable: %s", _e)
 
@@ -3762,16 +3762,16 @@ def _ransom_addrs():
 
 @transform(input='wallet', outputs=(), name='riesgo_wallet',
            description='Address risk: linked to ransomware? (Ransomwhere, CC0, keyless) (F11 step 141)')
-def _t_riesgo_wallet(entidad, ctx):
-    if entidad.value in _ransom_addrs():
-        entidad.tag('ransomware')
-        entidad.properties['riesgo'] = 'linked to ransomware (Ransomwhere)'
+def _t_riesgo_wallet(entity, ctx):
+    if entity.value in _ransom_addrs():
+        entity.tag('ransomware')
+        entity.properties['risk'] = 'linked to ransomware (Ransomwhere)'
 
 @transform(input='wallet', outputs=('url',), name='exchange_attrib',
            description='Exchange attribution: links to Blockchair/WalletExplorer/Arkham/OXT (F11 step 140)')
-def _t_exchange_attrib(entidad, ctx):
+def _t_exchange_attrib(entity, ctx):
     from urllib.parse import quote as _q
-    a = _q(entidad.value)
+    a = _q(entity.value)
     enlaces = {'blockchair': f'https://blockchair.com/search?q={a}',
                'walletexplorer': f'https://www.walletexplorer.com/address/{a}',
                'arkham': f'https://intel.arkm.com/explorer/address/{a}',
@@ -3781,8 +3781,8 @@ def _t_exchange_attrib(entidad, ctx):
 
 @transform(input='wallet', outputs=('wallet',), name='cluster_wallets',
            description='Clustering by co-inputs: addresses of the same owner (heuristic, blockchain.info) (F11 step 139)')
-def _t_cluster_wallets(entidad, ctx):
-    addr = entidad.value
+def _t_cluster_wallets(entity, ctx):
+    addr = entity.value
     if not _ES_BTC.match(addr):
         return
     try:
@@ -3804,47 +3804,47 @@ def _t_cluster_wallets(entidad, ctx):
 
 @transform(input='url', outputs=('wallet',), name='extraer_wallets',
            description='Extracts BTC/ETH addresses from a page (F11 step 137)')
-def _t_extraer_wallets(entidad, ctx):
+def _t_extraer_wallets(entity, ctx):
     try:
-        r = _fetch_seguro(entidad.value, timeout=10, stream=False)
+        r = _fetch_seguro(entity.value, timeout=10, stream=False)
     except Exception:
         return
-    texto = r.text[:200000]
+    text = r.text[:200000]
     for cadena, rx in _WALLET_RE.items():
-        for addr in list(set(rx.findall(texto)))[:30]:
+        for addr in list(set(rx.findall(text)))[:30]:
             ctx.emit('wallet', addr, label=cadena, cadena=cadena)
 
 @transform(input='person', outputs=('url',), name='language_dorks',
            description='Dorks adapted to the name language (Cyrillic/Chinese/Latin) (F15 step 176)')
-def _t_language_dorks(entidad, ctx):
+def _t_language_dorks(entity, ctx):
     from urllib.parse import quote as _q
-    idioma = _ml.detect_language(entidad.value)
-    for d in _ml.dorks_by_language(entidad.value, idioma):
+    idioma = _ml.detect_language(entity.value)
+    for d in _ml.dorks_by_language(entity.value, idioma):
         ctx.emit('url', f'https://www.google.com/search?q={_q(d)}', label=f'dork:{idioma}', language=idioma)
 
 @transform(input='person', outputs=('url',), name='local_engines',
            description='Search in local engines: Yandex, Baidu, Sogou (they index another internet) (F15 step 174)')
-def _t_local_engines(entidad, ctx):
-    for motor, url in _ml.local_engines(entidad.value).items():
+def _t_local_engines(entity, ctx):
+    for motor, url in _ml.local_engines(entity.value).items():
         ctx.emit('url', url, label=f'motor:{motor}', engine=motor)
 
 @transform(input='org', outputs=('url',), name='regional_registries',
            description='Company registries by region: QCC (China), RusProfile (Russia), OpenCorporates (F15 step 173)')
-def _t_regional_registries(entidad, ctx):
-    for reg, url in _ml.regional_registries(entidad.value).items():
+def _t_regional_registries(entity, ctx):
+    for reg, url in _ml.regional_registries(entity.value).items():
         ctx.emit('url', url, label=f'registro:{reg}', registry=reg)
 
 @transform(input='person', outputs=('person',), name='transliterate',
            description='Name variants in Cyrillic/Latin to search in each alphabet (F15 step 172)')
-def _t_transliterate(entidad, ctx):
-    for alfabeto, variante in _ml.transliterate(entidad.value).items():
-        if variante and variante.lower() != entidad.value.lower():
+def _t_transliterate(entity, ctx):
+    for alfabeto, variante in _ml.transliterate(entity.value).items():
+        if variante and variante.lower() != entity.value.lower():
             ctx.emit('person', variante, label=f'translit:{alfabeto}')
 
 @transform(input='user', outputs=('url',), name='regional_platforms',
            description='Profiles on regional platforms: VK, Weibo, Douyin, OK, Telegram (F15 step 171)')
-def _t_plataformas_regionales(entidad, ctx):
-    for plat, url in _ml.regional_profiles(entidad.value).items():
+def _t_plataformas_regionales(entity, ctx):
+    for plat, url in _ml.regional_profiles(entity.value).items():
         ctx.emit('url', url, label=f'plataforma:{plat}', platform=plat)
 
 _BLOCKLIST = {'nets': None, 'ts': 0}   # in-memory cache (refreshes every 6h)
@@ -3853,7 +3853,7 @@ _BLOCKLIST = {'nets': None, 'ts': 0}   # in-memory cache (refreshes every 6h)
 # Do NOT use noisy aggregators like FireHOL: mixed licenses + serious false
 # positives (they block whole countries, include TOR which is NOT malicious). A
 # match here is a SIGNAL with source, not a "malicious" verdict.
-_FEEDS_AMENAZA = [
+_THREAT_FEEDS = [
     ('Feodo Tracker (botnet C2)', 'https://feodotracker.abuse.ch/downloads/ipblocklist.txt'),
 ]
 
@@ -3861,14 +3861,14 @@ def _load_blocklist():
     if _BLOCKLIST['nets'] is not None and time.time() - _BLOCKLIST['ts'] < 21600:
         return _BLOCKLIST['nets']
     nets = []
-    for fuente, url in _FEEDS_AMENAZA:
+    for source, url in _THREAT_FEEDS:
         try:
             for linea in SESSION.get(url, timeout=15).text.splitlines():
                 linea = linea.strip()
                 if not linea or linea.startswith('#'):
                     continue
                 try:
-                    nets.append((ipaddress.ip_network(linea, strict=False), fuente))
+                    nets.append((ipaddress.ip_network(linea, strict=False), source))
                 except ValueError:
                     pass
         except Exception as _e:
@@ -3879,54 +3879,54 @@ def _load_blocklist():
 
 @transform(input='ip', outputs=(), name='ip_blocklist',
            description='Is the IP in high-confidence CC0 threat feeds? (abuse.ch, keyless)')
-def _t_ip_blocklist(entidad, ctx):
+def _t_ip_blocklist(entity, ctx):
     try:
-        ip = ipaddress.ip_address(entidad.value)
+        ip = ipaddress.ip_address(entity.value)
     except ValueError:
         return
-    for red, fuente in _load_blocklist():
+    for red, source in _load_blocklist():
         if ip in red:
-            entidad.tag('threat-listed')   # signal, NOT a 'malicious' verdict
-            entidad.properties['threat_source'] = fuente
+            entity.tag('threat-listed')   # signal, NOT a 'malicious' verdict
+            entity.properties['threat_source'] = source
             return
 
 @transform(input='ip', outputs=('org',), name='greynoise',
            description='Threat intel of the IP (GreyNoise Community, keyless but 25/day; 404=not observed)')
-def _t_greynoise(entidad, ctx):
+def _t_greynoise(entity, ctx):
     try:
-        r = SESSION.get(f'https://api.greynoise.io/v3/community/{entidad.value}', timeout=8)
+        r = SESSION.get(f'https://api.greynoise.io/v3/community/{entity.value}', timeout=8)
         if r.status_code != 200:   # 404 = IP not observed scanning -> no enrichment
             return
         d = r.json()
         if d.get('noise'):
-            entidad.tag('internet-scanning')
+            entity.tag('internet-scanning')
         if d.get('riot'):
-            entidad.tag('known-service')
+            entity.tag('known-service')
             if d.get('name'):
                 ctx.emit('org', d['name'], label='greynoise')
         clasif = d.get('classification')
         if clasif:
-            entidad.properties['greynoise'] = clasif
+            entity.properties['greynoise'] = clasif
             if clasif == 'malicious':
-                entidad.tag('malicious')
+                entity.tag('malicious')
     except Exception as _e:
         log.debug("greynoise unavailable: %s", _e)
 
 @transform(input='domain', outputs=(), name='dns_txt',
            description='TXT records of the domain (SPF, verifications, etc.)')
-def _t_dns_txt(entidad, ctx):
-    out = run_tool(['dig', entidad.value, 'TXT', '+short'], timeout=10)
+def _t_dns_txt(entity, ctx):
+    out = run_tool(['dig', entity.value, 'TXT', '+short'], timeout=10)
     txt = [l.strip().strip('"') for l in out.splitlines() if l.strip()]
     if txt:
-        entidad.properties['txt'] = txt[:10]
+        entity.properties['txt'] = txt[:10]
 
 @transform(input='domain', outputs=('org',), name='ssl',
            description='TLS certificate of the domain: issuer and validity')
-def _t_ssl(entidad, ctx):
+def _t_ssl(entity, ctx):
     try:
         contexto = ssl.create_default_context()
-        with socket.create_connection((entidad.value, 443), timeout=8) as sock:
-            with contexto.wrap_socket(sock, server_hostname=entidad.value) as segura:
+        with socket.create_connection((entity.value, 443), timeout=8) as sock:
+            with contexto.wrap_socket(sock, server_hostname=entity.value) as segura:
                 cert = segura.getpeercert()
         issuer = dict(x[0] for x in cert.get('issuer', []))
         org = issuer.get('organizationName')
@@ -3934,21 +3934,21 @@ def _t_ssl(entidad, ctx):
             ctx.emit('org', org, label='cert issuer')
         cn = dict(x[0] for x in cert.get('subject', [])).get('commonName')
         if cn:
-            entidad.properties['cert_cn'] = cn          # to pivot (step 115)
-        entidad.properties['cert_since'] = cert.get('notBefore')
-        entidad.properties['cert_expires'] = cert.get('notAfter')
+            entity.properties['cert_cn'] = cn          # to pivot (step 115)
+        entity.properties['cert_since'] = cert.get('notBefore')
+        entity.properties['cert_expires'] = cert.get('notAfter')
     except Exception as _e:
         log.debug("ssl unavailable: %s", _e)
 
 @transform(input='domain', outputs=('ip',), name='cert_pivote', requires_key=True,
            description='IPs with the same TLS cert (CN) across FOFA/Shodan -- same infra (F8)')
-def _t_cert_pivote(entidad, ctx):
-    cn = entidad.properties.get('cert_cn')
+def _t_cert_pivote(entity, ctx):
+    cn = entity.properties.get('cert_cn')
     if not cn:                                            # if ssl did not run, get the CN now
         try:
             contexto = ssl.create_default_context()
-            with socket.create_connection((entidad.value, 443), timeout=8) as sock:
-                with contexto.wrap_socket(sock, server_hostname=entidad.value) as segura:
+            with socket.create_connection((entity.value, 443), timeout=8) as sock:
+                with contexto.wrap_socket(sock, server_hostname=entity.value) as segura:
                     cert = segura.getpeercert()
             cn = dict(x[0] for x in cert.get('subject', [])).get('commonName')
         except Exception:
@@ -3976,8 +3976,8 @@ def _run_transform_internal(type, value, name):
     Raises ValueError/KeyError; the caller decides what to do with the error."""
     if not valid_type(type):
         raise ValueError('invalid entity type')
-    semilla = Entity(type, (value or '').strip())          # may raise ValueError
-    if not semilla.well_formed():
+    seed = Entity(type, (value or '').strip())          # may raise ValueError
+    if not seed.well_formed():
         raise ValueError(f'malformed value for {type}')
     if _PROXIES['pool']:
         _rotate_proxy()                                      # OPSEC: rotate proxy per transform (154)
@@ -3985,26 +3985,26 @@ def _run_transform_internal(type, value, name):
     _jitter()                                               # OPSEC: spacing between requests (156)
     _record_footprint(name, type, value)                  # OPSEC: log your footprint (160)
     with _almacen_lock:
-        semilla = _store.add(semilla)
-        producidas = run_by_name(name, semilla, _store)
+        seed = _store.add(seed)
+        produced = run_by_name(name, seed, _store)
         if _ws_activo:                          # autosave (46) + audit (48)
             try:
                 _gestor.save(_ws_activo, _store)
-                _gestor.record(_ws_activo, name, value, len(producidas))
+                _gestor.record(_ws_activo, name, value, len(produced))
             except Exception as _e:
                 log.warning("autosave failed: %s", _e)
-    return producidas
+    return produced
 
 @app.route('/api/v2/run', methods=['POST'])
 def api_v2_run():
     """Runs a transform on an entity {type, value} (step 36)."""
     d = request.json or {}
     try:
-        producidas = _run_transform_internal(
+        produced = _run_transform_internal(
             d.get('type', ''), d.get('value', ''), d.get('transform', ''))
     except (KeyError, ValueError) as e:
         return _error(str(e), 400)
-    return jsonify({'producidas': [e.to_dict() for e in producidas],
+    return jsonify({'produced': [e.to_dict() for e in produced],
                     'total_entities': len(_store), 'workspace': _ws_activo})
 
 def _status_data():
@@ -4012,7 +4012,7 @@ def _status_data():
     por_tipo = {}
     con_key = []
     total = 0
-    for tp in TIPOS:
+    for tp in TYPES:
         ts = REGISTRO.applicable(tp)
         if ts:
             por_tipo[tp] = len(ts)
@@ -4044,12 +4044,12 @@ def _status_data():
         'ntfy': bool(_ntfy_topic()),
     }
 
-_REGLAS_FILE = os.path.join(HOME, '.obsidian', 'reglas.yaml')
+_RULES_FILE = os.path.join(HOME, '.obsidian', 'reglas.yaml')
 
 def _load_user_rules():
     try:
-        if os.path.exists(_REGLAS_FILE):
-            with open(_REGLAS_FILE, encoding='utf-8') as f:
+        if os.path.exists(_RULES_FILE):
+            with open(_RULES_FILE, encoding='utf-8') as f:
                 n = load_yaml_rules(f.read())
                 log.info("user YAML rules loaded: %d", n)
     except Exception as _e:
@@ -4060,22 +4060,22 @@ def api_v2_reglas():
     """User YAML correlation rules (step 63). POST {yaml} loads and persists them;
     GET returns the active ones."""
     if request.method == 'POST':
-        texto = (request.json or {}).get('yaml', '')
-        n = load_yaml_rules(texto)
+        text = (request.json or {}).get('yaml', '')
+        n = load_yaml_rules(text)
         try:
-            os.makedirs(os.path.dirname(_REGLAS_FILE), exist_ok=True)
-            with open(_REGLAS_FILE, 'w', encoding='utf-8') as f:
-                f.write(texto)
+            os.makedirs(os.path.dirname(_RULES_FILE), exist_ok=True)
+            with open(_RULES_FILE, 'w', encoding='utf-8') as f:
+                f.write(text)
         except Exception as _e:
             log.warning("could not save reglas.yaml: %s", _e)
         return jsonify({'ok': True, 'cargadas': n})
-    from core.correlacion import _REGLAS_YAML
-    return jsonify({'reglas': _REGLAS_YAML})
+    from core.correlacion import _YAML_RULES
+    return jsonify({'reglas': _YAML_RULES})
 
 @app.route('/api/v2/find/translate', methods=['POST'])
 def api_v2_find_translate():
     """Translates a unified query to EACH engine's dialect (F8 step 117).
-    Body: {campos:{ip,dominio,favicon,cert,puerto,...}, cn:true|false|null}."""
+    Body: {campos:{ip,domain,favicon,cert,port,...}, cn:true|false|null}."""
     d = request.json or {}
     campos = {k: v for k, v in (d.get('campos') or {}).items() if v}
     return jsonify({'campos': campos, 'queries': traducir_todos(campos, d.get('cn'))})
@@ -4151,7 +4151,7 @@ def api_v2_tarea(tid):
     est = _tareas.estado(tid)
     if not est:
         return _error('task not found', 404)
-    return jsonify({'id': est['id'], 'estado': est['estado'], 'resultado': est['resultado']})
+    return jsonify({'id': est['id'], 'estado': est['estado'], 'result': est['result']})
 
 @app.route('/api/v2/task/<tid>/stream')
 def api_v2_tarea_stream(tid):
@@ -4282,21 +4282,21 @@ def _set_anonimo(on):
     _OPSEC['anonimo'] = bool(on)
     SESSION.proxies = {'http': TOR_PROXY, 'https': TOR_PROXY} if on else {}
 
-_HUELLA = []
+_FOOTPRINT = []
 
 def _record_footprint(name, type, value):
     """Records which transform you ran on which target and whether it was anonymized
     -- your footprint/exposure while investigating (F13 step 160)."""
-    _HUELLA.insert(0, {'ts': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    _FOOTPRINT.insert(0, {'ts': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                        'transform': name, 'target': f'{type}:{value}',
                        'anonimo': _OPSEC['anonimo'] or bool(_PROXIES['pool'])})
-    del _HUELLA[500:]
+    del _FOOTPRINT[500:]
 
 @app.route('/api/v2/opsec/footprint')
 def api_v2_opsec_footprint():
     """Your footprint: what you touched and how much was un-anonymized (exposure). Step 160."""
-    expuestos = sum(1 for h in _HUELLA if not h['anonimo'])
-    return jsonify({'total': len(_HUELLA), 'expuestos': expuestos, 'huella': _HUELLA[:100]})
+    expuestos = sum(1 for h in _FOOTPRINT if not h['anonimo'])
+    return jsonify({'total': len(_FOOTPRINT), 'expuestos': expuestos, 'huella': _FOOTPRINT[:100]})
 
 _KEY_ROT = {}
 
@@ -4498,7 +4498,7 @@ def api_v2_keys():
     return jsonify({'ok': True, 'servicios': _boveda.servicios()})
 
 # Service -> (transform, type, known test value that has data)
-_TEST_SERVICIO = {
+_TEST_SERVICE = {
     'shodan': ('shodan', 'ip', '8.8.8.8'), 'censys': ('censys', 'ip', '8.8.8.8'),
     'zoomeye': ('zoomeye', 'ip', '8.8.8.8'), 'fofa': ('fofa', 'ip', '8.8.8.8'),
     'quake': ('quake', 'ip', '8.8.8.8'), 'hunter': ('hunter', 'ip', '8.8.8.8'),
@@ -4516,14 +4516,14 @@ def api_v2_keys_probar():
     """Verifies a REAL key: runs its transform on a known target and reports whether
     the parser produced data (this confirms each engine against its real API)."""
     service = ((request.json or {}).get('service', '') or '').strip().lower()
-    mapeo = _TEST_SERVICIO.get(service)
+    mapeo = _TEST_SERVICE.get(service)
     if not mapeo:
         return _error('service has no defined test', 400)
     name, type, value = mapeo
     tiene = bool(_boveda.get(service))
-    alm = Store()
+    store = Store()
     try:
-        n = len(run_by_name(name, alm.create(type, value), alm))
+        n = len(run_by_name(name, store.create(type, value), store))
     except Exception as e:
         return jsonify({'service': service, 'ok': False, 'nota': f'error: {e}'})
     if n > 0:
@@ -4534,13 +4534,13 @@ def api_v2_keys_probar():
     return jsonify({'service': service, 'ok': False, 'entities': 0,
                     'nota': 'key present but 0 results (invalid, out of quota, or different schema?)'})
 
-_TIPOS_ACTIVO = ('domain', 'subdomain', 'ip', 'port', 'tech', 'url', 'cve', 'bucket', 'org')
+_ACTIVE_TYPES = ('domain', 'subdomain', 'ip', 'port', 'tech', 'url', 'cve', 'bucket', 'org')
 
 @app.route('/api/v2/inventory')
 def api_v2_inventario():
     """Inventory of the target's internet-facing assets, in one place (F12 step 144)."""
     inv = {}
-    for t in _TIPOS_ACTIVO:
+    for t in _ACTIVE_TYPES:
         ents = _store.of_type(t)
         if ents:
             inv[t] = [{'value': e.value, 'tags': sorted(e.tags),
@@ -4573,17 +4573,17 @@ def api_v2_diff_historico():
 @app.route('/api/v2/exposure')
 def api_v2_exposicion():
     """Target exposure score: surface size + risk (F12 step 149)."""
-    conteos = {t: len(_store.of_type(t)) for t in _TIPOS_ACTIVO}
+    counts = {t: len(_store.of_type(t)) for t in _ACTIVE_TYPES}
     h = correlate(_store)
-    riesgo = risk_score(h)
-    return jsonify({'exposicion': exposure_score(conteos, riesgo), 'riesgo': riesgo,
-                    'superficie': conteos, 'hallazgos': len(h)})
+    risk = risk_score(h)
+    return jsonify({'exposicion': exposure_score(counts, risk), 'risk': risk,
+                    'surface': counts, 'findings': len(h)})
 
 @app.route('/api/v2/findings')
 def api_v2_findings():
     """Runs the correlation engine on the active case (F4 steps 62, 64)."""
     h = correlate(_store)
-    return jsonify({'hallazgos': [x.to_dict() for x in h], 'score': risk_score(h)})
+    return jsonify({'findings': [x.to_dict() for x in h], 'score': risk_score(h)})
 
 def _target_of_store():
     """Best 'target' candidate of the case for the report header. Prefers the SEED
@@ -4613,7 +4613,7 @@ def api_v2_report():
             with open(ruta_vis, encoding='utf-8') as f:
                 vis_js = f.read()
     html_doc = generate_report(
-        _store, hallazgos=h, score=risk_score(h),
+        _store, findings=h, score=risk_score(h),
         meta={'workspace': _ws_activo, 'target': _target_of_store()},
         vis_js=vis_js)
     return Response(html_doc, mimetype='text/html')
@@ -4626,7 +4626,7 @@ def _export_name():
 def api_v2_export_json():
     """Full case in JSON, re-importable (F7 step 94)."""
     h = correlate(_store)
-    data = exportar_json(_store, h, risk_score(h),
+    data = export_json(_store, h, risk_score(h),
                          {'workspace': _ws_activo, 'target': _target_of_store()})
     return Response(data, mimetype='application/json',
                     headers={'Content-Disposition': f'attachment; filename="{_export_name()}.json"'})
@@ -4634,7 +4634,7 @@ def api_v2_export_json():
 @app.route('/api/v2/export/csv')
 def api_v2_export_csv():
     """Entities as flat CSV, sanitized against formula injection (F7 step 94)."""
-    data = exportar_csv(_store)
+    data = export_csv(_store)
     return Response(data, mimetype='text/csv',
                     headers={'Content-Disposition': f'attachment; filename="{_export_name()}.csv"'})
 
@@ -4663,12 +4663,12 @@ def _ntfy_topic():
     except Exception:
         return None
 
-def _monitor_alerta(cambios):
+def _monitor_alerta(changes):
     """Monitor alert hook (step 95): notifies the phone via ntfy (step 96)."""
-    log.info("MONITOR: %s", cambios.summary())
+    log.info("MONITOR: %s", changes.summary())
     topic = _ntfy_topic()
     if topic:
-        send_ntfy(topic, cambios.summary(), titulo='OBSIDIAN · change detected',
+        send_ntfy(topic, changes.summary(), titulo='OBSIDIAN · change detected',
                     prioridad='high', tags='satellite,warning')
 
 def _tareas_monitor_default():
@@ -4733,14 +4733,14 @@ def api_v2_monitor_stop():
         _monitor.stop()
     return jsonify({'active': False})
 
-_PROMPTS_IA = {
+_AI_PROMPTS = {
     'escenario': ('OSINT collected on "{target}". Generate an ETHICAL pentesting scenario:\n'
                   '1. ENTRY VECTORS (with evidence from the data)\n'
                   '2. Probable KILL CHAIN step by step\n'
                   '3. Relevant MITRE ATT&CK TECHNIQUES (with IDs)\n'
                   '4. TOP 3 most critical vulnerabilities\n'
                   '5. COUNTERMEASURES per vector\n\nData:\n{data}'),
-    'superficie': ('Attack surface map of "{target}":\n'
+    'surface': ('Attack surface map of "{target}":\n'
                    '1. EXPOSED ASSETS (IPs, domains, services, technologies)\n'
                    '2. LEAKED DATA found\n3. TECHNOLOGIES with known CVEs\n'
                    '4. WEAK CONFIGURATIONS\n5. RISK SCORE 0-10 with justification\n'
@@ -4778,16 +4778,16 @@ def api_v2_normalize_phone():
 @app.route('/api/v2/language', methods=['POST'])
 def api_v2_language():
     """Detects the text language and suggests the right source/engine (F15 step 175)."""
-    idioma = _ml.detect_language((request.json or {}).get('texto', ''))
+    idioma = _ml.detect_language((request.json or {}).get('text', ''))
     return jsonify({'idioma': idioma, 'fuente_sugerida': _FUENTE_POR_IDIOMA.get(idioma, 'Google')})
 
 @app.route('/api/v2/extract_text', methods=['POST'])
 def api_v2_extraer_texto():
     """Paste text -> typed entities into the graph (F14 step 161, deterministic regex)."""
-    texto = (request.json or {}).get('texto', '')
+    text = (request.json or {}).get('text', '')
     agregadas = []
     with _almacen_lock:
-        for type, value in extract_entities(texto):
+        for type, value in extract_entities(text):
             try:
                 e = _store.create(type, value)
                 agregadas.append({'type': e.type, 'value': e.value})
@@ -4824,13 +4824,13 @@ def api_v2_deteccion_ia():
     'ela' transform (126). No reliable keyless method exists -- it is indicative only."""
     if not ia.available():
         return _error('AI (Ollama) unavailable', 503)
-    texto = ((request.json or {}).get('texto', '') or '')[:3000]
-    if not texto.strip():
+    text = ((request.json or {}).get('text', '') or '')[:3000]
+    if not text.strip():
         return _error('empty text', 400)
     try:
         resp = ia.ask('Does this text look AI-generated? Give concrete SIGNALS (uniformity, '
                             'generic phrasing, lack of specific detail) and a tentative verdict. '
-                            f'Do not invent certainty.\n\n{texto}', max_tokens=400, temp=0.3)
+                            f'Do not invent certainty.\n\n{text}', max_tokens=400, temp=0.3)
     except Exception as e:
         return _error(f'AI failed: {e}', 500)
     return jsonify({'evaluacion': resp,
@@ -4845,7 +4845,7 @@ def api_v2_consulta():
     pregunta = ((request.json or {}).get('pregunta', '') or '').strip()
     if not pregunta:
         return _error('empty question', 400)
-    disponibles = sorted({t.name for tp in TIPOS for t in REGISTRO.applicable(tp)})
+    disponibles = sorted({t.name for tp in TYPES for t in REGISTRO.applicable(tp)})
     prompt = (f'You are OBSIDIAN, an OSINT engine. Available transforms: {", ".join(disponibles)}.\n'
               f'The user asks: "{pregunta}". Return a concrete PLAN: which transforms to run, '
               f'on which entity and in what order. Be specific.')
@@ -4860,12 +4860,12 @@ def api_v2_traducir():
     """Translates foreign text (Chinese/Russian/Arabic...) to English with Ollama (F14 step 162)."""
     if not ia.available():
         return _error('AI (Ollama) unavailable', 503)
-    texto = ((request.json or {}).get('texto', '') or '')[:4000]
-    if not texto.strip():
+    text = ((request.json or {}).get('text', '') or '')[:4000]
+    if not text.strip():
         return _error('empty text', 400)
     try:
         resp = ia.ask(f'Translate to English. Return ONLY the translation, no notes '
-                            f'or quotes:\n\n{texto}', max_tokens=800, temp=0.2)
+                            f'or quotes:\n\n{text}', max_tokens=800, temp=0.2)
     except Exception as e:
         return _error(f'AI failed: {e}', 500)
     return jsonify({'traduccion': resp})
@@ -4873,17 +4873,17 @@ def api_v2_traducir():
 @app.route('/api/v2/ia/<modo>', methods=['POST'])
 def api_v2_ia_modo(modo):
     """Case-level AI (step 34 backfill): MITRE scenario / surface / analyze."""
-    if modo not in _PROMPTS_IA:
+    if modo not in _AI_PROMPTS:
         return _error('invalid mode', 404)
     if not ia.available():
         return _error('AI (Ollama) unavailable', 503)
     contexto = json.dumps(_store.to_dict(), default=str)[:3500]
-    prompt = _PROMPTS_IA[modo].format(target=_target_of_store() or 'el target', data=contexto)
+    prompt = _AI_PROMPTS[modo].format(target=_target_of_store() or 'el target', data=contexto)
     try:
         resp = ia.ask(prompt, max_tokens=700, temp=0.4)
     except Exception as e:
         return _error(f'AI failed: {e}', 500)
-    return jsonify({'modo': modo, 'resultado': resp})
+    return jsonify({'modo': modo, 'result': resp})
 
 @app.route('/api/v2/findings/ia', methods=['POST'])
 def api_v2_findings_ai():
@@ -4892,10 +4892,10 @@ def api_v2_findings_ai():
     h = correlate(_store)
     if not h:
         return jsonify({'summary': 'No findings to analyze yet. Run more transforms.'})
-    conteo = {}
+    counts = {}
     for e in _store.entities:
-        conteo[e.type] = conteo.get(e.type, 0) + 1
-    ents = ', '.join(f'{n} {t}' for t, n in conteo.items())
+        counts[e.type] = counts.get(e.type, 0) + 1
+    ents = ', '.join(f'{n} {t}' for t, n in counts.items())
     lista = '\n'.join(f'- [{x.severity}] {x.message}' for x in h)
     prompt = (
         f"You are a cybersecurity analyst. In an OSINT investigation on a target "
@@ -4904,8 +4904,8 @@ def api_v2_findings_ai():
         f"In 3-4 sentences: summarize the main risk and suggest the next concrete "
         f"investigation step. Direct, no filler.")
     try:
-        texto = ia.ask(prompt, max_tokens=300)
-        return jsonify({'summary': texto or 'The AI returned no text.'})
+        text = ia.ask(prompt, max_tokens=300)
+        return jsonify({'summary': text or 'The AI returned no text.'})
     except Exception as e:
         log.warning("AI correlation failed: %s", e)
         return _error('Ollama unavailable (is it running on :11434?)', 503)
@@ -4995,8 +4995,8 @@ def api_kali():
     def _stream():
         yield f"data: {json.dumps({'status':'starting','tool':tool_id})}\n\n"
         try:
-            resultado = _kali_run(tool_id, arg)
-            yield f"data: {json.dumps({'status':'completed','resultado':resultado})}\n\n"
+            result = _kali_run(tool_id, arg)
+            yield f"data: {json.dumps({'status':'completed','result':result})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'status':'error','message':str(e)})}\n\n"
     return Response(stream_with_context(_stream()),
@@ -5015,8 +5015,8 @@ def api_parrot():
     def _stream():
         yield f"data: {json.dumps({'status':'starting','tool':tool_id})}\n\n"
         try:
-            resultado = _distrobox_run('parrot', PARROT_TOOLS, tool_id, arg)
-            yield f"data: {json.dumps({'status':'completed','resultado':resultado})}\n\n"
+            result = _distrobox_run('parrot', PARROT_TOOLS, tool_id, arg)
+            yield f"data: {json.dumps({'status':'completed','result':result})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'status':'error','message':str(e)})}\n\n"
     return Response(stream_with_context(_stream()),
@@ -5035,8 +5035,8 @@ def api_remnux():
     def _stream():
         yield f"data: {json.dumps({'status':'starting','tool':tool_id})}\n\n"
         try:
-            resultado = _distrobox_run('remnux', REMNUX_TOOLS, tool_id, arg)
-            yield f"data: {json.dumps({'status':'completed','resultado':resultado})}\n\n"
+            result = _distrobox_run('remnux', REMNUX_TOOLS, tool_id, arg)
+            yield f"data: {json.dumps({'status':'completed','result':result})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'status':'error','message':str(e)})}\n\n"
     return Response(stream_with_context(_stream()),
@@ -5053,8 +5053,8 @@ def api_blackarch():
     tool_id = d.get('tool','')
     arg     = d.get('arg','')
     try:
-        resultado = _distrobox_run('blackarch', BLACKARCH_TOOLS, tool_id, arg)
-        return jsonify({'ok': True, 'resultado': resultado})
+        result = _distrobox_run('blackarch', BLACKARCH_TOOLS, tool_id, arg)
+        return jsonify({'ok': True, 'result': result})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 

@@ -9,7 +9,7 @@ Testable design by INJECTION: the Monitor knows nothing about network or Flask.
 It receives
   - snapshot_fn(): returns the store's current state (dict),
   - refrescar_fn(): re-runs the transforms (mutates the store),
-  - on_alerta(cambios): optional callback (ntfy in step 96).
+  - on_alerta(changes): optional callback (ntfy in step 96).
 So tests inject fake functions and never touch the network. The thread only wraps
 `cycle()`, which is pure except for the callbacks."""
 from __future__ import annotations
@@ -18,66 +18,66 @@ import threading
 from dataclasses import dataclass, field
 
 
-def snapshot(almacen) -> dict:
+def snapshot(store) -> dict:
     """Snapshot of the relevant state to detect changes."""
     ents = {}
-    for e in almacen.entities:
+    for e in store.entities:
         ents[e.id] = {
             'type': e.type,
             'value': e.value,
             'props': {k: str(v) for k, v in (e.properties or {}).items()},
             'tags': sorted(e.tags),
         }
-    return {'ents': ents, 'rels': {r.id for r in almacen.relations}}
+    return {'ents': ents, 'rels': {r.id for r in store.relations}}
 
 
 @dataclass
 class Changes:
     """What changed between two snapshots."""
-    nuevas_entidades: list = field(default_factory=list)   # dicts {type,value}  # noqa
-    nuevas_relaciones: list = field(default_factory=list)  # ids
-    cambios_prop: list = field(default_factory=list)       # {entidad,type,campo,antes,ahora}  # noqa
+    new_entities: list = field(default_factory=list)   # dicts {type,value}  # noqa
+    new_relations: list = field(default_factory=list)  # ids
+    prop_changes: list = field(default_factory=list)       # {entity,type,campo,before,now}  # noqa
 
-    def hay(self) -> bool:
-        return bool(self.nuevas_entidades or self.nuevas_relaciones or self.cambios_prop)
+    def has_changes(self) -> bool:
+        return bool(self.new_entities or self.new_relations or self.prop_changes)
 
     def summary(self) -> str:
-        partes = []
-        if self.nuevas_entidades:
-            ej = ', '.join(e['value'] for e in self.nuevas_entidades[:3])
-            mas = f' (+{len(self.nuevas_entidades) - 3} more)' if len(self.nuevas_entidades) > 3 else ''
-            partes.append(f'{len(self.nuevas_entidades)} new entity(ies): {ej}{mas}')
-        if self.cambios_prop:
-            partes.append(f'{len(self.cambios_prop)} change(s) in existing data')
-        if self.nuevas_relaciones:
-            partes.append(f'{len(self.nuevas_relaciones)} new relation(s)')
-        return ' · '.join(partes) or 'no changes'
+        parts = []
+        if self.new_entities:
+            sample = ', '.join(e['value'] for e in self.new_entities[:3])
+            more_n = f' (+{len(self.new_entities) - 3} more)' if len(self.new_entities) > 3 else ''
+            parts.append(f'{len(self.new_entities)} new entity(ies): {sample}{more_n}')
+        if self.prop_changes:
+            parts.append(f'{len(self.prop_changes)} change(s) in existing data')
+        if self.new_relations:
+            parts.append(f'{len(self.new_relations)} new relation(s)')
+        return ' · '.join(parts) or 'no changes'
 
     def to_dict(self) -> dict:
-        return {'nuevas_entidades': self.nuevas_entidades,
-                'nuevas_relaciones': self.nuevas_relaciones,
-                'cambios_prop': self.cambios_prop}
+        return {'new_entities': self.new_entities,
+                'new_relations': self.new_relations,
+                'prop_changes': self.prop_changes}
 
 
-def diff(antes: dict, despues: dict) -> Changes:
+def diff(before: dict, after: dict) -> Changes:
     """Compares two snapshots and returns the changes."""
-    a, d = antes['ents'], despues['ents']
-    nuevas = [{'type': d[i]['type'], 'value': d[i]['value']} for i in d if i not in a]
-    nuevas_rel = sorted(despues['rels'] - antes['rels'])
-    cambios = []
+    a, d = before['ents'], after['ents']
+    new_ents = [{'type': d[i]['type'], 'value': d[i]['value']} for i in d if i not in a]
+    new_rels = sorted(after['rels'] - before['rels'])
+    changes = []
     for i in d:
         if i not in a:
             continue
         # properties that appeared or changed value
         for k, v in d[i]['props'].items():
             if a[i]['props'].get(k) != v:
-                cambios.append({'entidad': d[i]['value'], 'type': d[i]['type'],
-                                'campo': k, 'antes': a[i]['props'].get(k), 'ahora': v})
+                changes.append({'entity': d[i]['value'], 'type': d[i]['type'],
+                                'field': k, 'before': a[i]['props'].get(k), 'now': v})
         # new tags (e.g. 'vulnerable', 'takeover' appear after a re-scan)
         for t in sorted(set(d[i]['tags']) - set(a[i]['tags'])):
-            cambios.append({'entidad': d[i]['value'], 'type': d[i]['type'],
-                            'campo': 'tag', 'antes': None, 'ahora': t})
-    return Changes(nuevas, nuevas_rel, cambios)
+            changes.append({'entity': d[i]['value'], 'type': d[i]['type'],
+                            'field': 'tag', 'before': None, 'now': t})
+    return Changes(new_ents, new_rels, changes)
 
 
 def _ahora() -> str:
@@ -105,25 +105,25 @@ class Monitor:
 
     def cycle(self) -> Changes:
         """One cycle: snapshot, refresh, snapshot, diff, alert. Never raises (isolates failures)."""
-        antes = self.snapshot_fn()
+        before = self.snapshot_fn()
         try:
             self.refrescar_fn()
         except Exception:
             pass                          # a network failure does not take down the monitor
-        despues = self.snapshot_fn()
-        cambios = diff(antes, despues)
+        after = self.snapshot_fn()
+        changes = diff(before, after)
         self.last_cycle = _ahora()
-        if cambios.hay():
-            alerta = {'ts': self.last_cycle, 'summary': cambios.summary(),
-                      'cambios': cambios.to_dict()}
+        if changes.has_changes():
+            alerta = {'ts': self.last_cycle, 'summary': changes.summary(),
+                      'changes': changes.to_dict()}
             self.alerts.insert(0, alerta)
             del self.alerts[self.max_alertas:]
             if self.on_alerta:
                 try:
-                    self.on_alerta(cambios)
+                    self.on_alerta(changes)
                 except Exception:
                     pass
-        return cambios
+        return changes
 
     def _loop(self):
         # wait() returns True if stop was requested; False on timeout -> runs a cycle

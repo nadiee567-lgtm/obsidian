@@ -686,7 +686,7 @@ async function ejecutarKali() {
         try {
           const d = JSON.parse(line.slice(5));
           if (d.status === 'completed') {
-            const res = d.resultado;
+            const res = d.result;
             if (res.error) {
               append(out, '❌ ' + res.error + '\n', 'error');
             } else {
@@ -769,7 +769,7 @@ async function ejecutarParrot() {
         try {
           const d = JSON.parse(line.slice(5));
           if (d.status === 'completed') {
-            const res = d.resultado;
+            const res = d.result;
             if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
             else append(out, res.output + '\n');
           } else if (d.status === 'error') {
@@ -849,7 +849,7 @@ async function ejecutarRemnux() {
         try {
           const d = JSON.parse(line.slice(5));
           if (d.status === 'completed') {
-            const res = d.resultado;
+            const res = d.result;
             if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
             else append(out, res.output + '\n');
           } else if (d.status === 'error') {
@@ -929,7 +929,7 @@ async function ejecutarBlackarch() {
         try {
           const d = JSON.parse(line.slice(5));
           if (d.status === 'completed') {
-            const res = d.resultado;
+            const res = d.result;
             if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
             else append(out, res.output + '\n');
           } else if (d.status === 'error') {
@@ -964,7 +964,7 @@ async function checkURL() {
         if(!line.startsWith('data:')) continue;
         const d = JSON.parse(line.slice(5));
         if(d.status === 'completed') {
-          const res = d.resultado?.results || {};
+          const res = d.result?.results || {};
           out.innerHTML = '';
           const score = res.score_phishing || 0;
           const color = score >= 70 ? '#d9564b' : score >= 40 ? '#cc9a3c' : '#6fae7c';
@@ -1006,7 +1006,7 @@ async function checkPassword() {
         if(!line.startsWith('data:')) continue;
         const d = JSON.parse(line.slice(5));
         if(d.status === 'completed') {
-          const res = d.resultado?.results || {};
+          const res = d.result?.results || {};
           out.innerHTML = '';
           const color = res.score >= 75 ? '#6fae7c' : res.score >= 55 ? '#cc9a3c' : '#d9564b';
           append(out, `LEVEL: ${res.nivel} (${res.score}/100)\n`, res.score >= 55 ? 'ok' : 'warn');
@@ -1237,7 +1237,7 @@ async function ejecutar() {
           const d = JSON.parse(line.slice(5));
           if (d.status === 'starting') { append(out, '⚡ Processing...\n', 'info'); }
           else if (d.status === 'completed') {
-            const res = d.resultado;
+            const res = d.result;
             const tipo = res?.tipo || '';
             const results = res?.results || {};
             // Smart rendering by type
@@ -1296,7 +1296,7 @@ async function runSim(mod) {
         try {
           const d = JSON.parse(line.slice(5));
           if (d.status === 'completed') {
-            const analisis = d.resultado?.results?.analisis || JSON.stringify(d.resultado,null,2);
+            const analisis = d.result?.results?.analisis || JSON.stringify(d.result,null,2);
             append(out, '\n' + analisis + '\n');
           }
         } catch(e) {}

@@ -1,4 +1,4 @@
-"""Tests de la capa unificada de buscadores + traductor (F8 pasos 106, 117).
+"""Tests de la capa unificada de buscadores + traductor (F8 steps 106, 117).
 
 Correr:  ../.venv/bin/python -m pytest test_motores.py -q
 """

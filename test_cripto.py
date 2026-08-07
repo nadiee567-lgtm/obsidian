@@ -16,9 +16,9 @@ class _R:
 
 
 def _run_one(name, type, value):
-    alm = Store()
-    e = alm.create(type, value)
-    return run_by_name(name, e, alm), e, alm
+    store = Store()
+    e = store.create(type, value)
+    return run_by_name(name, e, store), e, store
 
 
 # ── 137: wallet extraction ──────────────────────────────────────────────────
@@ -72,9 +72,9 @@ def test_exchange_attrib():
 def test_riesgo_wallet_y_regla(monkeypatch):
     from core.correlacion import correlate
     monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
-    prod, e, alm = _run_one('riesgo_wallet', 'wallet', '1BadRansomAddr')
+    prod, e, store = _run_one('riesgo_wallet', 'wallet', '1BadRansomAddr')
     assert 'ransomware' in e.tags
-    h = correlate(alm)
+    h = correlate(store)
     assert any(x.rule == 'wallet-ransomware' and x.severity == 'critical' for x in h)
 
 
@@ -101,11 +101,11 @@ def test_eth_balance_ignora_btc():
 def test_monitor_detecta_movimiento_wallet():
     """Watching a wallet = the monitor diffs its balance; a movement => alert."""
     from core.monitor import snapshot, diff
-    alm = Store()
-    w = alm.create('wallet', _GENESIS, properties={'btc_balance': 1.5, 'btc_tx': 10})
-    antes = snapshot(alm)
+    store = Store()
+    w = store.create('wallet', _GENESIS, properties={'btc_balance': 1.5, 'btc_tx': 10})
+    before = snapshot(store)
     w.properties['btc_balance'] = 3.0                 # money moved in/out
     w.properties['btc_tx'] = 11
-    cambios = diff(antes, snapshot(alm))
-    campos = {c['campo'] for c in cambios.cambios_prop}
-    assert {'btc_balance', 'btc_tx'} <= campos and cambios.hay()
+    changes = diff(before, snapshot(store))
+    campos = {c['field'] for c in changes.prop_changes}
+    assert {'btc_balance', 'btc_tx'} <= campos and changes.has_changes()

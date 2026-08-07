@@ -1,6 +1,6 @@
-# OBSIDIAN — dependencias de desarrollo (tests + análisis estático)
-# Instalar:  pip install -r requirements-dev.txt
-# Incluye también las de ejecución.
+# OBSIDIAN — development dependencies (tests + static analysis)
+# Install:  pip install -r requirements-dev.txt
+# Also includes the runtime ones.
 
 -r requirements.txt
 

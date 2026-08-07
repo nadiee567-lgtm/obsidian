@@ -14,8 +14,8 @@ class _R:
         return self._data
 
 
-def _cliente_con(alm, monkeypatch):
-    monkeypatch.setattr(ob, '_store', alm)
+def _cliente_con(store, monkeypatch):
+    monkeypatch.setattr(ob, '_store', store)
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
@@ -24,12 +24,12 @@ def _cliente_con(alm, monkeypatch):
 
 # ── 144: asset inventory ────────────────────────────────────────────────────
 def test_inventario(monkeypatch):
-    alm = Store()
-    alm.create('domain', 'x.com')
-    alm.create('ip', '1.2.3.4')
-    alm.create('port', '1.2.3.4:443')
-    alm.create('email', 'a@x.com')                # NOT an internet-facing asset
-    c = _cliente_con(alm, monkeypatch)
+    store = Store()
+    store.create('domain', 'x.com')
+    store.create('ip', '1.2.3.4')
+    store.create('port', '1.2.3.4:443')
+    store.create('email', 'a@x.com')                # NOT an internet-facing asset
+    c = _cliente_con(store, monkeypatch)
     d = c.get('/api/v2/inventory').get_json()
     assert d['total_activos'] == 3               # domain+ip+port, not the email
     assert set(d['inventario']) == {'domain', 'ip', 'port'}
@@ -38,34 +38,34 @@ def test_inventario(monkeypatch):
 # ── 145 + 146: continuous discovery + change detection (via the monitor) ─────
 def test_descubrimiento_y_cambios_via_monitor():
     from core.monitor import snapshot, diff
-    alm = Store()
-    d = alm.create('domain', 'x.com', properties={'cert_expires': '2027'})
-    antes = snapshot(alm)
-    alm.create('subdomain', 'nuevo.x.com')       # new asset (145)
-    alm.create('port', '1.2.3.4:22')            # new port (146)
+    store = Store()
+    d = store.create('domain', 'x.com', properties={'cert_expires': '2027'})
+    before = snapshot(store)
+    store.create('subdomain', 'nuevo.x.com')       # new asset (145)
+    store.create('port', '1.2.3.4:22')            # new port (146)
     d.properties['cert_expires'] = '2020'        # cert changed (146)
-    cambios = diff(antes, snapshot(alm))
-    valores = {e['value'] for e in cambios.nuevas_entidades}
+    changes = diff(before, snapshot(store))
+    valores = {e['value'] for e in changes.new_entities}
     assert {'nuevo.x.com', '1.2.3.4:22'} <= valores
-    assert any(c['campo'] == 'cert_expires' for c in cambios.cambios_prop)
+    assert any(c['field'] == 'cert_expires' for c in changes.prop_changes)
 
 
 # ── 147: infrastructure clustering ──────────────────────────────────────────
 def test_infra_compartida():
     from core.correlacion import correlate
-    alm = Store()
-    alm.create('domain', 'a.com', properties={'favicon_hash': '123456'})
-    alm.create('domain', 'b.com', properties={'favicon_hash': '123456'})   # same favicon
-    alm.create('domain', 'c.com', properties={'favicon_hash': '999'})       # different
-    r = [x for x in correlate(alm) if x.rule == 'shared-infra']
+    store = Store()
+    store.create('domain', 'a.com', properties={'favicon_hash': '123456'})
+    store.create('domain', 'b.com', properties={'favicon_hash': '123456'})   # same favicon
+    store.create('domain', 'c.com', properties={'favicon_hash': '999'})       # different
+    r = [x for x in correlate(store) if x.rule == 'shared-infra']
     assert len(r) == 1 and len(r[0].entities) == 2                          # a.com and b.com
 
 
 def test_infra_compartida_sin_grupo():
     from core.correlacion import correlate
-    alm = Store()
-    alm.create('domain', 'solo.com', properties={'favicon_hash': '111'})
-    assert not [x for x in correlate(alm) if x.rule == 'shared-infra']
+    store = Store()
+    store.create('domain', 'solo.com', properties={'favicon_hash': '111'})
+    assert not [x for x in correlate(store) if x.rule == 'shared-infra']
 
 
 # ── 148: tech -> CVE map (cve_lookup, with anti-noise CPE filter) ────────────
@@ -77,8 +77,8 @@ def test_cve_lookup_tech(monkeypatch):
                  'configurations': [{'nodes': [{'cpeMatch': [{'criteria': 'cpe:2.3:a:apache:httpd:2.4'}]}]}]}},
     ]}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=resp))
-    alm = Store()
-    prod = run_by_name('cve_lookup', alm.create('tech', 'nginx'), alm)
+    store = Store()
+    prod = run_by_name('cve_lookup', store.create('tech', 'nginx'), store)
     cids = {x.value for x in prod if x.type == 'cve'}
     assert cids == {'CVE-2021-1234'}             # anti-noise CPE filter: only the nginx one
 
@@ -93,22 +93,22 @@ def test_score_exposicion():
 
 
 def test_exposicion_endpoint(monkeypatch):
-    alm = Store()
+    store = Store()
     for i in range(5):
-        alm.create('subdomain', f's{i}.x.com')
-    c = _cliente_con(alm, monkeypatch)
+        store.create('subdomain', f's{i}.x.com')
+    c = _cliente_con(store, monkeypatch)
     d = c.get('/api/v2/exposure').get_json()
-    assert d['superficie']['subdomain'] == 5 and 0 <= d['exposicion'] <= 100
+    assert d['surface']['subdomain'] == 5 and 0 <= d['exposicion'] <= 100
 
 
 # ── 150: Shadow IT / forgotten assets ───────────────────────────────────────
 def test_shadow_it():
     from core.correlacion import correlate
-    alm = Store()
-    alm.create('bucket', 'acme-backups').tag('public')           # open storage
-    alm.create('subdomain', 'viejo.acme.com', properties={'http_status': 503})  # broken
-    alm.create('subdomain', 'vivo.acme.com', properties={'http_status': 200})   # healthy
-    r = [x for x in correlate(alm) if x.rule == 'shadow-it']
+    store = Store()
+    store.create('bucket', 'acme-backups').tag('public')           # open storage
+    store.create('subdomain', 'viejo.acme.com', properties={'http_status': 503})  # broken
+    store.create('subdomain', 'vivo.acme.com', properties={'http_status': 200})   # healthy
+    r = [x for x in correlate(store) if x.rule == 'shadow-it']
     sev = {x.severity for x in r}
     assert len(r) == 2 and sev == {'high', 'medium'}                    # bucket + broken subdom
 
@@ -118,12 +118,12 @@ def test_diff_historico(tmp_path):
     from core.workspaces import Manager
     g = Manager(str(tmp_path))
     g.create('caso')
-    alm = Store()
-    alm.create('subdomain', 'a.x.com')
-    g.save('caso', alm)
+    store = Store()
+    store.create('subdomain', 'a.x.com')
+    g.save('caso', store)
     sid = g.snapshot('caso')                     # historical snapshot: 1 asset
-    alm.create('subdomain', 'b.x.com')           # a new asset appeared
-    g.save('caso', alm)
+    store.create('subdomain', 'b.x.com')           # a new asset appeared
+    g.save('caso', store)
     viejo = g.load_snapshot('caso', sid)
     assert len(viejo) == 1
     nuevos = {e.id for e in g.load('caso').entities} - {e.id for e in viejo.entities}

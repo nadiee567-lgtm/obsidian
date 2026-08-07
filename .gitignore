@@ -1,4 +1,4 @@
-# Respaldos locales — nunca al repo
+# Local backups — never commit
 *.bak
 *.bak-*
 *.orig
@@ -10,7 +10,7 @@ __pycache__/
 venv/
 *.egg-info/
 
-# Datos de investigación y estado — PRIVADOS, jamás públicos
+# Investigation data and state — PRIVATE, never public
 obsidian-cases/
 *.db
 *.sqlite
@@ -18,16 +18,19 @@ obsidian-cases/
 auth.json
 screenshots/
 
-# Secretos / llaves de API
+# Secrets / API keys
 .env
 *.pem
 *.key
 apikeys.json
 secrets.json
 
-# Estáticos generados / grandes
+# Generated / large static assets
 vis-network.min.js
 
-# Sistema
+# Tooling output (local paths + cache — never commit)
+graphify-out/
+
+# System
 .DS_Store
 *.log

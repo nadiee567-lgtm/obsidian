@@ -8,9 +8,9 @@ from core.transforms import run_by_name
 
 
 def _run_one(name, type, value):
-    alm = Store()
-    e = alm.create(type, value)
-    return run_by_name(name, e, alm), e
+    store = Store()
+    e = store.create(type, value)
+    return run_by_name(name, e, store), e
 
 
 # ── 171: regional social platforms ──────────────────────────────────────────
@@ -29,8 +29,8 @@ def test_transliterar_funciones():
 
 def test_transliterar_transform():
     prod, _ = _run_one('transliterate', 'person', 'Иван')
-    variantes = {p.value for p in prod if p.type == 'person'}
-    assert 'ivan' in variantes                    # latin variant
+    variants = {p.value for p in prod if p.type == 'person'}
+    assert 'ivan' in variants                    # latin variant
 
 
 # ── 173: regional registries ────────────────────────────────────────────────
@@ -59,7 +59,7 @@ def test_idioma_endpoint(monkeypatch):
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    d = c.post('/api/v2/language', json={'texto': 'Привет'}).get_json()
+    d = c.post('/api/v2/language', json={'text': 'Привет'}).get_json()
     assert d['idioma'] == 'ru' and 'Yandex' in d['fuente_sugerida']
 
 

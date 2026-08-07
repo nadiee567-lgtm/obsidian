@@ -20,7 +20,7 @@ try:
 except Exception:
     Vault = None
 
-SESION = os.path.join(HOME, '.obsidian', 'telegram.session')
+SESSION = os.path.join(HOME, '.obsidian', 'telegram.session')
 
 
 def _cred():
@@ -46,12 +46,12 @@ def main():
               "  OBSIDIAN_API_ID=... OBSIDIAN_API_HASH=... python telegram_login.py")
         return 1
     from telethon.sync import TelegramClient
-    os.makedirs(os.path.dirname(SESION), exist_ok=True)
-    with TelegramClient(SESION, int(api_id), api_hash) as cli:
+    os.makedirs(os.path.dirname(SESSION), exist_ok=True)
+    with TelegramClient(SESSION, int(api_id), api_hash) as cli:
         cli.start()   # asks for phone + code interactively
         yo = cli.get_me()
         print(f"✓ Session created for @{getattr(yo, 'username', None) or yo.id}")
-        print(f"  Saved to {SESION}. You can now use the 'telegram' transform in OBSIDIAN.")
+        print(f"  Saved to {SESSION}. You can now use the 'telegram' transform in OBSIDIAN.")
     return 0
 
 

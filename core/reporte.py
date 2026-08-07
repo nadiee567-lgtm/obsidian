@@ -12,10 +12,10 @@ import html
 import json
 import datetime
 
-from core.modelo import TIPOS
+from core.modelo import TYPES
 
 _SEV_COLOR = {'critical': '#f38ba8', 'high': '#fab387', 'medium': '#f9e2af', 'low': '#89b4fa'}  # Catppuccin Mocha
-_SEV_ORDEN = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
+_SEV_ORDER = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
 
 
 def _e(v) -> str:
@@ -23,43 +23,43 @@ def _e(v) -> str:
     return html.escape(str(v), quote=True)
 
 
-def _severity_summary(hallazgos) -> dict:
-    conteo = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
-    for h in hallazgos:
+def _severity_summary(findings) -> dict:
+    counts = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
+    for h in findings:
         sev = getattr(h, 'severity', None)
-        if sev in conteo:
-            conteo[sev] += 1
-    return conteo
+        if sev in counts:
+            counts[sev] += 1
+    return counts
 
 
-def _graph_data(almacen) -> tuple:
+def _graph_data(store) -> tuple:
     """Nodes/edges for vis-network, with the same per-type color as /v2."""
     nodos, aristas = [], []
-    for e in almacen.entities:
-        color = TIPOS.get(e.type, {}).get('color', '#8b8b98')
+    for e in store.entities:
+        color = TYPES.get(e.type, {}).get('color', '#8b8b98')
         nodos.append({'id': e.id, 'label': e.value, 'color': color, 'shape': 'dot',
                       'group': e.type})
-    for r in almacen.relations:
+    for r in store.relations:
         aristas.append({'from': r.source, 'to': r.target, 'label': r.label})
     return nodos, aristas
 
 
-def generate_report(almacen, hallazgos=None, score=0, meta=None, vis_js=None) -> str:
+def generate_report(store, findings=None, score=0, meta=None, vis_js=None) -> str:
     """Returns the full report HTML.
 
-    almacen   -- typed Store (source of entities/relations)
-    hallazgos -- list of Finding from correlacion.correlate() (or None)
+    store   -- typed Store (source of entities/relations)
+    findings -- list of Finding from correlacion.correlate() (or None)
     score     -- risk score 0-100 (correlacion.risk_score)
     meta      -- {'workspace','target','generado'} optional
     vis_js    -- vis-network.min.js content to embed (or None: no graph)
     """
-    hallazgos = list(hallazgos or [])
-    hallazgos.sort(key=lambda h: -_SEV_ORDEN.get(getattr(h, 'severity', ''), 0))
+    findings = list(findings or [])
+    findings.sort(key=lambda h: -_SEV_ORDER.get(getattr(h, 'severity', ''), 0))
     meta = meta or {}
     generado = meta.get('generado') or datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
     ws = meta.get('workspace') or 'ephemeral'
     target = meta.get('target') or '—'
-    conteo = _severity_summary(hallazgos)
+    counts = _severity_summary(findings)
 
     # ── score bar colored by level ──
     if score >= 70:   score_col = _SEV_COLOR['critical']
@@ -68,28 +68,28 @@ def generate_report(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
     else:             score_col = _SEV_COLOR['low']
 
     # ── findings ──
-    if hallazgos:
-        filas = []
-        for h in hallazgos:
+    if findings:
+        rows = []
+        for h in findings:
             sev = getattr(h, 'severity', 'low')
             col = _SEV_COLOR.get(sev, '#8b8b98')
             n_ent = len(getattr(h, 'entities', []) or [])
-            filas.append(
+            rows.append(
                 f'<tr><td><span class="sev" style="background:{col}">{_e(sev)}</span></td>'
                 f'<td class="rule">{_e(getattr(h, "rule", ""))}</td>'
                 f'<td>{_e(getattr(h, "message", ""))}</td>'
                 f'<td class="num">{n_ent}</td></tr>')
         hallazgos_html = (
-            '<table class="hallazgos"><thead><tr><th>Severity</th><th>Rule</th>'
+            '<table class="findings"><thead><tr><th>Severity</th><th>Rule</th>'
             '<th>Detail</th><th>Entities</th></tr></thead><tbody>'
-            + ''.join(filas) + '</tbody></table>')
+            + ''.join(rows) + '</tbody></table>')
     else:
         hallazgos_html = '<p class="vacio">No risks detected by the correlation engine.</p>'
 
     # ── entity inventory by type ──
     bloques = []
-    for type, info in TIPOS.items():
-        ents = almacen.of_type(type)
+    for type, info in TYPES.items():
+        ents = store.of_type(type)
         if not ents:
             continue
         color = info['color']
@@ -104,7 +104,7 @@ def generate_report(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
             fuentes = ', '.join(_e(o) for o in sorted(e.sources)) or '—'
             items.append(
                 f'<li><span class="val">{_e(e.value)}</span> {tags}'
-                f'<div class="fuente">sources: {fuentes}</div>{extra}</li>')
+                f'<div class="source">sources: {fuentes}</div>{extra}</li>')
         bloques.append(
             f'<section class="type"><h3><span class="dot" style="background:{color}"></span>'
             f'{_e(info["label"])} <span class="cnt">{len(ents)}</span></h3>'
@@ -113,7 +113,7 @@ def generate_report(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
 
     # ── embedded graph (optional, self-contained) ──
     if vis_js:
-        nodos, aristas = _graph_data(almacen)
+        nodos, aristas = _graph_data(store)
         grafo_html = f'''
   <h2>Relationship graph</h2>
   <div id="grafo"></div>
@@ -131,7 +131,7 @@ def generate_report(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
 
     chips = ''.join(
         f'<span class="chip" style="border-color:{_SEV_COLOR[s]}">'
-        f'<b style="color:{_SEV_COLOR[s]}">{conteo[s]}</b> {s}</span>'
+        f'<b style="color:{_SEV_COLOR[s]}">{counts[s]}</b> {s}</span>'
         for s in ('critical', 'high', 'medium', 'low'))
 
     return f'''<!doctype html>
@@ -164,7 +164,7 @@ def generate_report(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
   .type li{{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.6rem .7rem}}
   .val{{font-family:ui-monospace,monospace;color:var(--txt);word-break:break-all}}
   .tag{{display:inline-block;background:#2a2a36;color:var(--amber);border-radius:4px;padding:.02rem .4rem;font-size:.68rem;margin-left:.3rem}}
-  .fuente,.props{{color:var(--muted);font-size:.72rem;margin-top:.3rem;word-break:break-all}}
+  .source,.props{{color:var(--muted);font-size:.72rem;margin-top:.3rem;word-break:break-all}}
   .vacio{{color:var(--muted);font-style:italic}}
   #grafo{{height:520px;background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:.5rem}}
   footer{{margin-top:3rem;padding-top:1rem;border-top:1px solid var(--line);color:var(--muted);font-size:.78rem}}
@@ -184,7 +184,7 @@ def generate_report(almacen, hallazgos=None, score=0, meta=None, vis_js=None) ->
   </div>
   <h1><span class="sq"></span>OBSIDIAN — Reconnaissance report</h1>
   <div class="meta">Workspace: <b>{_e(ws)}</b> · Target: <b>{_e(target)}</b> ·
-    Entities: <b>{len(almacen)}</b> · Generated: <b>{_e(generado)}</b></div>
+    Entities: <b>{len(store)}</b> · Generated: <b>{_e(generado)}</b></div>
 
   <h2>Risk summary</h2>
   <div class="score">

@@ -48,9 +48,9 @@ class Manager:
             raise ValueError('invalid workspace name')
         if os.path.exists(r):
             raise ValueError('a workspace with that name already exists')
-        alm = Store()
-        save_store(alm, r)   # creates the file + schema
-        return alm
+        store = Store()
+        save_store(store, r)   # creates the file + schema
+        return store
 
     def load(self, name):
         r = self._path(name)
@@ -58,11 +58,11 @@ class Manager:
             raise KeyError('workspace not found')
         return load_store(r)
 
-    def save(self, name, almacen):
+    def save(self, name, store):
         r = self._path(name)
         if not r:
             raise ValueError('invalid workspace name')
-        save_store(almacen, r)
+        save_store(store, r)
 
     def delete(self, name):
         r = self._path(name)
@@ -71,8 +71,8 @@ class Manager:
             return True
         return False
 
-    def rename(self, viejo, nuevo):
-        rv, rn = self._path(viejo), self._path(nuevo)
+    def rename(self, old, new):
+        rv, rn = self._path(old), self._path(new)
         if not rv or not os.path.exists(rv):
             raise KeyError('workspace not found')
         if not rn:

@@ -3,7 +3,7 @@
 Run:  ../.venv/bin/python -m pytest test_modelo.py -q
 """
 import pytest
-from core.modelo import Entity, Relation, Store, normalize, TIPOS, valid_type
+from core.modelo import Entity, Relation, Store, normalize, TYPES, valid_type
 from core.eventos import Bus, ENTITY_NEW, ENTITY_UPDATED, RELATION_NEW
 
 
@@ -34,7 +34,7 @@ def test_valor_vacio_falla():
         Entity('domain', '   ')
 
 def test_todos_los_tipos_del_catalogo_sirven():
-    for type in TIPOS:
+    for type in TYPES:
         assert valid_type(type)
         Entity(type, 'value-de-prueba')   # must not raise
 
@@ -55,40 +55,40 @@ def test_fusionar_distinto_id_falla():
 
 # ── store: automatic dedup (steps 16, 17) ───────────────────────────────────
 def test_store_dedup():
-    alm = Store()
-    alm.create('domain', 'example.com', sources={'whois'})
-    alm.create('domain', 'WWW.example.com', sources={'crtsh'})   # same domain
-    assert len(alm) == 1, "must collapse into a single entity"
-    ent = alm.find('domain', 'example.com')
+    store = Store()
+    store.create('domain', 'example.com', sources={'whois'})
+    store.create('domain', 'WWW.example.com', sources={'crtsh'})   # same domain
+    assert len(store) == 1, "must collapse into a single entity"
+    ent = store.find('domain', 'example.com')
     assert ent.sources == {'whois', 'crtsh'}, "merged sources"
 
 def test_store_of_type_and_find():
-    alm = Store()
-    alm.create('ip', '8.8.8.8')
-    alm.create('ip', '1.1.1.1')
-    alm.create('email', 'a@b.com')
-    assert len(alm.of_type('ip')) == 2
-    assert alm.find('email', 'A@B.com') is not None   # respects normalization
+    store = Store()
+    store.create('ip', '8.8.8.8')
+    store.create('ip', '1.1.1.1')
+    store.create('email', 'a@b.com')
+    assert len(store.of_type('ip')) == 2
+    assert store.find('email', 'A@B.com') is not None   # respects normalization
 
 
 # ── relations: deterministic and non-duplicated (step 15) ───────────────────
 def test_relations_dedup():
-    alm = Store()
-    d = alm.create('domain', 'example.com')
-    i = alm.create('ip', '93.184.216.34')
-    alm.relate(d, i, 'resuelve_a')
-    alm.relate(d, i, 'resuelve_a')   # same relation again
-    assert len(alm.relations) == 1
+    store = Store()
+    d = store.create('domain', 'example.com')
+    i = store.create('ip', '93.184.216.34')
+    store.relate(d, i, 'resuelve_a')
+    store.relate(d, i, 'resuelve_a')   # same relation again
+    assert len(store.relations) == 1
 
 
 # ── round-trip serialization (step 21) ──────────────────────────────────────
 def test_store_roundtrip():
-    alm = Store()
-    d = alm.create('domain', 'example.com', sources={'whois'}, properties={'reg': 'GoDaddy'})
-    i = alm.create('ip', '93.184.216.34', sources={'dns'})
-    alm.relate(d, i, 'resuelve_a')
+    store = Store()
+    d = store.create('domain', 'example.com', sources={'whois'}, properties={'reg': 'GoDaddy'})
+    i = store.create('ip', '93.184.216.34', sources={'dns'})
+    store.relate(d, i, 'resuelve_a')
 
-    d2 = alm.to_dict()
+    d2 = store.to_dict()
     alm2 = Store.from_dict(d2)
 
     assert len(alm2) == 2
@@ -143,9 +143,9 @@ def test_bus_publica_entidad_nueva_y_actualizada():
     nuevas, actualizadas = [], []
     bus.subscribe(ENTITY_NEW, lambda e: nuevas.append(e))
     bus.subscribe(ENTITY_UPDATED, lambda e: actualizadas.append(e))
-    alm = Store(bus=bus)
-    alm.create('domain', 'example.com')            # new
-    alm.create('domain', 'www.example.com')        # same id -> updated
+    store = Store(bus=bus)
+    store.create('domain', 'example.com')            # new
+    store.create('domain', 'www.example.com')        # same id -> updated
     assert len(nuevas) == 1
     assert len(actualizadas) == 1
 
@@ -153,11 +153,11 @@ def test_bus_publishes_new_relation():
     bus = Bus()
     rels = []
     bus.subscribe(RELATION_NEW, lambda r: rels.append(r))
-    alm = Store(bus=bus)
-    d = alm.create('domain', 'example.com')
-    i = alm.create('ip', '93.184.216.34')
-    alm.relate(d, i, 'resuelve_a')
-    alm.relate(d, i, 'resuelve_a')   # dup: does not re-publish
+    store = Store(bus=bus)
+    d = store.create('domain', 'example.com')
+    i = store.create('ip', '93.184.216.34')
+    store.relate(d, i, 'resuelve_a')
+    store.relate(d, i, 'resuelve_a')   # dup: does not re-publish
     assert len(rels) == 1
 
 def test_bus_aisla_fallos_de_suscriptor():

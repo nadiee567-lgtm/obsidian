@@ -27,23 +27,23 @@ def _cell(v) -> str:
     return s
 
 
-def exportar_json(almacen, hallazgos=None, score=0, meta=None) -> str:
+def export_json(store, findings=None, score=0, meta=None) -> str:
     """Full case in JSON, re-importable with Store.from_dict()."""
     meta = dict(meta or {})
     meta.setdefault('generado', datetime.datetime.now().isoformat(timespec='seconds'))
-    d = almacen.to_dict()
+    d = store.to_dict()
     d['meta'] = meta
     d['score'] = int(score)
-    d['hallazgos'] = [h.to_dict() for h in (hallazgos or [])]
+    d['findings'] = [h.to_dict() for h in (findings or [])]
     return json.dumps(d, ensure_ascii=False, indent=2)
 
 
-def exportar_csv(almacen) -> str:
+def export_csv(store) -> str:
     """One row per entity. Cells sanitized against formula injection."""
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(['type', 'value', 'tags', 'sources', 'confidence', 'properties'])
-    for e in sorted(almacen.entities, key=lambda x: (x.type, x.value)):
+    for e in sorted(store.entities, key=lambda x: (x.type, x.value)):
         props = '; '.join(f'{k}={v}' for k, v in (e.properties or {}).items())
         w.writerow([_cell(e.type), _cell(e.value), _cell(' '.join(sorted(e.tags))),
                     _cell(' '.join(sorted(e.sources))),

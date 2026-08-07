@@ -34,9 +34,9 @@ def test_traducir(monkeypatch):
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    d = c.post('/api/v2/translate', json={'texto': '你好世界'}).get_json()
+    d = c.post('/api/v2/translate', json={'text': '你好世界'}).get_json()
     assert d['traduccion'] == 'Hello world'
-    assert c.post('/api/v2/translate', json={'texto': ''}).status_code == 400
+    assert c.post('/api/v2/translate', json={'text': ''}).status_code == 400
 
 
 def test_traducir_sin_ia(monkeypatch):
@@ -45,26 +45,26 @@ def test_traducir_sin_ia(monkeypatch):
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    assert c.post('/api/v2/translate', json={'texto': 'x'}).status_code == 503
+    assert c.post('/api/v2/translate', json={'text': 'x'}).status_code == 503
 
 
 # ── 163: natural-language case summary (AI mode) ────────────────────────────
 def test_resumen_modo_ia(monkeypatch):
     import obsidian_web as ob
-    assert 'summary' in ob._PROMPTS_IA
+    assert 'summary' in ob._AI_PROMPTS
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'The target has 3 exposed subdomains.')
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
     d = c.post('/api/v2/ia/summary').get_json()
-    assert d['modo'] == 'summary' and 'subdomains' in d['resultado']
+    assert d['modo'] == 'summary' and 'subdomains' in d['result']
 
 
 # ── 164/166/167: AI modes (next step, narrative, classification) ────────────
 def test_modos_ia_extra():
     import obsidian_web as ob
-    assert {'siguiente', 'narrativa', 'clasificar'} <= set(ob._PROMPTS_IA)
+    assert {'siguiente', 'narrativa', 'clasificar'} <= set(ob._AI_PROMPTS)
 
 
 # ── 165: natural-language query -> plan ─────────────────────────────────────
@@ -97,7 +97,7 @@ def test_deteccion_ia(monkeypatch):
     c = ob.app.test_client()
     with c.session_transaction() as s:
         s['auth'] = True
-    d = c.post('/api/v2/ai_detection', json={'texto': 'lorem ipsum...'}).get_json()
+    d = c.post('/api/v2/ai_detection', json={'text': 'lorem ipsum...'}).get_json()
     assert 'evaluacion' in d and 'A HINT' in d['aviso']   # honesty: gives no certainty
 
 

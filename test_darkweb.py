@@ -8,9 +8,9 @@ from core.transforms import run_by_name
 
 
 def _run_one(name, type, value):
-    alm = Store()
-    e = alm.create(type, value)
-    return run_by_name(name, e, alm), e
+    store = Store()
+    e = store.create(type, value)
+    return run_by_name(name, e, store), e
 
 
 # ── 128: .onion routing over Tor ────────────────────────────────────────────
@@ -72,7 +72,7 @@ def test_telegram_sin_sesion(monkeypatch):
 
 # ── 131: channel monitoring (testable logic; fetch degrades without an account) ─
 def test_coincidencias_leak():
-    hits = ob.leak_matches(['hola mundo', 'nueva DATABASE a la venta', 'ransomware group', 'nada'])
+    hits = ob.leak_matches(['hola mundo', 'new_one DATABASE a la venta', 'ransomware group', 'nada'])
     assert len(hits) == 2 and {h['keyword'] for h in hits} == {'database', 'ransomware'}
 
 
