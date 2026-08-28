@@ -157,7 +157,7 @@
       </div>
       <div class="card">
         <h2>Findings · <span id="nHall">0</span><span class="score" id="scoreBadge"></span>
-          <button id="btnIA" class="btnia">🧠 IA</button>
+          <button id="btnIA" class="btnia">🧠 AI</button>
           <button id="btnEscudo" class="btnia" style="background:var(--cyan)">🛡️</button></h2>
         <div id="iaResumen"></div>
         <div class="iabtns">
@@ -171,7 +171,7 @@
       <div class="card">
         <h2>Monitor <span id="monEstado" class="score">off</span></h2>
         <div class="monctl">
-          <input id="monIntervalo" type="number" min="1" value="10" title="minutos"> min
+          <input id="monIntervalo" type="number" min="1" value="10" title="minutes"> min
           <button id="btnMonitor">▶ watch</button>
         </div>
         <div id="monInfo" class="vacio">Re-scans the target every N minutes and alerts if something changes.</div>
@@ -318,7 +318,7 @@ async function cargarModulos(type, value, cont){
   lista.forEach(t=>{
     const b=el('button','modbtn');
     b.innerHTML=esc(t.name)+(t.requires_key?' <span class="key">⚿</span>':'');
-    b.title=(t.description||'')+(t.requires_key?' · necesita API key (🔑)':''); b.onclick=()=>correr(type, value, t.name, t.requires_key);
+    b.title=(t.description||'')+(t.requires_key?' · needs an API key':''); b.onclick=()=>correr(type, value, t.name, t.requires_key);
     grid.appendChild(b);
   });
   cont.appendChild(grid);
@@ -419,7 +419,7 @@ async function analizarIA(){
   try{ const d=await(await fetch('/api/v2/findings/ia',{method:'POST'})).json();
     out.innerHTML='<div class="iaresumen">'+(d.resumen||d.error||'')+'</div>'; }
   catch(e){ out.textContent='Error: '+e.message; }
-  btn.disabled=false; btn.textContent='🧠 IA';
+  btn.disabled=false; btn.textContent='🧠 AI';
 }
 async function segundoEscudo(){
   const btn=$('#btnEscudo'),out=$('#iaResumen'); btn.disabled=true; btn.textContent='…';
@@ -440,8 +440,8 @@ async function cargarWorkspaces(){
 }
 async function abrirWs(){ const n=$('#wsSel').value; if(!n)return;
   await fetch('/api/v2/workspaces/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});
-  setStatus('workspace abierto: '+n); await cargarWorkspaces(); await pintarGrafo(); }
-async function crearWs(){ const n=$('#wsNuevo').value.trim(); if(!n){setStatus('escribe un name','err');return;}
+  setStatus('workspace opened: '+n); await cargarWorkspaces(); await pintarGrafo(); }
+async function crearWs(){ const n=$('#wsNuevo').value.trim(); if(!n){setStatus('enter a name','err');return;}
   const r=await fetch('/api/v2/workspaces',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});
   const d=await r.json(); if(!r.ok){setStatus('error: '+(d.error||r.status),'err');return;}
   $('#wsNuevo').value=''; setStatus('workspace created: '+d.active); await cargarWorkspaces(); await pintarGrafo(); }
@@ -493,10 +493,10 @@ async function panelKeys(){
   SERVICIOS_KEY.forEach(([s,hint])=>{
     const row=el('div','krow'); const ok=conf.has(s);
     const lab=el('span','ks'); lab.innerHTML=esc(s)+(ok?' <b style="color:var(--green)">●</b>':''); row.appendChild(lab);
-    const inp=el('input'); inp.type='password'; inp.placeholder=ok?'(configurada) — nueva para reemplazar':hint; row.appendChild(inp);
-    const g=el('button'); g.textContent='guardar'; g.onclick=async()=>{ if(!inp.value)return;
+    const inp=el('input'); inp.type='password'; inp.placeholder=ok?'(configured) — enter a new one to replace':hint; row.appendChild(inp);
+    const g=el('button'); g.textContent='save'; g.onclick=async()=>{ if(!inp.value)return;
       await fetch('/api/v2/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({service:s,value:inp.value})});
-      inp.value=''; setStatus('🔑 '+s+' guardada'); panelKeys(); }; row.appendChild(g);
+      inp.value=''; setStatus('🔑 '+s+' saved'); panelKeys(); }; row.appendChild(g);
     const st=el('span','kst');
     if(OBTENER[s]){ const o=el('a'); o.textContent='get'; o.href=OBTENER[s]; o.target='_blank'; o.style.cssText='color:var(--muted);font-size:.68rem;text-decoration:underline'; row.appendChild(o); }
     const p=el('button'); p.textContent='probar'; p.onclick=async()=>{ st.textContent='testing '+s+'…'; st.style.color='var(--muted)';
