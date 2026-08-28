@@ -13,7 +13,7 @@ import re
 import requests
 
 OLLAMA = os.environ.get('OBSIDIAN_OLLAMA', 'http://localhost:11434')
-MODELO = os.environ.get('OBSIDIAN_MODELO_IA', 'qwen2.5:3b')
+MODELO = os.environ.get('OBSIDIAN_MODELO_IA', 'qwen2.5:7b')
 NEXO = os.environ.get('OBSIDIAN_NEXO', '')       # '1' enables NEXO-style routing
 
 _S = requests.Session()
@@ -23,8 +23,8 @@ _ROUTING = {
     'seguridad': (['exploit', 'vuln', 'cve', 'attack', 'malware', 'ransomware',
                    'payload', 'pentest', 'shell', 'takeover'], 'dolphin-llama3'),
     'osint': (['osint', 'domain', 'subdomain', 'whois', 'dns', 'recon', 'wallet',
-               'breach', 'leak'], 'qwen2.5:3b'),
-    'codigo': (['code', 'python', 'function', 'regex', 'script', 'bug'], 'qwen2.5:3b'),
+               'breach', 'leak'], 'qwen2.5:7b'),
+    'codigo': (['code', 'python', 'function', 'regex', 'script', 'bug'], 'qwen2.5:7b'),
 }
 
 
@@ -36,7 +36,7 @@ def pick_model(text):
     if re.search(r'\b\d{1,3}(?:\.\d{1,3}){3}\b', t):
         puntajes['seguridad'] += 2
     cat = max(puntajes, key=puntajes.get)
-    return _ROUTING[cat][1] if puntajes[cat] > 0 else 'qwen2.5:1.5b'
+    return _ROUTING[cat][1] if puntajes[cat] > 0 else 'qwen2.5:3b'
 
 
 def available():
@@ -60,6 +60,6 @@ def ask(prompt, sistema=None, max_tokens=300, temp=0.4, modelo=None):
         'model': m,
         'messages': mensajes,
         'stream': False,
-        'options': {'num_ctx': 2048, 'num_predict': max_tokens, 'temperature': temp},
+        'options': {'num_ctx': 8192, 'num_predict': max_tokens, 'temperature': temp},
     }, timeout=(10, 120))
     return (r.json().get('message', {}) or {}).get('content', '').strip()

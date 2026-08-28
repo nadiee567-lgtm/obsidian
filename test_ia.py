@@ -84,9 +84,9 @@ def test_query_nl(monkeypatch):
 def test_choose_model_nexo():
     from core.ia import pick_model
     assert pick_model('find an exploit for this vuln') == 'dolphin-llama3'     # security
-    assert pick_model('recon of the domain and its subdomains') == 'qwen2.5:3b'   # osint
+    assert pick_model('recon of the domain and its subdomains') == 'qwen2.5:7b'   # osint
     assert pick_model('scan of 8.8.8.8') == 'dolphin-llama3'                   # IP -> security
-    assert pick_model('hello how are you') == 'qwen2.5:1.5b'                   # no signal -> fast
+    assert pick_model('hello how are you') == 'qwen2.5:3b'                    # no signal -> modest default
 
 
 # ── 169: AI detection (a hint, not proof) ───────────────────────────────────
