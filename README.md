@@ -62,7 +62,7 @@ report, JSON/CSV/PDF export, and a scriptable CLI that does all of the above.
 Requires Python 3.14. Clone it, install the dependencies, and run:
 
 ```bash
-git clone https://github.com/nadiee/obsidian.git
+git clone https://github.com/nadiee567-lgtm/obsidian.git
 cd obsidian
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
