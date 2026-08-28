@@ -10,7 +10,7 @@ from core.transforms import run_by_name
 from core.imagen import reverse_links, facial_links
 
 
-def test_reverse_links_todos_los_motores():
+def test_reverse_links_all_engines():
     d = reverse_links('https://x.com/a.jpg')
     assert set(d) == {'yandex', 'google', 'tineye', 'bing'}
     assert all(u.startswith('https://') for u in d.values())
@@ -39,7 +39,7 @@ def test_facial_links():
     assert d['pimeyes']['modo'] == 'upload'
 
 
-def test_busqueda_facial_transform():
+def test_search_facial_transform():
     store = Store()
     e = store.create('url', 'https://x.com/cara.jpg')
     prod = run_by_name('facial_search', e, store)
@@ -52,7 +52,7 @@ class _FakeStream:
         yield b'\xff\xd8fakeimage'
 
 
-def test_metadata_exif_como_entidades(monkeypatch):
+def test_metadata_exif_como_entities(monkeypatch):
     """El EXIF se vuelve entities pivotables: dispositivo, software, autor, GPS."""
     monkeypatch.setattr(ob, '_which', lambda x: True)
     monkeypatch.setattr(ob, '_fetch_seguro', lambda *a, **k: _FakeStream())
@@ -91,7 +91,7 @@ def test_cronolocalizacion(monkeypatch):
     assert any('40' in p.value for p in prod)         # coords en el link
 
 
-def test_satellite_requiere_gps():
+def test_satellite_requires_gps():
     from core.transforms import run_by_name
     store = Store()
     u = store.create('url', 'https://x.com/f.jpg')       # sin GPS
@@ -106,7 +106,7 @@ def test_landmarks():
     assert {p.properties.get('tool') for p in prod} == {'google_lens', 'mapillary', 'wikimapia'}
 
 
-def test_ocr_sin_tesseract(monkeypatch):
+def test_ocr_without_tesseract(monkeypatch):
     from core.transforms import run_by_name
     monkeypatch.setattr(ob, '_which', lambda x: False)
     store = Store()
@@ -114,7 +114,7 @@ def test_ocr_sin_tesseract(monkeypatch):
     assert run_by_name('ocr', u, store) == []   # degrada sin tesseract
 
 
-def test_geoloc_es_modo_ia():
+def test_geoloc_is_mode_ai():
     assert 'geoloc' in ob._AI_PROMPTS
 
 

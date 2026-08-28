@@ -19,13 +19,13 @@ def test_only_names_no_values(tmp_path):
     assert b.servicios() == ['hibp', 'shodan']   # sorted names, no values
 
 
-def test_persiste_entre_instancias(tmp_path):
+def test_persists_between_instances(tmp_path):
     Vault(str(tmp_path)).save('vt', 'MI-KEY')
     # another instance (simulates a restart) reads the same
     assert Vault(str(tmp_path)).get('vt') == 'MI-KEY'
 
 
-def test_archivo_esta_cifrado(tmp_path):
+def test_file_is_encrypted(tmp_path):
     b = Vault(str(tmp_path))
     b.save('shodan', 'VALOR-EN-CLARO-XYZ')
     # the on-disk file must NOT contain the value in plaintext
@@ -34,7 +34,7 @@ def test_archivo_esta_cifrado(tmp_path):
     assert b'shodan' not in raw
 
 
-def test_sin_la_clave_no_se_puede_leer(tmp_path):
+def test_without_key_no_puede_leer(tmp_path):
     b = Vault(str(tmp_path))
     b.save('shodan', 'SECRETO')
     # deleting the master key → the ciphertext is unreadable (no crash, returns empty)
@@ -44,7 +44,7 @@ def test_sin_la_clave_no_se_puede_leer(tmp_path):
     assert b2.get('shodan') is None
 
 
-def test_borrar(tmp_path):
+def test_delete(tmp_path):
     b = Vault(str(tmp_path))
     b.save('x', 'k')
     assert b.delete('x') is True

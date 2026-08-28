@@ -69,7 +69,7 @@ def test_exchange_attrib():
 
 
 # ── 141: risk scoring (ransomware) + rule ───────────────────────────────────
-def test_wallet_risk_y_regla(monkeypatch):
+def test_wallet_risk_rule(monkeypatch):
     from core.correlacion import correlate
     monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
     prod, e, store = _run_one('wallet_risk', 'wallet', '1BadRansomAddr')
@@ -78,7 +78,7 @@ def test_wallet_risk_y_regla(monkeypatch):
     assert any(x.rule == 'wallet-ransomware' and x.severity == 'critical' for x in h)
 
 
-def test_wallet_risk_limpia(monkeypatch):
+def test_wallet_risk_clears(monkeypatch):
     monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
     _, e, _ = _run_one('wallet_risk', 'wallet', _GENESIS)   # not in the list
     assert 'ransomware' not in e.tags
@@ -92,13 +92,13 @@ def test_eth_balance(monkeypatch):
     assert abs(e.properties.get('eth_balance') - 1.0) < 1e-9 and e.properties.get('cadena') == 'eth'
 
 
-def test_eth_balance_ignora_btc():
+def test_eth_balance_ignores_btc():
     _, e, _ = _run_one('eth_balance', 'wallet', _GENESIS)     # BTC -> not applicable
     assert 'eth_balance' not in e.properties
 
 
 # ── 143: movement alerts (via the existing monitor) ─────────────────────────
-def test_monitor_detecta_movimiento_wallet():
+def test_monitor_detects_movement_wallet():
     """Watching a wallet = the monitor diffs its balance; a movement => alert."""
     from core.monitor import snapshot, diff
     store = Store()

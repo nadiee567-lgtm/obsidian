@@ -20,11 +20,11 @@ def test_build_respects_own_server():
     assert url == 'https://ntfy.mydomain.com/t'
 
 
-def test_enviar_sin_topic_no_hace_nada():
+def test_send_without_topic_no_does_nothing():
     assert send_ntfy('', 'x') is False
 
 
-def test_enviar_con_fallo_de_red_no_lanza(monkeypatch):
+def test_send_with_failure_network_no_raises(monkeypatch):
     import core.notificar as n
     def boom(*a, **k):
         raise RuntimeError('no network')

@@ -6,7 +6,7 @@ import pytest
 from core.workspaces import Manager
 
 
-def test_crear_y_listar(tmp_path):
+def test_create_list(tmp_path):
     g = Manager(str(tmp_path))
     assert g.list_ws() == []
     g.create('caso1')
@@ -22,7 +22,7 @@ def test_no_duplicar(tmp_path):
         g.create('caso1')
 
 
-def test_persistencia_aislada(tmp_path):
+def test_persistence_isolated(tmp_path):
     """Each workspace stores its own, without mixing with another."""
     g = Manager(str(tmp_path))
     a = g.create('caso_a')
@@ -42,7 +42,7 @@ def test_persistencia_aislada(tmp_path):
     assert rb.find('domain', 'example.com') is None
 
 
-def test_sobrevive_recarga(tmp_path):
+def test_survives_reload(tmp_path):
     """State persists (does not live only in memory)."""
     g1 = Manager(str(tmp_path))
     a = g1.create('caso1')
@@ -55,7 +55,7 @@ def test_sobrevive_recarga(tmp_path):
     assert e is not None and 'interesting' in e.tags
 
 
-def test_borrar_y_renombrar(tmp_path):
+def test_delete_rename(tmp_path):
     g = Manager(str(tmp_path))
     g.create('viejo')
     g.rename('viejo', 'nuevo')
@@ -73,7 +73,7 @@ def test_malicious_names_rejected(tmp_path):
     assert g.list_ws() == []
 
 
-def test_historial(tmp_path):
+def test_history(tmp_path):
     g = Manager(str(tmp_path))
     g.create('caso')
     g.record('caso', 'dns_a', 'example.com', 3)

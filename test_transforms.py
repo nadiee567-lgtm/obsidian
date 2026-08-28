@@ -73,7 +73,7 @@ def test_run_validates_input_type():
 
 
 # ── failure isolation (step 38) ─────────────────────────────────────────────
-def test_transform_que_revienta_no_propaga():
+def test_transform_crashes_no_propagate():
     @tr.transform(input='domain', outputs=('ip',), name='medio_roto')
     def _f(entity, ctx):
         ctx.emit('ip', '1.1.1.1')       # this does get through
@@ -85,7 +85,7 @@ def test_transform_que_revienta_no_propaga():
     assert len(produced) == 1
     assert store.find('ip', '1.1.1.1') is not None
 
-def test_emitir_valor_basura_se_ignora():
+def test_emit_value_garbage_ignores():
     @tr.transform(input='domain', outputs=('ip',), name='sucio')
     def _f(entity, ctx):
         assert ctx.emit('ip', '   ') is None   # empty value -> None, no crash
@@ -98,7 +98,7 @@ def test_emitir_valor_basura_se_ignora():
 
 
 # ── the engine fires the bus events (integration with step 19) ──────────────
-def test_transform_dispara_eventos_del_bus():
+def test_transform_fires_eventos_bus():
     nuevas = []
     bus = Bus()
     bus.subscribe(ENTITY_NEW, lambda e: nuevas.append(e))
@@ -114,7 +114,7 @@ def test_transform_dispara_eventos_del_bus():
 
 
 # ── cache: do not repeat the same (transform, entity) -- step 41 ────────────
-def test_corredor_cachea():
+def test_runner_caches():
     runs = []
     @tr.transform(input='domain', outputs=('ip',), name='dns')
     def _f(entity, ctx):

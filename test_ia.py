@@ -5,7 +5,7 @@ Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_ia.py -q
 
 
 # ── 161: entity extraction from text ────────────────────────────────────────
-def test_extraer_entidades():
+def test_extraer_entities():
     from core.extraccion import extract_entities
     txt = ('Contact admin@acme.com via https://acme.com from 8.8.8.8. '
            'Attached reporte.pdf and foto.jpg. Bad IP 999.1.1.1.')
@@ -19,7 +19,7 @@ def test_extraer_entidades():
     assert '999.1.1.1' not in vals               # invalid octet discarded
 
 
-def test_extract_wallets_de_texto():
+def test_extract_wallets_texto():
     from core.extraccion import extract_entities
     txt = 'pay to 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
     tipos = {t for t, _ in extract_entities(txt)}
@@ -27,7 +27,7 @@ def test_extract_wallets_de_texto():
 
 
 # ── 162: translation of foreign sources ─────────────────────────────────────
-def test_traducir(monkeypatch):
+def test_translate(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'Hello world')
@@ -39,7 +39,7 @@ def test_traducir(monkeypatch):
     assert c.post('/api/v2/translate', json={'text': ''}).status_code == 400
 
 
-def test_traducir_sin_ia(monkeypatch):
+def test_translate_without_ai(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'available', lambda: False)
     c = ob.app.test_client()
@@ -49,7 +49,7 @@ def test_traducir_sin_ia(monkeypatch):
 
 
 # ── 163: natural-language case summary (AI mode) ────────────────────────────
-def test_resumen_modo_ia(monkeypatch):
+def test_summary_mode_ai(monkeypatch):
     import obsidian_web as ob
     assert 'summary' in ob._AI_PROMPTS
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
@@ -62,13 +62,13 @@ def test_resumen_modo_ia(monkeypatch):
 
 
 # ── 164/166/167: AI modes (next step, narrative, classification) ────────────
-def test_modos_ia_extra():
+def test_modes_ai_extra():
     import obsidian_web as ob
     assert {'siguiente', 'narrativa', 'clasificar'} <= set(ob._AI_PROMPTS)
 
 
 # ── 165: natural-language query -> plan ─────────────────────────────────────
-def test_consulta_nl(monkeypatch):
+def test_query_nl(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: '1. dns_a on the domain\n2. crtsh')
@@ -81,7 +81,7 @@ def test_consulta_nl(monkeypatch):
 
 
 # ── 168: connect with NEXO (per-task model routing) ─────────────────────────
-def test_elegir_modelo_nexo():
+def test_choose_model_nexo():
     from core.ia import pick_model
     assert pick_model('find an exploit for this vuln') == 'dolphin-llama3'     # security
     assert pick_model('recon of the domain and its subdomains') == 'qwen2.5:3b'   # osint
@@ -90,7 +90,7 @@ def test_elegir_modelo_nexo():
 
 
 # ── 169: AI detection (a hint, not proof) ───────────────────────────────────
-def test_deteccion_ia(monkeypatch):
+def test_detection_ai(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'Very uniform text, possibly AI.')

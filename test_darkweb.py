@@ -49,21 +49,21 @@ def test_haystak(monkeypatch):
     assert any('.onion' in o for o in onions) and len(onions) == 2
 
 
-def test_haystak_sin_tor(monkeypatch):
+def test_haystak_without_tor(monkeypatch):
     monkeypatch.setattr(ob, '_tor_disponible', lambda: False)
     prod, e = _run_one('haystak', 'person', 'target')
     assert prod == [] and 'requires Tor' in e.properties.get('haystak', '')
 
 
 # ── 130: Telegram (Telethon) -- degradation paths (the active one needs an account) ─
-def test_telegram_sin_credenciales(monkeypatch):
+def test_telegram_without_credenciales(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('TELEGRAM_API', '')
     prod, e = _run_one('telegram', 'user', 'durov')
     assert prod == [] and 'api_id:api_hash' in e.properties.get('telegram', '')
 
 
-def test_telegram_sin_sesion(monkeypatch):
+def test_telegram_without_session(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: '123:abchash')
     monkeypatch.setattr(ob.os.path, 'exists', lambda p: not str(p).endswith('telegram.session'))
     prod, e = _run_one('telegram', 'user', 'durov')
@@ -85,7 +85,7 @@ def test_channel_leaks(monkeypatch):
     assert 'admin@acme.com' in {x.value for x in prod if x.type == 'email'}
 
 
-def test_channel_leaks_sin_creds(monkeypatch):
+def test_channel_leaks_without_creds(monkeypatch):
     monkeypatch.setattr(ob, '_tg_mensajes', lambda u, limite=100: (False, 'falta api_id:api_hash ...'))
     prod, e = _run_one('channel_leaks', 'user', 'x')
     assert prod == [] and 'api_id' in e.properties.get('channel_leaks', '')
@@ -145,7 +145,7 @@ def test_intelx(monkeypatch):
     assert 'https://intelx.io/?did=sys-a' in {x.value for x in prod if x.type == 'url'}
 
 
-def test_intelx_sin_key(monkeypatch):
+def test_intelx_without_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('INTELX_KEY', '')
     prod, _ = _run_one('intelx', 'email', 'a@b.com')
@@ -153,7 +153,7 @@ def test_intelx_sin_key(monkeypatch):
 
 
 # ── 135: breach aggregator (keyless-first, unifies sources) ─────────────────
-def test_breaches_agrega_y_dedup(monkeypatch):
+def test_breaches_agrega_dedup(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)   # no HIBP
     monkeypatch.setenv('HIBP_API_KEY', '')
     def fake_get(url, *a, **k):

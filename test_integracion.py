@@ -25,7 +25,7 @@ def test_transforms_reales_registrados():
             'ip_reputation', 'abuseipdb', 'wallet_balance', 'ip_blocklist', 'ct_certspotter', 'tech', 'cve_lookup', 'dorks', 'pastes_github', 'sherlock', 'metadata', 'wayback', 'reverse_whois', 'favicon_hash'} <= nombres
 
 
-def test_transforms_aplicables_por_tipo():
+def test_transforms_applicable_per_type():
     ip = {t.name for t in REGISTRO.applicable('ip')}
     assert {'ptr', 'geo_ip', 'ports'} <= ip
     domain = {t.name for t in REGISTRO.applicable('domain')}
@@ -34,13 +34,13 @@ def test_transforms_aplicables_por_tipo():
     assert 'github_user' in username
 
 
-def test_endpoints_viejos_intactos():
+def test_endpoints_old_intact():
     c = _client()
     assert c.get('/').status_code == 200
     assert c.get('/api/status').status_code == 200
 
 
-def test_v2_transforms_aplicables():
+def test_v2_transforms_applicable():
     c = _client()
     r = c.get('/api/v2/transforms/domain')
     assert r.status_code == 200
@@ -56,7 +56,7 @@ def test_v2_run_rechaza_arg_injection():
     assert r.status_code == 400
 
 
-def test_v2_run_tipo_invalido():
+def test_v2_run_type_invalid():
     c = _client()
     r = c.post('/api/v2/run', json={'type': 'inventado', 'value': 'x', 'transform': 'ptr'})
     assert r.status_code == 400
@@ -111,7 +111,7 @@ def test_workspaces_flujo(tmp_path):
         ob._gestor, ob._ws_activo, ob._store = prev_g, prev_ws, prev_a
 
 
-def test_guard_recuerda_destino():
+def test_guard_remembers_target():
     # without a session, going to /v2 redirects to /login AND saves the destination
     # in the session, to return there after login (fixes the bounce to the old page)
     c = ob.app.test_client()

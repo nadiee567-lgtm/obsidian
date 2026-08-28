@@ -45,7 +45,7 @@ def test_save_is_idempotent(tmp_path):
     assert len(cargado.relations) == 1
 
 
-def test_ids_estables_tras_recarga(tmp_path):
+def test_ids_stable_after_reload(tmp_path):
     db = str(tmp_path / 'caso.db')
     store = _store_example()
     ids_antes = {e.id for e in store.entities}

@@ -6,7 +6,7 @@ from core.modelo import Store
 from core.monitor import snapshot, diff, Monitor
 
 
-def test_diff_detecta_entidad_nueva():
+def test_diff_detects_entidad_nueva():
     store = Store()
     store.create('domain', 'target.com')
     before = snapshot(store)
@@ -27,7 +27,7 @@ def test_diff_detects_new_relation():
     assert len(changes.new_relations) == 1
 
 
-def test_diff_detecta_cambio_de_propiedad():
+def test_diff_detects_change_propiedad():
     store = Store()
     d = store.create('domain', 'target.com', properties={'cert_expires': '2027'})
     before = snapshot(store)
@@ -38,7 +38,7 @@ def test_diff_detecta_cambio_de_propiedad():
     assert c['field'] == 'cert_expires' and c['before'] == '2027' and c['now'] == '2020'
 
 
-def test_diff_detecta_tag_nuevo():
+def test_diff_detects_tag_nuevo():
     store = Store()
     s = store.create('subdomain', 's.target.com')
     before = snapshot(store)
@@ -47,14 +47,14 @@ def test_diff_detecta_tag_nuevo():
     assert any(c['field'] == 'tag' and c['now'] == 'takeover' for c in changes.prop_changes)
 
 
-def test_diff_sin_cambios():
+def test_diff_without_changes():
     store = Store()
     store.create('domain', 'target.com')
     snap = snapshot(store)
     assert not diff(snap, snapshot(store)).has_changes()
 
 
-def test_monitor_ciclo_alerta_en_cambio():
+def test_monitor_cycle_alert_change():
     store = Store()
     store.create('domain', 'target.com')
     disparos = []
@@ -69,7 +69,7 @@ def test_monitor_ciclo_alerta_en_cambio():
     assert 'nuevo.target.com' in m.alerts[0]['summary']
 
 
-def test_monitor_ciclo_sin_cambios_no_alerta():
+def test_monitor_cycle_without_changes_no_alert():
     store = Store()
     store.create('domain', 'target.com')
     m = Monitor(lambda: snapshot(store), lambda: None, interval=999)
@@ -77,7 +77,7 @@ def test_monitor_ciclo_sin_cambios_no_alerta():
     assert m.alerts == []
 
 
-def test_monitor_refrescar_que_falla_no_tumba_el_ciclo():
+def test_monitor_refresh_fails_no_kill_cycle():
     store = Store()
     store.create('domain', 'target.com')
     def refrescar():

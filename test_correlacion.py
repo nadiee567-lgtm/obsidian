@@ -6,7 +6,7 @@ from core.modelo import Store
 from core.correlacion import correlate, risk_score, Finding
 
 
-def test_puerto_sensible():
+def test_port_sensitive():
     store = Store()
     store.create('port', '1.2.3.4:3389', properties={'service': 'rdp'})
     store.create('port', '1.2.3.4:443')   # https, not sensitive
@@ -16,7 +16,7 @@ def test_puerto_sensible():
     assert sum(1 for x in h if x.rule == 'sensitive-port') == 1   # only the 3389
 
 
-def test_cert_vencido():
+def test_cert_expired():
     store = Store()
     store.create('domain', 'viejo.com', properties={'cert_expires': 'Jan 1 00:00:00 2020 GMT'})
     store.create('domain', 'nuevo.com', properties={'cert_expires': 'Jan 1 00:00:00 2099 GMT'})
@@ -24,7 +24,7 @@ def test_cert_vencido():
     assert reglas.count('cert-expired') == 1   # only the 2020 one
 
 
-def test_ip_maliciosa_es_critica():
+def test_ip_malicious_is_critical():
     store = Store()
     ip = store.create('ip', '45.9.9.9')
     ip.tag('malicious')
@@ -32,7 +32,7 @@ def test_ip_maliciosa_es_critica():
     assert h[0].rule == 'ip-malicious' and h[0].severity == 'critical'   # comes first
 
 
-def test_email_filtrado_y_spoofable():
+def test_email_filter_spoofable():
     store = Store()
     e = store.create('email', 'a@b.com')
     e.tag('leaked', 'spoofable')
@@ -40,7 +40,7 @@ def test_email_filtrado_y_spoofable():
     assert {'email-leaked', 'email-spoofable'} <= reglas
 
 
-def test_orden_por_severidad():
+def test_order_per_severity():
     store = Store()
     store.create('email', 'x@y.com').tag('spoofable')   # medium
     store.create('ip', '45.0.0.1').tag('malicious')     # critical
@@ -50,7 +50,7 @@ def test_orden_por_severidad():
     assert sev[0] == 'critical'
 
 
-def test_score_riesgo():
+def test_score_risk():
     assert risk_score([]) == 0
     h = [Finding('a', 'critical', 'x'), Finding('b', 'medium', 'y')]
     assert risk_score(h) == 48          # 40 + 8
@@ -63,7 +63,7 @@ def test_no_data_no_findings():
     assert correlate(Store()) == []
 
 
-def test_feedback_suprime_descartados():
+def test_feedback_suppresses_discarded():
     """If the analyst tags the entity as a false positive, its finding disappears."""
     store = Store()
     ip = store.create('ip', '45.9.9.9')

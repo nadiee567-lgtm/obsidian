@@ -61,7 +61,7 @@ def test_passivedns(monkeypatch):
     assert {p.value for p in prod if p.type == 'ip'} == {'9.9.9.9'}
 
 
-def test_passivedns_sin_key(monkeypatch):
+def test_passivedns_without_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('VT_API_KEY', '')
     prod, _, _ = _run_one('passivedns', 'domain', 'ejemplo.com')
@@ -76,7 +76,7 @@ class _Rj:
         return self._d
 
 
-def test_github_sec_y_regla(monkeypatch):
+def test_github_sec_rule(monkeypatch):
     from core.correlacion import correlate
     def fake_get(url, *a, **k):
         if '/commits/' in url:
@@ -97,7 +97,7 @@ def test_github_sec_y_regla(monkeypatch):
 
 
 # ── 56: exposed login/panel + credential ────────────────────────────────────
-def test_login_expuesto_regla():
+def test_login_exposed_rule():
     from core.correlacion import correlate
     store = Store()
     store.create('domain', 'admin.x.com').tag('login-panel')
@@ -108,7 +108,7 @@ def test_login_expuesto_regla():
     assert r2 and r2[0].severity == 'critical'
 
 
-def test_http_probe_detecta_panel_login(monkeypatch):
+def test_http_probe_detects_panel_login(monkeypatch):
     class R:
         status_code = 200
         url = 'https://admin.x.com'
@@ -130,7 +130,7 @@ def test_leak_login():
     assert e.id in r[0].entities and p.id in r[0].entities   # names both
 
 
-def test_leak_login_sin_filtrado():
+def test_leak_login_without_filter():
     from core.correlacion import correlate
     store = Store()
     store.create('subdomain', 'panel.acme.com').tag('login-panel')   # panel but no credential
@@ -138,7 +138,7 @@ def test_leak_login_sin_filtrado():
 
 
 # ── 59: platform pivot ──────────────────────────────────────────────────────
-def test_pivote_plataformas():
+def test_pivote_platforms():
     from core.correlacion import correlate
     store = Store()
     u = store.create('user', 'nadiee')
@@ -149,7 +149,7 @@ def test_pivote_plataformas():
     assert r and '6 platforms' in r[0].message
 
 
-def test_pivote_plataformas_pocas_no_dispara():
+def test_pivote_platforms_few_no_fires():
     from core.correlacion import correlate
     store = Store()
     u = store.create('user', 'x')
@@ -159,7 +159,7 @@ def test_pivote_plataformas_pocas_no_dispara():
 
 
 # ── 63: user YAML rule loader ───────────────────────────────────────────────
-def test_reglas_yaml():
+def test_rules_yaml():
     from core.correlacion import load_yaml_rules, correlate
     yaml_txt = """
 - name: puerto-ftp
@@ -180,7 +180,7 @@ def test_reglas_yaml():
         load_yaml_rules('')                          # clears the global
 
 
-def test_reglas_yaml_severidad_invalida_se_normaliza():
+def test_rules_yaml_severity_invalid_normalizes():
     from core.correlacion import load_yaml_rules, _YAML_RULES
     try:
         load_yaml_rules("- name: x\n  severity: URGENTISIMO\n  when: {tag: y}\n")
@@ -189,13 +189,13 @@ def test_reglas_yaml_severidad_invalida_se_normaliza():
         load_yaml_rules('')
 
 
-def test_reglas_yaml_basura_no_rompe():
+def test_rules_yaml_garbage_no_break():
     from core.correlacion import load_yaml_rules
     assert load_yaml_rules('no: [es: :valido') == 0   # broken YAML → 0, no exception
 
 
 # ── 40: per-transform rate limiting ─────────────────────────────────────────
-def test_rate_limit_concurrencia():
+def test_rate_limit_concurrency():
     import threading
     import time
     from core.transforms import transform, run_by_name, set_limite
@@ -299,12 +299,12 @@ def test_render_js_bloquea_ssrf(monkeypatch):
     assert prod == []                              # does not render internal hosts
 
 
-def test_yara_bulk_carpeta_invalida():
+def test_yara_bulk_folder_invalid():
     prod, _, _ = _run_one('yara_bulk', 'file', '/does/not/exist/xyz')
     assert prod == []
 
 
-def test_wordlist_ia(monkeypatch):
+def test_wordlist_ai(monkeypatch):
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'juan2024\npassword123\nperez.juan\nabc')
     _, e, _ = _run_one('wordlist', 'person', 'Juan')
@@ -324,7 +324,7 @@ def test_ai_case_endpoint(monkeypatch):
     assert c.post('/api/v2/ia/noexiste').status_code == 404
 
 
-def test_keys_probar_sin_key(monkeypatch):
+def test_keys_test_without_key(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)   # empty vault
     monkeypatch.setenv('SHODAN_API_KEY', '')
     c = ob.app.test_client()

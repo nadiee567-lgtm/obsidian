@@ -3,7 +3,7 @@ import sqlite3
 from core.persistencia import load_store, save_store
 
 
-def _crear_db_vieja(path):
+def _create_db_old(path):
     """Builds a DB with the OLD Spanish schema + Spanish type values + a relation."""
     con = sqlite3.connect(path)
     con.executescript("""
@@ -22,9 +22,9 @@ def _crear_db_vieja(path):
     con.commit(); con.close()
 
 
-def test_migracion_completa(tmp_path):
+def test_migration_complete(tmp_path):
     db = str(tmp_path / 'old.db')
-    _crear_db_vieja(db)
+    _create_db_old(db)
     store = load_store(db)                      # triggers schema + type-value migration
     # entities survived, types are English now
     tipos = {e.type for e in store.entities}
@@ -43,9 +43,9 @@ def test_migracion_completa(tmp_path):
     assert len(alm2.relations) == 1
 
 
-def test_migracion_idempotente(tmp_path):
+def test_migration_idempotent(tmp_path):
     db = str(tmp_path / 'old.db')
-    _crear_db_vieja(db)
+    _create_db_old(db)
     load_store(db)
     a = load_store(db)                        # second open: already English, no-op
     assert {e.type for e in a.entities} == {'domain', 'ip'}

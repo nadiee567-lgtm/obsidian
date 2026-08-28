@@ -35,7 +35,7 @@ def test_json_reimportable():
     assert len(alm2.relations) == 1
 
 
-def test_csv_tiene_cabecera_y_filas():
+def test_csv_tiene_cabecera_filas():
     store, _, _ = _demo()
     rows = list(csv.reader(io.StringIO(export_csv(store))))
     assert rows[0] == ['type', 'value', 'tags', 'sources', 'confidence', 'properties']
@@ -44,7 +44,7 @@ def test_csv_tiene_cabecera_y_filas():
     assert valores == {'target.com', '93.184.216.34'}
 
 
-def test_csv_neutraliza_inyeccion_de_formulas():
+def test_csv_neutraliza_inyeccion_formulas():
     """A tag starting with a formula (=+-@) must not stay executable in the cell."""
     store = Store()
     e = store.create('email', 'a@b.com')
@@ -55,14 +55,14 @@ def test_csv_neutraliza_inyeccion_de_formulas():
     assert tags.startswith("'")
 
 
-def test_csv_valor_peligroso_al_inicio():
+def test_csv_value_dangerous_at_start():
     store = Store()
     store.create('user', '=cmd')          # username allows arbitrary text
     rows = list(csv.reader(io.StringIO(export_csv(store))))
     assert rows[1][1] == "'=cmd"         # sanitized
 
 
-def test_csv_ninguna_celda_empieza_con_formula():
+def test_csv_ninguna_celda_empieza_with_formula():
     """Invariant: NO data cell starts with a formula character."""
     store = Store()
     store.create('user', '+evil')

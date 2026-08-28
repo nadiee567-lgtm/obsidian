@@ -37,7 +37,7 @@ CASE_VIEJO = {
 }
 
 
-def test_migracion_crea_entidades_tipadas():
+def test_migration_creates_entities_typed():
     store = migrate_case(CASE_VIEJO)
     # target + domain + ip + subdomains + email + country + org + ptr + takeover...
     assert store.find('target', 'example.com') is not None
@@ -48,7 +48,7 @@ def test_migracion_crea_entidades_tipadas():
     assert store.find('tech', 'nginx') is not None
 
 
-def test_migracion_dedup_email_entre_modulos():
+def test_migration_dedup_email_between_modules():
     # the email appears in the 'domain' module (emails) and the 'email' module:
     # it must be ONE single entity with both sources
     store = migrate_case(CASE_VIEJO)
@@ -56,7 +56,7 @@ def test_migracion_dedup_email_entre_modulos():
     assert 'domain' in e.sources and 'email' in e.sources
 
 
-def test_migracion_tags_y_props():
+def test_migration_tags_props():
     store = migrate_case(CASE_VIEJO)
     e = store.find('email', 'admin@example.com')
     assert 'spoofable' in e.tags and 'leaked' in e.tags
@@ -65,7 +65,7 @@ def test_migracion_tags_y_props():
     assert 'takeover' in sub.tags
 
 
-def test_migracion_no_truena_con_modulo_roto():
+def test_migration_no_crash_with_module_broken():
     # the 'roto' module has no 'target'; the migration skips it without error
     store = migrate_case(CASE_VIEJO)
     assert len(store) > 0

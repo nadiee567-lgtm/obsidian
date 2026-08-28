@@ -17,7 +17,7 @@ def test_persona_manager(tmp_path):
 
 
 # ── 153: Tor/SOCKS5 routing (anonymous mode) ────────────────────────────────
-def test_modo_anonimo_toggle():
+def test_mode_anonymous_toggle():
     import obsidian_web as ob
     try:
         ob._set_anonimo(True)
@@ -29,7 +29,7 @@ def test_modo_anonimo_toggle():
 
 
 # ── 154: proxy rotation ─────────────────────────────────────────────────────
-def test_rotacion_proxies():
+def test_rotation_proxies():
     import obsidian_web as ob
     try:
         ob._PROXIES['pool'] = ['http://p1:8080', 'http://p2:8080']
@@ -43,7 +43,7 @@ def test_rotacion_proxies():
 
 
 # ── 155: request hygiene (random UA) ────────────────────────────────────────
-def test_higiene_request():
+def test_hygiene_request():
     import obsidian_web as ob
     prev = ob.SESSION.headers.get('User-Agent')
     try:
@@ -71,7 +71,7 @@ def test_jitter():
 
 
 # ── 157: non-attribution mode (per-workspace OPSEC profile) ─────────────────
-def test_perfil_opsec_por_workspace(tmp_path, monkeypatch):
+def test_profile_opsec_per_workspace(tmp_path, monkeypatch):
     import json
     import obsidian_web as ob
     pf = tmp_path / 'op.json'

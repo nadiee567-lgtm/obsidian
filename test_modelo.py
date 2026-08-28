@@ -8,39 +8,39 @@ from core.eventos import Bus, ENTITY_NEW, ENTITY_UPDATED, RELATION_NEW
 
 
 # ── deterministic id + normalization (steps 14, 22) ─────────────────────────
-def test_id_deterministico_mismo_dato():
+def test_id_deterministic_same_data():
     a = Entity('domain', 'Example.com')
     b = Entity('domain', 'www.example.com.')   # www + uppercase + trailing dot
     assert a.id == b.id, "the same domain must give the same id"
 
-def test_normalizacion():
+def test_normalization():
     assert normalize('domain', 'WWW.Example.COM.') == 'example.com'
     assert normalize('email', 'A@B.COM') == 'a@b.com'
     assert normalize('ip', '2001:4860:4860:0:0:0:0:8888') == '2001:4860:4860::8888'
     assert normalize('url', 'http://x.com/') == 'http://x.com'
 
-def test_ids_distintos_por_tipo_y_valor():
+def test_ids_distinct_per_type_value():
     assert Entity('domain', 'x.com').id != Entity('user', 'x.com').id
     assert Entity('ip', '8.8.8.8').id != Entity('ip', '1.1.1.1').id
 
 
 # ── validation (step 14) ─────────────────────────────────────────────────────
-def test_tipo_invalido_falla():
+def test_type_invalid_fails():
     with pytest.raises(ValueError):
         Entity('inventado', 'x')
 
-def test_valor_vacio_falla():
+def test_value_empty_fails():
     with pytest.raises(ValueError):
         Entity('domain', '   ')
 
-def test_todos_los_tipos_del_catalogo_sirven():
+def test_all_types_catalog_work():
     for type in TYPES:
         assert valid_type(type)
         Entity(type, 'value-de-prueba')   # must not raise
 
 
 # ── merge / dedup (step 17) ──────────────────────────────────────────────────
-def test_fusionar_une_origenes_y_props():
+def test_merge_merges_sources_props():
     a = Entity('ip', '8.8.8.8', sources={'shodan'}, properties={'country': 'US'}, confidence=0.5)
     b = Entity('ip', '8.8.8.8', sources={'nmap'}, properties={'port': 53}, confidence=0.9)
     a.merge(b)
@@ -48,7 +48,7 @@ def test_fusionar_une_origenes_y_props():
     assert a.properties == {'country': 'US', 'port': 53}
     assert a.confidence == 0.9
 
-def test_fusionar_distinto_id_falla():
+def test_merge_different_id_fails():
     with pytest.raises(ValueError):
         Entity('ip', '8.8.8.8').merge(Entity('ip', '1.1.1.1'))
 
@@ -109,7 +109,7 @@ def test_tags():
     assert set(e.to_dict()['tags']) == {'interesting'}
     assert Entity.from_dict(e.to_dict()).tags == {'interesting'}
 
-def test_tags_se_fusionan():
+def test_tags_merge():
     a = Entity('ip', '8.8.8.8', tags={'a'})
     b = Entity('ip', '8.8.8.8', tags={'b'})
     a.merge(b)
@@ -117,7 +117,7 @@ def test_tags_se_fusionan():
 
 
 # ── detailed provenance (step 18) ───────────────────────────────────────────
-def test_valor_bien_formado():
+def test_value_well_formed():
     assert Entity('ip', '8.8.8.8').well_formed() is True
     assert Entity('domain', 'example.com').well_formed() is True
     assert Entity('email', 'a@b.com').well_formed() is True
@@ -127,7 +127,7 @@ def test_valor_bien_formado():
     assert Entity('person', 'Juan Perez Garcia').well_formed() is True
 
 
-def test_procedencia():
+def test_provenance():
     e = Entity('subdomain', 'mail.example.com')
     e.note_provenance('transform_subdominios', input_id='abc123')
     assert 'transform_subdominios' in e.sources
@@ -138,7 +138,7 @@ def test_procedencia():
 
 
 # ── event bus (step 19) ─────────────────────────────────────────────────────
-def test_bus_publica_entidad_nueva_y_actualizada():
+def test_bus_publica_entidad_nueva_actualizada():
     bus = Bus()
     nuevas, actualizadas = [], []
     bus.subscribe(ENTITY_NEW, lambda e: nuevas.append(e))
@@ -160,7 +160,7 @@ def test_bus_publishes_new_relation():
     store.relate(d, i, 'resuelve_a')   # dup: does not re-publish
     assert len(rels) == 1
 
-def test_bus_aisla_fallos_de_suscriptor():
+def test_bus_aisla_fallos_suscriptor():
     bus = Bus()
     ok = []
     bus.subscribe(ENTITY_NEW, lambda e: (_ for _ in ()).throw(RuntimeError("boom")))

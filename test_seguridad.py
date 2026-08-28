@@ -29,7 +29,7 @@ def test_command_injection_bloqueada():
 
 
 # ── allowlist: legitimate input DOES pass ───────────────────────────────────
-def test_objetivos_validos_pasan():
+def test_targets_valid_pass():
     assert ob._validate('example.com', 'domain')
     assert ob._validate('sub.example.co.uk', 'domain')
     assert ob._validate('8.8.8.8', 'ip')
@@ -39,7 +39,7 @@ def test_objetivos_validos_pasan():
 
 
 # ── edge cases: empty, leading hyphen, spaces ───────────────────────────────
-def test_bordes():
+def test_edges():
     assert ob._validate('', 'domain') is False
     assert ob._validate('   ', 'ip') is False
     assert ob._validate('-example.com', 'domain') is False   # leading hyphen
@@ -49,7 +49,7 @@ def test_bordes():
 
 
 # ── the module→type map covers every module that touches the shell ──────────
-def test_modulos_shell_tienen_tipo():
+def test_modules_shell_have_type():
     for mod in ('user', 'domain', 'ip', 'email', 'ssl', 'typosquatting', 'takeover'):
         assert mod in ob._MODULE_TYPE
 

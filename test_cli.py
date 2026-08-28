@@ -11,7 +11,7 @@ def test_parser_run():
     assert a.workspace == 'c1' and a.fn is cli.cmd_run
 
 
-def test_parser_recon_con_keys():
+def test_parser_recon_with_keys():
     a = cli.build_parser().parse_args(['recon', 'ip', '1.1.1.1', '--with-keys'])
     assert a.with_keys is True and a.fn is cli.cmd_recon
 
@@ -22,7 +22,7 @@ def test_transforms_lista(capsys):
     assert 'dns_a' in out and '→' in out
 
 
-def test_run_tipo_invalido():
+def test_run_type_invalid():
     assert cli.main(['run', 'noexiste', 'x', 'dns_a']) == 1
 
 

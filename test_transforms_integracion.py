@@ -28,12 +28,12 @@ def test_dns_a(monkeypatch):
     assert all(e.type == 'ip' for e in prod)
 
 
-def test_dns_a_sin_resultados(monkeypatch):
+def test_dns_a_without_resultados(monkeypatch):
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: '')
     assert _run_one('dns_a', 'domain', 'ejemplo.com') == []
 
 
-def test_dns_a_ignora_basura(monkeypatch):
+def test_dns_a_ignores_garbage(monkeypatch):
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: ';; connection timed out\n1.2.3.4\n')
     prod = _run_one('dns_a', 'domain', 'ejemplo.com')
     assert {e.value for e in prod} == {'1.2.3.4'}      # discards non-IP
@@ -84,13 +84,13 @@ def test_shodan(monkeypatch):
     assert orgs == {'ACME Corp'}
 
 
-def test_shodan_sin_key_no_hace_nada(monkeypatch):
+def test_shodan_without_key_no_does_nothing(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('SHODAN_API_KEY', '')
     assert _run_one('shodan', 'ip', '1.2.3.4') == []
 
 
-def test_transform_con_api_caida_no_propaga(monkeypatch):
+def test_transform_with_api_caida_no_propagate(monkeypatch):
     """If the API blows up, the transform catches it and returns empty (isolation)."""
     def boom(*a, **k):
         raise RuntimeError('network down')

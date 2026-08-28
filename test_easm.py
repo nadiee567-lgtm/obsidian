@@ -14,7 +14,7 @@ class _R:
         return self._data
 
 
-def _cliente_con(store, monkeypatch):
+def _cliente_with(store, monkeypatch):
     monkeypatch.setattr(ob, '_store', store)
     c = ob.app.test_client()
     with c.session_transaction() as s:
@@ -23,20 +23,20 @@ def _cliente_con(store, monkeypatch):
 
 
 # ── 144: asset inventory ────────────────────────────────────────────────────
-def test_inventario(monkeypatch):
+def test_inventory(monkeypatch):
     store = Store()
     store.create('domain', 'x.com')
     store.create('ip', '1.2.3.4')
     store.create('port', '1.2.3.4:443')
     store.create('email', 'a@x.com')                # NOT an internet-facing asset
-    c = _cliente_con(store, monkeypatch)
+    c = _cliente_with(store, monkeypatch)
     d = c.get('/api/v2/inventory').get_json()
     assert d['total_activos'] == 3               # domain+ip+port, not the email
     assert set(d['inventario']) == {'domain', 'ip', 'port'}
 
 
 # ── 145 + 146: continuous discovery + change detection (via the monitor) ─────
-def test_descubrimiento_y_cambios_via_monitor():
+def test_discovery_changes_via_monitor():
     from core.monitor import snapshot, diff
     store = Store()
     d = store.create('domain', 'x.com', properties={'cert_expires': '2027'})
@@ -51,7 +51,7 @@ def test_descubrimiento_y_cambios_via_monitor():
 
 
 # ── 147: infrastructure clustering ──────────────────────────────────────────
-def test_infra_compartida():
+def test_infra_shared():
     from core.correlacion import correlate
     store = Store()
     store.create('domain', 'a.com', properties={'favicon_hash': '123456'})
@@ -61,7 +61,7 @@ def test_infra_compartida():
     assert len(r) == 1 and len(r[0].entities) == 2                          # a.com and b.com
 
 
-def test_infra_compartida_sin_grupo():
+def test_infra_shared_without_group():
     from core.correlacion import correlate
     store = Store()
     store.create('domain', 'solo.com', properties={'favicon_hash': '111'})
@@ -84,7 +84,7 @@ def test_cve_lookup_tech(monkeypatch):
 
 
 # ── 149: exposure scoring ───────────────────────────────────────────────────
-def test_score_exposicion():
+def test_score_exposure():
     from core.correlacion import exposure_score
     assert exposure_score({}, 0) == 0
     # surface: 10 subdom + 3 ports(*2) = 16 ; risk 40//2 = 20 -> 36
@@ -92,11 +92,11 @@ def test_score_exposicion():
     assert exposure_score({'subdomain': 999}, 100) == 100          # caps at 100
 
 
-def test_exposicion_endpoint(monkeypatch):
+def test_exposure_endpoint(monkeypatch):
     store = Store()
     for i in range(5):
         store.create('subdomain', f's{i}.x.com')
-    c = _cliente_con(store, monkeypatch)
+    c = _cliente_with(store, monkeypatch)
     d = c.get('/api/v2/exposure').get_json()
     assert d['surface']['subdomain'] == 5 and 0 <= d['exposicion'] <= 100
 
@@ -114,7 +114,7 @@ def test_shadow_it():
 
 
 # ── 151: historical surface diff ────────────────────────────────────────────
-def test_diff_historico(tmp_path):
+def test_diff_history(tmp_path):
     from core.workspaces import Manager
     g = Manager(str(tmp_path))
     g.create('caso')
