@@ -157,3 +157,11 @@ def test_keyed_no_key(monkeypatch):
                            ('threatfox', 'ip', '1.2.3.4'), ('emailrep', 'email', 'a@b.com')]:
         _, e, _ = _run(name, typ, val)
         assert not e.tags and not e.properties.get('malware') and not e.properties.get('threats')
+
+
+def test_distro_missing_gives_notice(monkeypatch):
+    monkeypatch.setattr(ob, '_distro_exists', lambda d: False)
+    r = ob._kali_run('nmap', '1.2.3.4')
+    assert r.get('needs_distro') == 'kali'
+    r2 = ob._distrobox_run('parrot', ob.PARROT_TOOLS, 'whatever', '1.2.3.4')
+    assert r2.get('needs_distro') == 'parrot'

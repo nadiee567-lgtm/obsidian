@@ -1078,8 +1078,32 @@ BLACKARCH_TOOLS = {
     ],
 }
 
+_DISTRO_CACHE = {'t': 0.0, 'names': set()}
+
+
+def _distro_exists(distro):
+    """True if a distrobox container with that name exists (cached 30s)."""
+    now = time.time()
+    if now - _DISTRO_CACHE['t'] > 30:
+        try:
+            out = _cmd('distrobox list', timeout=10)
+        except Exception:
+            out = ''
+        names = set()
+        for ln in out.splitlines()[1:]:
+            parts = [p.strip() for p in ln.split('|')]
+            if len(parts) >= 2 and parts[1]:
+                names.add(parts[1].lower())
+        _DISTRO_CACHE['t'] = now
+        _DISTRO_CACHE['names'] = names
+    return distro.lower() in _DISTRO_CACHE['names']
+
+
 def _distrobox_run(distro, tool_dict, tool_id, arg):
     """Runs a tool inside a distrobox container"""
+    if not _distro_exists(distro):
+        return {'error': f'The "{distro}" distrobox container is not created yet',
+                'needs_distro': distro}
     tool = None
     for cat in tool_dict.values():
         for t in cat:
@@ -1096,6 +1120,9 @@ def _distrobox_run(distro, tool_dict, tool_id, arg):
 
 def _kali_run(tool_id, arg):
     """Runs a Kali tool inside the distrobox container"""
+    if not _distro_exists('kali'):
+        return {'error': 'The "kali" distrobox container is not created yet',
+                'needs_distro': 'kali'}
     tool = None
     for cat in KALI_TOOLS.values():
         for t in cat:
@@ -4100,6 +4127,57 @@ def api_v2_run():
         return _error(str(e), 400)
     return jsonify({'produced': [e.to_dict() for e in produced],
                     'total_entities': len(_store), 'workspace': _ws_activo})
+
+
+@app.route('/api/v2/distros')
+def api_v2_distros():
+    """Which pentest distrobox containers exist right now."""
+    return jsonify({d: _distro_exists(d) for d in ('kali', 'parrot', 'remnux')})
+
+
+@app.route('/api/v2/scratch', methods=['POST'])
+def api_v2_scratch():
+    """Runs a transform in a throwaway store: returns results only, nothing is
+    saved to the case (ad-hoc lookups from the Tools view)."""
+    from core.modelo import Store
+    d = request.json or {}
+    tp = d.get('type', '')
+    if not valid_type(tp):
+        return _error('invalid entity type', 400)
+    seed = Entity(tp, (d.get('value', '') or '').strip())
+    if not seed.well_formed():
+        return _error(f'malformed value for {tp}', 400)
+    tmp = Store()
+    seed = tmp.add(seed)
+    try:
+        produced = run_by_name(d.get('transform', ''), seed, tmp)
+    except (KeyError, ValueError) as e:
+        return _error(str(e), 400)
+    return jsonify({'seed': seed.to_dict(),
+                    'produced': [e.to_dict() for e in produced]})
+
+
+@app.route('/api/v2/distro/tools/<distro>')
+def api_v2_distro_tools(distro):
+    """Flat tool list for a pentest distro + whether its container exists."""
+    cat = {'kali': KALI_TOOLS, 'parrot': PARROT_TOOLS, 'remnux': REMNUX_TOOLS}.get(distro)
+    if cat is None:
+        return _error('unknown distro', 404)
+    tools = [{'id': t['id'], 'name': t['name'], 'desc': t.get('desc', ''),
+              'placeholder': t.get('placeholder', '')}
+             for group in cat.values() for t in group]
+    return jsonify({'distro': distro, 'exists': _distro_exists(distro), 'tools': tools})
+
+
+@app.route('/api/v2/distro/run', methods=['POST'])
+def api_v2_distro_run():
+    """Runs one distro tool (auto-connects to the container; graceful notice if missing)."""
+    d = request.json or {}
+    distro = (d.get('distro', '') or '').lower()
+    cat = {'kali': KALI_TOOLS, 'parrot': PARROT_TOOLS, 'remnux': REMNUX_TOOLS}.get(distro)
+    if cat is None:
+        return _error('unknown distro', 404)
+    return jsonify(_distrobox_run(distro, cat, d.get('tool', ''), d.get('arg', '')))
 
 def _status_data():
     """Collects system health (touches disk/processes)."""

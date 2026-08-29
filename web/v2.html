@@ -104,6 +104,30 @@
   .krow button{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem .5rem;font-size:.7rem;cursor:pointer}
   .krow button:hover{border-color:var(--cyan);color:var(--cyan)}
   .krow .kst{flex-basis:100%;color:var(--muted);font-size:.7rem;padding-left:6.4rem}
+  /* Tools slide-over */
+  #toolsHandle{position:fixed;top:50%;right:0;transform:translateY(-50%);z-index:60;background:var(--panel2);border:1px solid var(--line);border-right:none;color:var(--muted);font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;padding:1rem .35rem;cursor:pointer;writing-mode:vertical-rl}
+  #toolsHandle:hover{color:var(--text);border-color:var(--blue)}
+  #toolsView{position:fixed;inset:0;z-index:55;background:var(--bg);transform:translateX(100%);transition:transform .28s ease;overflow-y:auto;padding:1.1rem 1.1rem 3rem}
+  #toolsView.open{transform:translateX(0)}
+  .tvhead{display:flex;align-items:center;gap:.8rem;max-width:1000px;margin:0 auto 1rem}
+  .tvback{background:var(--panel2);border:1px solid var(--line);color:var(--text);font-family:var(--mono);font-size:.78rem;padding:.4rem .8rem;cursor:pointer}
+  .tvback:hover{border-color:var(--blue)}
+  .tvhead h2{font-family:var(--mono);font-size:1rem;margin:0}
+  .tvhead .hint{color:var(--muted);font-size:.74rem;font-family:var(--mono);margin-left:auto}
+  .tvbody{max-width:1000px;margin:0 auto}
+  .tsec{border:1px solid var(--line);background:var(--panel);margin-bottom:1rem}
+  .tsec>h3{font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--text);margin:0;padding:.55rem .8rem;border-bottom:1px solid var(--line);background:var(--panel2)}
+  .tsec>h3 .badge{font-size:.6rem;color:var(--muted);margin-left:.5rem;letter-spacing:0;text-transform:none}
+  .tsec .tbody{padding:.8rem}
+  .tnotice{color:var(--amber);font-family:var(--mono);font-size:.78rem;line-height:1.6}
+  .tnotice code{background:var(--panel2);border:1px solid var(--line);padding:.05rem .3rem}
+  .trow{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;padding:.35rem 0;border-bottom:1px solid var(--line)}
+  .trow .tnm{font-family:var(--mono);font-size:.74rem;min-width:9rem;color:var(--text)}
+  .trow .tds{color:var(--muted);font-size:.66rem;flex-basis:100%;font-family:var(--mono)}
+  .trow input{flex:1;min-width:9rem}
+  .tout{white-space:pre-wrap;font-family:var(--mono);font-size:.72rem;color:#9aa2b5;background:var(--panel2);border:1px solid var(--line);padding:.5rem;margin:.3rem 0;max-height:240px;overflow:auto}
+  .tres{font-family:var(--mono);font-size:.74rem;color:var(--text);padding:.15rem 0}
+  .tres .tt{color:var(--muted);font-size:.62rem;text-transform:uppercase;margin-right:.4rem}
   /* serious look: square corners, flat (no glow/shadow) */
   *{border-radius:0 !important}
   .card,#grafo,.barra,#ctx,#timeline,#keys,select,input,button{box-shadow:none !important}
@@ -185,6 +209,36 @@
   </div>
 </div>
 
+<div id="toolsHandle">TOOLS &#8594;</div>
+<div id="toolsView">
+  <div class="tvhead">
+    <button class="tvback" id="tvBack">&#8592; graph</button>
+    <h2>Tools</h2>
+    <span class="hint">ad-hoc lookups &mdash; nothing here touches the case unless you send it</span>
+  </div>
+  <div class="tvbody">
+    <div class="tsec">
+      <h3>Tools <span class="badge">OSINT &middot; run standalone</span></h3>
+      <div class="tbody">
+        <div class="trow" style="border:none">
+          <select id="tType">
+            <option value="domain">domain</option><option value="ip">ip</option>
+            <option value="email">email</option><option value="user">user</option>
+            <option value="phone">phone</option><option value="hash">hash</option>
+            <option value="wallet">wallet</option><option value="url">url</option>
+          </select>
+          <input id="tValue" placeholder="target&hellip;">
+          <button class="primary" id="tLoad">load tools</button>
+        </div>
+        <div id="tTransforms" class="tagbar"></div>
+        <div id="tResult"></div>
+      </div>
+    </div>
+    <div class="tsec"><h3>Kali</h3><div class="tbody" id="bodyKali"></div></div>
+    <div class="tsec"><h3>Parrot</h3><div class="tbody" id="bodyParrot"></div></div>
+    <div class="tsec"><h3>REMnux</h3><div class="tbody" id="bodyRemnux"></div></div>
+  </div>
+</div>
 <div id="ctx"></div>
 
 <script>
@@ -548,6 +602,78 @@ $('#btnMonitor').onclick=async()=>{
 };
 cargarMonitor(); setInterval(cargarMonitor, 20000);   // refresh alerts periodically
 cargarWorkspaces(); pintarGrafo();
+
+/* ---- Tools slide-over ---- */
+const _tv=$('#toolsView'); let _tvLoaded=false;
+function openTools(){ _tv.classList.add('open'); if(!_tvLoaded){ _tvLoaded=true; loadDistros(); } }
+function closeTools(){ _tv.classList.remove('open'); }
+$('#toolsHandle').onclick=openTools; $('#tvBack').onclick=closeTools;
+let _sx=null;
+document.addEventListener('touchstart',e=>{_sx=e.touches[0].clientX;},{passive:true});
+document.addEventListener('touchend',e=>{ if(_sx==null)return; const dx=e.changedTouches[0].clientX-_sx;
+  if(dx<-90 && !_tv.classList.contains('open')) openTools();
+  else if(dx>90 && _tv.classList.contains('open')) closeTools(); _sx=null; },{passive:true});
+
+$('#tLoad').onclick=async()=>{
+  const type=$('#tType').value, val=$('#tValue').value.trim();
+  const cont=$('#tTransforms'); cont.innerHTML=''; $('#tResult').innerHTML='';
+  if(!val){ cont.innerHTML='<div class="tnotice">enter a target first</div>'; return; }
+  let list=[]; try{ list=(await (await fetch('/api/v2/transforms/'+type)).json()).transforms||[]; }catch(_){}
+  if(!list.length){ cont.innerHTML='<div class="tnotice">no tools for this type</div>'; return; }
+  list.forEach(t=>{ const b=el('button','tagbtn'); b.textContent=t.name+(t.requires_key?' ·key':'');
+    b.title=t.description||''; b.onclick=()=>runScratch(type,val,t.name); cont.appendChild(b); });
+};
+async function runScratch(type,value,name){
+  const out=$('#tResult'); out.innerHTML='';
+  const st=el('div','tnotice'); st.textContent='running '+name+'…'; out.appendChild(st);
+  let r; try{ r=await (await fetch('/api/v2/scratch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,value,transform:name})})).json(); }
+  catch(e){ st.textContent='error'; return; }
+  out.innerHTML='';
+  if(r.error){ const n=el('div','tnotice'); n.textContent=r.error; out.appendChild(n); return; }
+  const prod=r.produced||[];
+  const head=el('div','tres'); const b=el('b'); b.textContent=name; head.appendChild(b);
+  head.appendChild(document.createTextNode(' → '+prod.length+' result(s)  '));
+  const send=el('button','tvback'); send.textContent='→ send to graph'; send.onclick=()=>sendToGraph(type,value,name);
+  head.appendChild(send); out.appendChild(head);
+  if(!prod.length){ const n=el('div','tnotice'); n.textContent='nothing new (the target may just have been tagged)'; out.appendChild(n); }
+  prod.forEach(p=>{ const d=el('div','tres'); const tt=el('span','tt'); tt.textContent=p.type; d.appendChild(tt); d.appendChild(document.createTextNode(p.value)); out.appendChild(d); });
+}
+async function sendToGraph(type,value,name){
+  try{ await fetch('/api/v2/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,value,transform:name})}); }catch(_){}
+  closeTools(); await pintarGrafo(); setStatus('added '+name+' results to the case');
+}
+async function loadDistros(){
+  let stt={}; try{ stt=await (await fetch('/api/v2/distros')).json(); }catch(_){}
+  ['kali','parrot','remnux'].forEach(d=>buildDistro(d, !!stt[d]));
+}
+async function buildDistro(distro, exists){
+  const body=$('#body'+distro[0].toUpperCase()+distro.slice(1)); body.innerHTML='';
+  if(!exists){
+    const IMG={kali:'docker.io/kalilinux/kali-rolling',parrot:'docker.io/parrotsec/security',remnux:'docker.io/remnux/remnux-distro'};
+    const n=el('div','tnotice');
+    n.innerHTML='The <b>'+distro+'</b> distrobox container is not created yet. Create it to enable these tools:<br>'+
+      '<code>distrobox create -i '+(IMG[distro]||'')+' -n '+distro+'</code><br>'+
+      'Once it exists, OBSIDIAN connects to it automatically.';
+    body.appendChild(n); return;
+  }
+  let data={tools:[]}; try{ data=await (await fetch('/api/v2/distro/tools/'+distro)).json(); }catch(_){}
+  (data.tools||[]).forEach(t=>{
+    const row=el('div','trow');
+    const nm=el('span','tnm'); nm.textContent=t.name; row.appendChild(nm);
+    const inp=el('input'); inp.placeholder=t.placeholder||'target'; row.appendChild(inp);
+    const b=el('button'); b.textContent='run'; b.onclick=()=>runDistro(distro,t.id,inp.value,row); row.appendChild(b);
+    if(t.desc){ const ds=el('span','tds'); ds.textContent=t.desc; row.appendChild(ds); }
+    body.appendChild(row);
+  });
+}
+async function runDistro(distro,tool,arg,row){
+  let pre=row.nextElementSibling && row.nextElementSibling.classList.contains('tout')?row.nextElementSibling:null;
+  if(!pre){ pre=el('div','tout'); row.after(pre); }
+  pre.textContent='running…';
+  let r; try{ r=await (await fetch('/api/v2/distro/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({distro,tool,arg})})).json(); }
+  catch(e){ pre.textContent='error'; return; }
+  pre.textContent = r.needs_distro ? ('['+r.error+']') : (r.output || r.error || '(no output)');
+}
 </script>
 </body>
 </html>
