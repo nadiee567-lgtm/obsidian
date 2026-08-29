@@ -7,10 +7,10 @@
 <script src="/static/vis-network.min.js"></script>
 <style>
   :root{
-    /* Catppuccin Mocha (branding consistente, paso 104) */
-    --bg:#1e1e2e; --panel:#181825; --panel2:#313244; --line:#313244;
-    --text:#cdd6f4; --muted:#6c7086; --dim:#45475a; --blue:#89b4fa; --amber:#fab387;
-    --green:#a6e3a1; --red:#f38ba8; --mauve:#cba6f7; --cyan:#89dceb;
+    /* dry, matte palette -- sober, low-saturation, no glow */
+    --bg:#15171b; --panel:#1a1d22; --panel2:#22262d; --line:#2c313a;
+    --text:#c2c6cc; --muted:#767b85; --dim:#3a3f48; --blue:#6f8aa8; --amber:#a98b62;
+    --green:#7d9a78; --red:#a86a70; --mauve:#8a7fa0; --cyan:#6f9298;
     --mono:ui-monospace,Menlo,Consolas,monospace;
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   }
@@ -104,12 +104,16 @@
   .krow button{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem .5rem;font-size:.7rem;cursor:pointer}
   .krow button:hover{border-color:var(--cyan);color:var(--cyan)}
   .krow .kst{flex-basis:100%;color:var(--muted);font-size:.7rem;padding-left:6.4rem}
+  /* serious look: square corners, flat (no glow/shadow) */
+  *{border-radius:0 !important}
+  .card,#grafo,.barra,#ctx,#timeline,#keys,select,input,button{box-shadow:none !important}
+  .iaresumen{background:var(--panel2)}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1><span class="sq">⬛</span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnKeys">🔑 API keys</a> · <a href="/v2/status">system status</a> · <a href="/">← classic interface</a></div>
+  <h1><span class="sq"></span> OBSIDIAN · engine v2</h1>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/">← classic interface</a></div>
   <div id="keys"></div>
 
   <div class="wsbar">
@@ -138,11 +142,11 @@
   <div id="status">Add a target and right-click its node to run transforms.</div>
 
   <div class="gtools">
-    <input id="buscar" placeholder="🔎 search node…" autocomplete="off">
+    <input id="buscar" placeholder="search node…" autocomplete="off">
     <span id="filtros"></span>
     <span style="margin-left:auto"></span>
-    <button id="btnTimeline">📅 timeline</button>
-    <button id="btnReporte">📄 report</button>
+    <button id="btnTimeline">timeline</button>
+    <button id="btnReporte">report</button>
     <button id="btnReacomodar">↻ re-layout</button>
     <button id="btnExport">⬇ PNG</button>
   </div>
@@ -157,14 +161,14 @@
       </div>
       <div class="card">
         <h2>Findings · <span id="nHall">0</span><span class="score" id="scoreBadge"></span>
-          <button id="btnIA" class="btnia">🧠 AI</button>
-          <button id="btnEscudo" class="btnia" style="background:var(--cyan)">🛡️</button></h2>
+          <button id="btnIA" class="btnia">AI</button>
+          <button id="btnEscudo" class="btnia" style="background:var(--cyan)"></button></h2>
         <div id="iaResumen"></div>
         <div class="iabtns">
-          <button onclick="iaCaso('escenario')">🎯 scenario</button>
-          <button onclick="iaCaso('superficie')">🗺️ surface</button>
-          <button onclick="iaCaso('analizar')">🧩 analyze</button>
-          <button onclick="iaCaso('geoloc')">📍 geoloc</button>
+          <button onclick="iaCaso('escenario')">scenario</button>
+          <button onclick="iaCaso('superficie')">surface</button>
+          <button onclick="iaCaso('analizar')">analyze</button>
+          <button onclick="iaCaso('geoloc')">geoloc</button>
         </div>
         <div id="hallazgos"><div class="vacio">Correlation looks for risks on its own.</div></div>
       </div>
@@ -184,10 +188,10 @@
 <div id="ctx"></div>
 
 <script>
-const COLOR={target:'#d99a4e',domain:'#5b9bd5',subdomain:'#7fb8d9',ip:'#d9564b',email:'#6fae7c',
-  user:'#cc9a3c',phone:'#c99a6b',person:'#e0af68',org:'#bb9af7',url:'#5fa8a0',port:'#8b8b98',
+const COLOR={target:'#a98b62',domain:'#6f8aa8',subdomain:'#89a0b5',ip:'#a86a70',email:'#7d9a78',
+  user:'#a98b62',phone:'#9a8a72',person:'#b0956a',org:'#8a7fa0',url:'#6f9298',port:'#7a808c',
   hash:'#9a7ecc',cve:'#f7768e',bucket:'#d9564b',credential:'#f7768e',asn:'#7a85b0',country:'#7a85b0',
-  tech:'#5fa8a0',image:'#73daca',wallet:'#e0af68',platform:'#c17a52',repo:'#d99a4e',subdomain_vuln:'#f7768e'};
+  tech:'#6f9298',image:'#7f9a95',wallet:'#b0956a',platform:'#9a7a5e',repo:'#a98b62',subdomain_vuln:'#b56a72'};
 const SHAPE={target:'star',ip:'diamond',email:'triangle',user:'hexagon',org:'box',country:'box',
   port:'square',cve:'triangleDown',tech:'dot',platform:'dot',repo:'dot',wallet:'diamond',
   credential:'triangleDown',asn:'box'};
@@ -199,7 +203,7 @@ let tiposOcultos=new Set();
 
 const nodes=new vis.DataSet(), edges=new vis.DataSet();
 const network=new vis.Network($('#grafo'),{nodes,edges},{
-  nodes:{font:{color:'#c8cfdf',size:13,face:'monospace'},borderWidth:2,size:16},
+  nodes:{font:{color:'#b8bcc4',size:13,face:'monospace'},borderWidth:2,size:16},
   edges:{color:{color:'#3a3f52',highlight:'#7aa2f7'},font:{color:'#8b8b98',size:10,strokeWidth:0,face:'monospace'},
          arrows:{to:{enabled:true,scaleFactor:.5}},smooth:{type:'continuous'}},
   physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-55,springLength:110,springConstant:.05},
@@ -287,7 +291,7 @@ function mostrarDetalle(id){
     const c=el('div','kv');
     c.innerHTML='<b>hallado por:</b> '+esc(p.transform)+(inp?' ← <span style="color:var(--cyan)">'+esc(inp.value)+'</span>':'');
     d.appendChild(c);
-    const bc=el('button','tagbtn'); bc.textContent='🔗 highlight chain'; bc.style.marginTop='.3rem';
+    const bc=el('button','tagbtn'); bc.textContent='highlight chain'; bc.style.marginTop='.3rem';
     bc.onclick=()=>{ const ch=cadenaIds(e.id); network.selectNodes(ch); network.fit({nodes:ch,animation:true}); setStatus('chain: '+ch.length+' pasos'); };
     d.appendChild(bc);
   }
@@ -317,7 +321,7 @@ async function cargarModulos(type, value, cont){
   const grid=el('div','modgrid');
   lista.forEach(t=>{
     const b=el('button','modbtn');
-    b.innerHTML=esc(t.name)+(t.requires_key?' <span class="key">⚿</span>':'');
+    b.innerHTML=esc(t.name)+(t.requires_key?' <span class="key"></span>':'');
     b.title=(t.description||'')+(t.requires_key?' · needs an API key':''); b.onclick=()=>correr(type, value, t.name, t.requires_key);
     grid.appendChild(b);
   });
@@ -351,7 +355,7 @@ async function menuTransforms(ids,ev){
   if(!d.transforms.length){ const b=el('button'); b.textContent='(no transforms)'; b.disabled=true; ctx.appendChild(b); }
   d.transforms.forEach(t=>{
     const b=el('button');
-    b.innerHTML=t.name+(t.requires_key?' <span class="key">⚿</span>':'');
+    b.innerHTML=t.name+(t.requires_key?' <span class="key"></span>':'');
     b.title=t.description||'';
     b.onclick=()=>{ ocultarCtx(); correrEn(mismos,t.name); };
     ctx.appendChild(b);
@@ -380,7 +384,7 @@ async function correr(type,value,name,requiereKey){
     const d=await r.json();
     if(!r.ok){ setStatus('error: '+(d.error||r.status),'err'); return; }
     const n=d.producidas?d.producidas.length:0;
-    if(n===0 && requiereKey){ setStatus('⚿ '+name+' returned nothing — needs an API key. Open it in 🔑 API keys (top). Without a key, use the modules without ⚿ (free).','err'); }
+    if(n===0 && requiereKey){ setStatus(''+name+' returned nothing — needs an API key. Open it in API keys (top). Without a key, use the modules without (free).','err'); }
     else setStatus('✓ '+name+': +'+n+' entities (total '+d.total_entities+')');
     await pintarGrafo();
   }catch(e){ setStatus('error: '+e.message,'err'); }
@@ -419,16 +423,16 @@ async function analizarIA(){
   try{ const d=await(await fetch('/api/v2/findings/ia',{method:'POST'})).json();
     out.innerHTML='<div class="iaresumen">'+(d.resumen||d.error||'')+'</div>'; }
   catch(e){ out.textContent='Error: '+e.message; }
-  btn.disabled=false; btn.textContent='🧠 AI';
+  btn.disabled=false; btn.textContent='AI';
 }
 async function segundoEscudo(){
   const btn=$('#btnEscudo'),out=$('#iaResumen'); btn.disabled=true; btn.textContent='…';
   out.innerHTML='<div class="iaresumen">2nd shield reviewing…</div>';
   try{ const d=await(await fetch('/api/v2/findings/verify',{method:'POST'})).json();
     out.textContent=''; (d.revisiones||[]).forEach(r=>{
-      const x=el('div','iaresumen'); x.innerHTML='<b style="color:var(--cyan)">🛡️ '+r.hallazgo+'</b>\n'+r.reason; out.appendChild(x); }); }
+      const x=el('div','iaresumen'); x.innerHTML='<b style="color:var(--cyan)">'+r.hallazgo+'</b>\n'+r.reason; out.appendChild(x); }); }
   catch(e){ out.textContent='Error: '+e.message; }
-  btn.disabled=false; btn.textContent='🛡️';
+  btn.disabled=false; btn.textContent='';
 }
 
 // ── workspaces ──
@@ -464,7 +468,7 @@ function timeline(){
   }));
   ent.sort((a,b)=>a.f-b.f);
   const ov=$('#timeline');
-  ov.innerHTML='<span class="cerrar" id="tlCerrar">✕</span><h2>📅 Timeline · <span>'+ent.length+' eventos</span></h2>';
+  ov.innerHTML='<span class="cerrar" id="tlCerrar">✕</span><h2>Timeline · <span>'+ent.length+' eventos</span></h2>';
   if(!ent.length) ov.innerHTML+='<div class="vacio">No dates yet. Run rdap / ssl / wayback on a node.</div>';
   ent.forEach(x=>{ const r=el('div','tlrow');
     r.innerHTML='<span class="tlf">'+x.f.toISOString().slice(0,10)+'</span><span class="tle">'+x.ev+'</span><span class="tlq">'+esc(x.quien)+'</span>';
@@ -479,24 +483,26 @@ const SERVICIOS_KEY=[
   ['quake','token'],['hunter','api-key'],['netlas','api-key'],['criminalip','api-key'],
   ['binaryedge','api-key'],['virustotal','api-key (passivedns)'],['abuseipdb','api-key'],
   ['github','token (better limits)'],['viewdns','api-key'],
+  ['abusech','abuse.ch Auth-Key (MalwareBazaar + ThreatFox) FREE'],['emailrep','EmailRep key FREE'],
   ['hibp','optional and PAID — you already have breaches_xon + stealer_hudsonrock FREE']];
 const OBTENER={shodan:'https://account.shodan.io/register',censys:'https://accounts.censys.io/register',
   zoomeye:'https://www.zoomeye.org/',fofa:'https://en.fofa.info/',quake:'https://quake.360.net/',
   hunter:'https://hunter.how/',netlas:'https://app.netlas.io/registration/',criminalip:'https://www.criminalip.io/',
   binaryedge:'https://www.binaryedge.io/',virustotal:'https://www.virustotal.com/gui/join-us',
   abuseipdb:'https://www.abuseipdb.com/register',github:'https://github.com/settings/tokens',
-  viewdns:'https://viewdns.info/api/',hibp:'https://haveibeenpwned.com/API/Key'};
+  viewdns:'https://viewdns.info/api/',hibp:'https://haveibeenpwned.com/API/Key',
+  abusech:'https://auth.abuse.ch/',emailrep:'https://emailrep.io/key'};
 async function panelKeys(){
   const ov=$('#keys');
   let conf=new Set(); try{ conf=new Set((await (await fetch('/api/v2/keys')).json()).servicios||[]); }catch(_){}
-  ov.innerHTML='<span class="cerrar" id="kCerrar">✕</span><h2>🔑 API keys · <span>encrypted vault · the key never leaves your machine</span></h2>';
+  ov.innerHTML='<span class="cerrar" id="kCerrar">✕</span><h2>API keys · <span>encrypted vault · the key never leaves your machine</span></h2>';
   SERVICIOS_KEY.forEach(([s,hint])=>{
     const row=el('div','krow'); const ok=conf.has(s);
     const lab=el('span','ks'); lab.innerHTML=esc(s)+(ok?' <b style="color:var(--green)">●</b>':''); row.appendChild(lab);
     const inp=el('input'); inp.type='password'; inp.placeholder=ok?'(configured) — enter a new one to replace':hint; row.appendChild(inp);
     const g=el('button'); g.textContent='save'; g.onclick=async()=>{ if(!inp.value)return;
       await fetch('/api/v2/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({service:s,value:inp.value})});
-      inp.value=''; setStatus('🔑 '+s+' saved'); panelKeys(); }; row.appendChild(g);
+      inp.value=''; setStatus(''+s+' saved'); panelKeys(); }; row.appendChild(g);
     const st=el('span','kst');
     if(OBTENER[s]){ const o=el('a'); o.textContent='get'; o.href=OBTENER[s]; o.target='_blank'; o.style.cssText='color:var(--muted);font-size:.68rem;text-decoration:underline'; row.appendChild(o); }
     const p=el('button'); p.textContent='probar'; p.onclick=async()=>{ st.textContent='testing '+s+'…'; st.style.color='var(--muted)';
@@ -536,7 +542,7 @@ $('#btnMonitor').onclick=async()=>{
     const r=await fetch('/api/v2/monitor/start',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({interval:min*60})});
     const j=await r.json();
-    if(!r.ok){ setStatus('error: '+(j.error||r.status),'err'); } else setStatus('👁 monitor active every '+min+' min');
+    if(!r.ok){ setStatus('error: '+(j.error||r.status),'err'); } else setStatus('monitor active every '+min+' min');
   }
   cargarMonitor();
 };

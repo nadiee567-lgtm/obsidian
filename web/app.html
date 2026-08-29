@@ -197,19 +197,19 @@ input[type=text]::placeholder{color:#55555f}
     <div class="card">
       <div class="card-title">OSINT Modules</div>
       <div class="mod-grid">
-        <div class="mod-btn" onclick="selMod('person')"><span class="icon">👤</span><div class="name">Persona</div><div class="cat">OSINT</div></div>
-        <div class="mod-btn" onclick="selMod('user')"><span class="icon">🏷️</span><div class="name">Username</div><div class="cat">400+ platforms</div></div>
-        <div class="mod-btn" onclick="selMod('domain')"><span class="icon">🌐</span><div class="name">Domain</div><div class="cat">Full Recon</div></div>
-        <div class="mod-btn" onclick="selMod('ip')"><span class="icon">📡</span><div class="name">IP</div><div class="cat">Geo · Ports · ASN</div></div>
-        <div class="mod-btn" onclick="selMod('email')"><span class="icon">📧</span><div class="name">Email</div><div class="cat">Breach · SPF · DMARC</div></div>
-        <div class="mod-btn" onclick="selMod('phone')"><span class="icon">📱</span><div class="name">Phone</div><div class="cat">Carrier · Social</div></div>
+        <div class="mod-btn" onclick="selMod('person')"><span class="icon"></span><div class="name">Persona</div><div class="cat">OSINT</div></div>
+        <div class="mod-btn" onclick="selMod('user')"><span class="icon"></span><div class="name">Username</div><div class="cat">400+ platforms</div></div>
+        <div class="mod-btn" onclick="selMod('domain')"><span class="icon"></span><div class="name">Domain</div><div class="cat">Full Recon</div></div>
+        <div class="mod-btn" onclick="selMod('ip')"><span class="icon"></span><div class="name">IP</div><div class="cat">Geo · Ports · ASN</div></div>
+        <div class="mod-btn" onclick="selMod('email')"><span class="icon"></span><div class="name">Email</div><div class="cat">Breach · SPF · DMARC</div></div>
+        <div class="mod-btn" onclick="selMod('phone')"><span class="icon"></span><div class="name">Phone</div><div class="cat">Carrier · Social</div></div>
       </div>
       <div class="input-row">
         <input type="text" id="mod-arg" placeholder="Enter target..." onkeydown="if(event.key==='Enter')ejecutar()">
         <button class="btn" onclick="ejecutar()" id="exec-btn">Run</button>
       </div>
       <div class="output" id="output">
-<span class="info">⬛ OBSIDIAN ready. Select a module and enter the target.</span>
+<span class="info">OBSIDIAN ready. Select a module and enter the target.</span>
       </div>
     </div>
   </div>
@@ -219,16 +219,16 @@ input[type=text]::placeholder{color:#55555f}
     <div class="card">
       <div class="card-title">Advanced Reconnaissance</div>
       <div class="mod-grid">
-        <div class="mod-btn" onclick="selMod('github_sec')"><span class="icon">🔑</span><div class="name">GitHub Secrets</div><div class="cat">Tokens · Keys</div></div>
-        <div class="mod-btn" onclick="selMod('ssl')"><span class="icon">🔒</span><div class="name">SSL Deep</div><div class="cat">Ciphers · Vulns</div></div>
+        <div class="mod-btn" onclick="selMod('github_sec')"><span class="icon"></span><div class="name">GitHub Secrets</div><div class="cat">Tokens · Keys</div></div>
+        <div class="mod-btn" onclick="selMod('ssl')"><span class="icon"></span><div class="name">SSL Deep</div><div class="cat">Ciphers · Vulns</div></div>
         <div class="mod-btn" onclick="selMod('favicon')"><span class="icon">◇</span><div class="name">Favicon Hash</div><div class="cat">Related infra</div></div>
-        <div class="mod-btn" onclick="selMod('typosquatting')"><span class="icon">🎭</span><div class="name">Typosquatting</div><div class="cat">Fake domains</div></div>
-        <div class="mod-btn" onclick="selMod('buckets')"><span class="icon">🪣</span><div class="name">Cloud Buckets</div><div class="cat">S3 · GCS · Azure</div></div>
-        <div class="mod-btn" onclick="selMod('takeover')"><span class="icon">💀</span><div class="name">Subdomain Takeover</div><div class="cat">Orphan subdomains</div></div>
-        <div class="mod-btn" onclick="selMod('metadata')"><span class="icon">🗂️</span><div class="name">Metadata</div><div class="cat">EXIF · GPS · Meta</div></div>
+        <div class="mod-btn" onclick="selMod('typosquatting')"><span class="icon"></span><div class="name">Typosquatting</div><div class="cat">Fake domains</div></div>
+        <div class="mod-btn" onclick="selMod('buckets')"><span class="icon"></span><div class="name">Cloud Buckets</div><div class="cat">S3 · GCS · Azure</div></div>
+        <div class="mod-btn" onclick="selMod('takeover')"><span class="icon"></span><div class="name">Subdomain Takeover</div><div class="cat">Orphan subdomains</div></div>
+        <div class="mod-btn" onclick="selMod('metadata')"><span class="icon"></span><div class="name">Metadata</div><div class="cat">EXIF · GPS · Meta</div></div>
         <div class="mod-btn" onclick="selMod('passivedns')"><span class="icon">◇</span><div class="name">Passive DNS</div><div class="cat">Historical IPs</div></div>
-        <div class="mod-btn" onclick="selMod('cve')"><span class="icon">🚨</span><div class="name">CVE Correlation</div><div class="cat">Technologies → CVEs</div></div>
-        <div class="mod-btn" onclick="selMod('wordlist')"><span class="icon">📝</span><div class="name">Wordlist AI</div><div class="cat">Custom dictionary</div></div>
+        <div class="mod-btn" onclick="selMod('cve')"><span class="icon"></span><div class="name">CVE Correlation</div><div class="cat">Technologies → CVEs</div></div>
+        <div class="mod-btn" onclick="selMod('wordlist')"><span class="icon"></span><div class="name">Wordlist AI</div><div class="cat">Custom dictionary</div></div>
         <div class="mod-btn" onclick="selMod('yara_bulk')"><span class="icon">◇</span><div class="name">YARA Bulk Scan</div><div class="cat">Scan a folder</div></div>
         <div class="mod-btn" onclick="selMod('render_js')"><span class="icon">◇</span><div class="name">JS Render</div><div class="cat">Headless screenshot</div></div>
       </div>
@@ -245,9 +245,9 @@ input[type=text]::placeholder{color:#55555f}
     <div class="card">
       <div class="card-title">Simulation & Analysis</div>
       <div class="mod-grid">
-        <div class="mod-btn" onclick="runSim('escenario')"><span class="icon">🎯</span><div class="name">Scenario</div><div class="cat">Kill Chain · MITRE</div></div>
-        <div class="mod-btn" onclick="runSim('superficie')"><span class="icon">🗺️</span><div class="name">Surface</div><div class="cat">Attack Surface</div></div>
-        <div class="mod-btn" onclick="runSim('analizar')"><span class="icon">🧠</span><div class="name">AI Analysis</div><div class="cat">Full correlation</div></div>
+        <div class="mod-btn" onclick="runSim('escenario')"><span class="icon"></span><div class="name">Scenario</div><div class="cat">Kill Chain · MITRE</div></div>
+        <div class="mod-btn" onclick="runSim('superficie')"><span class="icon"></span><div class="name">Surface</div><div class="cat">Attack Surface</div></div>
+        <div class="mod-btn" onclick="runSim('analizar')"><span class="icon"></span><div class="name">AI Analysis</div><div class="cat">Full correlation</div></div>
       </div>
       <div class="input-row">
         <input type="text" id="sim-arg" placeholder="Target (or leave empty to use active case)">
@@ -408,7 +408,7 @@ input[type=text]::placeholder{color:#55555f}
     <div class="card">
       <div class="card-title">Kali Linux — Tools</div>
       <div style="font-size:.72rem;color:#d9564b;margin-bottom:10px">
-        ⚠ Only use on systems you own or have explicit written authorization.
+        Only use on systems you own or have explicit written authorization.
       </div>
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
@@ -440,7 +440,7 @@ input[type=text]::placeholder{color:#55555f}
     <div class="card">
       <div class="card-title">Parrot Security — Tools</div>
       <div style="font-size:.72rem;color:#d9564b;margin-bottom:10px">
-        ⚠ Only use on systems you own or have explicit written authorization.
+        Only use on systems you own or have explicit written authorization.
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
         <button class="btn secondary" onclick="parrotCat('anonymity')" id="pcat-anonymity">Anonymity</button>
@@ -556,7 +556,7 @@ async function buscarDark() {
   const q = document.getElementById('dark-query').value.trim();
   if (!q) { toast('Enter a target'); return; }
   const out = document.getElementById('output-dark');
-  out.innerHTML = '<span class="info">🌑 Searching the indexed dark web...</span>';
+  out.innerHTML = '<span class="info">Searching the indexed dark web...</span>';
   try {
     const r = await fetch('/api/darkweb', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
     const d = await r.json();
@@ -591,7 +591,7 @@ async function buscarShodan() {
   const q = document.getElementById('shodan-query').value.trim();
   if (!q) { toast('Enter IP or query'); return; }
   const out = document.getElementById('output-shodan');
-  out.innerHTML = '<span class="info">📡 Scanning...</span>';
+  out.innerHTML = '<span class="info">Scanning...</span>';
   const esIP = /^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$/.test(q);
   try {
     const body = esIP ? {ip:q} : {query:q};
@@ -639,11 +639,11 @@ async function kaliCat(cat) {
   document.getElementById('kcat-'+cat)?.classList.add('active');
   const grid = document.getElementById('kali-tools-grid');
   grid.innerHTML = '';
-  const ICONS = {recon:'🔍',web:'🌐',passwords:'🔑',forensics:'🔬',exploits:'💣',network:'📡'};
+  const ICONS = {recon:'',web:'',passwords:'',forensics:'',exploits:'',network:''};
   (kaliTools[cat]||[]).forEach(t => {
     const btn = document.createElement('div');
     btn.className = 'mod-btn' + (kaliToolActiva?.id === t.id ? ' active' : '');
-    btn.innerHTML = `<span class="icon">${ICONS[cat]||'⚙'}</span><div class="name" style="font-size:.7rem">${t.name}</div><div class="cat">${t.desc}</div>`;
+    btn.innerHTML = `<span class="icon">${ICONS[cat]||''}</span><div class="name" style="font-size:.7rem">${t.name}</div><div class="cat">${t.desc}</div>`;
     btn.onclick = () => selKaliTool(t);
     grid.appendChild(btn);
   });
@@ -688,17 +688,17 @@ async function ejecutarKali() {
           if (d.status === 'completed') {
             const res = d.result;
             if (res.error) {
-              append(out, '❌ ' + res.error + '\n', 'error');
+              append(out, '✗ ' + res.error + '\n', 'error');
             } else {
               append(out, res.output + '\n');
             }
           } else if (d.status === 'error') {
-            append(out, '❌ Error: ' + d.message + '\n', 'error');
+            append(out, '✗ Error: ' + d.message + '\n', 'error');
           }
         } catch(e) {}
       }
     }
-    append(out, '\n✅ Done\n', 'ok');
+    append(out, '\n✓ Done\n', 'ok');
   } catch(e) {
     append(out, 'Connection error: ' + e.message, 'error');
   }
@@ -722,11 +722,11 @@ async function parrotCat(cat) {
   document.getElementById('pcat-'+cat)?.classList.add('active');
   const grid = document.getElementById('parrot-tools-grid');
   grid.innerHTML = '';
-  const ICONS = {anonymity:'🕵️',osint:'🔍',wifi:'📡',passwords:'🔑',forensics:'🔬'};
+  const ICONS = {anonymity:'',osint:'',wifi:'',passwords:'',forensics:''};
   (parrotTools[cat]||[]).forEach(t => {
     const btn = document.createElement('div');
     btn.className = 'mod-btn' + (parrotToolActiva?.id === t.id ? ' active' : '');
-    btn.innerHTML = `<span class="icon">${ICONS[cat]||'⚙'}</span><div class="name" style="font-size:.7rem">${t.name}</div><div class="cat">${t.desc}</div>`;
+    btn.innerHTML = `<span class="icon">${ICONS[cat]||''}</span><div class="name" style="font-size:.7rem">${t.name}</div><div class="cat">${t.desc}</div>`;
     btn.onclick = () => selParrotTool(t, btn);
     grid.appendChild(btn);
   });
@@ -770,15 +770,15 @@ async function ejecutarParrot() {
           const d = JSON.parse(line.slice(5));
           if (d.status === 'completed') {
             const res = d.result;
-            if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
+            if (res.error) append(out, '✗ ' + res.error + '\n', 'error');
             else append(out, res.output + '\n');
           } else if (d.status === 'error') {
-            append(out, '❌ Error: ' + d.message + '\n', 'error');
+            append(out, '✗ Error: ' + d.message + '\n', 'error');
           }
         } catch(e) {}
       }
     }
-    append(out, '\n✅ Done\n', 'ok');
+    append(out, '\n✓ Done\n', 'ok');
   } catch(e) {
     append(out, 'Connection error: ' + e.message, 'error');
   }
@@ -802,11 +802,11 @@ async function remnuxCat(cat) {
   document.getElementById('rcat-'+cat)?.classList.add('active');
   const grid = document.getElementById('remnux-tools-grid');
   grid.innerHTML = '';
-  const ICONS = {malware:'🦠',documents:'📄',analysis:'🔍',crypto:'🔐'};
+  const ICONS = {malware:'',documents:'',analysis:'',crypto:''};
   (remnuxTools[cat]||[]).forEach(t => {
     const btn = document.createElement('div');
     btn.className = 'mod-btn' + (remnuxToolActiva?.id === t.id ? ' active' : '');
-    btn.innerHTML = `<span class="icon">${ICONS[cat]||'⚙'}</span><div class="name" style="font-size:.7rem">${t.name}</div><div class="cat">${t.desc}</div>`;
+    btn.innerHTML = `<span class="icon">${ICONS[cat]||''}</span><div class="name" style="font-size:.7rem">${t.name}</div><div class="cat">${t.desc}</div>`;
     btn.onclick = () => selRemnuxTool(t, btn);
     grid.appendChild(btn);
   });
@@ -850,15 +850,15 @@ async function ejecutarRemnux() {
           const d = JSON.parse(line.slice(5));
           if (d.status === 'completed') {
             const res = d.result;
-            if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
+            if (res.error) append(out, '✗ ' + res.error + '\n', 'error');
             else append(out, res.output + '\n');
           } else if (d.status === 'error') {
-            append(out, '❌ Error: ' + d.message + '\n', 'error');
+            append(out, '✗ Error: ' + d.message + '\n', 'error');
           }
         } catch(e) {}
       }
     }
-    append(out, '\n✅ Done\n', 'ok');
+    append(out, '\n✓ Done\n', 'ok');
   } catch(e) {
     append(out, 'Connection error: ' + e.message, 'error');
   }
@@ -882,11 +882,11 @@ async function blackarchCat(cat) {
   document.getElementById('bcat-'+cat)?.classList.add('active');
   const grid = document.getElementById('blackarch-tools-grid');
   grid.innerHTML = '';
-  const ICONS = {recon:'🔍',web:'🌐',passwords:'🔑',windows:'🪟',wireless:'📡',forensics:'🔬',anonymity:'🕵️',osint:'🔎',wifi:'📶',malware:'🦠',documents:'📄',analysis:'🔬',crypto:'🔐',exploits:'💣',network:'📡'};
+  const ICONS = {recon:'',web:'',passwords:'',windows:'',wireless:'',forensics:'',anonymity:'',osint:'',wifi:'',malware:'',documents:'',analysis:'',crypto:'',exploits:'',network:''};
   (blackarchTools[cat]||[]).forEach(t => {
     const btn = document.createElement('div');
     btn.className = 'mod-btn' + (blackarchToolActiva?.id === t.id ? ' active' : '');
-    btn.innerHTML = `<span class="icon">${ICONS[cat]||'⚙'}</span><div class="name" style="font-size:.7rem">${t.name}</div><div class="cat">${t.desc}</div>`;
+    btn.innerHTML = `<span class="icon">${ICONS[cat]||''}</span><div class="name" style="font-size:.7rem">${t.name}</div><div class="cat">${t.desc}</div>`;
     btn.onclick = () => selBlackarchTool(t, btn);
     grid.appendChild(btn);
   });
@@ -930,15 +930,15 @@ async function ejecutarBlackarch() {
           const d = JSON.parse(line.slice(5));
           if (d.status === 'completed') {
             const res = d.result;
-            if (res.error) append(out, '❌ ' + res.error + '\n', 'error');
+            if (res.error) append(out, '✗ ' + res.error + '\n', 'error');
             else append(out, res.output + '\n');
           } else if (d.status === 'error') {
-            append(out, '❌ Error: ' + d.message + '\n', 'error');
+            append(out, '✗ Error: ' + d.message + '\n', 'error');
           }
         } catch(e) {}
       }
     }
-    append(out, '\n✅ Done\n', 'ok');
+    append(out, '\n✓ Done\n', 'ok');
   } catch(e) {
     append(out, 'Connection error: ' + e.message, 'error');
   }
@@ -950,7 +950,7 @@ async function checkURL() {
   const url = document.getElementById('url-check-input').value.trim();
   if (!url) { toast('Enter a URL'); return; }
   const out = document.getElementById('output-url');
-  out.innerHTML = '<span class="info">🔍 Analyzing URL...</span>';
+  out.innerHTML = '<span class="info">Analyzing URL...</span>';
   try {
     const r = await fetch('/api/run', {method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({module:'url_check',argument:url})});
@@ -992,7 +992,7 @@ async function checkPassword() {
   const pwd = document.getElementById('pwd-input').value;
   if (!pwd) { toast('Enter a password'); return; }
   const out = document.getElementById('output-pwd');
-  out.innerHTML = '<span class="info">🔐 Analyzing...</span>';
+  out.innerHTML = '<span class="info">Analyzing...</span>';
   try {
     const r = await fetch('/api/run', {method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({module:'password',argument:pwd})});
@@ -1235,14 +1235,14 @@ async function ejecutar() {
         if (!line.startsWith('data:')) continue;
         try {
           const d = JSON.parse(line.slice(5));
-          if (d.status === 'starting') { append(out, '⚡ Processing...\n', 'info'); }
+          if (d.status === 'starting') { append(out, 'Processing...\n', 'info'); }
           else if (d.status === 'completed') {
             const res = d.result;
             const tipo = res?.tipo || '';
             const results = res?.results || {};
             // Smart rendering by type
             if (tipo === 'render_js' && results.screenshot) {
-              append(out, `\n✅ Rendered — ${results.titulo || '?'}\n`, 'ok');
+              append(out, `\n✓ Rendered — ${results.titulo || '?'}\n`, 'ok');
               const img = document.createElement('img');
               img.src = results.screenshot + '?t=' + Date.now();
               img.style.cssText = 'max-width:100%;border:1px solid #26262f;border-radius:2px;margin:6px 0;display:block';
@@ -1251,21 +1251,21 @@ async function ejecutar() {
             } else if (tipo === 'github_secrets') {
               const h = results.hallazgos || [];
               const repos = results.repos_analizados || 0;
-              if (results.error) { append(out, '❌ Error: ' + results.error + '\n', 'error'); }
+              if (results.error) { append(out, '✗ Error: ' + results.error + '\n', 'error'); }
               else if (h.length === 0) {
                 append(out, `\n✓ No exposed secrets in ${repos} analyzed repos.\n`, 'ok');
               } else {
-                append(out, `\n⚠ ${h.length} SECRETS FOUND in ${repos} repos:\n`, 'warn');
+                append(out, `\n${h.length} SECRETS FOUND in ${repos} repos:\n`, 'warn');
                 h.forEach(x => append(out, `  [${x.type}] ${x.repo} · commit ${x.commit} · ${x.archivo}\n  → ${x.value}\n`, 'error'));
               }
             } else {
-              append(out, '\n✅ COMPLETED\n', 'ok');
+              append(out, '\n✓ COMPLETED\n', 'ok');
               append(out, JSON.stringify(res, null, 2) + '\n');
             }
             await refreshStatus();
             if (grafoNet) cargarGrafo();
           }
-          else if (d.status === 'error') { append(out, '❌ Error: ' + d.message + '\n', 'error'); }
+          else if (d.status === 'error') { append(out, '✗ Error: ' + d.message + '\n', 'error'); }
         } catch(e) {}
       }
     }

@@ -14,7 +14,7 @@ import datetime
 
 from core.modelo import TYPES
 
-_SEV_COLOR = {'critical': '#f38ba8', 'high': '#fab387', 'medium': '#f9e2af', 'low': '#89b4fa'}  # Catppuccin Mocha
+_SEV_COLOR = {'critical': '#a86a70', 'high': '#b5895c', 'medium': '#a89a6a', 'low': '#6f8aa8'}
 _SEV_ORDER = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
 
 
@@ -61,13 +61,11 @@ def generate_report(store, findings=None, score=0, meta=None, vis_js=None) -> st
     target = meta.get('target') or '—'
     counts = _severity_summary(findings)
 
-    # ── score bar colored by level ──
     if score >= 70:   score_col = _SEV_COLOR['critical']
     elif score >= 40: score_col = _SEV_COLOR['high']
     elif score >= 15: score_col = _SEV_COLOR['medium']
     else:             score_col = _SEV_COLOR['low']
 
-    # ── findings ──
     if findings:
         rows = []
         for h in findings:
@@ -86,7 +84,6 @@ def generate_report(store, findings=None, score=0, meta=None, vis_js=None) -> st
     else:
         hallazgos_html = '<p class="vacio">No risks detected by the correlation engine.</p>'
 
-    # ── entity inventory by type ──
     bloques = []
     for type, info in TYPES.items():
         ents = store.of_type(type)
@@ -111,7 +108,6 @@ def generate_report(store, findings=None, score=0, meta=None, vis_js=None) -> st
             f'<ul>{"".join(items)}</ul></section>')
     inventario_html = ''.join(bloques) or '<p class="vacio">No entities.</p>'
 
-    # ── embedded graph (optional, self-contained) ──
     if vis_js:
         nodos, aristas = _graph_data(store)
         grafo_html = f'''
@@ -139,11 +135,12 @@ def generate_report(store, findings=None, score=0, meta=None, vis_js=None) -> st
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OBSIDIAN · Report · {_e(ws)}</title>
 <style>
-  :root{{--bg:#1e1e2e;--panel:#181825;--line:#313244;--txt:#cdd6f4;--muted:#6c7086;--cyan:#89dceb;--amber:#fab387}}  /* Catppuccin Mocha */
+  :root{{--bg:#15171b;--panel:#1a1d22;--line:#2c313a;--txt:#c2c6cc;--muted:#767b85;--cyan:#6f9298;--amber:#a98b62}}  /* dry, matte */
+  *{{border-radius:0 !important;box-shadow:none !important}}
   *{{box-sizing:border-box}} body{{margin:0;background:var(--bg);color:var(--txt);
     font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;padding:2rem;max-width:1000px;margin:auto}}
   h1{{font-size:1.5rem;margin:0 0 .2rem;letter-spacing:.05em}}
-  h1 .sq{{display:inline-block;width:.9rem;height:.9rem;background:linear-gradient(135deg,#5b9bd5,#b07a9e);vertical-align:middle;margin-right:.5rem;border-radius:2px}}
+  h1 .sq{{display:inline-block;width:.85rem;height:.85rem;background:#4a5560;vertical-align:middle;margin-right:.5rem}}
   h2{{font-size:1.05rem;margin:2rem 0 .8rem;border-bottom:1px solid var(--line);padding-bottom:.4rem}}
   .meta{{color:var(--muted);font-size:.82rem;margin-bottom:1.5rem}} .meta b{{color:var(--txt)}}
   .score{{display:flex;align-items:center;gap:1rem;margin:1rem 0}}
@@ -178,7 +175,7 @@ def generate_report(store, findings=None, score=0, meta=None, vis_js=None) -> st
 </style></head>
 <body>
   <div class="toolbar no-print">
-    <button onclick="window.print()">🖨 PDF</button>
+    <button onclick="window.print()">PDF</button>
     <a href="/api/v2/export/json" download>⬇ JSON</a>
     <a href="/api/v2/export/csv" download>⬇ CSV</a>
   </div>
