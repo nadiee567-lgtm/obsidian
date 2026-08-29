@@ -6,7 +6,7 @@
 
 ![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-blue)
 ![Python 3.14](https://img.shields.io/badge/python-3.14-3776ab)
-![Tests](https://img.shields.io/badge/tests-293%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-297%20passing-brightgreen)
 ![Transforms](https://img.shields.io/badge/transforms-104-orange)
 
 OBSIDIAN takes two ideas that already work — Maltego's model (entities you expand
