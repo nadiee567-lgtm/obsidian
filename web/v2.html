@@ -123,6 +123,7 @@
   .tnotice code{background:var(--panel2);border:1px solid var(--line);padding:.05rem .3rem}
   .trow{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;padding:.35rem 0;border-bottom:1px solid var(--line)}
   .trow .tnm{font-family:var(--mono);font-size:.74rem;min-width:9rem;color:var(--text)}
+  .trow .tmiss{color:var(--red);font-size:.62rem;opacity:.8}
   .trow .tds{color:var(--muted);font-size:.66rem;flex-basis:100%;font-family:var(--mono)}
   .trow input{flex:1;min-width:9rem}
   .tout{white-space:pre-wrap;font-family:var(--mono);font-size:.72rem;color:#9aa2b5;background:var(--panel2);border:1px solid var(--line);padding:.5rem;margin:.3rem 0;max-height:240px;overflow:auto}
@@ -234,9 +235,8 @@
         <div id="tResult"></div>
       </div>
     </div>
-    <div class="tsec"><h3>Kali</h3><div class="tbody" id="bodyKali"></div></div>
-    <div class="tsec"><h3>Parrot</h3><div class="tbody" id="bodyParrot"></div></div>
-    <div class="tsec"><h3>REMnux</h3><div class="tbody" id="bodyRemnux"></div></div>
+    <div class="tsec"><h3>Kali tools <span class="badge">run on host</span></h3><div class="tbody" id="bodyKali"></div></div>
+    <div class="tsec"><h3>BlackArch <span class="badge">run on host</span></h3><div class="tbody" id="bodyBlackarch"></div></div>
   </div>
 </div>
 <div id="ctx"></div>
@@ -643,36 +643,29 @@ async function sendToGraph(type,value,name){
   closeTools(); await pintarGrafo(); setStatus('added '+name+' results to the case');
 }
 async function loadDistros(){
-  let stt={}; try{ stt=await (await fetch('/api/v2/distros')).json(); }catch(_){}
-  ['kali','parrot','remnux'].forEach(d=>buildDistro(d, !!stt[d]));
+  ['kali','blackarch'].forEach(f=>buildFamily(f));
 }
-async function buildDistro(distro, exists){
-  const body=$('#body'+distro[0].toUpperCase()+distro.slice(1)); body.innerHTML='';
-  if(!exists){
-    const IMG={kali:'docker.io/kalilinux/kali-rolling',parrot:'docker.io/parrotsec/security',remnux:'docker.io/remnux/remnux-distro'};
-    const n=el('div','tnotice');
-    n.innerHTML='The <b>'+distro+'</b> distrobox container is not created yet. Create it to enable these tools:<br>'+
-      '<code>distrobox create -i '+(IMG[distro]||'')+' -n '+distro+'</code><br>'+
-      'Once it exists, OBSIDIAN connects to it automatically.';
-    body.appendChild(n); return;
-  }
-  let data={tools:[]}; try{ data=await (await fetch('/api/v2/distro/tools/'+distro)).json(); }catch(_){}
+async function buildFamily(fam){
+  const body=$('#body'+fam[0].toUpperCase()+fam.slice(1)); body.innerHTML='';
+  let data={tools:[]}; try{ data=await (await fetch('/api/v2/distro/tools/'+fam)).json(); }catch(_){}
   (data.tools||[]).forEach(t=>{
     const row=el('div','trow');
-    const nm=el('span','tnm'); nm.textContent=t.name; row.appendChild(nm);
+    const nm=el('span','tnm'); nm.textContent=t.name;
+    if(!t.installed){ const w=el('span','tmiss'); w.textContent=' (not installed)'; nm.appendChild(w); }
+    row.appendChild(nm);
     const inp=el('input'); inp.placeholder=t.placeholder||'target'; row.appendChild(inp);
-    const b=el('button'); b.textContent='run'; b.onclick=()=>runDistro(distro,t.id,inp.value,row); row.appendChild(b);
+    const b=el('button'); b.textContent='run'; b.onclick=()=>runTool(fam,t.id,inp.value,row); row.appendChild(b);
     if(t.desc){ const ds=el('span','tds'); ds.textContent=t.desc; row.appendChild(ds); }
     body.appendChild(row);
   });
 }
-async function runDistro(distro,tool,arg,row){
+async function runTool(fam,tool,arg,row){
   let pre=row.nextElementSibling && row.nextElementSibling.classList.contains('tout')?row.nextElementSibling:null;
   if(!pre){ pre=el('div','tout'); row.after(pre); }
   pre.textContent='running…';
-  let r; try{ r=await (await fetch('/api/v2/distro/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({distro,tool,arg})})).json(); }
+  let r; try{ r=await (await fetch('/api/v2/distro/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({distro:fam,tool,arg})})).json(); }
   catch(e){ pre.textContent='error'; return; }
-  pre.textContent = r.needs_distro ? ('['+r.error+']') : (r.output || r.error || '(no output)');
+  pre.textContent = r.needs_install ? ('['+r.error+' — sudo apt install '+r.needs_install+']') : (r.output || r.error || '(no output)');
 }
 </script>
 </body>

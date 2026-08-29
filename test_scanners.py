@@ -165,3 +165,25 @@ def test_distro_missing_gives_notice(monkeypatch):
     assert r.get('needs_distro') == 'kali'
     r2 = ob._distrobox_run('parrot', ob.PARROT_TOOLS, 'whatever', '1.2.3.4')
     assert r2.get('needs_distro') == 'parrot'
+
+
+def test_host_tool_run(monkeypatch):
+    monkeypatch.setattr(ob, '_which', lambda b: True)
+    monkeypatch.setattr(ob, '_cmd', lambda cmd, timeout=90: 'scan output here')
+    r = ob._host_tool_run(ob.KALI_TOOLS, 'nmap', '1.2.3.4')
+    assert r['output'] == 'scan output here'
+    assert 'nmap' in r['cmd'] and '1.2.3.4' in r['cmd']
+
+
+def test_host_tool_not_installed(monkeypatch):
+    monkeypatch.setattr(ob, '_which', lambda b: False)
+    r = ob._host_tool_run(ob.KALI_TOOLS, 'nmap', '1.2.3.4')
+    assert r.get('needs_install') == 'nmap'
+    assert 'output' not in r
+
+
+def test_host_tool_blackarch_registered():
+    assert 'blackarch' in ob._TOOLSETS
+    # masscan lives in the blackarch catalog
+    ids = {t['id'] for grp in ob.BLACKARCH_TOOLS.values() for t in grp}
+    assert 'masscan' in ids

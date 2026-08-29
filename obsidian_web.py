@@ -4157,27 +4157,50 @@ def api_v2_scratch():
                     'produced': [e.to_dict() for e in produced]})
 
 
+_TOOLSETS = {'kali': KALI_TOOLS, 'parrot': PARROT_TOOLS,
+             'remnux': REMNUX_TOOLS, 'blackarch': BLACKARCH_TOOLS}
+
+
+def _host_tool_run(tool_dict, tool_id, arg):
+    """Runs a pentest tool directly on the host (no container needed)."""
+    tool = None
+    for cat in tool_dict.values():
+        for t in cat:
+            if t['id'] == tool_id:
+                tool = t
+                break
+    if not tool:
+        return {'error': f'unknown tool: {tool_id}'}
+    binary = tool['cmd'].strip().split()[0]
+    if not _which(binary):
+        return {'error': f'{binary} is not installed on the host', 'needs_install': binary}
+    if not _safe_target(arg):
+        return {'error': 'invalid argument: disallowed characters'}
+    cmd = tool['cmd'].replace('{arg}', arg.strip())
+    return {'tool': tool['name'], 'cmd': cmd, 'output': _cmd(cmd, timeout=90)}
+
+
 @app.route('/api/v2/distro/tools/<distro>')
 def api_v2_distro_tools(distro):
-    """Flat tool list for a pentest distro + whether its container exists."""
-    cat = {'kali': KALI_TOOLS, 'parrot': PARROT_TOOLS, 'remnux': REMNUX_TOOLS}.get(distro)
+    """Flat tool list for a pentest toolset, with per-tool host availability."""
+    cat = _TOOLSETS.get(distro)
     if cat is None:
-        return _error('unknown distro', 404)
+        return _error('unknown toolset', 404)
     tools = [{'id': t['id'], 'name': t['name'], 'desc': t.get('desc', ''),
-              'placeholder': t.get('placeholder', '')}
+              'placeholder': t.get('placeholder', ''),
+              'installed': bool(_which(t['cmd'].strip().split()[0]))}
              for group in cat.values() for t in group]
-    return jsonify({'distro': distro, 'exists': _distro_exists(distro), 'tools': tools})
+    return jsonify({'toolset': distro, 'tools': tools})
 
 
 @app.route('/api/v2/distro/run', methods=['POST'])
 def api_v2_distro_run():
-    """Runs one distro tool (auto-connects to the container; graceful notice if missing)."""
+    """Runs one pentest tool on the host (clear notice if it's not installed)."""
     d = request.json or {}
-    distro = (d.get('distro', '') or '').lower()
-    cat = {'kali': KALI_TOOLS, 'parrot': PARROT_TOOLS, 'remnux': REMNUX_TOOLS}.get(distro)
+    cat = _TOOLSETS.get((d.get('distro', '') or '').lower())
     if cat is None:
-        return _error('unknown distro', 404)
-    return jsonify(_distrobox_run(distro, cat, d.get('tool', ''), d.get('arg', '')))
+        return _error('unknown toolset', 404)
+    return jsonify(_host_tool_run(cat, d.get('tool', ''), d.get('arg', '')))
 
 def _status_data():
     """Collects system health (touches disk/processes)."""
