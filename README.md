@@ -6,8 +6,8 @@
 
 ![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-blue)
 ![Python 3.14](https://img.shields.io/badge/python-3.14-3776ab)
-![Tests](https://img.shields.io/badge/tests-279%20passing-brightgreen)
-![Transforms](https://img.shields.io/badge/transforms-95-orange)
+![Tests](https://img.shields.io/badge/tests-293%20passing-brightgreen)
+![Transforms](https://img.shields.io/badge/transforms-104-orange)
 
 OBSIDIAN takes two ideas that already work — Maltego's model (entities you expand
 with transforms into a graph) and SpiderFoot's (typed events feeding a correlation
@@ -27,11 +27,12 @@ username, wallet, and 17 more) with a deterministic id. The same IP found by two
 different sources collapses into one node. Nothing is stored twice, and every value
 carries where it came from.
 
-**Transform engine — 95 of them.** DNS, RDAP, Certificate Transparency, subdomain
+**Transform engine — 104 of them.** DNS, RDAP, Certificate Transparency, subdomain
 enumeration, HTTP probing, screenshots, nuclei, tech and CVE lookups, breach checks,
 infostealer logs, IP reputation, favicon and TLS-cert pivots, Wayback, reverse WHOIS,
-EXIF metadata, crypto tracing, Gravatar and RDAP enrichment, end-of-life detection,
-and more. Writing a new one is a decorator and a function.
+EXIF metadata, crypto tracing, end-of-life detection, passive exposure from Shodan
+InternetDB (ports and CVEs with no key), active subnet scanning, and email/username
+footprinting (holehe, maigret, theHarvester). Writing a new one is a decorator and a function.
 
 **Interactive graph** (`/v2`). Right-click a node to run transforms on it. Per-type
 colors, filters, multi-entity pivoting, an evidence chain that shows how each datum
@@ -74,9 +75,19 @@ OBSIDIAN_PASSWORD=your_password python obsidian_web.py
 The server binds to localhost only. On first run it prints a generated password if
 you didn't set `OBSIDIAN_PASSWORD`.
 
-A few transforms lean on system tools when they're present (`dig`, `nmap`, `whois`,
-`exiftool`, `nuclei`, `tor`, and `playwright` for screenshots). None are required —
-the engine skips a transform quietly if its tool isn't installed.
+A few transforms lean on external tools when they're present (`dig`, `nmap`, `whois`,
+`exiftool`, `nuclei`, `tor`, `playwright` for screenshots, and `holehe` / `maigret` /
+`theHarvester` for account and footprint discovery). None are required — the engine
+skips a transform quietly if its tool isn't installed.
+
+The optional AI second-pass runs on a local model through [Ollama](https://ollama.com).
+For good graph analysis, pull a 7B model (a 6-8 GB GPU handles it well):
+
+```bash
+ollama pull qwen2.5:7b
+```
+
+Without Ollama the engine still works — the AI panel simply stays quiet.
 
 ### Docker
 
@@ -110,7 +121,7 @@ your machine. There is no OBSIDIAN account and no shared key.
 
 | Needs a key | What it does | Free keyless alternative already included |
 |---|---|---|
-| Shodan / Censys / ZoomEye / FOFA / Quake / Hunter / Netlas / Criminal IP / BinaryEdge | Internet search engines (ports, services, infra) | `ports` (nmap), `geo_ip`, `ip_reputation`, `ip_blocklist`, `greynoise`, `ripe_netinfo`, `ip_rdap` |
+| Shodan / Censys / ZoomEye / FOFA / Quake / Hunter / Netlas / Criminal IP / BinaryEdge | Internet search engines (ports, services, infra) | `internetdb` (Shodan's own dataset, keyless), `ports` (nmap), `geo_ip`, `ip_reputation`, `ip_blocklist`, `greynoise`, `ripe_netinfo`, `ip_rdap` |
 | HIBP | Email in data breaches | `breaches_xon` (XposedOrNot), `comb` (ProxyNova), `stealer_hudsonrock` |
 | VirusTotal | Passive DNS history of a domain | `crtsh`, `subdomains_ht`, `rdap` |
 | ViewDNS | Other domains of the same registrant | — |
