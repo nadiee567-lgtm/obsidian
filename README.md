@@ -60,42 +60,121 @@ report, JSON/CSV/PDF export, and a scriptable CLI that does all of the above.
 
 ## Install
 
-Requires Python 3.14. Clone it, install the dependencies, and run:
+Needs Python 3.11 or newer (3.14 recommended) on Linux, macOS, or WSL — any
+distribution. Nothing else is required to start; the pentest tools and the local
+AI model are optional add-ons you can skip and add later.
+
+Total footprint: ~30 MB for the engine alone, ~700 MB with all the OSINT and
+pentest tools, and about 5 GB if you also pull the local AI model.
+
+### Fastest path — the installer
+
+```bash
+git clone https://github.com/nadiee567-lgtm/obsidian.git
+cd obsidian
+bash obsidian_install.sh
+```
+
+The installer detects your package manager (`apt`, `dnf`, or `pacman`), installs the
+Python dependencies and the OSINT command-line tools, then asks — one prompt each —
+whether you want the pentest tools (~190 MB) and remote access via
+[Tailscale](https://tailscale.com). Answer and you're done; jump to
+[Running it](#running-it).
+
+### Manual install
+
+Prefer to do it by hand, or on a distro the installer doesn't cover:
+
+**1. Clone and create the Python environment** (every distro):
 
 ```bash
 git clone https://github.com/nadiee567-lgtm/obsidian.git
 cd obsidian
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-
-OBSIDIAN_PASSWORD=your_password python obsidian_web.py
-# open http://localhost:8767/v2
 ```
 
-The server binds to localhost only. On first run it prints a generated password if
-you didn't set `OBSIDIAN_PASSWORD`.
+**2. System tools** that back the DNS, port, and metadata transforms. Pick your
+distro (all of these are optional — the engine skips a transform quietly if its tool
+isn't there):
 
-A few transforms lean on external tools when they're present (`dig`, `nmap`, `whois`,
-`exiftool`, `nuclei`, `tor`, `playwright` for screenshots, and `holehe` / `maigret` /
-`theHarvester` for account and footprint discovery). None are required — the engine
-skips a transform quietly if its tool isn't installed.
+| Distro | Command |
+|---|---|
+| Debian / Ubuntu / Mint | `sudo apt install nmap whois dnsutils libimage-exiftool-perl tor` |
+| Fedora / RHEL | `sudo dnf install nmap whois bind-utils perl-Image-ExifTool tor` |
+| Arch / Manjaro | `sudo pacman -S nmap whois bind perl-image-exiftool tor` |
+| openSUSE | `sudo zypper install nmap whois bind-utils exiftool tor` |
 
-The optional AI second-pass runs on a local model through [Ollama](https://ollama.com).
-For good graph analysis, pull a 7B model (a 6-8 GB GPU handles it well):
+### Optional: OSINT command-line tools
+
+`holehe` (which sites an email is registered on), `maigret` (a username across 500+
+sites), and `theHarvester` (emails and subdomains for a domain) are installed with
+[pipx](https://pipx.pypa.io) so each gets its own isolated environment:
 
 ```bash
+python -m pip install --user pipx
+pipx install holehe maigret theHarvester
+```
+
+### Optional: pentest tools
+
+These fill the Kali, Parrot, REMnux, and BlackArch sections of the Tools view
+(nmap, sqlmap, nikto, gobuster, masscan, ffuf, hydra, hashcat, john, binwalk,
+exiftool, steghide, and more). About 190 MB. Anything you skip simply shows a
+"not installed" note in the Tools view, so you can add tools one at a time.
+
+| Distro | Command |
+|---|---|
+| Debian / Ubuntu / Mint | `sudo apt install nmap nikto sqlmap gobuster dirb whatweb wfuzz hashid john binwalk steghide arp-scan netcat-traditional masscan wafw00f dnsrecon dnsenum sublist3r ffuf hydra medusa hashcat crunch cewl wifite` |
+| Fedora / RHEL | `sudo dnf install nmap nikto sqlmap john binwalk steghide masscan hydra hashcat crunch` |
+| Arch / Manjaro | `sudo pacman -S nmap nikto sqlmap john binwalk steghide masscan hydra hashcat crunch` — the rest live in the [AUR](https://aur.archlinux.org) or the [BlackArch repo](https://blackarch.org/blackarch-installer.html) |
+
+Document- and malware-analysis helpers (`olevba`, `mraptor`, `xortool`) install the
+same way on every distro, through pipx:
+
+```bash
+pipx install oletools xortool
+```
+
+### Optional: local AI analysis
+
+The AI second-pass (the "AI" panel and the scenario/surface/analyze buttons) runs a
+model locally through [Ollama](https://ollama.com) — no cloud, no per-token cost.
+Without it the engine works exactly the same; the AI panel just stays quiet.
+
+```bash
+# install Ollama (Linux / WSL)
+curl -fsSL https://ollama.com/install.sh | sh
+# pull the analysis model (~4.7 GB; a 6-8 GB GPU runs it comfortably, CPU also works)
 ollama pull qwen2.5:7b
 ```
 
-Without Ollama the engine still works — the AI panel simply stays quiet.
+On macOS, download Ollama from [ollama.com/download](https://ollama.com/download),
+then run the `ollama pull` line.
+
+### Running it
+
+```bash
+OBSIDIAN_PASSWORD=your_password python obsidian_web.py
+# then open http://localhost:8767/v2
+```
+
+The server binds to localhost only. If you don't set `OBSIDIAN_PASSWORD`, it prints a
+generated one on first run. Slide the graph left (or use the handle on the right edge)
+to reach the Tools view.
 
 ### Docker
 
+If you'd rather not install anything system-wide:
+
 ```bash
 OBSIDIAN_PASSWORD=your_password docker compose up
+# open http://localhost:8767/v2
 ```
 
-### CLI
+### Command line
+
+The whole engine also runs from the terminal, no browser needed:
 
 ```bash
 python obsidian_cli.py transforms domain            # transforms for a type
