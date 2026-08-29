@@ -82,8 +82,40 @@ fi
 
 # Install optional OSINT tools
 echo -e "${BLUE}[*] Installing optional OSINT tools...${NC}"
-pip3 install holehe shodan --quiet --break-system-packages 2>/dev/null || \
-pip3 install --user holehe shodan --quiet 2>/dev/null || true
+pip3 install holehe maigret theHarvester shodan --quiet --break-system-packages 2>/dev/null || \
+pip3 install --user holehe maigret theHarvester shodan --quiet 2>/dev/null || true
+
+# ── Pentest tools (optional) — powers the Tools view ────────────────────────────
+echo ""
+echo -e "${CYAN}${BOLD}[*] Pentest tools (optional)${NC}"
+echo -e "${CYAN}    Fills the Tools view (Kali / Parrot / REMnux / BlackArch) with${NC}"
+echo -e "${CYAN}    nmap, sqlmap, nikto, gobuster, masscan, ffuf, hydra, hashcat,${NC}"
+echo -e "${CYAN}    john, binwalk, exiftool, steghide, olevba and more. ~190 MB.${NC}"
+echo -e "${CYAN}    Skippable — missing tools just show a notice in the Tools view.${NC}"
+echo ""
+read -p "$(echo -e "${YELLOW}Install pentest tools? [Y/n]: ${NC}")" INSTALL_PENTEST
+INSTALL_PENTEST=${INSTALL_PENTEST:-Y}
+if [[ "$INSTALL_PENTEST" =~ ^[Yy]$ ]]; then
+    echo -e "${BLUE}[*] Installing pentest tools (this may take a few minutes)...${NC}"
+    if [ "$PKG" = "apt" ]; then
+        sudo apt-get install -y --no-install-recommends \
+            nmap nikto sqlmap gobuster dirb whatweb dmitry wfuzz hashid john binwalk \
+            libimage-exiftool-perl steghide arp-scan netcat-traditional masscan wafw00f \
+            dnsrecon dnsenum sublist3r ffuf hydra medusa hashcat crunch cewl wifite 2>/dev/null || true
+    elif [ "$PKG" = "dnf" ]; then
+        sudo dnf install -y nmap nikto sqlmap john binwalk perl-Image-ExifTool steghide \
+            masscan hydra hashcat crunch 2>/dev/null || true
+    elif [ "$PKG" = "pacman" ]; then
+        sudo pacman -S --noconfirm nmap nikto sqlmap john binwalk perl-image-exiftool steghide \
+            masscan hydra hashcat crunch 2>/dev/null || true
+    fi
+    # malware/doc analysis (pip, cross-distro): olevba, mraptor, xortool
+    pipx install oletools 2>/dev/null || pip3 install --user oletools --quiet 2>/dev/null || true
+    pipx install xortool 2>/dev/null || pip3 install --user xortool --quiet 2>/dev/null || true
+    echo -e "${GREEN}[+] Pentest tools installed (any missing ones show a notice in the Tools view)${NC}"
+else
+    echo -e "${YELLOW}[*] Skipped — install anytime; the Tools view shows what is available${NC}"
+fi
 
 # Download vis.js if missing
 if [ ! -f ~/obsidian-static/vis-network.min.js ]; then
