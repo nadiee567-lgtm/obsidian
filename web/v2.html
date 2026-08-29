@@ -236,6 +236,8 @@
       </div>
     </div>
     <div class="tsec"><h3>Kali tools <span class="badge">run on host</span></h3><div class="tbody" id="bodyKali"></div></div>
+    <div class="tsec"><h3>Parrot <span class="badge">run on host</span></h3><div class="tbody" id="bodyParrot"></div></div>
+    <div class="tsec"><h3>REMnux <span class="badge">malware analysis · run on host</span></h3><div class="tbody" id="bodyRemnux"></div></div>
     <div class="tsec"><h3>BlackArch <span class="badge">run on host</span></h3><div class="tbody" id="bodyBlackarch"></div></div>
   </div>
 </div>
@@ -643,7 +645,7 @@ async function sendToGraph(type,value,name){
   closeTools(); await pintarGrafo(); setStatus('added '+name+' results to the case');
 }
 async function loadDistros(){
-  ['kali','blackarch'].forEach(f=>buildFamily(f));
+  ['kali','parrot','remnux','blackarch'].forEach(f=>buildFamily(f));
 }
 async function buildFamily(fam){
   const body=$('#body'+fam[0].toUpperCase()+fam.slice(1)); body.innerHTML='';
@@ -665,7 +667,7 @@ async function runTool(fam,tool,arg,row){
   pre.textContent='running…';
   let r; try{ r=await (await fetch('/api/v2/distro/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({distro:fam,tool,arg})})).json(); }
   catch(e){ pre.textContent='error'; return; }
-  pre.textContent = r.needs_install ? ('['+r.error+' — sudo apt install '+r.needs_install+']') : (r.output || r.error || '(no output)');
+  pre.textContent = r.needs_install ? ('['+r.error+']') : (r.output || r.error || '(no output)');
 }
 </script>
 </body>
