@@ -34,9 +34,9 @@ def snapshot(store) -> dict:
 @dataclass
 class Changes:
     """What changed between two snapshots."""
-    new_entities: list = field(default_factory=list)   # dicts {type,value}  # noqa
-    new_relations: list = field(default_factory=list)  # ids
-    prop_changes: list = field(default_factory=list)       # {entity,type,campo,before,now}  # noqa
+    new_entities: list = field(default_factory=list)
+    new_relations: list = field(default_factory=list)
+    prop_changes: list = field(default_factory=list)
 
     def has_changes(self) -> bool:
         return bool(self.new_entities or self.new_relations or self.prop_changes)
@@ -68,12 +68,10 @@ def diff(before: dict, after: dict) -> Changes:
     for i in d:
         if i not in a:
             continue
-        # properties that appeared or changed value
         for k, v in d[i]['props'].items():
             if a[i]['props'].get(k) != v:
                 changes.append({'entity': d[i]['value'], 'type': d[i]['type'],
                                 'field': k, 'before': a[i]['props'].get(k), 'now': v})
-        # new tags (e.g. 'vulnerable', 'takeover' appear after a re-scan)
         for t in sorted(set(d[i]['tags']) - set(a[i]['tags'])):
             changes.append({'entity': d[i]['value'], 'type': d[i]['type'],
                             'field': 'tag', 'before': None, 'now': t})
@@ -94,7 +92,7 @@ class Monitor:
         self.on_alerta = on_alerta
         self.interval = interval
         self.max_alertas = max_alertas
-        self.alerts: list = []          # history of detected changes (newest first)
+        self.alerts: list = []
         self.last_cycle: str | None = None
         self._hilo: threading.Thread | None = None
         self._parar = threading.Event()
@@ -109,7 +107,7 @@ class Monitor:
         try:
             self.refrescar_fn()
         except Exception:
-            pass                          # a network failure does not take down the monitor
+            pass
         after = self.snapshot_fn()
         changes = diff(before, after)
         self.last_cycle = _ahora()
@@ -126,7 +124,6 @@ class Monitor:
         return changes
 
     def _loop(self):
-        # wait() returns True if stop was requested; False on timeout -> runs a cycle
         while not self._parar.wait(self.interval):
             self.cycle()
 

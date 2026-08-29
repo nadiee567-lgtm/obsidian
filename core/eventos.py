@@ -7,7 +7,6 @@ the base the transform engine (F2) and correlation (F4) run on.
 PURE module: no Flask, no network. A subscriber's failures are ISOLATED so a
 broken callback cannot take down the others or the publisher."""
 
-# Standard event names (constants so we don't scatter loose strings).
 ENTITY_NEW        = 'entity_new'
 ENTITY_UPDATED  = 'entity_updated'
 RELATION_NEW       = 'relation_new'
@@ -30,6 +29,6 @@ class Bus:
         for cb in list(self._subs.get(evento, ())):
             try:
                 cb(*args, **kwargs)
-            except Exception as e:   # noqa: BLE001 -- isolate by design
+            except Exception as e:
                 errors.append(e)
         return errors

@@ -20,14 +20,11 @@ def _run(name, type, value, **props):
     return run_by_name(name, e, store), e, store
 
 
-# ── endoflife.date (tech -> EOL) ─────────────────────────────────────────────
 def test_eol_flags_dead_version(monkeypatch):
-    # nginx 1.18 whose cycle is EOL in the past
     cycles = [{'cycle': '1.25', 'eol': False}, {'cycle': '1.18', 'eol': '2020-01-01'}]
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=cycles))
     _, e, store = _run('eol', 'tech', 'nginx', version='1.18.0')
     assert 'eol' in e.tags and e.properties.get('eol_since') == '2020-01-01'
-    # correlation rule fires
     from core.correlacion import correlate
     h = correlate(store)
     assert any(x.rule == 'software-eol' and x.severity == 'high' for x in h)
@@ -46,13 +43,11 @@ def test_eol_untracked_product_noop(monkeypatch):
     assert 'eol' not in e.tags and 'eol_tracked' not in e.properties
 
 
-# ── ProxyNova COMB (email -> breach count) ───────────────────────────────────
 def test_comb_flags_leaked(monkeypatch):
     resp = {'count': 42, 'lines': ['a@b.com:123456', 'a@b.com:hunter2', 'other@x.com:z']}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=resp))
     _, e, _ = _run('comb', 'email', 'a@b.com')
     assert 'leaked' in e.tags and e.properties.get('comb_count') == 42
-    # security/ethics: plaintext passwords are NOT stored in the graph
     assert 'hunter2' not in str(e.properties)
 
 
@@ -62,7 +57,6 @@ def test_comb_clean_email(monkeypatch):
     assert 'leaked' not in e.tags
 
 
-# ── Gravatar (email -> person + accounts) ────────────────────────────────────
 def test_gravatar_profile(monkeypatch):
     prof = {'entry': [{'displayName': 'Jane Dev',
                        'accounts': [{'url': 'https://github.com/jane', 'shortname': 'github'}],
@@ -80,7 +74,6 @@ def test_gravatar_no_profile(monkeypatch):
     assert prod == [] and 'has-gravatar' not in e.tags
 
 
-# ── IP-RDAP (ip -> net owner + abuse) ────────────────────────────────────────
 def test_ip_rdap(monkeypatch):
     d = {'name': 'GOOGLE', 'startAddress': '8.8.8.0', 'endAddress': '8.8.8.255',
          'entities': [{'roles': ['registrant'],
@@ -94,7 +87,6 @@ def test_ip_rdap(monkeypatch):
     assert 'Google LLC' in {x.value for x in prod if x.type == 'org'}
 
 
-# ── RIPEstat (ip -> ASN + prefix) ────────────────────────────────────────────
 def test_ripe_netinfo(monkeypatch):
     d = {'data': {'prefix': '8.8.8.0/24', 'asns': ['15169']}}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=d))
@@ -103,12 +95,10 @@ def test_ripe_netinfo(monkeypatch):
     assert 'AS15169' in {x.value for x in prod if x.type == 'asn'}
 
 
-# ── DNSTwister (domain -> registered typosquats) ─────────────────────────────
 def test_dnstwister(monkeypatch):
     fuzz = {'fuzzy_domains': [{'domain': 'github.com'}, {'domain': 'gitbub.com'},
                               {'domain': 'guthub.com'}]}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=fuzz))
-    # only gitbub.com "resolves"
     monkeypatch.setattr(ob, 'run_tool',
                         lambda argv, **k: '1.2.3.4\n' if 'gitbub.com' in argv else '')
     prod, _, _ = _run('dnstwister', 'domain', 'github.com')

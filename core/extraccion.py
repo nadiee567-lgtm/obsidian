@@ -8,7 +8,6 @@ PURE module."""
 from __future__ import annotations
 import re
 
-# common extensions that are NOT domains (anti false-positive)
 _NO_TLD = {'txt', 'jpg', 'jpeg', 'png', 'gif', 'pdf', 'html', 'htm', 'js', 'css',
           'py', 'exe', 'zip', 'doc', 'docx', 'xml', 'json', 'csv', 'md', 'php'}
 
@@ -31,9 +30,9 @@ def extract_entities(text: str) -> list:
             v = m.strip().rstrip('.,);:')
             if type == 'ip':
                 if any(int(o) > 255 for o in v.split('.')):
-                    continue                     # invalid octet
+                    continue
             if type == 'domain' and v.rsplit('.', 1)[-1].lower() in _NO_TLD:
-                continue                         # it's a file, not a domain
+                continue
             key = (type, v.lower())
             if v and key not in seen:
                 seen.add(key)

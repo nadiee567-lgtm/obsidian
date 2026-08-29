@@ -28,7 +28,6 @@ def test_json_reimportable():
     assert obj['meta']['workspace'] == 'c1'
     assert obj['score'] == 20
     assert len(obj['findings']) == 1
-    # the full case can be reconstructed
     alm2 = Store.from_dict(obj)
     assert len(alm2) == len(store) == 2
     assert {e.value for e in alm2.entities} == {'target.com', '93.184.216.34'}
@@ -39,7 +38,7 @@ def test_csv_tiene_cabecera_filas():
     store, _, _ = _demo()
     rows = list(csv.reader(io.StringIO(export_csv(store))))
     assert rows[0] == ['type', 'value', 'tags', 'sources', 'confidence', 'properties']
-    assert len(rows) == 1 + 2                       # header + 2 entities
+    assert len(rows) == 1 + 2
     valores = {f[1] for f in rows[1:]}
     assert valores == {'target.com', '93.184.216.34'}
 
@@ -51,15 +50,15 @@ def test_csv_neutraliza_inyeccion_formulas():
     e.tag('=HYPERLINK(evil)')
     rows = list(csv.reader(io.StringIO(export_csv(store))))
     tags = rows[1][2]
-    assert not tags.startswith('=')       # neutralized
+    assert not tags.startswith('=')
     assert tags.startswith("'")
 
 
 def test_csv_value_dangerous_at_start():
     store = Store()
-    store.create('user', '=cmd')          # username allows arbitrary text
+    store.create('user', '=cmd')
     rows = list(csv.reader(io.StringIO(export_csv(store))))
-    assert rows[1][1] == "'=cmd"         # sanitized
+    assert rows[1][1] == "'=cmd"
 
 
 def test_csv_ninguna_celda_empieza_with_formula():

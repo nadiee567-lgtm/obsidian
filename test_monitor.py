@@ -10,7 +10,7 @@ def test_diff_detects_entidad_nueva():
     store = Store()
     store.create('domain', 'target.com')
     before = snapshot(store)
-    store.create('subdomain', 'nuevo.target.com')      # a subdomain appeared
+    store.create('subdomain', 'nuevo.target.com')
     changes = diff(before, snapshot(store))
     assert changes.has_changes()
     assert len(changes.new_entities) == 1
@@ -31,7 +31,7 @@ def test_diff_detects_change_propiedad():
     store = Store()
     d = store.create('domain', 'target.com', properties={'cert_expires': '2027'})
     before = snapshot(store)
-    d.properties['cert_expires'] = '2020'              # the cert changed (expired)
+    d.properties['cert_expires'] = '2020'
     changes = diff(before, snapshot(store))
     assert len(changes.prop_changes) == 1
     c = changes.prop_changes[0]
@@ -42,7 +42,7 @@ def test_diff_detects_tag_nuevo():
     store = Store()
     s = store.create('subdomain', 's.target.com')
     before = snapshot(store)
-    s.tag('takeover')                            # became vulnerable
+    s.tag('takeover')
     changes = diff(before, snapshot(store))
     assert any(c['field'] == 'tag' and c['now'] == 'takeover' for c in changes.prop_changes)
 
@@ -58,14 +58,14 @@ def test_monitor_cycle_alert_change():
     store = Store()
     store.create('domain', 'target.com')
     disparos = []
-    def refrescar():                                   # simulates a re-scan with news
+    def refrescar():
         store.create('subdomain', 'nuevo.target.com')
     m = Monitor(lambda: snapshot(store), refrescar,
                 on_alerta=lambda c: disparos.append(c), interval=999)
     changes = m.cycle()
     assert changes.has_changes()
     assert len(m.alerts) == 1
-    assert len(disparos) == 1                          # the callback (future ntfy) was called
+    assert len(disparos) == 1
     assert 'nuevo.target.com' in m.alerts[0]['summary']
 
 
@@ -83,5 +83,5 @@ def test_monitor_refresh_fails_no_kill_cycle():
     def refrescar():
         raise RuntimeError('network down')
     m = Monitor(lambda: snapshot(store), refrescar, interval=999)
-    m.cycle()                                          # must not raise
-    assert m.alerts == []                             # no real changes
+    m.cycle()
+    assert m.alerts == []

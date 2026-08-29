@@ -14,5 +14,4 @@ PORT       = int(os.environ.get('OBSIDIAN_PORT', 8767))
 HOST       = os.environ.get('OBSIDIAN_HOST', '127.0.0.1')
 VIS_FILE   = 'vis-network.min.js'
 
-# F3: each workspace (case) is an isolated SQLite database inside this folder.
 WORKSPACES_DIR = os.path.join(HOME, '.obsidian', 'workspaces')

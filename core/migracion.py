@@ -26,7 +26,7 @@ def migrate_case(case: dict) -> Store:
         try:
             _MIGRADORES.get(type, lambda *a: None)(store, raiz, value, res, key)
         except Exception:
-            continue   # malformed module: skipped
+            continue
     return store
 
 

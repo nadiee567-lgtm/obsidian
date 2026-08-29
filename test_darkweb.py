@@ -13,10 +13,9 @@ def _run_one(name, type, value):
     return run_by_name(name, e, store), e
 
 
-# ── 128: .onion routing over Tor ────────────────────────────────────────────
 def test_onion_fetch_solo_onion():
     prod, _ = _run_one('onion_fetch', 'url', 'https://clearnet.com')
-    assert prod == []                                # ignores non-.onion (anti-SSRF)
+    assert prod == []
 
 
 def test_onion_fetch(monkeypatch):
@@ -38,7 +37,6 @@ def test_onion_fetch_tor_caido(monkeypatch):
     assert prod == [] and 'Tor unavailable' in e.properties.get('tor', '')
 
 
-# ── 129: Ahmia + Haystak ────────────────────────────────────────────────────
 def test_haystak(monkeypatch):
     class R:
         text = 'results: abcdefghij234567.onion y zzzz2233abcdefgh.onion'
@@ -55,7 +53,6 @@ def test_haystak_without_tor(monkeypatch):
     assert prod == [] and 'requires Tor' in e.properties.get('haystak', '')
 
 
-# ── 130: Telegram (Telethon) -- degradation paths (the active one needs an account) ─
 def test_telegram_without_credenciales(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('TELEGRAM_API', '')
@@ -70,7 +67,6 @@ def test_telegram_without_session(monkeypatch):
     assert prod == [] and 'login' in e.properties.get('telegram', '')
 
 
-# ── 131: channel monitoring (testable logic; fetch degrades without an account) ─
 def test_coincidencias_leak():
     hits = ob.leak_matches(['hola mundo', 'new_one DATABASE a la venta', 'ransomware group', 'nada'])
     assert len(hits) == 2 and {h['keyword'] for h in hits} == {'database', 'ransomware'}
@@ -91,7 +87,6 @@ def test_channel_leaks_without_creds(monkeypatch):
     assert prod == [] and 'api_id' in e.properties.get('channel_leaks', '')
 
 
-# ── 132: domain-level stealer logs (keyless, Hudson Rock) ────────────────────
 class _RjD:
     def __init__(self, data):
         self._d = data
@@ -114,27 +109,26 @@ def test_stealer_domain_clean(monkeypatch):
     assert 'stealer-exposed' not in e.tags
 
 
-# ── 133: paste monitoring (psbdmp + keyless dorks) ──────────────────────────
 def test_pastes(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _RjD({'data': [{'id': 'abc123'}, {'id': 'def456'}]}))
-    prod, _ = _run_one('pastes', 'email', 'a@b.com')
+    prod, e = _run_one('pastes', 'email', 'a@b.com')
     urls = {x.value for x in prod if x.type == 'url'}
-    assert 'https://pastebin.com/abc123' in urls          # from psbdmp
-    assert any('site%3Apastebin.com' in u for u in urls)  # dork (url-encoded, correct)
-    assert len(urls) >= 6                                  # 2 pastes + 4 dorks
+    assert urls == {'https://pastebin.com/abc123', 'https://pastebin.com/def456'}
+    assert all('google.com/search' not in u for u in urls)
+    assert any('site%3Apastebin.com' in u for u in e.properties['paste_searches'])
 
 
 def test_pastes_psbdmp_muerto(monkeypatch):
     def boom(*a, **k):
         raise RuntimeError('psbdmp down')
     monkeypatch.setattr(ob.SESSION, 'get', boom)
-    prod, _ = _run_one('pastes', 'email', 'a@b.com')
+    prod, e = _run_one('pastes', 'email', 'a@b.com')
     urls = {x.value for x in prod if x.type == 'url'}
-    assert len(urls) == 4                                  # the 4 dorks still come out
+    assert len(urls) == 0
+    assert len(e.properties['paste_searches']) == 4
 
 
-# ── 134: historical leaks (Intelligence X, keyed) ───────────────────────────
 def test_intelx(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'fakekey')
     monkeypatch.setattr(ob.SESSION, 'post', lambda *a, **k: _RjD({'id': 'search-123'}))
@@ -152,9 +146,8 @@ def test_intelx_without_key(monkeypatch):
     assert prod == []
 
 
-# ── 135: breach aggregator (keyless-first, unifies sources) ─────────────────
 def test_breaches_agrega_dedup(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)   # no HIBP
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('HIBP_API_KEY', '')
     def fake_get(url, *a, **k):
         if 'xposedornot' in url:
@@ -165,7 +158,7 @@ def test_breaches_agrega_dedup(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get', fake_get)
     prod, e = _run_one('breaches', 'email', 'a@b.com')
     orgs = {x.value for x in prod if x.type == 'org'}
-    assert orgs == {'Adobe', 'LinkedIn', 'Canva'}    # unified and deduped (Adobe once)
+    assert orgs == {'Adobe', 'LinkedIn', 'Canva'}
     assert 'leaked' in e.tags
 
 

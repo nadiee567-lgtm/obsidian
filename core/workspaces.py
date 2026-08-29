@@ -49,7 +49,7 @@ class Manager:
         if os.path.exists(r):
             raise ValueError('a workspace with that name already exists')
         store = Store()
-        save_store(store, r)   # creates the file + schema
+        save_store(store, r)
         return store
 
     def load(self, name):
@@ -81,7 +81,6 @@ class Manager:
             raise ValueError('a workspace with the new name already exists')
         os.rename(rv, rn)
 
-    # ── History / audit (step 48) ──
     def record(self, name, transform, input, outputs):
         r = self._path(name)
         if r and os.path.exists(r):
@@ -91,7 +90,6 @@ class Manager:
         r = self._path(name)
         return read_history(r) if (r and os.path.exists(r)) else []
 
-    # ── Snapshots / versions (step 49) ──
     def _dir_snaps(self, name):
         slug = _case_slug(name)
         d = os.path.join(self.dir, '_snapshots', slug) if slug else None
@@ -105,7 +103,7 @@ class Manager:
         d = self._dir_snaps(name)
         if not r or not os.path.exists(r) or not d:
             raise KeyError('workspace not found')
-        snap_id = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')  # us: unique ids
+        snap_id = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
         shutil.copy2(r, os.path.join(d, snap_id + '.db'))
         return snap_id
 
@@ -135,5 +133,5 @@ class Manager:
         if not source or not os.path.exists(source):
             raise KeyError('snapshot not found')
         if os.path.exists(r):
-            self.snapshot(name)     # back up the current state before overwriting
+            self.snapshot(name)
         shutil.copy2(source, r)

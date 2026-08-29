@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """OBSIDIAN CLI -- F7 step 98.
 
 Everything the web engine does, scriptable from the terminal: run transforms, do
@@ -21,7 +20,7 @@ import argparse
 import os
 import sys
 
-import obsidian_web as _ob   # registers the transforms (does not start Flask)
+import obsidian_web as _ob
 from core.modelo import Store, valid_type
 from core.transforms import REGISTRO, run_by_name, run_batch
 from core.correlacion import correlate, risk_score

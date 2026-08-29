@@ -45,17 +45,16 @@ def test_report_escapes_xss():
               properties={'nota': '<script>alert(1)</script>'})
     h = [Finding('r', 'critical', 'injection <img src=x onerror=alert(1)>', [])]
     html = generate_report(store, findings=h, score=40)
-    assert '<script>alert(1)</script>' not in html          # raw NO
-    assert '&lt;script&gt;' in html                          # escaped YES
-    assert '<img src=x onerror' not in html                  # the finding's neither
+    assert '<script>alert(1)</script>' not in html
+    assert '&lt;script&gt;' in html
+    assert '<img src=x onerror' not in html
     assert '&lt;img src=x' in html
 
 
 def test_report_embedded_graph():
     store, d, ip = _store_demo()
-    # fake vis_js: we only check it gets embedded and builds the datasets
     html = generate_report(store, findings=[], score=0, vis_js='/*VISLIB*/')
     assert 'Relationship graph' in html
     assert '/*VISLIB*/' in html
     assert 'vis.Network' in html
-    assert d.id in html and ip.id in html                    # nodes by id
+    assert d.id in html and ip.id in html

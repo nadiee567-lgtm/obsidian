@@ -33,11 +33,10 @@ def test_persistence_isolated(tmp_path):
     b.create('ip', '8.8.8.8')
     g.save('caso_b', b)
 
-    # reload each one: sees only its own
     ra = g.load('caso_a')
     rb = g.load('caso_b')
     assert ra.find('domain', 'example.com') is not None
-    assert ra.find('ip', '8.8.8.8') is None       # isolated
+    assert ra.find('ip', '8.8.8.8') is None
     assert rb.find('ip', '8.8.8.8') is not None
     assert rb.find('domain', 'example.com') is None
 
@@ -48,7 +47,6 @@ def test_survives_reload(tmp_path):
     a = g1.create('caso1')
     a.create('email', 'a@b.com', tags={'interesting'})
     g1.save('caso1', a)
-    # new Manager (simulates a server restart)
     g2 = Manager(str(tmp_path))
     r = g2.load('caso1')
     e = r.find('email', 'a@b.com')
@@ -69,7 +67,6 @@ def test_malicious_names_rejected(tmp_path):
     for malo in ['../../etc/passwd', '..', 'a/b', 'x\\y', '']:
         with pytest.raises(ValueError):
             g.create(malo)
-    # and nothing was created outside the directory
     assert g.list_ws() == []
 
 
@@ -80,7 +77,7 @@ def test_history(tmp_path):
     g.record('caso', 'rdap', 'example.com', 5)
     h = g.history('caso')
     assert len(h) == 2
-    assert h[0]['transform'] == 'rdap' and h[0]['outputs'] == 5   # most recent first
+    assert h[0]['transform'] == 'rdap' and h[0]['outputs'] == 5
 
 
 def test_snapshots(tmp_path):
@@ -91,10 +88,9 @@ def test_snapshots(tmp_path):
     sid = g.snapshot('caso')
     assert sid in g.list_snapshots('caso')
 
-    # change the case, then restore the snapshot -> the old state returns
     a2 = g.load('caso')
     a2.create('ip', '1.1.1.1')
     g.save('caso', a2)
     assert len(g.load('caso')) == 2
     g.restore('caso', sid)
-    assert len(g.load('caso')) == 1   # reverted to the snapshot (only 8.8.8.8)
+    assert len(g.load('caso')) == 1

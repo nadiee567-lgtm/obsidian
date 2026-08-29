@@ -46,7 +46,6 @@ def test_v2_transforms_applicable():
     assert r.status_code == 200
     nombres = [t['name'] for t in r.get_json()['transforms']]
     assert 'dns_a' in nombres and 'crtsh' in nombres
-    # ptr applies to ip, not to domain
     assert 'ptr' not in nombres
 
 
@@ -76,7 +75,6 @@ def test_v2_graph_migrate_empty():
 
 
 def test_auth_protege_v2():
-    # without a session, /api/v2 must require auth (no leaking)
     c = ob.app.test_client()
     r = c.get('/api/v2/transforms/domain')
     assert r.status_code == 401
@@ -91,19 +89,15 @@ def test_workspaces_flujo(tmp_path):
     ob._store = ob.Store()
     try:
         c = _client()
-        # create -> becomes active
         r = c.post('/api/v2/workspaces', json={'name': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['active'] == 'caso demo'
-        # list
         j = c.get('/api/v2/workspaces').get_json()
         assert 'caso demo' in j['workspaces'] and j['active'] == 'caso demo'
-        # simulate saved data and open fresh
         ob._store.create('ip', '8.8.8.8')
         ob._gestor.save('caso demo', ob._store)
         ob._store = ob.Store()
         r = c.post('/api/v2/workspaces/open', json={'name': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['total_entities'] == 1
-        # delete -> no active
         r = c.delete('/api/v2/workspaces', json={'name': 'caso demo'})
         assert r.status_code == 200 and r.get_json()['active'] is None
         assert c.get('/api/v2/workspaces').get_json()['workspaces'] == []
@@ -112,8 +106,6 @@ def test_workspaces_flujo(tmp_path):
 
 
 def test_guard_remembers_target():
-    # without a session, going to /v2 redirects to /login AND saves the destination
-    # in the session, to return there after login (fixes the bounce to the old page)
     c = ob.app.test_client()
     r = c.get('/v2')
     assert r.status_code == 302 and '/login' in r.headers.get('Location', '')

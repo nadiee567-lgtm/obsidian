@@ -4,7 +4,6 @@ Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_opsec.py -q
 """
 
 
-# ── 152: sock-puppet vault ──────────────────────────────────────────────────
 def test_persona_manager(tmp_path):
     from core.personas import PersonaManager
     g = PersonaManager(str(tmp_path / 'p.json'))
@@ -16,7 +15,6 @@ def test_persona_manager(tmp_path):
     assert g.delete('no_existe') is False
 
 
-# ── 153: Tor/SOCKS5 routing (anonymous mode) ────────────────────────────────
 def test_mode_anonymous_toggle():
     import obsidian_web as ob
     try:
@@ -25,24 +23,22 @@ def test_mode_anonymous_toggle():
         ob._set_anonimo(False)
         assert ob.SESSION.proxies == {} and not ob._OPSEC['anonimo']
     finally:
-        ob._set_anonimo(False)                       # do not leave the proxy set
+        ob._set_anonimo(False)
 
 
-# ── 154: proxy rotation ─────────────────────────────────────────────────────
 def test_rotation_proxies():
     import obsidian_web as ob
     try:
         ob._PROXIES['pool'] = ['http://p1:8080', 'http://p2:8080']
         ob._PROXIES['i'] = 0
         p1, p2, p3 = ob._rotate_proxy(), ob._rotate_proxy(), ob._rotate_proxy()
-        assert (p1, p2, p3) == ('http://p1:8080', 'http://p2:8080', 'http://p1:8080')  # round-robin
+        assert (p1, p2, p3) == ('http://p1:8080', 'http://p2:8080', 'http://p1:8080')
         assert ob.SESSION.proxies['https'] == 'http://p1:8080'
     finally:
         ob._PROXIES['pool'] = []
         ob.SESSION.proxies = {}
 
 
-# ── 155: request hygiene (random UA) ────────────────────────────────────────
 def test_hygiene_request():
     import obsidian_web as ob
     prev = ob.SESSION.headers.get('User-Agent')
@@ -56,10 +52,9 @@ def test_hygiene_request():
             ob.SESSION.headers['User-Agent'] = prev
 
 
-# ── 156: jitter / throttling ────────────────────────────────────────────────
 def test_jitter():
     import obsidian_web as ob
-    assert ob._jitter() == 0.0                       # no config, no wait
+    assert ob._jitter() == 0.0
     try:
         ob._OPSEC_JITTER['min'] = 0.01
         ob._OPSEC_JITTER['max'] = 0.03
@@ -70,7 +65,6 @@ def test_jitter():
         ob._OPSEC_JITTER['max'] = 0.0
 
 
-# ── 157: non-attribution mode (per-workspace OPSEC profile) ─────────────────
 def test_profile_opsec_per_workspace(tmp_path, monkeypatch):
     import json
     import obsidian_web as ob
@@ -90,27 +84,24 @@ def test_profile_opsec_per_workspace(tmp_path, monkeypatch):
         ob.SESSION.proxies = {}
 
 
-# ── 158: leak detection ─────────────────────────────────────────────────────
 def test_evaluar_fuga():
     import obsidian_web as ob
-    assert ob._evaluate_leak(True, '1.2.3.4', '1.2.3.4') is True     # anonymous but same IP = LEAK
-    assert ob._evaluate_leak(True, '9.9.9.9', '1.2.3.4') is False    # different IP = ok
-    assert ob._evaluate_leak(False, '1.2.3.4', '1.2.3.4') is False   # not anonymous = not applicable
+    assert ob._evaluate_leak(True, '1.2.3.4', '1.2.3.4') is True
+    assert ob._evaluate_leak(True, '9.9.9.9', '1.2.3.4') is False
+    assert ob._evaluate_leak(False, '1.2.3.4', '1.2.3.4') is False
 
 
-# ── 159: API key rotation ───────────────────────────────────────────────────
 def test_key_rotativa(monkeypatch):
     import obsidian_web as ob
     ob._KEY_ROT.clear()
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'k1|k2|k3')
-    assert [ob._rotating_key('shodan') for _ in range(4)] == ['k1', 'k2', 'k3', 'k1']  # round-robin
+    assert [ob._rotating_key('shodan') for _ in range(4)] == ['k1', 'k2', 'k3', 'k1']
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'solo')
-    assert ob._rotating_key('x') == 'solo'                # a single one: as-is
+    assert ob._rotating_key('x') == 'solo'
     monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     assert ob._rotating_key('x') is None
 
 
-# ── 160: logging your own footprint ─────────────────────────────────────────
 def test_record_footprint():
     import obsidian_web as ob
     ob._FOOTPRINT.clear()

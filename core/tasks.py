@@ -29,7 +29,7 @@ class TaskManager:
             try:
                 est['result'] = trabajo(lambda ev: est['eventos'].put(ev))
                 est['estado'] = 'hecho'
-            except Exception as e:              # noqa: BLE001
+            except Exception as e:
                 est['estado'] = 'error'
                 est['result'] = {'error': str(e)}
             finally:

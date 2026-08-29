@@ -24,10 +24,8 @@ def test_batch_merges_results():
     res = run_batch([('domain', 'ejemplo.com', '_test_lote_a'),
                          ('domain', 'ejemplo.com', '_test_lote_b')], store)
     assert dict(res) == {'_test_lote_a': 2, '_test_lote_b': 1}
-    # shared seed (dedup) + 2 ip + 1 subdomain = 4
     assert len(store) == 4
     assert {e.type for e in store.entities} == {'domain', 'ip', 'subdomain'}
-    # the seed→output relations were merged too
     assert len(store.relations) == 3
 
 
@@ -45,7 +43,7 @@ def test_batch_missing_transform_ok():
     store = Store()
     res = run_batch([('domain', 'a.com', 'no_existe_zzz')], store)
     assert res == [('no_existe_zzz', 0)]
-    assert len(store) == 1          # only the seed
+    assert len(store) == 1
 
 
 def test_batch_no_data_loss_parallel():
@@ -53,6 +51,5 @@ def test_batch_no_data_loss_parallel():
     store = Store()
     tasks = [('domain', f'sitio{i}.com', '_test_lote_a') for i in range(20)]
     run_batch(tasks, store, max_workers=8)
-    # 20 distinct seeds + 2 shared ips (10.0.0.1/2) = 22
     assert len(store.of_type('domain')) == 20
     assert len(store.of_type('ip')) == 2

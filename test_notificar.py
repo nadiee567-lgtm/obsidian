@@ -12,7 +12,7 @@ def test_build_url_and_headers():
     assert headers['Title'] == 'OBSIDIAN'
     assert headers['Priority'] == 'high'
     assert headers['Tags'] == 'warning'
-    assert cuerpo == 'São Paulo alert'.encode('utf-8')   # utf-8 body
+    assert cuerpo == 'São Paulo alert'.encode('utf-8')
 
 
 def test_build_respects_own_server():
@@ -29,4 +29,4 @@ def test_send_with_failure_network_no_raises(monkeypatch):
     def boom(*a, **k):
         raise RuntimeError('no network')
     monkeypatch.setattr(n.requests, 'post', boom)
-    assert send_ntfy('topic', 'x') is False        # does not raise, returns False
+    assert send_ntfy('topic', 'x') is False

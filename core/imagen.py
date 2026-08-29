@@ -101,9 +101,6 @@ def reverse_links(url_imagen: str) -> dict:
     }
 
 
-# FACIAL recognition engines (step 119). 'modo':
-#   url    = searches by the image URL directly (automatic)
-#   upload = requires uploading the image manually (they don't accept a URL)
 _FACE = {
     'yandex':    ('url',    'https://yandex.com/images/search?rpt=imageview&url={u}'),
     'facecheck': ('upload', 'https://facecheck.id/'),

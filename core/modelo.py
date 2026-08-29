@@ -15,19 +15,14 @@ import ipaddress
 import datetime
 from dataclasses import dataclass, field, asdict
 
-from core.validacion import _validate   # step 25: a single source of truth
+from core.validacion import _validate
 
-# Entity type -> core.validacion validation type (the ones with a strict shape).
-# The rest (person, org, hash...) are not validated by shape.
 _TYPE_VALIDATION = {
     'ip': 'ip', 'domain': 'domain', 'subdomain': 'domain',
     'email': 'email', 'user': 'user',
 }
 
 
-# ── Step 13: entity type catalog ─────────────────────────────────────────────
-# Single source of truth for which types exist and how they look (the graph will
-# read from here in F6). label = readable name; color = palette used in the graph.
 TYPES = {
     'target':   {'label': 'Target',       'color': '#d99a4e'},
     'domain':    {'label': 'Domain',       'color': '#5b9bd5'},
@@ -59,7 +54,6 @@ def valid_type(type: str) -> bool:
     return type in TYPES
 
 
-# ── Step 22: per-type normalizers (for stable dedup) ─────────────────────────
 def normalize(type: str, value: str) -> str:
     """Canonical form of a value, so two writes of the same datum yield the same
     id. E.g.: 'WWW.Example.COM.' and 'example.com' -> 'example.com'."""
@@ -70,7 +64,7 @@ def normalize(type: str, value: str) -> str:
             v = v[4:]
     elif type == 'ip':
         try:
-            v = str(ipaddress.ip_address(v))   # compresses IPv6, validates
+            v = str(ipaddress.ip_address(v))
         except ValueError:
             pass
     elif type == 'email':
@@ -84,7 +78,6 @@ def _now() -> str:
     return datetime.datetime.now().isoformat(timespec='seconds')
 
 
-# ── Step 14: the Entity ──────────────────────────────────────────────────────
 @dataclass
 class Entity:
     """Atomic unit of data. The id derives from (type, normalized value), so two
@@ -93,10 +86,10 @@ class Entity:
     type: str
     value: str
     properties: dict = field(default_factory=dict)
-    sources: set = field(default_factory=set)     # transform/source names
-    provenance: list = field(default_factory=list)  # step 18: [{transform, input}]
-    tags: set = field(default_factory=set)          # step 23: interesting/suspicious/...
-    confidence: float = 1.0                          # 0..1
+    sources: set = field(default_factory=set)
+    provenance: list = field(default_factory=list)
+    tags: set = field(default_factory=set)
+    confidence: float = 1.0
     created: str = field(default_factory=_now)
     id: str = field(default='', init=False)
 
@@ -112,14 +105,12 @@ class Entity:
             self.tags = set(self.tags)
         self.id = self._compute_id()
 
-    # ── Step 23: analyst tags ──
     def tag(self, *tags) -> None:
         self.tags.update(tags)
 
     def untag(self, tag) -> None:
         self.tags.discard(tag)
 
-    # ── Step 18: detailed traceability ──
     def note_provenance(self, transform, input_id=None) -> None:
         """Records which transform (and on which input entity) created it."""
         self.sources.add(transform)
@@ -155,10 +146,9 @@ class Entity:
         self.confidence = max(self.confidence, other.confidence)
         self.created = min(self.created, other.created)
 
-    # ── Step 21: serialization ──
     def to_dict(self) -> dict:
         d = asdict(self)
-        d['sources'] = sorted(self.sources)   # a set is not JSON-serializable
+        d['sources'] = sorted(self.sources)
         d['tags'] = sorted(self.tags)
         return d
 
@@ -174,13 +164,12 @@ class Entity:
         return e
 
 
-# ── Step 15: the Relation ────────────────────────────────────────────────────
 @dataclass
 class Relation:
     """Typed, directed edge between two entities (by id). Deterministic id from
     (source, target, label) -> the same relation is never duplicated."""
-    source: str        # entity id
-    target: str       # entity id
+    source: str
+    target: str
     label: str = ''
     id: str = field(default='', init=False)
 
@@ -196,7 +185,6 @@ class Relation:
         return cls(source=d['source'], target=d['target'], label=d.get('label', ''))
 
 
-# ── Steps 16 + 17: the Store with automatic dedup ────────────────────────────
 class Store:
     """Holds a case's entities and relations. Deduplicates by id on add. If given
     a Bus, publishes events on create/merge/relate (step 19)."""
@@ -204,14 +192,13 @@ class Store:
     def __init__(self, bus=None):
         self._entities: dict[str, Entity] = {}
         self._relations: dict[str, Relation] = {}
-        self._by_type: dict[str, set] = {}     # type -> {id, ...}
+        self._by_type: dict[str, set] = {}
         self._bus = bus
 
     def _publish(self, event, *args):
         if self._bus is not None:
             self._bus.publish(event, *args)
 
-    # -- entities --
     def add(self, entity: Entity) -> Entity:
         """Adds or merges. Returns the live entity in the store (step 17)."""
         existing = self._entities.get(entity.id)
@@ -239,7 +226,6 @@ class Store:
     def of_type(self, type) -> list:
         return [self._entities[i] for i in self._by_type.get(type, ())]
 
-    # -- relations --
     def relate(self, source, target, label='') -> Relation:
         """Connects two entities (by id or Entity object). Deduplicates."""
         oid = source.id if isinstance(source, Entity) else source
@@ -250,7 +236,6 @@ class Store:
             self._publish('relation_new', rel)
         return self._relations[rel.id]
 
-    # -- views --
     @property
     def entities(self) -> list:
         return list(self._entities.values())
@@ -262,7 +247,6 @@ class Store:
     def __len__(self) -> int:
         return len(self._entities)
 
-    # ── Step 21: full-case serialization ──
     def to_dict(self) -> dict:
         return {
             'entities': [e.to_dict() for e in self._entities.values()],

@@ -4,7 +4,6 @@ Run:  OBSIDIAN_PASSWORD=x ../.venv/bin/python -m pytest test_ia.py -q
 """
 
 
-# ── 161: entity extraction from text ────────────────────────────────────────
 def test_extraer_entities():
     from core.extraccion import extract_entities
     txt = ('Contact admin@acme.com via https://acme.com from 8.8.8.8. '
@@ -13,10 +12,10 @@ def test_extraer_entities():
     assert 'admin@acme.com' in vals
     assert '8.8.8.8' in vals
     assert 'https://acme.com' in vals
-    assert 'acme.com' in vals                    # extracted domain
-    assert 'reporte.pdf' not in vals             # anti-FP: file, not a domain
+    assert 'acme.com' in vals
+    assert 'reporte.pdf' not in vals
     assert 'foto.jpg' not in vals
-    assert '999.1.1.1' not in vals               # invalid octet discarded
+    assert '999.1.1.1' not in vals
 
 
 def test_extract_wallets_texto():
@@ -26,7 +25,6 @@ def test_extract_wallets_texto():
     assert 'wallet' in tipos
 
 
-# ── 162: translation of foreign sources ─────────────────────────────────────
 def test_translate(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
@@ -48,7 +46,6 @@ def test_translate_without_ai(monkeypatch):
     assert c.post('/api/v2/translate', json={'text': 'x'}).status_code == 503
 
 
-# ── 163: natural-language case summary (AI mode) ────────────────────────────
 def test_summary_mode_ai(monkeypatch):
     import obsidian_web as ob
     assert 'summary' in ob._AI_PROMPTS
@@ -61,13 +58,11 @@ def test_summary_mode_ai(monkeypatch):
     assert d['modo'] == 'summary' and 'subdomains' in d['result']
 
 
-# ── 164/166/167: AI modes (next step, narrative, classification) ────────────
 def test_modes_ai_extra():
     import obsidian_web as ob
     assert {'siguiente', 'narrativa', 'clasificar'} <= set(ob._AI_PROMPTS)
 
 
-# ── 165: natural-language query -> plan ─────────────────────────────────────
 def test_query_nl(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
@@ -80,16 +75,14 @@ def test_query_nl(monkeypatch):
     assert c.post('/api/v2/query', json={'pregunta': ''}).status_code == 400
 
 
-# ── 168: connect with NEXO (per-task model routing) ─────────────────────────
 def test_choose_model_nexo():
     from core.ia import pick_model
-    assert pick_model('find an exploit for this vuln') == 'dolphin-llama3'     # security
-    assert pick_model('recon of the domain and its subdomains') == 'qwen2.5:7b'   # osint
-    assert pick_model('scan of 8.8.8.8') == 'dolphin-llama3'                   # IP -> security
-    assert pick_model('hello how are you') == 'qwen2.5:3b'                    # no signal -> modest default
+    assert pick_model('find an exploit for this vuln') == 'dolphin-llama3'
+    assert pick_model('recon of the domain and its subdomains') == 'qwen2.5:7b'
+    assert pick_model('scan of 8.8.8.8') == 'dolphin-llama3'
+    assert pick_model('hello how are you') == 'qwen2.5:3b'
 
 
-# ── 169: AI detection (a hint, not proof) ───────────────────────────────────
 def test_detection_ai(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'available', lambda: True)
@@ -98,10 +91,9 @@ def test_detection_ai(monkeypatch):
     with c.session_transaction() as s:
         s['auth'] = True
     d = c.post('/api/v2/ai_detection', json={'text': 'lorem ipsum...'}).get_json()
-    assert 'evaluacion' in d and 'A HINT' in d['aviso']   # honesty: gives no certainty
+    assert 'evaluacion' in d and 'A HINT' in d['aviso']
 
 
-# ── 170: chat about the case ────────────────────────────────────────────────
 def test_chat_case(monkeypatch):
     import obsidian_web as ob
     monkeypatch.setattr(ob.ia, 'available', lambda: True)

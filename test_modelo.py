@@ -7,10 +7,9 @@ from core.modelo import Entity, Relation, Store, normalize, TYPES, valid_type
 from core.eventos import Bus, ENTITY_NEW, ENTITY_UPDATED, RELATION_NEW
 
 
-# ── deterministic id + normalization (steps 14, 22) ─────────────────────────
 def test_id_deterministic_same_data():
     a = Entity('domain', 'Example.com')
-    b = Entity('domain', 'www.example.com.')   # www + uppercase + trailing dot
+    b = Entity('domain', 'www.example.com.')
     assert a.id == b.id, "the same domain must give the same id"
 
 def test_normalization():
@@ -24,7 +23,6 @@ def test_ids_distinct_per_type_value():
     assert Entity('ip', '8.8.8.8').id != Entity('ip', '1.1.1.1').id
 
 
-# ── validation (step 14) ─────────────────────────────────────────────────────
 def test_type_invalid_fails():
     with pytest.raises(ValueError):
         Entity('inventado', 'x')
@@ -36,10 +34,9 @@ def test_value_empty_fails():
 def test_all_types_catalog_work():
     for type in TYPES:
         assert valid_type(type)
-        Entity(type, 'value-de-prueba')   # must not raise
+        Entity(type, 'value-de-prueba')
 
 
-# ── merge / dedup (step 17) ──────────────────────────────────────────────────
 def test_merge_merges_sources_props():
     a = Entity('ip', '8.8.8.8', sources={'shodan'}, properties={'country': 'US'}, confidence=0.5)
     b = Entity('ip', '8.8.8.8', sources={'nmap'}, properties={'port': 53}, confidence=0.9)
@@ -53,11 +50,10 @@ def test_merge_different_id_fails():
         Entity('ip', '8.8.8.8').merge(Entity('ip', '1.1.1.1'))
 
 
-# ── store: automatic dedup (steps 16, 17) ───────────────────────────────────
 def test_store_dedup():
     store = Store()
     store.create('domain', 'example.com', sources={'whois'})
-    store.create('domain', 'WWW.example.com', sources={'crtsh'})   # same domain
+    store.create('domain', 'WWW.example.com', sources={'crtsh'})
     assert len(store) == 1, "must collapse into a single entity"
     ent = store.find('domain', 'example.com')
     assert ent.sources == {'whois', 'crtsh'}, "merged sources"
@@ -68,20 +64,18 @@ def test_store_of_type_and_find():
     store.create('ip', '1.1.1.1')
     store.create('email', 'a@b.com')
     assert len(store.of_type('ip')) == 2
-    assert store.find('email', 'A@B.com') is not None   # respects normalization
+    assert store.find('email', 'A@B.com') is not None
 
 
-# ── relations: deterministic and non-duplicated (step 15) ───────────────────
 def test_relations_dedup():
     store = Store()
     d = store.create('domain', 'example.com')
     i = store.create('ip', '93.184.216.34')
     store.relate(d, i, 'resuelve_a')
-    store.relate(d, i, 'resuelve_a')   # same relation again
+    store.relate(d, i, 'resuelve_a')
     assert len(store.relations) == 1
 
 
-# ── round-trip serialization (step 21) ──────────────────────────────────────
 def test_store_roundtrip():
     store = Store()
     d = store.create('domain', 'example.com', sources={'whois'}, properties={'reg': 'GoDaddy'})
@@ -98,14 +92,12 @@ def test_store_roundtrip():
     assert ent.properties == {'reg': 'GoDaddy'}
 
 
-# ── analyst tags (step 23) ──────────────────────────────────────────────────
 def test_tags():
     e = Entity('ip', '8.8.8.8')
     e.tag('interesting', 'revisar')
     assert e.tags == {'interesting', 'revisar'}
     e.untag('revisar')
     assert e.tags == {'interesting'}
-    # tags survive serialization
     assert set(e.to_dict()['tags']) == {'interesting'}
     assert Entity.from_dict(e.to_dict()).tags == {'interesting'}
 
@@ -116,14 +108,11 @@ def test_tags_merge():
     assert a.tags == {'a', 'b'}
 
 
-# ── detailed provenance (step 18) ───────────────────────────────────────────
 def test_value_well_formed():
     assert Entity('ip', '8.8.8.8').well_formed() is True
     assert Entity('domain', 'example.com').well_formed() is True
     assert Entity('email', 'a@b.com').well_formed() is True
-    # a value malformed for its type is detected (even if it can be created)
     assert Entity('ip', '999.999.999.999').well_formed() is False
-    # types without a strict validator: always True (person with spaces, etc.)
     assert Entity('person', 'Juan Perez Garcia').well_formed() is True
 
 
@@ -132,20 +121,18 @@ def test_provenance():
     e.note_provenance('transform_subdominios', input_id='abc123')
     assert 'transform_subdominios' in e.sources
     assert {'transform': 'transform_subdominios', 'input': 'abc123'} in e.provenance
-    # does not duplicate the same provenance
     e.note_provenance('transform_subdominios', input_id='abc123')
     assert len(e.provenance) == 1
 
 
-# ── event bus (step 19) ─────────────────────────────────────────────────────
 def test_bus_publica_entidad_nueva_actualizada():
     bus = Bus()
     nuevas, actualizadas = [], []
     bus.subscribe(ENTITY_NEW, lambda e: nuevas.append(e))
     bus.subscribe(ENTITY_UPDATED, lambda e: actualizadas.append(e))
     store = Store(bus=bus)
-    store.create('domain', 'example.com')            # new
-    store.create('domain', 'www.example.com')        # same id -> updated
+    store.create('domain', 'example.com')
+    store.create('domain', 'www.example.com')
     assert len(nuevas) == 1
     assert len(actualizadas) == 1
 
@@ -157,7 +144,7 @@ def test_bus_publishes_new_relation():
     d = store.create('domain', 'example.com')
     i = store.create('ip', '93.184.216.34')
     store.relate(d, i, 'resuelve_a')
-    store.relate(d, i, 'resuelve_a')   # dup: does not re-publish
+    store.relate(d, i, 'resuelve_a')
     assert len(rels) == 1
 
 def test_bus_aisla_fallos_suscriptor():

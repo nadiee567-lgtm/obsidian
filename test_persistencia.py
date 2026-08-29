@@ -39,7 +39,7 @@ def test_save_is_idempotent(tmp_path):
     db = str(tmp_path / 'caso.db')
     store = _store_example()
     save_store(store, db)
-    save_store(store, db)   # segunda vez: upsert, no duplica
+    save_store(store, db)
     cargado = load_store(db)
     assert len(cargado) == 2
     assert len(cargado.relations) == 1

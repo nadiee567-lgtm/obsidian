@@ -19,9 +19,9 @@ _WEIGHT = {'critical': 40, 'high': 20, 'medium': 8, 'low': 3}
 class Finding:
     """A detected risk pattern (step 54)."""
     rule: str
-    severity: str          # critical | high | medium | low (severity value ids)
+    severity: str
     message: str
-    entities: list = field(default_factory=list)   # ids involucrados
+    entities: list = field(default_factory=list)
 
     def to_dict(self):
         return asdict(self)
@@ -38,17 +38,6 @@ def rule(fn):
 
 _SUPPRESS = {'discarded', 'false-positive'}
 
-# ── User YAML rules (step 63) ────────────────────────────────────────────────
-# The user defines their own rules in YAML without touching Python. They are
-# evaluated alongside the built-in ones. Format:
-#   - name: ftp-anon
-#     severity: high            # critical|high|medium|low
-#     message: "Anonymous FTP on {value}"
-#     when:
-#       type: port               # entity type (optional)
-#       tag: ftp-anon            # required tag (optional)
-#       value_contains: ":21"    # substring in the value (optional)
-#       property: {name: service, value: ftp}   # prop == value (optional)
 _YAML_RULES = []
 
 
@@ -78,7 +67,7 @@ def load_yaml_rules(text: str) -> int:
             if s.get('severity', 'medium') not in SEVERITIES:
                 s['severity'] = 'medium'
             specs.append(s)
-    _YAML_RULES[:] = specs           # mutate in place: external references see it
+    _YAML_RULES[:] = specs
     return len(specs)
 
 
@@ -105,7 +94,7 @@ def correlate(store) -> list:
         try:
             out.extend(fn(store) or [])
         except Exception:
-            pass   # a broken rule does not take down correlation
+            pass
     try:
         out.extend(_evaluate_yaml(store))
     except Exception:
@@ -134,9 +123,6 @@ def exposure_score(counts: dict, risk: int) -> int:
     return min(100, surface + risk // 2)
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# Built-in rules (they fire on data the transforms already produce)
-# ════════════════════════════════════════════════════════════════════════════
 
 _SENSITIVE_PORTS = {
     '21': 'FTP', '23': 'Telnet', '445': 'SMB', '1433': 'MSSQL', '3306': 'MySQL',

@@ -36,7 +36,7 @@ def test_dns_a_without_resultados(monkeypatch):
 def test_dns_a_ignores_garbage(monkeypatch):
     monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: ';; connection timed out\n1.2.3.4\n')
     prod = _run_one('dns_a', 'domain', 'ejemplo.com')
-    assert {e.value for e in prod} == {'1.2.3.4'}      # discards non-IP
+    assert {e.value for e in prod} == {'1.2.3.4'}
 
 
 def test_ptr(monkeypatch):
@@ -73,7 +73,7 @@ def test_shodan(monkeypatch):
     host = {'org': 'ACME Corp', 'data': [
         {'port': 443, 'product': 'nginx'},
         {'port': 22, 'product': 'OpenSSH'},
-        {'port': 8443, 'product': 'nginx'}]}       # nginx repeated → a single tech
+        {'port': 8443, 'product': 'nginx'}]}
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: FakeResp(host))
     prod = _run_one('shodan', 'ip', '1.2.3.4')
     ports = {e.value for e in prod if e.type == 'port'}

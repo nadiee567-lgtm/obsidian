@@ -56,7 +56,6 @@ def regional_profiles(username: str) -> dict:
     }
 
 
-# ── Cyrillic <-> Latin transliteration (step 172) ────────────────────────────
 _CIR_LAT = {
     'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e', 'ж': 'zh',
     'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
@@ -95,7 +94,6 @@ def transliterate(name: str) -> dict:
     return {'latino': cyrillic_to_latin(name), 'cirilico': latin_to_cyrillic(name)}
 
 
-# ── Language detection by alphabet (step 175) ────────────────────────────────
 _DORK_TERMS = {
     'ru': {'contacto': 'контакты', 'email': 'почта', 'phone': 'телефон', 'sites': ['vk.com', 'ok.ru']},
     'zh': {'contacto': '联系', 'email': '邮箱', 'phone': '电话', 'sites': ['weibo.com', 'zhihu.com']},
@@ -117,7 +115,7 @@ def regional_registries(org: str) -> dict:
     return {
         'china_qcc': f'https://www.qcc.com/web/search?key={q}',
         'rusia_rusprofile': f'https://www.rusprofile.ru/search?query={q}',
-        'opencorporates': f'https://opencorporates.com/companies?q={q}',   # global, incl. LatAm
+        'opencorporates': f'https://opencorporates.com/companies?q={q}',
     }
 
 

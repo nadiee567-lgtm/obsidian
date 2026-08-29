@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Interactive Telegram login for OBSIDIAN -- F10 step 130.
 
 Run ONCE to create the session used by the 'telegram' transform. It asks for your
@@ -48,7 +47,7 @@ def main():
     from telethon.sync import TelegramClient
     os.makedirs(os.path.dirname(SESSION), exist_ok=True)
     with TelegramClient(SESSION, int(api_id), api_hash) as cli:
-        cli.start()   # asks for phone + code interactively
+        cli.start()
         yo = cli.get_me()
         print(f"✓ Session created for @{getattr(yo, 'username', None) or yo.id}")
         print(f"  Saved to {SESSION}. You can now use the 'telegram' transform in OBSIDIAN.")

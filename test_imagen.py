@@ -19,8 +19,8 @@ def test_reverse_links_all_engines():
 def test_reverse_links_urlencode():
     src = 'https://x.com/a b.jpg?p=1&q=2'
     d = reverse_links(src)
-    assert ' ' not in d['yandex']                       # sin espacios crudos
-    assert quote(src, safe='') in d['yandex']           # url completa urlencodeada
+    assert ' ' not in d['yandex']
+    assert quote(src, safe='') in d['yandex']
 
 
 def test_reverse_image_transform():
@@ -35,7 +35,7 @@ def test_facial_links():
     d = facial_links('https://x.com/cara.jpg')
     assert set(d) == {'yandex', 'facecheck', 'pimeyes'}
     assert d['yandex']['modo'] == 'url' and 'yandex.com' in d['yandex']['url']
-    assert d['facecheck']['modo'] == 'upload'          # honesto: es por subida manual
+    assert d['facecheck']['modo'] == 'upload'
     assert d['pimeyes']['modo'] == 'upload'
 
 
@@ -70,11 +70,10 @@ def test_metadata_exif_como_entities(monkeypatch):
     urls = [p for p in prod if p.type == 'url']
     assert 'Apple iPhone 12' in techs and '14.2' in techs
     assert 'Jane Doe' in personas
-    assert urls and 'maps' in urls[0].value          # GPS -> link de mapa pivotable
+    assert urls and 'maps' in urls[0].value
     assert 'has-gps' in e.tags
 
 
-# ── F9 121-125: geo/imagen ───────────────────────────────────────────────────
 def test_parse_gps():
     from core.imagen import parse_gps
     r = parse_gps("40 deg 26' 46.0\" N, 79 deg 58' 56.0\" W")
@@ -88,13 +87,13 @@ def test_cronolocalizacion(monkeypatch):
     u = store.create('url', 'https://x.com/f.jpg', properties={'gps': "40 deg 26' N, 79 deg 58' W"})
     prod = run_by_name('chronolocation', u, store)
     assert {p.properties.get('tool') for p in prod} == {'suncalc', 'shadowmap'}
-    assert any('40' in p.value for p in prod)         # coords en el link
+    assert any('40' in p.value for p in prod)
 
 
 def test_satellite_requires_gps():
     from core.transforms import run_by_name
     store = Store()
-    u = store.create('url', 'https://x.com/f.jpg')       # sin GPS
+    u = store.create('url', 'https://x.com/f.jpg')
     assert run_by_name('satellite', u, store) == []
 
 
@@ -111,14 +110,13 @@ def test_ocr_without_tesseract(monkeypatch):
     monkeypatch.setattr(ob, '_which', lambda x: False)
     store = Store()
     u = store.create('url', 'https://x.com/f.jpg')
-    assert run_by_name('ocr', u, store) == []   # degrada sin tesseract
+    assert run_by_name('ocr', u, store) == []
 
 
 def test_geoloc_is_mode_ai():
     assert 'geoloc' in ob._AI_PROMPTS
 
 
-# ── F9 126-127: ELA + pHash (necesitan Pillow) ───────────────────────────────
 def _img_grad():
     import tempfile
     from PIL import Image
@@ -134,7 +132,7 @@ def test_phash_estable():
     import os as _os
     a, b = _img_grad(), _img_grad()
     ha, hb = phash(a), phash(b)
-    assert ha and len(ha) == 16 and ha == hb        # misma imagen -> mismo hash
+    assert ha and len(ha) == 16 and ha == hb
     _os.unlink(a); _os.unlink(b)
 
 

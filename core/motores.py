@@ -14,8 +14,6 @@ Each engine supports a subset; `traducir` ignores the fields that don't apply.
 """
 from __future__ import annotations
 
-# Per-engine metadata + template for each field in its own dialect.
-# 'join' = the engine's AND operator. 'cn' marks the Chinese engines.
 MOTORES = {
     'shodan': {
         'label': 'Shodan', 'requires_key': True, 'cn': False, 'join': ' ',

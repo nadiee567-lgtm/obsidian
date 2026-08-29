@@ -16,7 +16,7 @@ import io
 import json
 import datetime
 
-_PELIGRO = ('=', '+', '-', '@')   # starts Excel/Sheets treat as a formula
+_PELIGRO = ('=', '+', '-', '@')
 
 
 def _cell(v) -> str:

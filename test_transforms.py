@@ -21,7 +21,6 @@ def _registro_aislado():
     tr.REGISTRO._by_name = prev_nombre
 
 
-# ── contract + registry + decorator (steps 26, 27) ──────────────────────────
 def test_decorator_registra():
     @tr.transform(input='domain', outputs=('ip',), name='dns')
     def _f(entity, ctx):
@@ -36,7 +35,7 @@ def test_invalid_input_or_output_type_fails():
         tr.Transform(name='y', input='domain', outputs=('inventado',))
 
 def test_no_duplicate_name():
-    tr.Transform  # noqa
+    tr.Transform
     @tr.transform(input='ip', name='dup')
     def _a(entity, ctx): pass
     with pytest.raises(ValueError):
@@ -44,7 +43,6 @@ def test_no_duplicate_name():
         def _b(entity, ctx): pass
 
 
-# ── execution: input → outputs, related and with provenance (step 28) ──────
 def test_run_emits_relates_notes_provenance():
     @tr.transform(input='domain', outputs=('ip', 'subdomain'), name='dns')
     def _dns(entity, ctx):
@@ -58,9 +56,7 @@ def test_run_emits_relates_notes_provenance():
     assert len(produced) == 2
     ip = store.find('ip', '93.184.216.34')
     assert ip is not None
-    # provenance recorded
     assert any(p['transform'] == 'dns' and p['input'] == dom.id for p in ip.provenance)
-    # relation created domain -> ip
     assert len(store.relations) == 2
 
 def test_run_validates_input_type():
@@ -72,23 +68,22 @@ def test_run_validates_input_type():
         tr.run_by_name('domain_only', ip, store)
 
 
-# ── failure isolation (step 38) ─────────────────────────────────────────────
 def test_transform_crashes_no_propagate():
     @tr.transform(input='domain', outputs=('ip',), name='medio_roto')
     def _f(entity, ctx):
-        ctx.emit('ip', '1.1.1.1')       # this does get through
-        raise RuntimeError("boom")         # crashes afterwards
+        ctx.emit('ip', '1.1.1.1')
+        raise RuntimeError("boom")
 
     store = Store()
     dom = store.create('domain', 'example.com')
-    produced = tr.run_by_name('medio_roto', dom, store)   # does NOT raise
+    produced = tr.run_by_name('medio_roto', dom, store)
     assert len(produced) == 1
     assert store.find('ip', '1.1.1.1') is not None
 
 def test_emit_value_garbage_ignores():
     @tr.transform(input='domain', outputs=('ip',), name='sucio')
     def _f(entity, ctx):
-        assert ctx.emit('ip', '   ') is None   # empty value -> None, no crash
+        assert ctx.emit('ip', '   ') is None
         ctx.emit('ip', '8.8.8.8')
 
     store = Store()
@@ -97,7 +92,6 @@ def test_emit_value_garbage_ignores():
     assert len(produced) == 1
 
 
-# ── the engine fires the bus events (integration with step 19) ──────────────
 def test_transform_fires_eventos_bus():
     nuevas = []
     bus = Bus()
@@ -108,12 +102,11 @@ def test_transform_fires_eventos_bus():
         ctx.emit('ip', '9.9.9.9')
 
     store = Store(bus=bus)
-    dom = store.create('domain', 'example.com')   # 1 event
-    tr.run_by_name('dns', dom, store)     # +1 event (the ip)
+    dom = store.create('domain', 'example.com')
+    tr.run_by_name('dns', dom, store)
     assert len(nuevas) == 2
 
 
-# ── cache: do not repeat the same (transform, entity) -- step 41 ────────────
 def test_runner_caches():
     runs = []
     @tr.transform(input='domain', outputs=('ip',), name='dns')
@@ -125,11 +118,10 @@ def test_runner_caches():
     dom = store.create('domain', 'example.com')
     corr = tr.Runner(store)
     corr.run('dns', dom)
-    corr.run('dns', dom)      # second time: cache, does not re-run
+    corr.run('dns', dom)
     assert len(runs) == 1
 
 
-# ── Machine: chain that cascades from one type to the next -- step 39 ───────
 def test_machine_cascada():
     @tr.transform(input='domain', outputs=('ip',), name='dns')
     def _dns(entity, ctx):
@@ -145,11 +137,10 @@ def test_machine_cascada():
     produced = tr.Runner(store).run_machine(recipe, dom)
 
     tipos = sorted(e.type for e in produced)
-    assert tipos == ['ip', 'port']              # cascade: domain→ip→port
+    assert tipos == ['ip', 'port']
     assert store.find('port', '443') is not None
 
 
-# ── plugins: load transforms from a directory -- step 42 ────────────────────
 def test_load_plugins(tmp_path):
     plugin = tmp_path / "mi_transform.py"
     plugin.write_text(

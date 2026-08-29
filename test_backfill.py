@@ -13,17 +13,14 @@ def _run_one(name, type, value):
     return run_by_name(name, e, store), e, store
 
 
-# ── 33: phone ───────────────────────────────────────────────────────────────
 def test_phone_dorks_keyless():
-    prod, _, _ = _run_one('phone_dorks', 'phone', '+14155552671')
-    dorks = {p.properties.get('dork') for p in prod if p.type == 'url'}
-    assert dorks == {'truecaller', 'whitepages', 'messaging', 'general'}
-    assert all(p.type == 'url' for p in prod)      # no key: only dorks, no country
+    prod, e, _ = _run_one('phone_dorks', 'phone', '+14155552671')
+    assert set(e.properties['searches']) == {'truecaller', 'whitepages', 'messaging', 'general'}
+    assert not [p for p in prod if p.type == 'url']
 
 
-# ── 34: typosquatting / buckets / takeover / passivedns ─────────────────────
 def test_typosquatting(monkeypatch):
-    monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: '1.2.3.4\n')   # everything "resolves"
+    monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: '1.2.3.4\n')
     prod, _, _ = _run_one('typosquatting', 'domain', 'google.com')
     assert prod and all(p.type == 'domain' and 'typosquat' in p.tags for p in prod)
 
@@ -45,7 +42,7 @@ def test_takeover(monkeypatch):
         def json(self):
             return [{'name_value': 'abandonado.ejemplo.com'}]
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: Rj())
-    monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: 'user.github.io.\n')  # orphan CNAME
+    monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: 'user.github.io.\n')
     prod, _, _ = _run_one('takeover', 'domain', 'ejemplo.com')
     vulns = [p for p in prod if 'takeover' in p.tags]
     assert vulns and vulns[0].value == 'abandonado.ejemplo.com'
@@ -68,7 +65,6 @@ def test_passivedns_without_key(monkeypatch):
     assert prod == []
 
 
-# ── 60: github_sec (secrets in commits) + rule ──────────────────────────────
 class _Rj:
     def __init__(self, data, code=200):
         self._d, self.status_code = data, code
@@ -96,14 +92,13 @@ def test_github_sec_rule(monkeypatch):
     assert any(x.rule == 'github-secret' and x.severity == 'critical' for x in h)
 
 
-# ── 56: exposed login/panel + credential ────────────────────────────────────
 def test_login_exposed_rule():
     from core.correlacion import correlate
     store = Store()
     store.create('domain', 'admin.x.com').tag('login-panel')
     r = [x for x in correlate(store) if x.rule == 'login-exposed']
     assert r and r[0].severity == 'high'
-    store.create('email', 'a@x.com').tag('leaked')     # login + credential
+    store.create('email', 'a@x.com').tag('leaked')
     r2 = [x for x in correlate(store) if x.rule == 'login-exposed']
     assert r2 and r2[0].severity == 'critical'
 
@@ -119,7 +114,6 @@ def test_http_probe_detects_panel_login(monkeypatch):
     assert 'login-panel' in e.tags
 
 
-# ── 136: leak -> login correlation ──────────────────────────────────────────
 def test_leak_login():
     from core.correlacion import correlate
     store = Store()
@@ -127,17 +121,16 @@ def test_leak_login():
     p = store.create('subdomain', 'panel.acme.com'); p.tag('login-panel')
     r = [x for x in correlate(store) if x.rule == 'leak-login']
     assert r and r[0].severity == 'critical'
-    assert e.id in r[0].entities and p.id in r[0].entities   # names both
+    assert e.id in r[0].entities and p.id in r[0].entities
 
 
 def test_leak_login_without_filter():
     from core.correlacion import correlate
     store = Store()
-    store.create('subdomain', 'panel.acme.com').tag('login-panel')   # panel but no credential
+    store.create('subdomain', 'panel.acme.com').tag('login-panel')
     assert not [x for x in correlate(store) if x.rule == 'leak-login']
 
 
-# ── 59: platform pivot ──────────────────────────────────────────────────────
 def test_pivote_platforms():
     from core.correlacion import correlate
     store = Store()
@@ -153,12 +146,11 @@ def test_pivote_platforms_few_no_fires():
     from core.correlacion import correlate
     store = Store()
     u = store.create('user', 'x')
-    for i in range(3):                                   # <5 → no finding
+    for i in range(3):
         store.relate(u.id, store.create('platform', f'p{i}').id, 'presente')
     assert not [x for x in correlate(store) if x.rule == 'platform-pivot']
 
 
-# ── 63: user YAML rule loader ───────────────────────────────────────────────
 def test_rules_yaml():
     from core.correlacion import load_yaml_rules, correlate
     yaml_txt = """
@@ -173,28 +165,27 @@ def test_rules_yaml():
         assert load_yaml_rules(yaml_txt) == 1
         store = Store()
         store.create('port', '1.2.3.4:21')
-        store.create('port', '1.2.3.4:443')              # does not match
+        store.create('port', '1.2.3.4:443')
         r = [x for x in correlate(store) if x.rule == 'puerto-ftp']
         assert len(r) == 1 and r[0].severity == 'high' and r[0].message == 'FTP en 1.2.3.4:21'
     finally:
-        load_yaml_rules('')                          # clears the global
+        load_yaml_rules('')
 
 
 def test_rules_yaml_severity_invalid_normalizes():
     from core.correlacion import load_yaml_rules, _YAML_RULES
     try:
         load_yaml_rules("- name: x\n  severity: URGENTISIMO\n  when: {tag: y}\n")
-        assert _YAML_RULES[0]['severity'] == 'medium'  # invalid severity → medio
+        assert _YAML_RULES[0]['severity'] == 'medium'
     finally:
         load_yaml_rules('')
 
 
 def test_rules_yaml_garbage_no_break():
     from core.correlacion import load_yaml_rules
-    assert load_yaml_rules('no: [es: :valido') == 0   # broken YAML → 0, no exception
+    assert load_yaml_rules('no: [es: :valido') == 0
 
 
-# ── 40: per-transform rate limiting ─────────────────────────────────────────
 def test_rate_limit_concurrency():
     import threading
     import time
@@ -221,12 +212,11 @@ def test_rate_limit_concurrency():
             t.start()
         for t in ths:
             t.join()
-        assert estado['max'] == 1                # never more than 1 concurrent
+        assert estado['max'] == 1
     finally:
-        set_limite('_test_rl', 0)                # removes the limit
+        set_limite('_test_rl', 0)
 
 
-# ── 37: background queue + SSE ──────────────────────────────────────────────
 def test_task_manager():
     from core.tasks import TaskManager
     g = TaskManager()
@@ -237,7 +227,7 @@ def test_task_manager():
         return {'ok': True}
 
     tid = g.create(trabajo)
-    eventos = list(g.stream(tid))                # blocks until 'fin'
+    eventos = list(g.stream(tid))
     tipos = [e['type'] for e in eventos]
     assert tipos[0] == 'inicio' and tipos[-1] == 'fin'
     assert g.estado(tid)['estado'] == 'hecho'
@@ -252,7 +242,7 @@ def test_task_manager_error_no_hang():
         raise RuntimeError('boom')
 
     tid = g.create(trabajo)
-    eventos = list(g.stream(tid))                # must close with 'fin' even on failure
+    eventos = list(g.stream(tid))
     assert eventos[-1]['type'] == 'fin'
     assert g.estado(tid)['estado'] == 'error'
 
@@ -263,16 +253,15 @@ def test_batch_progress():
     run_batch([('url', 'https://a.com/x.jpg', 'reverse_image'),
                    ('url', 'https://b.com/y.jpg', 'reverse_image')],
                   Store(), on_progreso=lambda *a: seen.append(a))
-    assert len(seen) == 2                       # one callback per finished transform
-    assert seen[-1][3] == 2                      # total == 2 on the last
+    assert len(seen) == 2
+    assert seen[-1][3] == 2
 
 
-# ── Migration of the rest of the old Obsidian (minus distroboxes) ────────────
 def test_person(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: _Rj({'AbstractText': 'Person bio.'}))
     prod, e, _ = _run_one('person', 'person', 'Juan Perez')
-    assert {p.properties.get('dork') for p in prod} == {'linkedin', 'x', 'contact', 'pdf', 'github', 'facebook'}
+    assert set(e.properties['searches']) == {'linkedin', 'x', 'contact', 'pdf', 'github', 'facebook'}
     assert e.properties.get('summary') == 'Person bio.'
 
 
@@ -283,7 +272,7 @@ def test_darkweb_ahmia(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: R())
     prod, _, _ = _run_one('darkweb', 'person', 'algo')
     urls = {p.value for p in prod if p.type == 'url'}
-    assert urls == {'http://abc.onion', 'http://xyz.onion'}   # normalizer strips the trailing /
+    assert urls == {'http://abc.onion', 'http://xyz.onion'}
 
 
 def test_url_check_urlhaus(monkeypatch):
@@ -294,9 +283,9 @@ def test_url_check_urlhaus(monkeypatch):
 
 
 def test_render_js_bloquea_ssrf(monkeypatch):
-    monkeypatch.setattr(ob, '_public_url', lambda u: False)   # internal host
+    monkeypatch.setattr(ob, '_public_url', lambda u: False)
     prod, _, _ = _run_one('render_js', 'url', 'http://169.254.169.254/')
-    assert prod == []                              # does not render internal hosts
+    assert prod == []
 
 
 def test_yara_bulk_folder_invalid():
@@ -309,7 +298,7 @@ def test_wordlist_ai(monkeypatch):
     monkeypatch.setattr(ob.ia, 'ask', lambda *a, **k: 'juan2024\npassword123\nperez.juan\nabc')
     _, e, _ = _run_one('wordlist', 'person', 'Juan')
     words = e.properties.get('wordlist')
-    assert 'juan2024' in words and 'abc' not in words   # filters <6 chars
+    assert 'juan2024' in words and 'abc' not in words
 
 
 def test_ai_case_endpoint(monkeypatch):
@@ -325,7 +314,7 @@ def test_ai_case_endpoint(monkeypatch):
 
 
 def test_keys_test_without_key(monkeypatch):
-    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)   # empty vault
+    monkeypatch.setattr(ob._boveda, 'get', lambda s: None)
     monkeypatch.setenv('SHODAN_API_KEY', '')
     c = ob.app.test_client()
     with c.session_transaction() as s:

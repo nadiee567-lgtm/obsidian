@@ -34,7 +34,7 @@ class Vault:
             with open(self.enc_file, 'rb') as f:
                 return json.loads(self._fernet().decrypt(f.read()).decode())
         except Exception:
-            return {}   # wrong key or corrupt file -> empty, does not crash
+            return {}
 
     def _escribir(self, d):
         token = self._fernet().encrypt(json.dumps(d).encode())
@@ -42,7 +42,6 @@ class Vault:
             f.write(token)
         os.chmod(self.enc_file, 0o600)
 
-    # -- public API --
     def save(self, service, value):
         d = self._read()
         d[service] = value

@@ -21,7 +21,6 @@ def _run_one(name, type, value):
     return run_by_name(name, e, store), e, store
 
 
-# ── 137: wallet extraction ──────────────────────────────────────────────────
 def test_extract_wallets(monkeypatch):
     eth = '0x' + 'a' * 40
     txt = f'donate to 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa or to {eth} thanks'
@@ -31,7 +30,6 @@ def test_extract_wallets(monkeypatch):
     assert '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa' in ws and eth in ws
 
 
-# ── 138: transaction graph ──────────────────────────────────────────────────
 _GENESIS = '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
 
 
@@ -41,15 +39,14 @@ def test_tx_graph(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=tx_json))
     prod, _, _ = _run_one('tx_graph', 'wallet', _GENESIS)
     ws = {e.value for e in prod if e.type == 'wallet'}
-    assert ws == {'inp111', 'out222'}                # counterparties, without itself
+    assert ws == {'inp111', 'out222'}
 
 
 def test_tx_graph_ignores_non_btc():
-    prod, _, _ = _run_one('tx_graph', 'wallet', '0x' + 'a' * 40)   # ETH -> not applicable yet
+    prod, _, _ = _run_one('tx_graph', 'wallet', '0x' + 'a' * 40)
     assert prod == []
 
 
-# ── 139: clustering by co-inputs ────────────────────────────────────────────
 def test_cluster_wallets(monkeypatch):
     tx_json = {'txs': [{'inputs': [{'prev_out': {'addr': _GENESIS}},
                                    {'prev_out': {'addr': 'hermana1'}}],
@@ -57,18 +54,16 @@ def test_cluster_wallets(monkeypatch):
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R(data=tx_json))
     prod, _, _ = _run_one('cluster_wallets', 'wallet', _GENESIS)
     hermanas = [e for e in prod if e.type == 'wallet']
-    assert {e.value for e in hermanas} == {'hermana1'}          # co-input, not the destination
+    assert {e.value for e in hermanas} == {'hermana1'}
     assert 'same-owner' in hermanas[0].tags
 
 
-# ── 140: exchange attribution (links to tools) ──────────────────────────────
 def test_exchange_attrib():
     prod, _, _ = _run_one('exchange_attrib', 'wallet', _GENESIS)
     herrs = {e.properties.get('tool') for e in prod if e.type == 'url'}
     assert herrs == {'blockchair', 'walletexplorer', 'arkham', 'oxt'}
 
 
-# ── 141: risk scoring (ransomware) + rule ───────────────────────────────────
 def test_wallet_risk_rule(monkeypatch):
     from core.correlacion import correlate
     monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
@@ -80,31 +75,28 @@ def test_wallet_risk_rule(monkeypatch):
 
 def test_wallet_risk_clears(monkeypatch):
     monkeypatch.setattr(ob, '_ransom_addrs', lambda: {'1BadRansomAddr'})
-    _, e, _ = _run_one('wallet_risk', 'wallet', _GENESIS)   # not in the list
+    _, e, _ = _run_one('wallet_risk', 'wallet', _GENESIS)
     assert 'ransomware' not in e.tags
 
 
-# ── 142: multi-chain (Ethereum) ─────────────────────────────────────────────
 def test_eth_balance(monkeypatch):
-    # 0xDE0B6B3A7640000 = 1 ETH in wei
     monkeypatch.setattr(ob.SESSION, 'post', lambda *a, **k: _R(data={'result': '0xDE0B6B3A7640000'}))
     _, e, _ = _run_one('eth_balance', 'wallet', '0x' + 'a' * 40)
     assert abs(e.properties.get('eth_balance') - 1.0) < 1e-9 and e.properties.get('cadena') == 'eth'
 
 
 def test_eth_balance_ignores_btc():
-    _, e, _ = _run_one('eth_balance', 'wallet', _GENESIS)     # BTC -> not applicable
+    _, e, _ = _run_one('eth_balance', 'wallet', _GENESIS)
     assert 'eth_balance' not in e.properties
 
 
-# ── 143: movement alerts (via the existing monitor) ─────────────────────────
 def test_monitor_detects_movement_wallet():
     """Watching a wallet = the monitor diffs its balance; a movement => alert."""
     from core.monitor import snapshot, diff
     store = Store()
     w = store.create('wallet', _GENESIS, properties={'btc_balance': 1.5, 'btc_tx': 10})
     before = snapshot(store)
-    w.properties['btc_balance'] = 3.0                 # money moved in/out
+    w.properties['btc_balance'] = 3.0
     w.properties['btc_tx'] = 11
     changes = diff(before, snapshot(store))
     campos = {c['field'] for c in changes.prop_changes}

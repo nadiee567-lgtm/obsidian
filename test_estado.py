@@ -41,4 +41,4 @@ def test_render_escapa_xss():
 def test_render_ai_no_disponible():
     d = _data(); d['ia'] = {'available': False, 'modelo': '?'}
     html = render_estado(d)
-    assert 'system status' in html      # does not blow up with AI down
+    assert 'system status' in html

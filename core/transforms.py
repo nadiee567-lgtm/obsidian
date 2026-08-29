@@ -69,7 +69,6 @@ class _Registry:
         self._by_name.clear()
 
 
-# Global registry (concrete transforms register themselves on import).
 REGISTRO = _Registry()
 
 
@@ -103,7 +102,7 @@ class Context:
         try:
             ent = Entity(type=type, value=value, properties=properties)
         except ValueError:
-            return None   # garbage value: ignored, does not break the transform
+            return None
         viva = self.store.add(ent)
         viva.note_provenance(self._nombre, input_id=self.input.id)
         self.store.relate(self.input, viva, label)
@@ -111,9 +110,6 @@ class Context:
         return viva
 
 
-# ── Per-transform rate limiting (step 40) ────────────────────────────────────
-# A semaphore per transform limits how many concurrent runs touch its API, so as
-# not to hammer third parties. No configured limit = no cap.
 import threading as _threading
 
 _SEMAFOROS: dict = {}
@@ -147,12 +143,12 @@ def run(t: Transform, entity: Entity, store: Store) -> list:
     sem = _SEMAFOROS.get(t.name)
     try:
         if sem is not None:
-            with sem:                       # no more than N concurrent of this transform
+            with sem:
                 t.fn(entity, ctx)
         else:
             t.fn(entity, ctx)
     except Exception:
-        pass   # a transform failure does not take down the case
+        pass
     return ctx.emitidas
 
 
@@ -207,7 +203,7 @@ def run_batch(tasks, store: Store, max_workers: int = 8, lock=None,
                     pass
 
     ctx = lock if lock is not None else contextlib.nullcontext()
-    with ctx:                                    # serialized merge (consistent dedup)
+    with ctx:
         for local in locales:
             for e in local.entities:
                 store.add(e)
@@ -216,7 +212,6 @@ def run_batch(tasks, store: Store, max_workers: int = 8, lock=None,
     return results
 
 
-# ── Step 39: Machines (recipes = chains of transforms, Maltego-style) ────────
 @dataclass
 class Machine:
     """A recipe: transforms in order that cascade from one type to the next.
@@ -226,18 +221,17 @@ class Machine:
     description: str = ''
 
 
-# ── Step 41: Runner with cache (don't repeat the same expensive query) ───────
 class Runner:
     """Runs transforms/machines over a store, remembering which
     (transform, entity) pairs already ran to avoid repeating them in the same session."""
     def __init__(self, store: Store):
         self.store = store
-        self._hechos: set = set()   # {(transform_name, entity_id)}
+        self._hechos: set = set()
 
     def run(self, name: str, entity: Entity) -> list:
         key = (name, entity.id)
         if key in self._hechos:
-            return []               # cache: already ran on this entity
+            return []
         self._hechos.add(key)
         return run_by_name(name, entity, self.store)
 
@@ -258,7 +252,6 @@ class Runner:
         return produced
 
 
-# ── Step 42: load transforms from plugins (without touching the core) ────────
 def load_plugins(directorio: str) -> list:
     """Imports each .py in `directorio` (which self-registers via @transform).
     Extensible like Maltego's Transform Hub. Returns the loaded names."""

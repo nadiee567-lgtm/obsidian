@@ -14,11 +14,10 @@ import requests
 
 OLLAMA = os.environ.get('OBSIDIAN_OLLAMA', 'http://localhost:11434')
 MODELO = os.environ.get('OBSIDIAN_MODELO_IA', 'qwen2.5:7b')
-NEXO = os.environ.get('OBSIDIAN_NEXO', '')       # '1' enables NEXO-style routing
+NEXO = os.environ.get('OBSIDIAN_NEXO', '')
 
 _S = requests.Session()
 
-# NEXO-style routing (step 168): classifies the task by keywords -> local model.
 _ROUTING = {
     'seguridad': (['exploit', 'vuln', 'cve', 'attack', 'malware', 'ransomware',
                    'payload', 'pentest', 'shell', 'takeover'], 'dolphin-llama3'),

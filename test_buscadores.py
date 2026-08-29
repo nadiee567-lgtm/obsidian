@@ -29,7 +29,6 @@ def _with_key(monkeypatch, resp, key='fakekey'):
     monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: FakeResp(resp))
 
 
-# ── Censys (108) ─────────────────────────────────────────────────────────────
 def test_censys(monkeypatch):
     resp = {'result': {
         'autonomous_system': {'name': 'ACME', 'asn': 64500},
@@ -49,7 +48,6 @@ def test_censys_without_key(monkeypatch):
     assert _run_one('censys', 'ip', '1.2.3.4') == []
 
 
-# ── ZoomEye CN (109) ─────────────────────────────────────────────────────────
 def test_zoomeye(monkeypatch):
     resp = {'matches': [{'portinfo': {'port': 80, 'service': 'http', 'app': 'nginx'}},
                         {'portinfo': {'port': 443, 'service': 'https', 'app': 'nginx'}}]}
@@ -65,7 +63,6 @@ def test_zoomeye_without_key(monkeypatch):
     assert _run_one('zoomeye', 'ip', '1.2.3.4') == []
 
 
-# ── FOFA CN (110) ────────────────────────────────────────────────────────────
 def test_fofa(monkeypatch):
     resp = {'error': False, 'results': [
         ['1.2.3.4', '443', 'site.com'],
@@ -87,7 +84,6 @@ def test_fofa_without_key(monkeypatch):
     assert _run_one('fofa', 'ip', '1.2.3.4') == []
 
 
-# ── Quake/360 CN (111) -- uses POST ─────────────────────────────────────────
 def test_quake(monkeypatch):
     resp = {'data': [{'port': 443, 'service': {'name': 'http/ssl'}},
                      {'port': 22, 'service': {'name': 'ssh'}}]}
@@ -104,7 +100,6 @@ def test_quake_without_key(monkeypatch):
     assert _run_one('quake', 'ip', '1.2.3.4') == []
 
 
-# ── Hunter.how + Netlas (112) ────────────────────────────────────────────────
 def test_hunter(monkeypatch):
     resp = {'data': {'list': [{'port': 443, 'domain': 'a.com'}, {'port': 80, 'domain': 'b.com'}]}}
     _with_key(monkeypatch, resp)
@@ -128,7 +123,6 @@ def test_hunter_netlas_without_key(monkeypatch):
     assert _run_one('netlas', 'ip', '1.2.3.4') == []
 
 
-# ── Criminal IP + BinaryEdge (113) ───────────────────────────────────────────
 def test_criminalip(monkeypatch):
     resp = {'port': {'data': [{'open_port_no': 443, 'app_name': 'HTTPS'},
                               {'open_port_no': 8080, 'app_name': 'HTTP'}]}}
@@ -138,7 +132,7 @@ def test_criminalip(monkeypatch):
 
 
 def test_binaryedge(monkeypatch):
-    resp = {'events': [{'port': 443}, {'port': 22}, {'port': 443}]}   # dedup by id
+    resp = {'events': [{'port': 443}, {'port': 22}, {'port': 443}]}
     _with_key(monkeypatch, resp)
     prod = _run_one('binaryedge', 'ip', '1.2.3.4')
     assert {e.value for e in prod if e.type == 'port'} == {'1.2.3.4:443', '1.2.3.4:22'}
@@ -152,7 +146,6 @@ def test_criminalip_binaryedge_without_key(monkeypatch):
     assert _run_one('binaryedge', 'ip', '1.2.3.4') == []
 
 
-# ── Favicon pivot (114) ─────────────────────────────────────────────────────
 def test_favicon_pivot(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get',
                         lambda s: {'fofa': 'a@b.com:k', 'shodan': 'sk'}.get(s))
@@ -165,7 +158,7 @@ def test_favicon_pivot(monkeypatch):
     h = store.create('hash', '123456', properties={'hash_type': 'favicon'})
     prod = run_by_name('favicon_pivot', h, store)
     ips = {e.value for e in prod if e.type == 'ip'}
-    assert ips == {'9.9.9.9', '8.8.8.8', '7.7.7.7'}   # cross-engine dedup of 9.9.9.9
+    assert ips == {'9.9.9.9', '8.8.8.8', '7.7.7.7'}
 
 
 def test_favicon_pivot_ignores_hash_no_favicon(monkeypatch):
@@ -175,7 +168,6 @@ def test_favicon_pivot_ignores_hash_no_favicon(monkeypatch):
     assert run_by_name('favicon_pivot', h, store) == []
 
 
-# ── TLS certificate pivot (115) ─────────────────────────────────────────────
 def test_cert_pivot(monkeypatch):
     monkeypatch.setattr(ob._boveda, 'get',
                         lambda s: {'fofa': 'a@b.com:k', 'shodan': 'sk'}.get(s))
@@ -190,23 +182,20 @@ def test_cert_pivot(monkeypatch):
     assert {e.value for e in prod if e.type == 'ip'} == {'5.5.5.5', '6.6.6.6'}
 
 
-# ── Cross-engine dedup (116) ────────────────────────────────────────────────
 def test_dedup_cross_engine(monkeypatch):
     """Same host/port reported by 2 engines = 1 entity with 2 sources."""
     monkeypatch.setattr(ob._boveda, 'get', lambda s: 'id:secret')
     store = Store()
     ip = store.create('ip', '1.2.3.4')
-    # Shodan sees port 443
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: FakeResp({'data': [{'port': 443, 'product': 'nginx'}]}))
     run_by_name('shodan', ip, store)
-    # Censys sees the SAME port 443
     monkeypatch.setattr(ob.SESSION, 'get',
                         lambda *a, **k: FakeResp({'result': {'services': [{'port': 443, 'service_name': 'HTTP'}]}}))
     run_by_name('censys', ip, store)
     ports = [e for e in store.entities if e.type == 'port' and e.value == '1.2.3.4:443']
-    assert len(ports) == 1                              # ONE single entity (deterministic id)
-    assert {'shodan', 'censys'} <= ports[0].sources    # with BOTH sources
+    assert len(ports) == 1
+    assert {'shodan', 'censys'} <= ports[0].sources
 
 
 def test_all_engines_registrados():

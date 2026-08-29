@@ -41,10 +41,6 @@ CREATE INDEX IF NOT EXISTS idx_ent_value ON entities(value);
 CREATE INDEX IF NOT EXISTS idx_rel_source ON relations(source);
 """
 
-# ── Migration: Spanish schema (pre-English) -> English (F1/Phase B3) ─────────
-# Old cases created before the English rename have tables `entidades`/`relaciones`/
-# `history` with Spanish columns. Rename them in place (data preserved) so any
-# existing .db keeps loading. Idempotent: skips whatever is already English.
 _TABLE_RENAME = {'entidades': 'entities', 'relaciones': 'relations', 'history': 'history'}
 _COLUMN_RENAME = {
     'entities': {'tipo': 'type', 'valor': 'value', 'propiedades': 'properties',
@@ -59,13 +55,11 @@ def _migrate_schema(con) -> None:
     """Renames legacy Spanish tables/columns to English, in place (SQLite >= 3.25)."""
     tables = {r[0] for r in con.execute(
         "SELECT name FROM sqlite_master WHERE type='table'")}
-    # 1) rename tables (only if the old exists and the new does not)
     for old, new in _TABLE_RENAME.items():
         if old in tables and new not in tables:
             con.execute(f"ALTER TABLE {old} RENAME TO {new}")
             tables.discard(old)
             tables.add(new)
-    # 2) rename columns within each (now-English) table
     for table, cols in _COLUMN_RENAME.items():
         if table not in tables:
             continue
@@ -75,9 +69,6 @@ def _migrate_schema(con) -> None:
                 con.execute(f"ALTER TABLE {table} RENAME COLUMN {old} TO {new}")
 
 
-# Spanish entity-type VALUES stored in old cases -> English (Phase B3, step 2).
-# Changing a type value changes the entity id (id = sha1("type:value")), so the
-# ids must be recomputed and every relation endpoint remapped. Idempotent.
 _TYPE_VALUE_RENAME = {
     'domain': 'domain', 'subdominio': 'subdomain', 'username': 'user',
     'telefono': 'phone', 'plataforma': 'platform', 'credencial': 'credential',
@@ -98,13 +89,13 @@ def _migrate_type_values(con) -> None:
     try:
         tipos = {r[0] for r in con.execute("SELECT DISTINCT type FROM entities")}
     except sqlite3.OperationalError:
-        return                                   # fresh DB, no entities table yet
+        return
     if not (tipos & set(_TYPE_VALUE_RENAME)):
-        return                                   # nothing legacy -> done
+        return
     rows = con.execute(
         "SELECT id,type,value,properties,sources,tags,provenance,confidence,created FROM entities"
     ).fetchall()
-    idmap = {}                                   # old entity id -> new entity id
+    idmap = {}
     nuevas = []
     for (eid, type_, value, props, srcs, tags, prov, conf, created) in rows:
         ntype = _TYPE_VALUE_RENAME.get(type_, type_)
@@ -129,9 +120,9 @@ def _migrate_type_values(con) -> None:
 
 def _connect(db_path):
     con = sqlite3.connect(db_path)
-    _migrate_schema(con)          # 1) legacy Spanish tables/columns -> English
-    con.executescript(_SCHEMA)    # 2) create tables if this is a fresh DB
-    _migrate_type_values(con)     # 3) legacy Spanish type VALUES -> English (+ reindex ids)
+    _migrate_schema(con)
+    con.executescript(_SCHEMA)
+    _migrate_type_values(con)
     return con
 
 
@@ -163,7 +154,7 @@ def load_store(db_path: str) -> Store:
     """Rebuilds a Store from the DB. SILENT load (no bus): does not fire events,
     because loading from disk is not 'discovering' new data."""
     con = _connect(db_path)
-    store = Store()   # no bus -> add() does not publish
+    store = Store()
     for row in con.execute(
         "SELECT type,value,properties,sources,tags,provenance,confidence,created FROM entities"
     ):
@@ -184,7 +175,6 @@ def load_store(db_path: str) -> Store:
     return store
 
 
-# ── Per-case history / audit (F3 step 48) ────────────────────────────────────
 def record_event(db_path: str, transform: str, input_: str, outputs: int) -> None:
     """Records that a transform ran (what, when, how many results)."""
     con = _connect(db_path)

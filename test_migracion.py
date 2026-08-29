@@ -5,7 +5,6 @@ Run:  ../.venv/bin/python -m pytest test_migracion.py -q
 from core.migracion import migrate_case
 
 
-# a realistic old case, as the OSINT modules used to leave it
 CASE_VIEJO = {
     'name': 'caso1',
     'target': 'example.com',
@@ -32,14 +31,13 @@ CASE_VIEJO = {
             'results': {'vulnerables': [{'subdomain': 'old.example.com',
                                             'service': 'GitHub Pages', 'status': '404'}]},
         },
-        'roto': {'type': 'ip'},   # malformed module: must not break anything
+        'roto': {'type': 'ip'},
     },
 }
 
 
 def test_migration_creates_entities_typed():
     store = migrate_case(CASE_VIEJO)
-    # target + domain + ip + subdomains + email + country + org + ptr + takeover...
     assert store.find('target', 'example.com') is not None
     assert store.find('domain', 'example.com') is not None
     assert store.find('ip', '93.184.216.34') is not None
@@ -49,8 +47,6 @@ def test_migration_creates_entities_typed():
 
 
 def test_migration_dedup_email_between_modules():
-    # the email appears in the 'domain' module (emails) and the 'email' module:
-    # it must be ONE single entity with both sources
     store = migrate_case(CASE_VIEJO)
     e = store.find('email', 'admin@example.com')
     assert 'domain' in e.sources and 'email' in e.sources
@@ -66,7 +62,6 @@ def test_migration_tags_props():
 
 
 def test_migration_no_crash_with_module_broken():
-    # the 'roto' module has no 'target'; the migration skips it without error
     store = migrate_case(CASE_VIEJO)
     assert len(store) > 0
 

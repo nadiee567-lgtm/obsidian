@@ -9,10 +9,8 @@ from urllib.parse import urlparse
 
 from core.config import CASES_DIR
 
-# Shell metacharacters -- used by the generic _safe_target check.
 _SHELL_DANGEROUS = set(' \t\n\r;&|`$<>(){}[]!*?~"\'\\')
 
-# A module -> which target type it expects (to validate with the right pattern).
 _MODULE_TYPE = {
     'user': 'user', 'domain': 'domain', 'ip': 'ip', 'email': 'email',
     'ssl': 'domain', 'typosquatting': 'domain', 'takeover': 'domain',
@@ -41,7 +39,6 @@ def _validate(arg, type):
     if type == 'ip':       return _is_ip(arg)
     if type == 'user':  return bool(_RE_USER.match(arg))
     if type == 'email':    return bool(_RE_EMAIL.match(arg))
-    # unknown type -> generic check
     return _safe_target(arg)
 
 
@@ -59,11 +56,10 @@ def _case_slug(name):
     no path separators or '..'. Returns '' if it ends up invalid -- so a name
     like '../../.bashrc' does not write/read outside CASES_DIR."""
     name = (name or '').strip()
-    # Flatly reject anything that looks like a path, do not "fix" it.
     if '/' in name or '\\' in name or '..' in name:
         return ''
     limpio = re.sub(r'[^A-Za-z0-9 _.-]', '', name).strip()[:80]
-    if not limpio or set(limpio) <= {'.'}:   # empty, '.', '...'
+    if not limpio or set(limpio) <= {'.'}:
         return ''
     return limpio
 
