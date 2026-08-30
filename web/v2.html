@@ -460,13 +460,13 @@ async function agregar(){
 // ── hallazgos + IA (paneles) ──
 async function pintarHallazgos(){
   const d=await(await fetch('/api/v2/findings')).json();
-  $('#nHall').textContent=d.hallazgos.length;
+  $('#nHall').textContent=d.findings.length;
   const b=$('#scoreBadge'); b.textContent='risk '+d.score+'/100';
   b.style.background=d.score>=60?'#f7768e':d.score>=25?'#e0af68':'#232735';
   b.style.color=d.score>=25?'#0b0d12':'#c8cfdf';
   const c=$('#hallazgos'); c.textContent='';
-  if(!d.hallazgos.length){ c.innerHTML='<div class="vacio">No risks detected (yet).</div>'; return; }
-  d.hallazgos.forEach(h=>{
+  if(!d.findings.length){ c.innerHTML='<div class="vacio">No risks detected (yet).</div>'; return; }
+  d.findings.forEach(h=>{
     const row=el('div','hall'); row.style.setProperty('--sc',SEVCOLOR[h.severity]||'#6b7488');
     const s=el('span','sev'); s.textContent=h.severity; row.appendChild(s);
     const m=el('span','msg'); m.textContent=h.message; row.appendChild(m);
