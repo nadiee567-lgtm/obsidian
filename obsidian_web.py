@@ -223,28 +223,28 @@ RULES: NEVER fabricate data. Be direct and technical. Use [!] critical, [+] posi
 Always respond in English."""
 
 
-def _cmd(cmd, timeout=25):
-    try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
-                          timeout=timeout, cwd=HOME, env={**os.environ,'HOME':HOME})
-        return (r.stdout + r.stderr).strip() or '(no output)'
-    except subprocess.TimeoutExpired:
-        return f'[Timeout {timeout}s]'
-    except Exception as e:
-        return f'[Error: {e}]'
-
-def run_tool(argv, timeout=25, stdin=None):
+def run_tool(argv, timeout=25, stdin=None, discard_stderr=False):
     """Runs a tool WITHOUT a shell: argv is a list, not a string. Closes
     metacharacter injection (;, |, `, $()...) because it never passes through a
     shell interpreter. To ALSO close argument injection (a value starting with
     '-' is read as a flag), validate the target by type with _validate() BEFORE
-    calling here. Prefer this function over _cmd for anything that interpolates
-    user data. _cmd is left only for internal pipelines with already-validated
-    values."""
+    calling here.
+
+    This is the ONLY way the app runs external commands -- there is no shell=True
+    anywhere. A few pentest tools are shell pipelines by design (echo | tool,
+    tool | head): those pass the pipeline as an explicit run_tool(['bash','-c',
+    pipeline]) with an arg already checked by _safe_target(), so the shell is
+    localized and auditable, not a blanket helper.
+
+    discard_stderr=True mirrors the old `2>/dev/null`: stderr is dropped and only
+    stdout is returned (for tools like dig/whois that are noisy on stderr).
+    """
     try:
-        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
-                           cwd=HOME, env={**os.environ, 'HOME': HOME}, input=stdin)
-        return (r.stdout + r.stderr).strip() or '(no output)'
+        stderr = subprocess.DEVNULL if discard_stderr else subprocess.STDOUT
+        r = subprocess.run(argv, stdout=subprocess.PIPE, stderr=stderr, text=True,
+                           timeout=timeout, cwd=HOME, env={**os.environ, 'HOME': HOME},
+                           input=stdin)
+        return (r.stdout or '').strip() or '(no output)'
     except subprocess.TimeoutExpired:
         return f'[Timeout {timeout}s]'
     except FileNotFoundError:
@@ -387,12 +387,12 @@ def _osint_user(username):
                 data['results']['github_repos'] = repos
     except Exception as _e: log.debug("source unavailable: %s", _e)
     if _which('sherlock'):
-        out = _cmd(f'sherlock {username} --timeout 5 --print-found 2>/dev/null', timeout=60)
+        out = run_tool(['sherlock', username, '--timeout', '5', '--print-found'], timeout=60, discard_stderr=True)
         encontrados_sh = [l.strip() for l in out.splitlines() if '[+]' in l]
         data['results']['sherlock'] = encontrados_sh
     if _which('maigret'):
         with tempfile.TemporaryDirectory() as tmpdir:
-            _cmd(f'maigret {username} --timeout 8 -J ndjson -fo {tmpdir} 2>/dev/null', timeout=90)
+            run_tool(['maigret', username, '--timeout', '8', '-J', 'ndjson', '-fo', tmpdir], timeout=90, discard_stderr=True)
             encontrados_mg = []
             for fpath in glob.glob(os.path.join(tmpdir, '*.ndjson')):
                 try:
@@ -416,13 +416,13 @@ def _osint_user(username):
 def _osint_domain(domain):
     domain = domain.replace('https://','').replace('http://','').split('/')[0]
     data = {'type':'domain','target':domain,'results':{}}
-    whois_raw = _cmd(f'whois {domain} 2>/dev/null')
+    whois_raw = run_tool(['whois', domain], discard_stderr=True)
     whois_lines = [l.strip() for l in whois_raw.splitlines()
                    if any(k in l.lower() for k in ['registr','creat','expir','name server','email','org','status'])]
     data['results']['whois'] = whois_lines[:20]
     dns = {}
     for rtype in ['A','AAAA','MX','NS','TXT','CNAME']:
-        out = _cmd(f'dig {domain} {rtype} +short 2>/dev/null')
+        out = run_tool(['dig', domain, rtype, '+short'], discard_stderr=True)
         if out.strip() and 'error' not in out.lower():
             dns[rtype] = out.strip()
     data['results']['dns'] = dns
@@ -446,7 +446,7 @@ def _osint_domain(domain):
         data['results']['headers_faltantes'] = missing_sec
     except Exception as _e: log.debug("source unavailable: %s", _e)
     if _which('theHarvester'):
-        out = _cmd(f'theHarvester -d {domain} -b duckduckgo -l 50 2>/dev/null', timeout=45)
+        out = run_tool(['theHarvester', '-d', domain, '-b', 'duckduckgo', '-l', '50'], timeout=45, discard_stderr=True)
         emails = list(set(re.findall(r'[\w\.-]+@[\w\.-]+', out)))
         hosts  = list(set(re.findall(r'[\w\.-]+\.'+re.escape(domain), out)))
         data['results']['emails']  = emails[:15]
@@ -470,7 +470,7 @@ def _osint_ip(ip):
         out = run_tool(['nmap','-T4','--top-ports','20','-sV','--open',ip], timeout=60)
         ports = [l.strip() for l in out.splitlines() if '/tcp' in l or '/udp' in l]
         data['results']['ports'] = ports
-    ptr = _cmd(f'dig -x {ip} +short 2>/dev/null').strip()
+    ptr = run_tool(['dig', '-x', ip, '+short'], discard_stderr=True).strip()
     if ptr: data['results']['ptr'] = ptr
     try:
         r = SESSION.get(f'https://api.hackertarget.com/aslookup/?q={ip}', timeout=8)
@@ -498,9 +498,9 @@ def _osint_email(email):
             data['results']['hibp_breaches'] = []
     except Exception as _e: log.debug("source unavailable: %s", _e)
     if domain:
-        spf   = _cmd(f'dig {domain} TXT +short 2>/dev/null')
-        dmarc = _cmd(f'dig _dmarc.{domain} TXT +short 2>/dev/null')
-        dkim  = _cmd(f'dig default._domainkey.{domain} TXT +short 2>/dev/null')
+        spf   = run_tool(['dig', domain, 'TXT', '+short'], discard_stderr=True)
+        dmarc = run_tool(['dig', f'_dmarc.{domain}', 'TXT', '+short'], discard_stderr=True)
+        dkim  = run_tool(['dig', f'default._domainkey.{domain}', 'TXT', '+short'], discard_stderr=True)
         spoofable = not any('v=spf1' in spf.lower() for _ in [1])
         data['results']['email_sec'] = {
             'spf': spf.strip()[:200] or 'NOT CONFIGURED',
@@ -583,10 +583,15 @@ def _recon_github_secrets(username_or_org):
 def _recon_ssl(domain):
     data = {'type':'ssl','target':domain,'results':{}}
     domain = domain.replace('https://','').replace('http://','').split('/')[0]
-    cert_info = _cmd(f'echo | openssl s_client -connect {domain}:443 -servername {domain} 2>/dev/null | openssl x509 -noout -subject -issuer -dates -fingerprint 2>/dev/null')
+    # openssl needs an empty stdin (was `echo | ...`) so s_client returns instead of hanging.
+    handshake = run_tool(['openssl', 's_client', '-connect', f'{domain}:443',
+                          '-servername', domain], stdin='', discard_stderr=True)
+    cert_info = run_tool(['openssl', 'x509', '-noout', '-subject', '-issuer',
+                          '-dates', '-fingerprint'], stdin=handshake, discard_stderr=True)
     data['results']['certificado'] = cert_info
     for cipher, vuln in [('RC4','OBSOLETE'),('DES','VULNERABLE'),('NULL','CRITICAL'),('EXPORT','CRITICAL')]:
-        out = _cmd(f'openssl s_client -connect {domain}:443 -cipher {cipher} 2>/dev/null | head -3')
+        out = '\n'.join(run_tool(['openssl', 's_client', '-connect', f'{domain}:443',
+                                  '-cipher', cipher], stdin='', discard_stderr=True).splitlines()[:3])
         if 'Cipher' in out and 'NONE' not in out:
             data['results'][f'cipher_{cipher}'] = f'VULNERABLE -- {vuln}'
     try:
@@ -661,7 +666,7 @@ def _recon_typosquatting(domain):
         variants.add(f'{name[:i]+name[i]*2+name[i:]}.{ext}')
     registered = []
     def _check_domain(v):
-        out = _cmd(f'dig {v} A +short 2>/dev/null', timeout=3)
+        out = run_tool(['dig', v, 'A', '+short'], timeout=3, discard_stderr=True)
         if out.strip() and not 'error' in out.lower():
             registered.append({'domain':v,'ip':out.strip()})
     ths = [threading.Thread(target=_check_domain, args=(v,)) for v in list(variants)[:25]]
@@ -727,7 +732,7 @@ def _recon_subdomain_takeover(domain):
     }
     vulnerables = []
     def _check_sub(sub):
-        cname = _cmd(f'dig {sub} CNAME +short 2>/dev/null').strip()
+        cname = run_tool(['dig', sub, 'CNAME', '+short'], discard_stderr=True).strip()
         if not cname: return
         for service, fp in FINGERPRINTS.items():
             if service in cname:
@@ -788,7 +793,7 @@ def _recon_metadata(url):
                     if f.tell() > 5_000_000: break
                 fname = f.name
             if _which('exiftool'):
-                exif = _cmd(f'exiftool {fname} 2>/dev/null')
+                exif = run_tool(['exiftool', fname], discard_stderr=True)
                 data['results']['exif'] = exif[:2000]
                 gps = re.findall(r'GPS.*?:\s*(.+)', exif)
                 if gps: data['results']['gps'] = gps
@@ -1086,7 +1091,7 @@ def _distro_exists(distro):
     now = time.time()
     if now - _DISTRO_CACHE['t'] > 30:
         try:
-            out = _cmd('distrobox list', timeout=10)
+            out = run_tool(['distrobox', 'list'], timeout=10)
         except Exception:
             out = ''
         names = set()
@@ -1115,7 +1120,10 @@ def _distrobox_run(distro, tool_dict, tool_id, arg):
     if not _safe_target(arg):
         return {'error': 'Invalid argument: contains disallowed characters'}
     cmd = tool['cmd'].replace('{arg}', arg.strip())
-    result = _cmd(f'distrobox enter {distro} -- bash -c "{cmd}"', timeout=90)
+    # The tool template is a shell pipeline, so bash -c is needed INSIDE the
+    # container -- but distro/cmd go as separate argv, no host shell (arg was
+    # already checked by _safe_target above).
+    result = run_tool(['distrobox', 'enter', distro, '--', 'bash', '-c', cmd], timeout=90)
     return {'tool': tool['name'], 'cmd': cmd, 'output': result}
 
 def _kali_run(tool_id, arg):
@@ -1138,8 +1146,8 @@ def _kali_run(tool_id, arg):
         return {'error': 'Invalid argument: contains disallowed characters'}
     cmd = cmd_template.replace('{arg}', arg.strip())
 
-    full_cmd = f'distrobox enter kali -- bash -c "{cmd}"'
-    result = _cmd(full_cmd, timeout=60)
+    # bash -c runs the tool pipeline inside the container; argv keeps the host shell out.
+    result = run_tool(['distrobox', 'enter', 'kali', '--', 'bash', '-c', cmd], timeout=60)
     return {
         'tool': tool['name'],
         'cmd': cmd,
@@ -1619,7 +1627,9 @@ def _shodan_search(query):
         ips = list(set(ips))[:5]
         banners = {}
         for ip in ips:
-            out = _cmd(f'nc -w2 -z -v {ip} 80 2>&1; nc -w2 -z -v {ip} 443 2>&1; nc -w2 -z -v {ip} 22 2>&1', timeout=10)
+            # nc -v writes the banner to stderr, so keep it merged (no discard).
+            out = '\n'.join(run_tool(['nc', '-w2', '-z', '-v', ip, port], timeout=4)
+                            for port in ('80', '443', '22'))
             banners[ip] = out[:300]
         data['results']['banners'] = banners
     else:
@@ -4177,7 +4187,10 @@ def _host_tool_run(tool_dict, tool_id, arg):
     if not _safe_target(arg):
         return {'error': 'invalid argument: disallowed characters'}
     cmd = tool['cmd'].replace('{arg}', arg.strip())
-    return {'tool': tool['name'], 'cmd': cmd, 'output': _cmd(cmd, timeout=90)}
+    # These host tool templates are shell pipelines (echo | tool, tool | head, && ),
+    # so bash -c is required -- but it is the ONLY shell in the app, localized here
+    # with an arg already checked by _safe_target above.
+    return {'tool': tool['name'], 'cmd': cmd, 'output': run_tool(['bash', '-c', cmd], timeout=90)}
 
 
 @app.route('/api/v2/distro/tools/<distro>')

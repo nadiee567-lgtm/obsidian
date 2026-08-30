@@ -169,7 +169,7 @@ def test_distro_missing_gives_notice(monkeypatch):
 
 def test_host_tool_run(monkeypatch):
     monkeypatch.setattr(ob, '_which', lambda b: True)
-    monkeypatch.setattr(ob, '_cmd', lambda cmd, timeout=90: 'scan output here')
+    monkeypatch.setattr(ob, 'run_tool', lambda argv, timeout=90: 'scan output here')
     r = ob._host_tool_run(ob.KALI_TOOLS, 'nmap', '1.2.3.4')
     assert r['output'] == 'scan output here'
     assert 'nmap' in r['cmd'] and '1.2.3.4' in r['cmd']
