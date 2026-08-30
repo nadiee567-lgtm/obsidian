@@ -123,6 +123,12 @@ These fill the Kali, Parrot, REMnux, and BlackArch sections of the Tools view
 exiftool, steghide, and more). About 190 MB. Anything you skip simply shows a
 "not installed" note in the Tools view, so you can add tools one at a time.
 
+The Tools view is a slide-over on the graph (drag left, or use the `TOOLS →`
+handle on the right edge). Each tool runs standalone against a target you type;
+nothing touches the case unless you send it to the graph.
+
+![Tools view — Kali / Parrot / REMnux / BlackArch](docs/img/tools.jpg)
+
 | Distro | Command |
 |---|---|
 | Debian / Ubuntu / Mint | `sudo apt install nmap nikto sqlmap gobuster dirb whatweb wfuzz hashid john binwalk steghide arp-scan netcat-traditional masscan wafw00f dnsrecon dnsenum sublist3r ffuf hydra medusa hashcat crunch cewl wifite` |
