@@ -262,8 +262,12 @@ and the CLI are two fronts over the same engine.
 
 The design assumes the target's data is hostile.
 
-- Per-type **allowlist** validation, and tools run via `argv` with no shell — so
-  neither command nor argument injection is possible.
+- Per-type **allowlist** validation, and every external command runs through a
+  single `run_tool()` helper that uses `argv` lists — **there is no `shell=True`
+  anywhere** — so command and argument injection are both closed. The only shell
+  is an explicit, localized `bash -c` for the handful of pentest tools that are
+  pipelines by design (`echo | tool`, `tool | head`), and even there the argument
+  is metacharacter-filtered first.
 - **Anti-SSRF:** private, loopback, and link-local addresses are rejected, and every
   redirect is revalidated (including cloud-metadata IPs).
 - Case names are checked against **path traversal**.
@@ -277,7 +281,7 @@ The design assumes the target's data is hostile.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest -q       # 279 tests
+python -m pytest -q       # 297 tests
 ```
 
 They cover the data model, the transforms (with real breach and scanner payloads
