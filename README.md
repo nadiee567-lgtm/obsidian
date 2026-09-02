@@ -160,9 +160,18 @@ then run the `ollama pull` line.
 
 ### Running it
 
+If you used the installer, just run `obsidian-web`. Otherwise the simplest way is
+`run.sh` — it creates the venv, installs dependencies, and starts the server:
+
+```bash
+OBSIDIAN_PASSWORD=your_password ./run.sh
+# then open http://localhost:8767/v2
+```
+
+Or, with the venv from the manual install already activated:
+
 ```bash
 OBSIDIAN_PASSWORD=your_password python obsidian_web.py
-# then open http://localhost:8767/v2
 ```
 
 The server binds to localhost only. If you don't set `OBSIDIAN_PASSWORD`, it prints a

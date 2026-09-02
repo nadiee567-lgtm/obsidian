@@ -37,14 +37,10 @@ echo -e "${BLUE}[*] Detected distro: $PKG${NC}"
 RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
 RAM_GB=$((RAM_MB / 1024))
 echo -e "${BLUE}[*] RAM detected: ${RAM_GB}GB${NC}"
-if [ $RAM_GB -lt 4 ]; then
-    echo -e "${YELLOW}[!] Minimum 4GB RAM recommended${NC}"
-elif [ $RAM_GB -ge 16 ]; then
-    echo -e "${GREEN}[+] RAM sufficient for OBSIDIAN Professional${NC}"
-elif [ $RAM_GB -ge 8 ]; then
-    echo -e "${GREEN}[+] RAM sufficient for OBSIDIAN Analyst${NC}"
+if [ "$RAM_GB" -lt 4 ]; then
+    echo -e "${YELLOW}[!] 4GB+ RAM recommended (8GB+ if you also run the local AI model)${NC}"
 else
-    echo -e "${GREEN}[+] RAM sufficient for OBSIDIAN Investigator${NC}"
+    echo -e "${GREEN}[+] RAM OK${NC}"
 fi
 
 # Create directories
@@ -63,12 +59,19 @@ fi
 PYTHON_VER=$(python3 --version 2>&1)
 echo -e "${GREEN}[+] $PYTHON_VER${NC}"
 
-# Install Python dependencies
-echo -e "${BLUE}[*] Installing Python dependencies...${NC}"
-pip3 install flask flask-cors requests --quiet --break-system-packages 2>/dev/null || \
-pip3 install flask flask-cors requests --quiet 2>/dev/null || \
-pip3 install --user flask flask-cors requests --quiet
-echo -e "${GREEN}[+] Flask, CORS, Requests installed${NC}"
+# Install Python dependencies in a project-local venv.
+# A venv keeps the system Python clean and works on distros that block global
+# pip (PEP 668: Arch/currOS, Debian 12+, Fedora). It installs the FULL
+# requirements.txt (Flask, cryptography, beautifulsoup4, PyYAML, mmh3, ...),
+# not a partial list -- OBSIDIAN needs all of them to start.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo -e "${BLUE}[*] Setting up Python environment (.venv)...${NC}"
+if [ ! -d "$SCRIPT_DIR/.venv" ]; then
+    python3 -m venv "$SCRIPT_DIR/.venv"
+fi
+"$SCRIPT_DIR/.venv/bin/pip" install -q --upgrade pip
+"$SCRIPT_DIR/.venv/bin/pip" install -q -r "$SCRIPT_DIR/requirements.txt"
+echo -e "${GREEN}[+] Python dependencies installed (from requirements.txt)${NC}"
 
 # Install system tools
 echo -e "${BLUE}[*] Installing recon tools...${NC}"
@@ -80,10 +83,18 @@ elif [ "$PKG" = "pacman" ]; then
     sudo pacman -S --noconfirm nmap whois curl wget 2>/dev/null || true
 fi
 
-# Install optional OSINT tools
-echo -e "${BLUE}[*] Installing optional OSINT tools...${NC}"
-pip3 install holehe maigret theHarvester shodan --quiet --break-system-packages 2>/dev/null || \
-pip3 install --user holehe maigret theHarvester shodan --quiet 2>/dev/null || true
+# Optional OSINT CLIs (holehe, maigret, theHarvester) -- isolated with pipx so
+# each gets its own env and lands on PATH (OBSIDIAN calls them as commands).
+# They are optional: without them the app just shows "not installed".
+echo -e "${BLUE}[*] Installing optional OSINT tools (holehe, maigret, theHarvester)...${NC}"
+if command -v pipx &>/dev/null; then
+    pipx install holehe 2>/dev/null || true
+    pipx install maigret 2>/dev/null || true
+    pipx install theHarvester 2>/dev/null || true
+    echo -e "${GREEN}[+] OSINT CLIs installed${NC}"
+else
+    echo -e "${YELLOW}[i] pipx not found — skipping. Install later:  pipx install holehe maigret theHarvester${NC}"
+fi
 
 # ── Pentest tools (optional) — powers the Tools view ────────────────────────────
 echo ""
@@ -131,10 +142,10 @@ if [ ! -f ~/obsidian-static/vis-network.min.js ]; then
     fi
 fi
 
-# Copy main files
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-echo -e "${BLUE}[*] Installing OBSIDIAN to ~/.obsidian/...${NC}"
-cp "$SCRIPT_DIR/obsidian_web.py" ~/.obsidian/obsidian_web.py
+# OBSIDIAN runs from this cloned repo -- obsidian_web.py needs the core/ package
+# and web/ templates next to it, so we do NOT copy it out. ~/.obsidian only holds
+# config, auth and the encrypted key vault (the app creates those itself).
+echo -e "${GREEN}[+] OBSIDIAN will run from: $SCRIPT_DIR${NC}"
 
 # OBSIDIAN is free and open -- no licenses or tiers.
 
@@ -189,10 +200,11 @@ fi
 echo ""
 echo -e "${BLUE}[*] Creating 'obsidian-web' command...${NC}"
 mkdir -p ~/.local/bin
-cat > ~/.local/bin/obsidian-web << 'EOF'
+cat > ~/.local/bin/obsidian-web << EOF
 #!/bin/bash
-cd ~/.obsidian
-python3 obsidian_web.py "$@"
+# Runs OBSIDIAN from its repo using the project venv.
+cd "$SCRIPT_DIR"
+exec "$SCRIPT_DIR/.venv/bin/python" obsidian_web.py "\$@"
 EOF
 chmod +x ~/.local/bin/obsidian-web
 
