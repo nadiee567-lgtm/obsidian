@@ -41,6 +41,7 @@ TYPES = {
     'bucket':     {'label': 'Bucket',       'color': '#d9564b'},
     'credential': {'label': 'Credential',   'color': '#f7768e'},
     'asn':        {'label': 'ASN',          'color': '#7a85b0'},
+    'netblock':   {'label': 'Netblock',     'color': '#8791b8'},
     'country':       {'label': 'Country',      'color': '#7a85b0'},
     'tech':       {'label': 'Technology',   'color': '#5fa8a0'},
     'image':     {'label': 'Image',        'color': '#73daca'},

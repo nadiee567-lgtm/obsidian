@@ -2175,6 +2175,75 @@ def _t_ct_certspotter(entity, ctx):
     except Exception as _e:
         log.debug("certspotter unavailable: %s", _e)
 
+@transform(input='domain', outputs=('subdomain', 'ip'), name='rapiddns',
+           description='Subdomains (+ their IP) from RapidDNS.io passive DNS (keyless)')
+def _t_rapiddns(entity, ctx):
+    try:
+        html_txt = SESSION.get(f'https://rapiddns.io/subdomain/{entity.value}?full=1', timeout=15).text
+    except Exception as _e:
+        log.debug("rapiddns unavailable: %s", _e)
+        return
+    seen = set()
+    for row in html_txt.split('<tr')[1:]:
+        cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
+        if len(cells) < 2:
+            continue
+        sub = re.sub(r'<[^>]+>', '', cells[0]).strip().lower().lstrip('*.')
+        ip = re.sub(r'<[^>]+>', '', cells[1]).strip()
+        if not sub.endswith(entity.value) or sub == entity.value or sub in seen:
+            continue
+        seen.add(sub)
+        sub_ent = ctx.emit('subdomain', sub, label='subdomain (rapiddns)')
+        if sub_ent and re.fullmatch(r'\d+\.\d+\.\d+\.\d+', ip):
+            ip_ent = ctx.store.create('ip', ip, sources={'rapiddns'})
+            ip_ent.note_provenance('rapiddns', input_id=sub_ent.id)
+            ctx.store.relate(sub_ent, ip_ent, 'A')
+        if len(seen) >= 200:
+            break
+
+@transform(input='domain', outputs=('url',), name='wayback_urls',
+           description='Historical URLs/endpoints of the domain (Wayback CDX) — old paths, panels, params')
+def _t_wayback_urls(entity, ctx):
+    try:
+        rows = SESSION.get('http://web.archive.org/cdx/search/cdx',
+                           params={'url': f'{entity.value}/*', 'output': 'json', 'fl': 'original',
+                                   'collapse': 'urlkey', 'limit': 400}, timeout=20).json()
+    except Exception as _e:
+        log.debug("wayback_urls unavailable: %s", _e)
+        return
+    seen = set()
+    for fila in (rows[1:] if isinstance(rows, list) else []):
+        u = (fila[0] if isinstance(fila, list) else fila) or ''
+        if not u or u in seen:
+            continue
+        seen.add(u)
+        ctx.emit('url', u, label='historical URL')
+        if len(seen) >= 300:
+            break
+
+@transform(input='asn', outputs=('netblock',), name='asn_netblocks',
+           description="All IP prefixes announced by an ASN (RIPEstat) — maps an org's whole netblock")
+def _t_asn_netblocks(entity, ctx):
+    m = re.search(r'(?:AS)?(\d{1,10})', entity.value)
+    if not m:
+        return
+    try:
+        data = SESSION.get('https://stat.ripe.net/data/announced-prefixes/data.json',
+                           params={'resource': f'AS{m.group(1)}'}, timeout=15).json()
+    except Exception as _e:
+        log.debug("asn_netblocks unavailable: %s", _e)
+        return
+    prefixes = (((data or {}).get('data') or {}).get('prefixes') or [])
+    seen = set()
+    for p in prefixes:
+        cidr = p.get('prefix') if isinstance(p, dict) else None
+        if not cidr or cidr in seen:
+            continue
+        seen.add(cidr)
+        ctx.emit('netblock', cidr, label='announced')
+        if len(seen) >= 500:
+            break
+
 @transform(input='ip', outputs=('country', 'org', 'asn'), name='geo_ip',
            description='Geolocation and network info of the IP (ip-api.com)')
 def _t_geo_ip(entity, ctx):

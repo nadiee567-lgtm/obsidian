@@ -6,8 +6,8 @@
 
 ![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-blue)
 ![Python 3.14](https://img.shields.io/badge/python-3.14-3776ab)
-![Tests](https://img.shields.io/badge/tests-297%20passing-brightgreen)
-![Transforms](https://img.shields.io/badge/transforms-104-orange)
+![Tests](https://img.shields.io/badge/tests-310%20passing-brightgreen)
+![Transforms](https://img.shields.io/badge/transforms-107-orange)
 
 OBSIDIAN takes two ideas that already work — Maltego's model (entities you expand
 with transforms into a graph) and SpiderFoot's (typed events feeding a correlation
@@ -27,12 +27,14 @@ username, wallet, and 17 more) with a deterministic id. The same IP found by two
 different sources collapses into one node. Nothing is stored twice, and every value
 carries where it came from.
 
-**Transform engine — 104 of them.** DNS, RDAP, Certificate Transparency, subdomain
-enumeration, HTTP probing, screenshots, nuclei, tech and CVE lookups, breach checks,
-infostealer logs, IP reputation, favicon and TLS-cert pivots, Wayback, reverse WHOIS,
-EXIF metadata, crypto tracing, end-of-life detection, passive exposure from Shodan
-InternetDB (ports and CVEs with no key), active subnet scanning, and email/username
-footprinting (holehe, maigret, theHarvester). Writing a new one is a decorator and a function.
+**Transform engine — 107 of them.** DNS, RDAP, Certificate Transparency, subdomain
+enumeration (crt.sh, certspotter, HackerTarget, **RapidDNS passive DNS**), HTTP probing,
+screenshots, nuclei, tech and CVE lookups, breach checks, infostealer logs, IP reputation,
+favicon and TLS-cert pivots, Wayback, **historical URL/endpoint discovery (Wayback CDX)**,
+**ASN → announced-netblock mapping (RIPEstat)**, reverse WHOIS, EXIF metadata, crypto
+tracing, end-of-life detection, passive exposure from Shodan InternetDB (ports and CVEs
+with no key), active subnet scanning, and email/username footprinting (holehe, maigret,
+theHarvester). Writing a new one is a decorator and a function.
 
 **Interactive graph** (`/v2`). Right-click a node to run transforms on it. Per-type
 colors, filters, multi-entity pivoting, an evidence chain that shows how each datum
