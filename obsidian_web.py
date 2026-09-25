@@ -1825,6 +1825,11 @@ self.addEventListener('fetch', e => e.respondWith(
 
 @app.route('/')
 def index():
+    # Default entry point is the interactive graph (v2). The classic UI lives at /classic.
+    return redirect('/v2')
+
+@app.route('/classic')
+def classic():
     ip = _get_local_ip()
     return WEB_HTML.replace('{{LOCAL_IP}}', ip).replace('{{PORT}}', str(PORT))
 
