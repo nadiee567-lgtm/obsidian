@@ -197,6 +197,7 @@ python obsidian_cli.py run domain github.com dns_a  # a single transform
 python obsidian_cli.py recon domain github.com -w case1   # all applicable, in parallel
 python obsidian_cli.py report -w case1 -o report.html
 python obsidian_cli.py export json -w case1 -o case.json
+python obsidian_cli.py export obsidian -w case1 -o vault/case1  # a notes vault: open in the Obsidian app and the graph rebuilds the case
 ```
 
 ---

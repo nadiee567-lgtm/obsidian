@@ -25,7 +25,7 @@ from core.modelo import Store, valid_type
 from core.transforms import REGISTRO, run_by_name, run_batch
 from core.correlacion import correlate, risk_score
 from core.reporte import generate_report
-from core.exportar import export_json, export_csv
+from core.exportar import export_json, export_csv, export_obsidian_vault
 from core.workspaces import Manager
 from core.config import WORKSPACES_DIR, STATIC_DIR, VIS_FILE
 
@@ -126,6 +126,17 @@ def cmd_export(a):
     store = _store(a.workspace)
     if not len(store):
         return _err("empty or nonexistent workspace")
+    if a.formato == 'obsidian':
+        h = correlate(store)
+        files = export_obsidian_vault(store, h, risk_score(h), {'workspace': a.workspace})
+        outdir = a.output or f'{a.workspace}-obsidian'
+        for rel, content in files.items():
+            path = os.path.join(outdir, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(content)
+        print(f"✓ export obsidian → {outdir}/  ({len(files)} notes) — open the folder as an Obsidian vault")
+        return 0
     if a.formato == 'json':
         h = correlate(store)
         data = export_json(store, h, risk_score(h), {'workspace': a.workspace})
@@ -175,10 +186,10 @@ def build_parser():
     s.add_argument('--no-graph', action='store_true')
     s.set_defaults(fn=cmd_report)
 
-    s = sub.add_parser('export', help='export json/csv of a workspace')
-    s.add_argument('formato', choices=['json', 'csv'])
+    s = sub.add_parser('export', help='export a workspace (json / csv / obsidian notes vault)')
+    s.add_argument('formato', choices=['json', 'csv', 'obsidian'])
     s.add_argument('-w', '--workspace', required=True)
-    s.add_argument('-o', '--output')
+    s.add_argument('-o', '--output', help='file (json/csv) or folder (obsidian)')
     s.set_defaults(fn=cmd_export)
 
     s = sub.add_parser('workspaces', help='list the workspaces')
