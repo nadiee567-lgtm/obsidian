@@ -36,7 +36,10 @@ def test_transforms_applicable_per_type():
 
 def test_endpoints_old_intact():
     c = _client()
-    assert c.get('/').status_code == 200
+    # / now redirects to the interactive graph (v2); the classic UI moved to /classic
+    r = c.get('/')
+    assert r.status_code == 302 and r.headers['Location'].endswith('/v2')
+    assert c.get('/classic').status_code == 200
     assert c.get('/api/status').status_code == 200
 
 
