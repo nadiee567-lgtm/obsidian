@@ -172,6 +172,7 @@
     <span style="margin-left:auto"></span>
     <button id="btnTimeline">timeline</button>
     <button id="btnReporte">report</button>
+    <button id="btnNotas" title="Download the case as an Obsidian notes vault (.zip)">⬇ notes</button>
     <button id="btnReacomodar">↻ re-layout</button>
     <button id="btnExport">⬇ PNG</button>
   </div>
@@ -534,6 +535,7 @@ function timeline(){
 }
 $('#btnTimeline').onclick=timeline;
 $('#btnReporte').onclick=()=>window.open('/v2/report','_blank');
+$('#btnNotas').onclick=()=>window.location='/api/v2/export/obsidian';
 const SERVICIOS_KEY=[
   ['shodan','Shodan key'],['censys','id:secret'],['zoomeye','API-KEY'],['fofa','email:key'],
   ['quake','token'],['hunter','api-key'],['netlas','api-key'],['criminalip','api-key'],

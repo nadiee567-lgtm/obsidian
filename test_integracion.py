@@ -43,6 +43,26 @@ def test_endpoints_old_intact():
     assert c.get('/api/status').status_code == 200
 
 
+def test_v2_export_obsidian_zip():
+    import io, zipfile
+    from core.modelo import Store
+    prev = ob._store
+    try:
+        ob._store = Store()
+        d = ob._store.create('domain', 'example.com')
+        ip = ob._store.create('ip', '203.0.113.10')
+        ob._store.relate(d, ip, 'resolves')
+        r = _client().get('/api/v2/export/obsidian')
+        assert r.status_code == 200 and r.mimetype == 'application/zip'
+        z = zipfile.ZipFile(io.BytesIO(r.data))
+        names = z.namelist()
+        assert any(n.endswith('index.md') for n in names)
+        dom = z.read(next(n for n in names if n.endswith('example.com.md'))).decode()
+        assert '[[203.0.113.10]]' in dom
+    finally:
+        ob._store = prev
+
+
 def test_v2_transforms_applicable():
     c = _client()
     r = c.get('/api/v2/transforms/domain')

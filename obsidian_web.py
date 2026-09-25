@@ -1,6 +1,6 @@
 """OBSIDIAN Web — Local OSINT & Security Framework"""
 import subprocess, requests, json, os, re, sys, threading, time, datetime, html, socket, hashlib, secrets, ssl
-import shutil, tempfile, glob, base64, sqlite3, ipaddress
+import shutil, tempfile, glob, base64, sqlite3, ipaddress, io, zipfile
 from urllib.parse import urlparse, urljoin
 from flask import Flask, request, jsonify, Response, stream_with_context, send_from_directory, session, redirect
 from werkzeug.exceptions import HTTPException
@@ -16,7 +16,7 @@ from core.workspaces import Manager
 from core.boveda import Vault
 from core.correlacion import correlate, risk_score, load_yaml_rules, exposure_score
 from core.reporte import generate_report
-from core.exportar import export_json, export_csv
+from core.exportar import export_json, export_csv, export_obsidian_vault
 from core.monitor import Monitor, snapshot as _snap_estado
 from core.notificar import send_ntfy, build_ntfy
 from core.estado import render_estado
@@ -4849,6 +4849,20 @@ def api_v2_export_csv():
     data = export_csv(_store)
     return Response(data, mimetype='text/csv',
                     headers={'Content-Disposition': f'attachment; filename="{_export_name()}.csv"'})
+
+@app.route('/api/v2/export/obsidian')
+def api_v2_export_obsidian():
+    """Case as an Obsidian notes vault (entities as notes, relations as [[wikilinks]]),
+    delivered as a .zip. Unzip into the Obsidian app and the graph rebuilds the case."""
+    h = correlate(_store)
+    files = export_obsidian_vault(_store, h, risk_score(h),
+                                  {'workspace': _ws_activo, 'target': _target_of_store()})
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
+        for rel, content in files.items():
+            z.writestr(rel, content)
+    return Response(buf.getvalue(), mimetype='application/zip',
+                    headers={'Content-Disposition': f'attachment; filename="{_export_name()}-notes.zip"'})
 
 _monitor = None
 _monitor_tareas = []
