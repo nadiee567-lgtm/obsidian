@@ -49,10 +49,18 @@ false positives.
 Criminal IP, and BinaryEdge behind one query that gets translated into each engine's
 dialect. The Chinese engines see infrastructure Shodan doesn't.
 
-**Everything else.** Continuous asset monitoring with ntfy push alerts, an OPSEC layer
-(Tor routing, proxy rotation, UA hygiene, per-case network identity, IP-leak checks),
-a sock-puppet vault, workspaces backed by SQLite with snapshots, a self-contained HTML
-report, JSON/CSV/PDF export, and a scriptable CLI that does all of the above.
+**Extreme OPSEC.** A `🛡 OPSEC` shield panel with a **fail-closed kill-switch**
+(transforms refuse to run unless traffic is provably anonymized — a dropped Tor/proxy
+circuit never leaks your real IP to the target), a one-toggle **paranoid mode** (Tor +
+UA hygiene + jitter + kill-switch + hardened headers at once), live exit-IP / country /
+leak readout, and one-click **Tor identity rotation**. On top of the base layer: proxy
+rotation, per-case network identity, sock-puppet vault, and IP-leak checks.
+
+**Everything else.** Continuous asset monitoring with ntfy push alerts, workspaces
+backed by SQLite with snapshots, a self-contained HTML report, and exports to
+JSON / CSV / PDF **and an Obsidian notes vault** (each entity a note, relations as
+`[[wikilinks]]` — open it in the Obsidian app and the graph rebuilds the case). A
+scriptable CLI does all of the above.
 
 ![Report](docs/img/reporte.jpg)
 
@@ -286,6 +294,10 @@ The design assumes the target's data is hostile.
   is metacharacter-filtered first.
 - **Anti-SSRF:** private, loopback, and link-local addresses are rejected, and every
   redirect is revalidated (including cloud-metadata IPs).
+- **Fail-closed OPSEC kill-switch:** with the kill-switch (or paranoid mode) on, a
+  transform refuses to run unless traffic is provably anonymized (Tor/proxy up and the
+  exit IP differs from the real IP) — so a silently dropped circuit never exposes your
+  real IP to the target.
 - Case names are checked against **path traversal**.
 - The graph and the report **escape** all target data (stored-XSS protection).
 - The CSV export **neutralizes formula injection** (`= + - @`).
