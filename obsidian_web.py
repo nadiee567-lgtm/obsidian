@@ -4830,39 +4830,9 @@ def api_v2_report():
         vis_js=vis_js)
     return Response(html_doc, mimetype='text/html')
 
-def _export_name():
-    base = _case_slug(_ws_activo) if _ws_activo else 'caso'
-    return f'obsidian-{base}-{datetime.datetime.now():%Y%m%d}'
-
-@app.route('/api/v2/export/json')
-def api_v2_export_json():
-    """Full case in JSON, re-importable (F7 step 94)."""
-    h = correlate(_store)
-    data = export_json(_store, h, risk_score(h),
-                         {'workspace': _ws_activo, 'target': _target_of_store()})
-    return Response(data, mimetype='application/json',
-                    headers={'Content-Disposition': f'attachment; filename="{_export_name()}.json"'})
-
-@app.route('/api/v2/export/csv')
-def api_v2_export_csv():
-    """Entities as flat CSV, sanitized against formula injection (F7 step 94)."""
-    data = export_csv(_store)
-    return Response(data, mimetype='text/csv',
-                    headers={'Content-Disposition': f'attachment; filename="{_export_name()}.csv"'})
-
-@app.route('/api/v2/export/obsidian')
-def api_v2_export_obsidian():
-    """Case as an Obsidian notes vault (entities as notes, relations as [[wikilinks]]),
-    delivered as a .zip. Unzip into the Obsidian app and the graph rebuilds the case."""
-    h = correlate(_store)
-    files = export_obsidian_vault(_store, h, risk_score(h),
-                                  {'workspace': _ws_activo, 'target': _target_of_store()})
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
-        for rel, content in files.items():
-            z.writestr(rel, content)
-    return Response(buf.getvalue(), mimetype='application/zip',
-                    headers={'Content-Disposition': f'attachment; filename="{_export_name()}-notes.zip"'})
+# The case-export endpoints (/api/v2/export/{json,csv,obsidian}) now live in
+# blueprints/export.py (registered at the bottom of this file). First step of the
+# obsidian_web.py -> blueprints split.
 
 _monitor = None
 _monitor_tareas = []
@@ -5344,6 +5314,12 @@ for _rl_nombre in ('crtsh', 'ct_certspotter', 'shodan', 'censys', 'zoomeye', 'fo
                    'quake', 'hunter', 'netlas', 'criminalip', 'binaryedge', 'passivedns',
                    'github_sec', 'reverse_whois', 'abuseipdb', 'greynoise'):
     _set_limite(_rl_nombre, _LIMITE_API)
+
+# ── Blueprints (incremental split of this monolith) ──────────────────────────
+# Imported here, after the shared state and helpers above are defined, so the
+# blueprint modules can read them at request time without a circular-import trap.
+from blueprints.export import bp as _export_bp
+app.register_blueprint(_export_bp)
 
 if __name__ == '__main__':
     _load_user_rules()
