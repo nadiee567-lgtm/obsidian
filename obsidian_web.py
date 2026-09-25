@@ -4115,6 +4115,7 @@ def _run_transform_internal(type, value, name):
     seed = Entity(type, (value or '').strip())
     if not seed.well_formed():
         raise ValueError(f'malformed value for {type}')
+    _opsec_guard()   # kill-switch: fail CLOSED if anonymity can't be verified
     if _PROXIES['pool']:
         _rotate_proxy()
     _request_hygiene()
@@ -4165,6 +4166,7 @@ def api_v2_scratch():
     tmp = Store()
     seed = tmp.add(seed)
     try:
+        _opsec_guard()   # kill-switch also guards ad-hoc Tools lookups
         produced = run_by_name(d.get('transform', ''), seed, tmp)
     except (KeyError, ValueError) as e:
         return _error(str(e), 400)
@@ -4668,6 +4670,147 @@ def api_v2_opsec_perfil():
     return jsonify({'perfil': _read_profiles().get(_ws_activo, {}), 'active': _ws_activo,
                     'estado': {'anonimo': _OPSEC['anonimo'], 'higiene': _OPSEC_HIGIENE['on'],
                                'proxies': len(_PROXIES['pool']), 'person': _OPSEC.get('person')}})
+
+# ── Extreme OPSEC: kill-switch, paranoid mode, shield status, Tor identity ────
+_ANON_TTL = 120
+_ANON_CACHE = {'ts': 0.0, 'exit_ip': None, 'real_ip': None, 'leak': None, 'anon': False}
+
+def _anon_engaged():
+    return bool(_OPSEC['anonimo'] or _PROXIES['pool'])
+
+def _verify_anon(force=False):
+    """Cached proof that traffic really exits via Tor/proxy (exit IP != real IP).
+    Re-checks at most every _ANON_TTL seconds so it doesn't hammer the network."""
+    now = time.time()
+    if not force and _ANON_CACHE['exit_ip'] and (now - _ANON_CACHE['ts'] < _ANON_TTL):
+        return _ANON_CACHE
+    anon = _anon_engaged()
+    exit_ip = real_ip = None
+    try: exit_ip = SESSION.get('https://api.ipify.org', timeout=8).text.strip()
+    except Exception: pass
+    try: real_ip = requests.get('https://api.ipify.org', timeout=8).text.strip()
+    except Exception: pass
+    _ANON_CACHE.update({'ts': now, 'exit_ip': exit_ip, 'real_ip': real_ip,
+                        'leak': _evaluate_leak(anon, exit_ip, real_ip), 'anon': anon})
+    return _ANON_CACHE
+
+def _opsec_guard():
+    """Kill-switch (fail-CLOSED): refuse to run a transform unless traffic is provably
+    anonymized. Prevents leaking your real IP to a target because Tor/proxy silently
+    dropped. No-op when the kill-switch is off."""
+    if not _OPSEC.get('killswitch'):
+        return
+    if not _anon_engaged():
+        raise ValueError('OPSEC kill-switch ON but anonymity is OFF — blocked to avoid exposing your real IP')
+    c = _verify_anon()
+    if c['leak']:
+        raise ValueError('OPSEC kill-switch: IP LEAK detected — transform blocked')
+    if c['exit_ip'] is None:
+        raise ValueError('OPSEC kill-switch: could not verify anonymity — blocked (fail closed)')
+
+_HARDEN_HEADERS = {'DNT': '1', 'Sec-GPC': '1', 'Accept-Language': 'en-US,en;q=0.5',
+                   'Upgrade-Insecure-Requests': '1'}
+
+def _harden_headers(on):
+    if on:
+        SESSION.headers.update(_HARDEN_HEADERS)
+        SESSION.headers.pop('Referer', None)
+
+def _tor_newnym():
+    """Ask Tor for a new circuit (fresh exit IP) via the control port. Degrades quietly
+    if the control port (9051) isn't open/authed."""
+    import socket as _sock
+    for auth in (b'AUTHENTICATE ""\r\n', b'AUTHENTICATE\r\n'):
+        try:
+            with _sock.create_connection(('127.0.0.1', 9051), timeout=5) as c:
+                c.sendall(auth)
+                if b'250' not in c.recv(256):
+                    continue
+                c.sendall(b'SIGNAL NEWNYM\r\n')
+                if b'250' in c.recv(256):
+                    _ANON_CACHE['ts'] = 0.0   # force re-verify (exit IP changed)
+                    return True
+        except Exception:
+            continue
+    return False
+
+def _paranoid(on):
+    """One switch: Tor + UA hygiene + jitter + kill-switch + hardened headers."""
+    on = bool(on)
+    _OPSEC['paranoid'] = on
+    _OPSEC['killswitch'] = on
+    _OPSEC_HIGIENE['on'] = on
+    _OPSEC_JITTER['min'], _OPSEC_JITTER['max'] = (1.0, 4.0) if on else (0.0, 0.0)
+    if on and _tor_disponible():
+        _set_anonimo(True)
+    if not on:
+        _set_anonimo(False)
+    _harden_headers(on)
+    return on
+
+def _geo_ip_country(ip):
+    """Best-effort country of the exit IP (over the current, possibly anonymized session)."""
+    if not ip:
+        return None
+    try:
+        r = SESSION.get(f'https://ipapi.co/{ip}/country_name/', timeout=6)
+        t = (r.text or '').strip()
+        return t if r.ok and t and len(t) < 60 else None
+    except Exception:
+        return None
+
+@app.route('/api/v2/opsec/killswitch', methods=['GET', 'POST'])
+def api_v2_opsec_killswitch():
+    """Fail-closed kill-switch: block every transform unless anonymity is verified."""
+    if request.method == 'POST':
+        _OPSEC['killswitch'] = bool((request.json or {}).get('on'))
+    return jsonify({'killswitch': bool(_OPSEC.get('killswitch'))})
+
+@app.route('/api/v2/opsec/paranoid', methods=['GET', 'POST'])
+def api_v2_opsec_paranoid():
+    """PARANOID MODE — one toggle turns on Tor + UA hygiene + jitter + kill-switch +
+    hardened headers. Full lockdown."""
+    if request.method == 'POST':
+        on = bool((request.json or {}).get('on'))
+        _paranoid(on)
+        if on and not _tor_disponible():
+            return jsonify({'paranoid': True, 'tor': False,
+                            'warning': 'Tor unavailable — kill-switch will block transforms until anonymity is up'})
+    return jsonify({'paranoid': bool(_OPSEC.get('paranoid')), 'tor': _tor_disponible()})
+
+@app.route('/api/v2/opsec/identity', methods=['POST'])
+def api_v2_opsec_identity():
+    """Rotate the Tor exit node — new public IP for the next requests."""
+    if not _tor_disponible():
+        return _error('Tor unavailable', 503)
+    ok = _tor_newnym()
+    return jsonify({'rotated': ok,
+                    'nota': 'new Tor circuit requested' if ok
+                    else 'control port 9051 not open/authed (add ControlPort 9051 + CookieAuthentication)'})
+
+@app.route('/api/v2/opsec/status')
+def api_v2_opsec_status():
+    """Consolidated OPSEC shield — everything the panel shows, in one call.
+    Add ?verify=1 to force a fresh exit-IP check."""
+    c = _verify_anon(force=request.args.get('verify') == '1')
+    exposed = sum(1 for h in _FOOTPRINT if not h['anonimo'])
+    engaged = _anon_engaged()
+    return jsonify({
+        'shield': 'engaged' if (engaged and not c['leak']) else 'down',
+        'paranoid': bool(_OPSEC.get('paranoid')),
+        'killswitch': bool(_OPSEC.get('killswitch')),
+        'tor_available': _tor_disponible(),
+        'anonymous': _OPSEC['anonimo'],
+        'proxies': len(_PROXIES['pool']),
+        'hygiene': _OPSEC_HIGIENE['on'],
+        'jitter': dict(_OPSEC_JITTER),
+        'exit_ip': c['exit_ip'],
+        'exit_country': _geo_ip_country(c['exit_ip']) if (engaged and c['exit_ip']) else None,
+        'leak': c['leak'],
+        'user_agent': SESSION.headers.get('User-Agent'),
+        'footprint_total': len(_FOOTPRINT),
+        'footprint_exposed': exposed,
+    })
 
 _personas = PersonaManager(os.path.join(HOME, '.obsidian', 'personas.json'))
 

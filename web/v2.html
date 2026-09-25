@@ -98,6 +98,14 @@
   #keys{display:none;position:fixed;z-index:95;top:50%;left:50%;transform:translate(-50%,-50%);width:min(620px,92vw);max-height:78vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   #keys h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .8rem} #keys h2 span{color:var(--muted);font-size:.7rem}
   #keys .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
+  #opsec{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(520px,92vw);max-height:80vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #opsec h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .8rem} #opsec .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
+  .oprow{display:flex;align-items:center;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.8rem}
+  .optog{border:1px solid var(--line);border-radius:5px;padding:.2rem .7rem;font-family:var(--mono);font-size:.72rem;cursor:pointer;background:var(--panel)}
+  .optog.on{color:var(--green);border-color:var(--green)} .optog.off{color:var(--muted)}
+  .opinfo{font-family:var(--mono);font-size:.72rem;color:var(--text);line-height:1.7;margin:.7rem 0}
+  .opacts{display:flex;gap:.4rem;margin-top:.3rem}
+  #btnOpsec.up{color:var(--green)} #btnOpsec.down{color:var(--red)}
   .krow{display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--line);font-size:.76rem;flex-wrap:wrap}
   .krow .ks{font-family:var(--mono);min-width:6rem;color:var(--cyan)}
   .krow input{flex:1;min-width:9rem;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem .4rem;font-family:var(--mono);font-size:.72rem}
@@ -138,8 +146,9 @@
 <body>
 <div class="wrap">
   <h1><span class="sq"></span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
   <div id="keys"></div>
+  <div id="opsec"></div>
 
   <div class="wsbar">
     <span class="wslabel">workspace</span>
@@ -573,6 +582,44 @@ async function panelKeys(){
   ov.style.display='block'; $('#kCerrar').onclick=()=>ov.style.display='none';
 }
 $('#btnKeys').onclick=(e)=>{ e.preventDefault(); panelKeys(); };
+async function panelOpsec(){
+  const ov=$('#opsec');
+  let d={}; try{ d=await(await fetch('/api/v2/opsec/status')).json(); }catch(_){}
+  const engaged=d.shield==='engaged';
+  const pill=$('#btnOpsec'); if(pill){ pill.className=engaged?'up':'down'; }
+  ov.innerHTML='<span class="cerrar" id="opCerrar">✕</span><h2>🛡 OPSEC shield · <span>'
+    +(engaged?'<b style="color:var(--green)">ENGAGED</b>':'<b style="color:var(--red)">DOWN</b>')+'</span></h2>';
+  [['PARANOID MODE',d.paranoid,'/api/v2/opsec/paranoid'],
+   ['Kill-switch (fail-closed)',d.killswitch,'/api/v2/opsec/killswitch'],
+   ['Tor route',d.anonymous,'/api/v2/opsec/anonymous']].forEach(([label,on,url])=>{
+    const r=el('div','oprow'); const s=el('span'); s.textContent=label; r.appendChild(s);
+    const b=el('button','optog '+(on?'on':'off')); b.textContent=on?'ON':'OFF';
+    b.onclick=async()=>{ b.textContent='…';
+      try{ const j=await(await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({on:!on})})).json();
+        if(j.warning) setStatus(j.warning,'run'); }catch(e){ setStatus('error: '+e.message,'err'); }
+      panelOpsec(); };
+    r.appendChild(b); ov.appendChild(r);
+  });
+  const yn=v=> v===true?'<b style="color:var(--red)">yes</b>':(v===false?'<b style="color:var(--green)">no</b>':'—');
+  const info=el('div','opinfo');
+  info.innerHTML='Tor available: '+(d.tor_available?'<b style="color:var(--green)">yes</b>':'<b style="color:var(--red)">no</b>')
+    +'<br>Exit IP: <b>'+esc(d.exit_ip||'—')+'</b>'+(d.exit_country?' ('+esc(d.exit_country)+')':'')
+    +'<br>IP leak: '+yn(d.leak)
+    +'<br>Proxies: '+(d.proxies||0)+' · UA hygiene: '+(d.hygiene?'on':'off')
+    +' · Jitter: '+(d.jitter&&d.jitter.max>0?d.jitter.min+'–'+d.jitter.max+'s':'off')
+    +'<br>Footprint exposed: '+(d.footprint_exposed||0)+'/'+(d.footprint_total||0);
+  ov.appendChild(info);
+  const acts=el('div','opacts');
+  const rot=el('button','modbtn'); rot.textContent='↻ new Tor identity';
+  rot.onclick=async()=>{ rot.textContent='rotating…';
+    try{ const r=await(await fetch('/api/v2/opsec/identity',{method:'POST'})).json(); setStatus(r.nota||(r.rotated?'new Tor identity':'no'),r.rotated?'':'run'); }
+    catch(e){ setStatus('error: '+e.message,'err'); } panelOpsec(); };
+  const rec=el('button','modbtn'); rec.textContent='⟳ re-check';
+  rec.onclick=async()=>{ try{ await fetch('/api/v2/opsec/status?verify=1'); }catch(_){} panelOpsec(); };
+  acts.appendChild(rot); acts.appendChild(rec); ov.appendChild(acts);
+  ov.style.display='block'; $('#opCerrar').onclick=()=>ov.style.display='none';
+}
+$('#btnOpsec').onclick=(e)=>{ e.preventDefault(); panelOpsec(); };
 async function iaCaso(modo){
   const out=$('#iaResumen'); out.innerHTML='<div class="iaresumen">AI ('+esc(modo)+') analyzing the case…</div>';
   try{ const r=await fetch('/api/v2/ia/'+modo,{method:'POST'}); const d=await r.json();
