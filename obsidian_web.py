@@ -2244,6 +2244,62 @@ def _t_asn_netblocks(entity, ctx):
         if len(seen) >= 500:
             break
 
+@transform(input='ip', outputs=('domain',), name='reverse_ip',
+           description='Other domains sharing this IP — co-hosted neighbors (reverse IP lookup, keyless)')
+def _t_reverse_ip(entity, ctx):
+    try:
+        text = SESSION.get(f'https://api.hackertarget.com/reverseiplookup/?q={entity.value}', timeout=12).text
+    except Exception as _e:
+        log.debug("reverse_ip unavailable: %s", _e)
+        return
+    if 'API count exceeded' in text or 'error' in text.lower():
+        return
+    seen = set()
+    for line in text.splitlines():
+        host = line.strip().lower().rstrip('.')
+        if not host or host in seen or not re.fullmatch(r'[a-z0-9.-]+\.[a-z]{2,}', host):
+            continue
+        seen.add(host)
+        ctx.emit('domain', host, label='co-hosted (same IP)')
+        if len(seen) >= 200:
+            break
+
+@transform(input='domain', outputs=('ip',), name='otx_passivedns',
+           description='Passive DNS: IPs this domain resolved to over time (AlienVault OTX, keyless)')
+def _t_otx_passivedns(entity, ctx):
+    try:
+        data = SESSION.get(
+            f'https://otx.alienvault.com/api/v1/indicators/domain/{entity.value}/passive_dns',
+            timeout=15).json()
+    except Exception as _e:
+        log.debug("otx_passivedns unavailable: %s", _e)
+        return
+    seen = set()
+    for rec in ((data.get('passive_dns') or []) if isinstance(data, dict) else []):
+        ip = str(rec.get('address') or '').strip()
+        if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', ip) and ip not in seen:
+            seen.add(ip)
+            ctx.emit('ip', ip, label='passive DNS (historical A)')
+            if len(seen) >= 200:
+                break
+
+@transform(input='domain', outputs=('subdomain',), name='anubis_subdomains',
+           description='Subdomains from the Anubis DB (jldc.me, keyless)')
+def _t_anubis_subdomains(entity, ctx):
+    try:
+        data = SESSION.get(f'https://jldc.me/anubis/subdomains/{entity.value}', timeout=12).json()
+    except Exception as _e:
+        log.debug("anubis unavailable: %s", _e)
+        return
+    seen = set()
+    for s in (data if isinstance(data, list) else []):
+        s = str(s).strip().lower().lstrip('*.')
+        if s.endswith(entity.value) and s != entity.value and s not in seen:
+            seen.add(s)
+            ctx.emit('subdomain', s, label='subdomain (anubis)')
+            if len(seen) >= 300:
+                break
+
 @transform(input='ip', outputs=('country', 'org', 'asn'), name='geo_ip',
            description='Geolocation and network info of the IP (ip-api.com)')
 def _t_geo_ip(entity, ctx):

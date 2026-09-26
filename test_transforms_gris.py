@@ -56,3 +56,40 @@ def test_asn_netblocks_ignores_non_asn():
     store = Store()
     e = store.create('asn', 'no-number-here')
     assert run_by_name('asn_netblocks', e, store) == []
+
+
+def test_reverse_ip(monkeypatch):
+    monkeypatch.setattr(ob.SESSION, 'get',
+                        lambda *a, **k: _Resp(text='a.com\nb.com\nnot a host\n'))
+    store = Store()
+    e = store.create('ip', '1.2.3.4')
+    prod = run_by_name('reverse_ip', e, store)
+    assert {p.value for p in prod} == {'a.com', 'b.com'}     # 'not a host' rejected
+    assert all(p.type == 'domain' for p in prod)
+
+
+def test_reverse_ip_api_limit(monkeypatch):
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _Resp(text='API count exceeded'))
+    store = Store()
+    e = store.create('ip', '1.2.3.4')
+    assert run_by_name('reverse_ip', e, store) == []
+
+
+def test_otx_passivedns(monkeypatch):
+    data = {'passive_dns': [{'address': '1.2.3.4'}, {'address': '5.6.7.8'}, {'address': 'bad'}]}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _Resp(data=data))
+    store = Store()
+    e = store.create('domain', 'ejemplo.com')
+    prod = run_by_name('otx_passivedns', e, store)
+    assert {p.value for p in prod} == {'1.2.3.4', '5.6.7.8'}
+    assert all(p.type == 'ip' for p in prod)
+
+
+def test_anubis_subdomains(monkeypatch):
+    data = ['a.ejemplo.com', 'b.ejemplo.com', 'ejemplo.com', 'otro.com']
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _Resp(data=data))
+    store = Store()
+    e = store.create('domain', 'ejemplo.com')
+    prod = run_by_name('anubis_subdomains', e, store)
+    assert {p.value for p in prod} == {'a.ejemplo.com', 'b.ejemplo.com'}  # apex + otro.com excluded
+    assert all(p.type == 'subdomain' for p in prod)
