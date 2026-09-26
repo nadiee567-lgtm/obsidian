@@ -155,6 +155,16 @@
   #exports{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(600px,93vw);max-height:84vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   #exports h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .6rem}
   #exports .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
+  #news{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(680px,94vw);max-height:84vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #news h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .6rem} #news h2 span{color:var(--muted);font-size:.7rem}
+  #news .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
+  #newsCountries{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.7rem}
+  .nctry{border:1px solid var(--line);border-radius:5px;padding:.15rem .5rem;cursor:pointer;color:var(--muted);font-family:var(--mono);font-size:.68rem;user-select:none}
+  .nctry.on{color:var(--green);border-color:var(--green)}
+  .nart{border-bottom:1px solid var(--line);padding:.45rem 0}
+  .nart a{color:var(--text);text-decoration:none;font-size:.82rem} .nart a:hover{color:var(--cyan);text-decoration:underline}
+  .nart .meta{color:var(--muted);font-family:var(--mono);font-size:.64rem;margin-top:.15rem}
+  .nsec{font-family:var(--mono);font-size:.7rem;color:var(--amber);margin:.6rem 0 .2rem}
   #mapHandle{position:fixed;top:50%;left:0;transform:translateY(-50%);z-index:60;background:var(--panel2);border:1px solid var(--line);border-left:none;color:var(--muted);font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;padding:1rem .35rem;cursor:pointer;writing-mode:vertical-rl}
   #mapHandle:hover{color:var(--green);border-color:var(--green)}
   #mapwrap{position:fixed;inset:0;z-index:98;background:#05070a;overflow:hidden;transform:translateX(-100%);transition:transform .28s ease}
@@ -208,7 +218,7 @@
 <body>
 <div class="wrap">
   <h1><span class="sq"></span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnMap">🌍 map</a> · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnDiff">⇄ diff</a> · <a href="#" id="btnTriage">▦ triage</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnMap">🌍 map</a> · <a href="#" id="btnNews">📰 news</a> · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnDiff">⇄ diff</a> · <a href="#" id="btnTriage">▦ triage</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
   <div id="keys"></div>
   <div id="opsec"></div>
   <div id="terminal"></div>
@@ -217,6 +227,7 @@
   <div id="diff"></div>
   <div id="triage"></div>
   <div id="exports"></div>
+  <div id="news"></div>
   <div id="mapwrap">
     <div id="mapcanvas"></div>
     <div id="mapbar">
@@ -227,6 +238,7 @@
       <span class="maplayer" data-layer="flights">✈️ flights</span>
       <span class="maplayer" data-layer="fires">🔥 fires</span>
       <span class="maplayer" data-layer="disasters">🌊 disasters</span>
+      <span class="maplayer" data-layer="news">📰 news</span>
       <span class="cerrar" id="mapCerrar">✕ close</span>
     </div>
     <div id="mapinfo"></div>
@@ -662,12 +674,46 @@ function renderWebhook(wh){
   box.appendChild(b);
 }
 $('#btnExports').onclick=(e)=>{ e.preventDefault(); panelExports(); };
+let _newsCtry=null;
+async function panelNews(){
+  const ov=$('#news');
+  if(!_newsCtry){ try{ _newsCtry=(await(await fetch('/api/v2/news/countries')).json()).countries||[]; }catch(_){ _newsCtry=[]; } }
+  ov.innerHTML='<span class="cerrar" id="nwCerrar">✕</span><h2>📰 news · <span>pick countries — live headlines (GDELT, keyless)</span></h2>'
+    +'<div id="newsCountries"></div><div style="margin:.3rem 0 .6rem"><button class="modbtn" id="nwGo">load headlines</button> '
+    +'<span class="pbd">also toggle the 📰 layer on the map to plot them</span></div><div id="newsFeed"></div>';
+  const cc=$('#newsCountries');
+  _newsCtry.forEach(c=>{ const b=el('span','nctry'+(NEWS_SEL.includes(c.code)?' on':'')); b.textContent=c.name;
+    b.onclick=()=>{ if(NEWS_SEL.includes(c.code)) NEWS_SEL=NEWS_SEL.filter(x=>x!==c.code); else NEWS_SEL.push(c.code);
+      b.classList.toggle('on'); }; cc.appendChild(b); });
+  $('#nwGo').onclick=loadNewsFeed;
+  ov.style.display='block'; $('#nwCerrar').onclick=()=>ov.style.display='none';
+  loadNewsFeed();
+}
+async function loadNewsFeed(){
+  const feed=$('#newsFeed'); if(!NEWS_SEL.length){ feed.innerHTML='<div class="pbd">pick at least one country</div>'; return; }
+  feed.innerHTML='<div class="pbd">loading headlines…</div>';
+  let d={news:{}}; try{ d=await(await fetch('/api/v2/news?countries='+NEWS_SEL.join(','))).json(); }catch(e){ feed.textContent='error: '+e.message; return; }
+  const nameByCode={}; (_newsCtry||[]).forEach(c=>nameByCode[c.code]=c.name);
+  feed.innerHTML='';
+  let any=false;
+  NEWS_SEL.forEach(code=>{
+    const arts=(d.news||{})[code]||[]; if(!arts.length) return; any=true;
+    const h=el('div','nsec'); h.textContent=(nameByCode[code]||code)+' · '+arts.length; feed.appendChild(h);
+    arts.forEach(a=>{ const row=el('div','nart');
+      const link=el('a'); link.href=a.url; link.target='_blank'; link.rel='noopener noreferrer'; link.textContent=a.title||a.url;
+      const m=el('div','meta'); m.textContent=[a.domain,a.language,(a.seendate||'').replace('T',' ').replace('Z','')].filter(Boolean).join(' · ');
+      row.appendChild(link); row.appendChild(m); feed.appendChild(row); });
+  });
+  if(!any) feed.innerHTML='<div class="pbd">no headlines right now (GDELT rate-limits; try again in a moment)</div>';
+}
+$('#btnNews').onclick=(e)=>{ e.preventDefault(); panelNews(); };
 /* ---- 🌍 live map (MapLibre GL globe) ---- */
-let MAP=null, MAP_ON={case:true,arcs:true,quakes:false,flights:false,fires:false,disasters:false}, MAP_TIMER=null;
+let MAP=null, MAP_ON={case:true,arcs:true,quakes:false,flights:false,fires:false,disasters:false,news:false}, MAP_TIMER=null;
+let NEWS_SEL=['MX','US'];  // selected country codes for the news layer/panel
 const LAYER_STYLE={
   case:{color:'#f7768e',radius:6}, quakes:{color:'#e0af68',radius:4},
   flights:{color:'#6f9298',radius:2.2}, fires:{color:'#ff7a45',radius:3.5},
-  disasters:{color:'#a86a70',radius:4}
+  disasters:{color:'#a86a70',radius:4}, news:{color:'#7aa2f7',radius:4}
 };
 function greatCircle(a,b,n=48){
   const rad=x=>x*Math.PI/180, deg=x=>x*180/Math.PI;
@@ -717,10 +763,11 @@ async function mapLoadCase(){
 async function mapLoadLayer(name){
   ensurePointLayer(name);
   if(!MAP_ON[name]){ MAP.getSource(name).setData(fc([])); return; }
-  let d={points:[]}; try{ d=await(await fetch('/api/v2/map/layer/'+name)).json(); }catch(_){}
+  const url = name==='news' ? '/api/v2/map/layer/news?countries='+NEWS_SEL.join(',') : '/api/v2/map/layer/'+name;
+  let d={points:[]}; try{ d=await(await fetch(url)).json(); }catch(_){}
   MAP.getSource(name).setData(fc(ptFeatures(d.points,LAYER_STYLE[name])));
 }
-function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }
+function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters','news'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }
 const MAP_STYLE={
   version:8, glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
   sources:{demo:{type:'vector',url:'https://demotiles.maplibre.org/tiles/tiles.json'}},

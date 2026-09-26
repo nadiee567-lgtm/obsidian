@@ -5405,6 +5405,89 @@ def api_v2_map_layer(name):
         return _error('unknown layer', 404)
     return jsonify(_layer_cached(name, fetch))
 
+# ── News by country (GDELT) ──────────────────────────────────────────────────
+# GDELT country codes (FIPS 10-4) for the picker. name -> code + centroid lat/lon
+_NEWS_COUNTRIES = {
+    'Mexico': ('MX', 23.6, -102.5), 'United States': ('US', 39.8, -98.6),
+    'Canada': ('CA', 56.1, -106.3), 'United Kingdom': ('UK', 55.4, -3.4),
+    'Spain': ('SP', 40.5, -3.7), 'France': ('FR', 46.2, 2.2), 'Germany': ('GM', 51.2, 10.4),
+    'Russia': ('RS', 61.5, 105.3), 'China': ('CH', 35.9, 104.2), 'Japan': ('JA', 36.2, 138.3),
+    'Brazil': ('BR', -14.2, -51.9), 'Argentina': ('AR', -38.4, -63.6),
+    'Ukraine': ('UP', 48.4, 31.2), 'Israel': ('IS', 31.0, 34.9), 'India': ('IN', 20.6, 78.9),
+    'Colombia': ('CO', 4.6, -74.3), 'Venezuela': ('VE', 6.4, -66.6),
+    'Australia': ('AS', -25.3, 133.8), 'Italy': ('IT', 41.9, 12.6), 'South Korea': ('KS', 35.9, 127.8),
+}
+_NEWS_CACHE = {}
+_NEWS_TTL = 600  # 10 min; GDELT asks for gentle polling
+_GDELT_LOCK = threading.Lock()
+_GDELT_LAST = [0.0]      # last GDELT hit (global) — GDELT asks for 1 request / 5s
+
+def _fetch_news(code):
+    now = time.time()
+    hit = _NEWS_CACHE.get(code)
+    # only trust a cached NON-empty result for the full TTL; empties expire fast so a
+    # rate-limited/failed fetch doesn't hide news for 10 minutes.
+    if hit and hit[1] and now - hit[0] < _NEWS_TTL:
+        return hit[1]
+    if hit and not hit[1] and now - hit[0] < 8:
+        return hit[1]
+    arts = []
+    # serialize GDELT calls and keep >=5.2s between them (their published limit)
+    with _GDELT_LOCK:
+        wait = 5.2 - (time.time() - _GDELT_LAST[0])
+        if wait > 0:
+            time.sleep(min(wait, 5.2))
+        _GDELT_LAST[0] = time.time()
+    try:
+        r = SESSION.get('https://api.gdeltproject.org/api/v2/doc/doc',
+                        params={'query': f'sourcecountry:{code}', 'mode': 'artlist',
+                                'maxrecords': 15, 'format': 'json', 'sort': 'datedesc'},
+                        timeout=15)
+        ct = r.headers.get('Content-Type', '')
+        if 'json' in ct or r.text.strip().startswith('{'):
+            for a in (r.json().get('articles') or []):
+                arts.append({'title': a.get('title', ''), 'url': a.get('url', ''),
+                             'domain': a.get('domain', ''), 'seendate': a.get('seendate', ''),
+                             'language': a.get('language', ''), 'country': a.get('sourcecountry', '')})
+    except Exception as _e:
+        log.debug("gdelt news %s: %s", code, _e)
+    _NEWS_CACHE[code] = (now, arts)
+    return arts
+
+@app.route('/api/v2/news/countries')
+def api_v2_news_countries():
+    """Countries available for the news picker (name + code)."""
+    return jsonify({'countries': [{'name': n, 'code': c[0]} for n, c in _NEWS_COUNTRIES.items()]})
+
+@app.route('/api/v2/news')
+def api_v2_news():
+    """Latest headlines for the requested countries (GDELT, keyless). ?countries=MX,US"""
+    codes = [c.strip().upper() for c in (request.args.get('countries', '') or '').split(',') if c.strip()]
+    valid = {c[0] for c in _NEWS_COUNTRIES.values()}
+    out = {}
+    for code in codes:
+        if code in valid:
+            out[code] = _fetch_news(code)
+    return jsonify({'news': out})
+
+@app.route('/api/v2/map/layer/news')
+def api_v2_map_layer_news():
+    """News as map points (plotted at each country's centroid). ?countries=MX,US"""
+    codes = [c.strip().upper() for c in (request.args.get('countries', '') or '').split(',') if c.strip()]
+    by_code = {c[0]: (c[1], c[2]) for c in _NEWS_COUNTRIES.values()}
+    valid = set(by_code)
+    pts = []
+    for code in codes:
+        if code not in valid:
+            continue
+        lat, lon = by_code[code]
+        arts = _fetch_news(code)
+        for i, a in enumerate(arts[:15]):
+            # fan the dots slightly around the centroid so they don't fully overlap
+            pts.append({'lat': lat + (i % 5) * 0.6 - 1.2, 'lon': lon + (i // 5) * 0.6 - 0.6,
+                        'label': a['title'][:90], 'url': a['url'], 'domain': a['domain']})
+    return jsonify({'points': pts})
+
 # ── Diff (compare two workspaces) ─────────────────────────────────────────────
 @app.route('/api/v2/diff')
 def api_v2_diff():

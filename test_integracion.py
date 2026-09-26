@@ -142,6 +142,43 @@ def test_v2_webhook_flow(monkeypatch):
             pass
 
 
+def test_v2_news_countries():
+    d = _client().get('/api/v2/news/countries').get_json()
+    codes = {c['code'] for c in d['countries']}
+    assert {'MX', 'US'} <= codes
+
+
+def test_v2_news(monkeypatch):
+    class _R:
+        headers = {'Content-Type': 'application/json'}
+        text = '{"articles":[]}'
+        def json(self):
+            return {'articles': [{'title': 'Titular MX', 'url': 'https://x.mx/a',
+                                  'domain': 'x.mx', 'seendate': '20260926T000000Z',
+                                  'language': 'Spanish', 'sourcecountry': 'Mexico'}]}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R())
+    ob._NEWS_CACHE.clear()
+    d = _client().get('/api/v2/news?countries=MX,ZZ').get_json()   # ZZ invalid, ignored
+    assert 'MX' in d['news'] and 'ZZ' not in d['news']
+    assert d['news']['MX'][0]['title'] == 'Titular MX'
+    ob._NEWS_CACHE.clear()
+
+
+def test_v2_map_layer_news(monkeypatch):
+    class _R:
+        headers = {'Content-Type': 'application/json'}
+        text = '{"articles":[]}'
+        def json(self):
+            return {'articles': [{'title': 'N', 'url': 'https://x/a', 'domain': 'x',
+                                  'seendate': '', 'language': '', 'sourcecountry': 'Mexico'}]}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R())
+    ob._NEWS_CACHE.clear()
+    d = _client().get('/api/v2/map/layer/news?countries=MX').get_json()
+    assert len(d['points']) == 1 and d['points'][0]['url'] == 'https://x/a'
+    assert -90 <= d['points'][0]['lat'] <= 90
+    ob._NEWS_CACHE.clear()
+
+
 def test_v2_map_layer_quakes(monkeypatch):
     class _R:
         def json(self):

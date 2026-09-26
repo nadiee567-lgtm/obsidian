@@ -6,7 +6,7 @@
 
 ![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-blue)
 ![Python 3.14](https://img.shields.io/badge/python-3.14-3776ab)
-![Tests](https://img.shields.io/badge/tests-342%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-345%20passing-brightgreen)
 ![Transforms](https://img.shields.io/badge/transforms-114-orange)
 
 OBSIDIAN takes two ideas that already work — Maltego's model (entities you expand
@@ -66,7 +66,9 @@ rotation, per-case network identity, sock-puppet vault, and IP-leak checks.
 the case's geolocated entities — IPs (real lat/lon from geo_ip), image/URL EXIF GPS — as
 points, with great-circle **arcs** between related located entities, and toggleable live
 global layers pulled server-side from keyless feeds: **earthquakes** (USGS), **flights**
-(OpenSky), **wildfires** (NASA EONET), and **disasters** (GDACS). Clicking a case point
+(OpenSky), **wildfires** (NASA EONET), **disasters** (GDACS), and **news** — live headlines
+for the countries you pick (GDELT), shown both as a readable feed (`📰 news`) and as points
+on the globe. Clicking a case point
 jumps to that node in the graph. (IP geolocation is city/datacenter-accurate, labeled as
 such — no fake precision.)
 
