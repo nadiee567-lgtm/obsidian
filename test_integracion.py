@@ -80,6 +80,39 @@ def test_v2_terminal_enabled_on_localhost():
     assert _client().get('/api/v2/terminal').get_json().get('enabled') is True
 
 
+def test_v2_playbooks_list():
+    names = {p['name'] for p in _client().get('/api/v2/playbooks').get_json()['playbooks']}
+    assert {'external_recon', 'ip_recon', 'attack_surface'} <= names
+
+
+def test_v2_playbook_unknown():
+    assert _client().post('/api/v2/playbook', json={'playbook': 'nope', 'value': 'x'}).status_code == 404
+
+
+def test_v2_playbook_malformed_value():
+    r = _client().post('/api/v2/playbook', json={'playbook': 'external_recon', 'value': 'not a domain'})
+    assert r.status_code == 400
+
+
+def test_v2_playbook_runs(monkeypatch):
+    from core.transforms import REGISTRO
+    from core.modelo import Store
+    monkeypatch.setattr(REGISTRO, 'by_name', lambda n: None)   # skip every step -> no network
+    ob._store = Store()
+    d = _client().post('/api/v2/playbook', json={'playbook': 'ip_recon', 'value': '1.2.3.4'}).get_json()
+    assert d['playbook'] == 'ip_recon' and isinstance(d['produced'], int)
+    assert d['total_entities'] >= 1   # the seed was added
+
+
+def test_v2_import_bulk():
+    from core.modelo import Store
+    ob._store = Store()
+    d = _client().post('/api/v2/import',
+                       json={'text': '1.2.3.4\nexample.com\nfoo@bar.com'}).get_json()
+    assert d['added'] == 3
+    assert {'ip', 'domain', 'email'} <= {e.type for e in ob._store.entities}
+
+
 def test_v2_transforms_applicable():
     c = _client()
     r = c.get('/api/v2/transforms/domain')

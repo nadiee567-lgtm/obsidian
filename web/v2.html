@@ -113,6 +113,15 @@
   .termin{display:flex;align-items:center;gap:.45rem;margin-top:.5rem;font-family:var(--mono);font-size:.76rem}
   #termcwd{color:var(--green);white-space:nowrap;max-width:38%;overflow:hidden;text-overflow:ellipsis}
   #termcmd{flex:1;background:#05070a;border:1px solid var(--line);color:#e6edf3;border-radius:6px;padding:.35rem .5rem;font-family:var(--mono);font-size:.76rem}
+  #playbooks{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(600px,93vw);max-height:82vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #playbooks h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .8rem} #playbooks h2 span{color:var(--muted);font-size:.7rem}
+  #playbooks .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
+  #pbTarget{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:.4rem .5rem;font-family:var(--mono);font-size:.78rem;margin-bottom:.6rem}
+  .pbrow{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--line);font-size:.8rem}
+  .pbin{font-family:var(--mono);font-size:.6rem;color:var(--amber);border:1px solid var(--amber);border-radius:4px;padding:0 .3rem}
+  .pbd{color:var(--muted);font-size:.68rem}
+  .pbimport{margin-top:.8rem;border-top:1px solid var(--line);padding-top:.6rem}
+  #pbImportText{width:100%;height:5rem;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:.4rem .5rem;font-family:var(--mono);font-size:.74rem;margin-bottom:.4rem;resize:vertical}
   .krow{display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--line);font-size:.76rem;flex-wrap:wrap}
   .krow .ks{font-family:var(--mono);min-width:6rem;color:var(--cyan)}
   .krow input{flex:1;min-width:9rem;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem .4rem;font-family:var(--mono);font-size:.72rem}
@@ -153,10 +162,11 @@
 <body>
 <div class="wrap">
   <h1><span class="sq"></span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
   <div id="keys"></div>
   <div id="opsec"></div>
   <div id="terminal"></div>
+  <div id="playbooks"></div>
 
   <div class="wsbar">
     <span class="wslabel">workspace</span>
@@ -665,6 +675,46 @@ async function panelTerminal(){
   setTimeout(()=>{ const i=$('#termcmd'); if(i) i.focus(); }, 60);
 }
 $('#btnTerminal').onclick=(e)=>{ e.preventDefault(); panelTerminal(); };
+async function panelPlaybooks(){
+  const ov=$('#playbooks');
+  let pbs=[]; try{ pbs=(await(await fetch('/api/v2/playbooks')).json()).playbooks||[]; }catch(_){}
+  ov.innerHTML='<span class="cerrar" id="pbCerrar">✕</span><h2>▶ playbooks · <span>1-click recon chains</span></h2>';
+  const tgt=el('input'); tgt.id='pbTarget'; tgt.autocomplete='off'; tgt.spellcheck=false;
+  tgt.placeholder='target — domain / ip / user / email'; ov.appendChild(tgt);
+  pbs.forEach(p=>{
+    const row=el('div','pbrow');
+    const info=el('div');
+    info.innerHTML='<b>'+esc(p.name)+'</b> <span class="pbin">'+esc(p.input)+'</span><br>'
+      +'<span class="pbd">'+esc(p.description)+' · '+p.steps+' steps</span>';
+    row.appendChild(info);
+    const b=el('button','modbtn'); b.textContent='run';
+    b.onclick=async()=>{ const v=tgt.value.trim(); if(!v){ tgt.focus(); return; }
+      b.textContent='running…'; setStatus('playbook '+p.name+' on '+v+'… (may take a bit)','run');
+      try{ const d=await(await fetch('/api/v2/playbook',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({playbook:p.name,value:v})})).json();
+        if(d.error){ setStatus(d.error,'err'); }
+        else { setStatus('✓ '+p.name+': +'+d.produced+' entities ('+d.total_entities+' total)');
+               pintarGrafo(); pintarHallazgos(); } }
+      catch(e){ setStatus('error: '+e.message,'err'); }
+      b.textContent='run'; };
+    row.appendChild(b); ov.appendChild(row);
+  });
+  const imp=el('div','pbimport');
+  imp.innerHTML='<div class="modtit">BULK IMPORT — paste targets (one per line; type auto-detected)</div>';
+  const ta=el('textarea'); ta.id='pbImportText'; ta.placeholder='example.com\n1.2.3.4\nuser@mail.com';
+  imp.appendChild(ta);
+  const ib=el('button','modbtn'); ib.textContent='import to graph';
+  ib.onclick=async()=>{ const t=ta.value.trim(); if(!t) return; ib.textContent='importing…';
+    try{ const d=await(await fetch('/api/v2/import',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({text:t})})).json();
+      setStatus('✓ imported '+d.added+' ('+d.total_entities+' total)'); pintarGrafo(); }
+    catch(e){ setStatus('error: '+e.message,'err'); }
+    ib.textContent='import to graph'; };
+  imp.appendChild(ib); ov.appendChild(imp);
+  ov.style.display='block'; $('#pbCerrar').onclick=()=>ov.style.display='none';
+  setTimeout(()=>tgt.focus(),50);
+}
+$('#btnPlaybooks').onclick=(e)=>{ e.preventDefault(); panelPlaybooks(); };
 async function iaCaso(modo){
   const out=$('#iaResumen'); out.innerHTML='<div class="iaresumen">AI ('+esc(modo)+') analyzing the case…</div>';
   try{ const r=await fetch('/api/v2/ia/'+modo,{method:'POST'}); const d=await r.json();

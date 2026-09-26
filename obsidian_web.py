@@ -4932,6 +4932,110 @@ def api_v2_opsec_perfil():
                     'estado': {'anonimo': _OPSEC['anonimo'], 'higiene': _OPSEC_HIGIENE['on'],
                                'proxies': len(_PROXIES['pool']), 'person': _OPSEC.get('person')}})
 
+# ── Playbooks (1-click recon chains) + bulk import ───────────────────────────
+_PLAYBOOKS = [
+    {'name': 'external_recon', 'input': 'domain',
+     'description': 'Full external footprint: subdomains, DNS, IPs, tech, CVEs + exploit intel',
+     'steps': ['crtsh', 'ct_certspotter', 'subdomains_ht', 'rapiddns', 'anubis_subdomains',
+               'otx_passivedns', 'dns_a', 'dns_mx', 'dns_ns', 'rdap', 'http_probe', 'tech',
+               'cve_lookup', 'cve_intel', 'geo_ip', 'reverse_ip', 'ports', 'ssl', 'takeover',
+               'wayback_urls']},
+    {'name': 'attack_surface', 'input': 'domain',
+     'description': 'Offensive surface: subdomains, exposed files & secrets, ports, vulns',
+     'steps': ['subdomains_ht', 'rapiddns', 'anubis_subdomains', 'http_probe', 'wayback_urls',
+               'exposed_files', 'secret_scan', 'ports', 'deep_scan', 'nuclei', 'tech',
+               'cve_lookup', 'cve_intel', 'takeover']},
+    {'name': 'ip_recon', 'input': 'ip',
+     'description': 'Everything about an IP: geo/ASN, neighbors, ports, reputation, passive exposure',
+     'steps': ['geo_ip', 'reverse_ip', 'internetdb', 'ports', 'ip_reputation', 'greynoise',
+               'ip_blocklist', 'asn_netblocks']},
+    {'name': 'person', 'input': 'user',
+     'description': 'Username footprint across platforms',
+     'steps': ['sherlock', 'maigret', 'github_user']},
+    {'name': 'email_recon', 'input': 'email',
+     'description': 'Email exposure: breaches, infostealer logs, registered sites',
+     'steps': ['breaches_xon', 'comb', 'stealer_hudsonrock', 'holehe', 'gravatar', 'email_spoofable']},
+]
+
+@app.route('/api/v2/playbooks')
+def api_v2_playbooks():
+    return jsonify({'playbooks': [{'name': p['name'], 'input': p['input'],
+                                   'description': p['description'], 'steps': len(p['steps'])}
+                                  for p in _PLAYBOOKS]})
+
+@app.route('/api/v2/playbook', methods=['POST'])
+def api_v2_playbook():
+    """Runs a curated chain of transforms (a Machine) that cascades from the seed."""
+    d = request.json or {}
+    pb = next((p for p in _PLAYBOOKS if p['name'] == d.get('playbook')), None)
+    if not pb:
+        return _error('unknown playbook', 404)
+    value = (d.get('value') or '').strip()
+    try:
+        seed = Entity(pb['input'], value)
+        if not seed.well_formed():
+            return _error(f'malformed {pb["input"]}: {value}', 400)
+        _opsec_guard()
+    except ValueError as e:
+        return _error(str(e), 400)
+    from core.transforms import Machine, Runner
+    machine = Machine(name=pb['name'], steps=tuple(pb['steps']))
+    with _almacen_lock:
+        _request_hygiene()
+        if _PROXIES['pool']:
+            _rotate_proxy()
+        seed = _store.add(seed)
+        produced = Runner(_store).run_machine(machine, seed)
+        _record_footprint(f"playbook:{pb['name']}", pb['input'], value)
+        if _ws_activo:
+            try:
+                _gestor.save(_ws_activo, _store)
+                _gestor.record(_ws_activo, f"playbook:{pb['name']}", value, len(produced))
+            except Exception as _e:
+                log.warning("autosave failed: %s", _e)
+    return jsonify({'playbook': pb['name'], 'produced': len(produced),
+                    'total_entities': len(_store), 'workspace': _ws_activo})
+
+def _guess_type(v):
+    v = v.strip()
+    if re.fullmatch(r'\d{1,3}(\.\d{1,3}){3}', v):
+        return 'ip'
+    if '@' in v and re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', v):
+        return 'email'
+    if v.startswith(('http://', 'https://')):
+        return 'url'
+    if re.fullmatch(r'[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+', v):
+        return 'domain'
+    return 'user'
+
+@app.route('/api/v2/import', methods=['POST'])
+def api_v2_import():
+    """Bulk-seed the graph from a pasted list (auto-detects type per line, or forces `type`)."""
+    d = request.json or {}
+    forced = d.get('type')
+    added = 0
+    with _almacen_lock:
+        for raw in (d.get('text') or '').replace(',', '\n').split('\n'):
+            v = raw.strip()
+            if not v:
+                continue
+            t = forced or _guess_type(v)
+            if not valid_type(t):
+                continue
+            try:
+                e = Entity(t, v)
+                if e.well_formed():
+                    _store.add(e)
+                    added += 1
+            except ValueError:
+                continue
+        if _ws_activo and added:
+            try:
+                _gestor.save(_ws_activo, _store)
+            except Exception as _e:
+                log.warning("autosave failed: %s", _e)
+    return jsonify({'added': added, 'total_entities': len(_store)})
+
 # ── Extreme OPSEC: kill-switch, paranoid mode, shield status, Tor identity ────
 _ANON_TTL = 120
 _ANON_CACHE = {'ts': 0.0, 'exit_ip': None, 'real_ip': None, 'leak': None, 'anon': False}
