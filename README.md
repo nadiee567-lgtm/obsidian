@@ -6,7 +6,7 @@
 
 ![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-blue)
 ![Python 3.14](https://img.shields.io/badge/python-3.14-3776ab)
-![Tests](https://img.shields.io/badge/tests-338%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-342%20passing-brightgreen)
 ![Transforms](https://img.shields.io/badge/transforms-114-orange)
 
 OBSIDIAN takes two ideas that already work — Maltego's model (entities you expand
@@ -61,6 +61,14 @@ circuit never leaks your real IP to the target), a one-toggle **paranoid mode** 
 UA hygiene + jitter + kill-switch + hardened headers at once), live exit-IP / country /
 leak readout, and one-click **Tor identity rotation**. On top of the base layer: proxy
 rotation, per-case network identity, sock-puppet vault, and IP-leak checks.
+
+**Live world map.** A 3D MapLibre globe (`🌍 map`) with real country borders that plots
+the case's geolocated entities — IPs (real lat/lon from geo_ip), image/URL EXIF GPS — as
+points, with great-circle **arcs** between related located entities, and toggleable live
+global layers pulled server-side from keyless feeds: **earthquakes** (USGS), **flights**
+(OpenSky), **wildfires** (NASA EONET), and **disasters** (GDACS). Clicking a case point
+jumps to that node in the graph. (IP geolocation is city/datacenter-accurate, labeled as
+such — no fake precision.)
 
 **Everything else.** One-click **recon playbooks** (curated transform chains that cascade
 from a seed — external recon, attack surface, IP recon, person, email) and **bulk target

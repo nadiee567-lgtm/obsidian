@@ -142,6 +142,22 @@ def test_v2_webhook_flow(monkeypatch):
             pass
 
 
+def test_v2_map_layer_quakes(monkeypatch):
+    class _R:
+        def json(self):
+            return {'features': [{'geometry': {'coordinates': [-118.0, 34.0, 5]},
+                                  'properties': {'mag': 4.2, 'place': 'CA'}}]}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R())
+    ob._LAYER_CACHE.clear()
+    d = _client().get('/api/v2/map/layer/quakes').get_json()
+    assert d['points'][0]['lat'] == 34.0 and d['points'][0]['mag'] == 4.2
+    ob._LAYER_CACHE.clear()
+
+
+def test_v2_map_layer_unknown():
+    assert _client().get('/api/v2/map/layer/nope').status_code == 404
+
+
 def test_v2_map():
     from core.modelo import Store
     ob._store = Store()

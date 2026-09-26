@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OBSIDIAN · engine v2</title>
 <script src="/static/vis-network.min.js"></script>
+<link rel="stylesheet" href="/static/maplibre-gl.css">
 <style>
   :root{
     /* dry, matte palette -- sober, low-saturation, no glow */
@@ -153,6 +154,16 @@
   #exports{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(600px,93vw);max-height:84vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   #exports h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .6rem}
   #exports .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
+  #mapwrap{display:none;position:fixed;z-index:98;inset:2.5vh 2.5vw;background:#05070a;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.7)}
+  #mapcanvas{position:absolute;inset:0}
+  #mapbar{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;padding:.5rem .7rem;background:linear-gradient(180deg,rgba(5,7,10,.92),rgba(5,7,10,0));font-family:var(--mono);font-size:.72rem}
+  #mapbar .mt{color:var(--text);font-weight:bold;margin-right:.4rem}
+  .maplayer{border:1px solid var(--line);border-radius:5px;padding:.15rem .5rem;cursor:pointer;color:var(--muted);background:rgba(10,14,19,.7);user-select:none}
+  .maplayer.on{color:var(--green);border-color:var(--green)}
+  #mapbar .cerrar{margin-left:auto;cursor:pointer;color:var(--muted)}
+  #mapinfo{position:absolute;bottom:.6rem;left:.7rem;z-index:2;font-family:var(--mono);font-size:.68rem;color:var(--muted);background:rgba(5,7,10,.75);border:1px solid var(--line);border-radius:6px;padding:.3rem .5rem;max-width:60%}
+  .maplibregl-popup-content{background:#0b0e13;color:#c8d2dc;font-family:var(--mono);font-size:.7rem;border:1px solid var(--line);border-radius:6px;padding:.4rem .6rem}
+  .maplibregl-popup-tip{border-top-color:#0b0e13!important;border-bottom-color:#0b0e13!important}
   .krow{display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--line);font-size:.76rem;flex-wrap:wrap}
   .krow .ks{font-family:var(--mono);min-width:6rem;color:var(--cyan)}
   .krow input{flex:1;min-width:9rem;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem .4rem;font-family:var(--mono);font-size:.72rem}
@@ -193,7 +204,7 @@
 <body>
 <div class="wrap">
   <h1><span class="sq"></span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnDiff">⇄ diff</a> · <a href="#" id="btnTriage">▦ triage</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnMap">🌍 map</a> · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnDiff">⇄ diff</a> · <a href="#" id="btnTriage">▦ triage</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
   <div id="keys"></div>
   <div id="opsec"></div>
   <div id="terminal"></div>
@@ -202,6 +213,20 @@
   <div id="diff"></div>
   <div id="triage"></div>
   <div id="exports"></div>
+  <div id="mapwrap">
+    <div id="mapcanvas"></div>
+    <div id="mapbar">
+      <span class="mt">🌍 live map</span>
+      <span class="maplayer on" data-layer="case">🎯 case</span>
+      <span class="maplayer on" data-layer="arcs">↔ arcs</span>
+      <span class="maplayer" data-layer="quakes">🌍 quakes</span>
+      <span class="maplayer" data-layer="flights">✈️ flights</span>
+      <span class="maplayer" data-layer="fires">🔥 fires</span>
+      <span class="maplayer" data-layer="disasters">🌊 disasters</span>
+      <span class="cerrar" id="mapCerrar">✕ close</span>
+    </div>
+    <div id="mapinfo"></div>
+  </div>
 
   <div class="wsbar">
     <span class="wslabel">workspace</span>
@@ -632,6 +657,85 @@ function renderWebhook(wh){
   box.appendChild(b);
 }
 $('#btnExports').onclick=(e)=>{ e.preventDefault(); panelExports(); };
+/* ---- 🌍 live map (MapLibre GL globe) ---- */
+let MAP=null, MAP_ON={case:true,arcs:true,quakes:false,flights:false,fires:false,disasters:false}, MAP_TIMER=null;
+const LAYER_STYLE={
+  case:{color:'#f7768e',radius:6}, quakes:{color:'#e0af68',radius:4},
+  flights:{color:'#6f9298',radius:2.2}, fires:{color:'#ff7a45',radius:3.5},
+  disasters:{color:'#a86a70',radius:4}
+};
+function greatCircle(a,b,n=48){
+  const rad=x=>x*Math.PI/180, deg=x=>x*180/Math.PI;
+  const la1=rad(a.lat),lo1=rad(a.lon),la2=rad(b.lat),lo2=rad(b.lon);
+  const d=2*Math.asin(Math.sqrt(Math.sin((la2-la1)/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin((lo2-lo1)/2)**2));
+  if(!d) return [[a.lon,a.lat],[b.lon,b.lat]];
+  const out=[];
+  for(let i=0;i<=n;i++){const f=i/n;
+    const A=Math.sin((1-f)*d)/Math.sin(d), B=Math.sin(f*d)/Math.sin(d);
+    const x=A*Math.cos(la1)*Math.cos(lo1)+B*Math.cos(la2)*Math.cos(lo2);
+    const y=A*Math.cos(la1)*Math.sin(lo1)+B*Math.cos(la2)*Math.sin(lo2);
+    const z=A*Math.sin(la1)+B*Math.sin(la2);
+    out.push([deg(Math.atan2(y,x)),deg(Math.atan2(z,Math.sqrt(x*x+y*y)))]);
+  }
+  return out;
+}
+function fc(features){ return {type:'FeatureCollection',features}; }
+function ptFeatures(points,style){
+  return (points||[]).map(p=>({type:'Feature',
+    geometry:{type:'Point',coordinates:[p.lon,p.lat]},
+    properties:{label:(p.label||p.value||''),sub:[p.type,p.city,p.country,p.mag!=null?('M'+p.mag):null].filter(Boolean).join(' · '),
+      color:style.color,radius:(p.w?Math.min(3+p.w*1.5,12):style.radius),id:p.id||''}}));
+}
+function ensurePointLayer(id){
+  if(MAP.getSource(id)) return;
+  MAP.addSource(id,{type:'geojson',data:fc([])});
+  MAP.addLayer({id:id,type:'circle',source:id,paint:{
+    'circle-radius':['coalesce',['get','radius'],4],
+    'circle-color':['coalesce',['get','color'],'#888'],
+    'circle-opacity':0.85,'circle-stroke-width':1,'circle-stroke-color':'rgba(0,0,0,.5)'}});
+  MAP.on('click',id,(e)=>{ const p=e.features[0].properties;
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML('<b>'+esc(p.label)+'</b>'+(p.sub?'<br>'+esc(p.sub):'')).addTo(MAP);
+    if(p.id){ try{ if(nodes && nodes.get && nodes.get(p.id)){ network.selectNodes([p.id]); network.focus(p.id,{scale:1.2}); } }catch(_){} } });
+  MAP.on('mouseenter',id,()=>MAP.getCanvas().style.cursor='pointer');
+  MAP.on('mouseleave',id,()=>MAP.getCanvas().style.cursor='');
+}
+async function mapLoadCase(){
+  if(!MAP.getSource('arcs')){ MAP.addSource('arcs',{type:'geojson',data:fc([])});
+    MAP.addLayer({id:'arcs',type:'line',source:'arcs',paint:{'line-color':'#7aa2f7','line-width':1,'line-opacity':0.5}}); }
+  ensurePointLayer('case');
+  let d={points:[],arcs:[]}; try{ d=await(await fetch('/api/v2/map')).json(); }catch(_){}
+  MAP.getSource('case').setData(fc(MAP_ON.case?ptFeatures(d.points,LAYER_STYLE.case):[]));
+  const arcF=(MAP_ON.arcs?d.arcs:[]).map(a=>({type:'Feature',geometry:{type:'LineString',coordinates:greatCircle(a.from,a.to)},properties:{}}));
+  MAP.getSource('arcs').setData(fc(arcF));
+  $('#mapinfo').textContent=d.located+' located / '+d.total+' entities in case · IP geo is city/datacenter-accurate';
+}
+async function mapLoadLayer(name){
+  ensurePointLayer(name);
+  if(!MAP_ON[name]){ MAP.getSource(name).setData(fc([])); return; }
+  let d={points:[]}; try{ d=await(await fetch('/api/v2/map/layer/'+name)).json(); }catch(_){}
+  MAP.getSource(name).setData(fc(ptFeatures(d.points,LAYER_STYLE[name])));
+}
+function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }
+function panelMap(){
+  const wrap=$('#mapwrap'); wrap.style.display='block';
+  if(!MAP){
+    if(typeof maplibregl==='undefined'){ $('#mapinfo').textContent='map library failed to load (/static/maplibre-gl.min.js)'; return; }
+    MAP=new maplibregl.Map({container:'mapcanvas',style:'https://demotiles.maplibre.org/style.json',
+      center:[0,20],zoom:1.4,attributionControl:false});
+    MAP.on('style.load',()=>{ try{ MAP.setProjection({type:'globe'}); }catch(_){}
+      mapRefreshAll();
+      if(MAP_TIMER) clearInterval(MAP_TIMER);
+      MAP_TIMER=setInterval(()=>{ if($('#mapwrap').style.display==='block') mapRefreshAll(); },60000);
+    });
+  } else { setTimeout(()=>{ MAP.resize(); mapRefreshAll(); },80); }
+}
+document.querySelectorAll('.maplayer').forEach(el=>{
+  el.onclick=()=>{ const L=el.dataset.layer; MAP_ON[L]=!MAP_ON[L]; el.classList.toggle('on',MAP_ON[L]);
+    if(!MAP) return;
+    if(L==='case'||L==='arcs') mapLoadCase(); else mapLoadLayer(L); };
+});
+$('#mapCerrar').onclick=()=>{ $('#mapwrap').style.display='none'; };
+$('#btnMap').onclick=(e)=>{ e.preventDefault(); panelMap(); };
 const SERVICIOS_KEY=[
   ['shodan','Shodan key'],['censys','id:secret'],['zoomeye','API-KEY'],['fofa','email:key'],
   ['quake','token'],['hunter','api-key'],['netlas','api-key'],['criminalip','api-key'],

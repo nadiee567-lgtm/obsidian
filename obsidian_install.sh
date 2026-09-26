@@ -142,6 +142,18 @@ if [ ! -f ~/obsidian-static/vis-network.min.js ]; then
     fi
 fi
 
+# Download MapLibre GL (live world map) if missing
+if [ ! -f ~/obsidian-static/maplibre-gl.min.js ]; then
+    echo -e "${BLUE}[*] Downloading MapLibre GL (live map)...${NC}"
+    curl -sL "https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js" \
+         -o ~/obsidian-static/maplibre-gl.min.js 2>/dev/null || true
+    curl -sL "https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css" \
+         -o ~/obsidian-static/maplibre-gl.css 2>/dev/null || true
+    [ -f ~/obsidian-static/maplibre-gl.min.js ] && \
+        echo -e "${GREEN}[+] MapLibre GL downloaded${NC}" || \
+        echo -e "${YELLOW}[!] MapLibre not downloaded — the map tab will show a notice (OBSIDIAN also auto-fetches it on first run)${NC}"
+fi
+
 # OBSIDIAN runs from this cloned repo -- obsidian_web.py needs the core/ package
 # and web/ templates next to it, so we do NOT copy it out. ~/.obsidian only holds
 # config, auth and the encrypted key vault (the app creates those itself).

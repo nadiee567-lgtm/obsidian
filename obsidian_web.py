@@ -115,6 +115,21 @@ def _load_web(name):
 
 if not os.path.exists(os.path.join(STATIC_DIR, _VIS)) and os.path.exists(os.path.join(_HERE, _VIS)):
     shutil.copy(os.path.join(_HERE, _VIS), os.path.join(STATIC_DIR, _VIS))
+
+# MapLibre GL (live map). Served locally like vis.js. Auto-fetch once if missing so a
+# fresh install still gets the map; best-effort and non-fatal (the map just won't load).
+_MAPLIBRE = {
+    'maplibre-gl.min.js': 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js',
+    'maplibre-gl.css': 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css',
+}
+for _fn, _url in _MAPLIBRE.items():
+    _dst = os.path.join(STATIC_DIR, _fn)
+    if not os.path.exists(_dst):
+        try:
+            import urllib.request
+            urllib.request.urlretrieve(_url, _dst)
+        except Exception:
+            pass  # map is optional; UI degrades with a clear message
 OLLAMA    = 'http://localhost:11434'
 MODEL     = 'qwen2.5:3b'
 
@@ -5315,6 +5330,80 @@ def api_v2_map():
                          'to': {'lat': t[0], 'lon': t[1]}, 'label': r.label})
     return jsonify({'points': pts, 'arcs': arcs,
                     'located': len(pts), 'total': len(_store)})
+
+_LAYER_CACHE = {}
+_LAYER_TTL = 60
+
+def _layer_cached(name, fetch):
+    now = time.time()
+    hit = _LAYER_CACHE.get(name)
+    if hit and now - hit[0] < _LAYER_TTL:
+        return hit[1]
+    try:
+        data = fetch()
+    except Exception as _e:
+        log.debug("map layer %s: %s", name, _e)
+        data = {'points': []}
+    _LAYER_CACHE[name] = (now, data)
+    return data
+
+def _layer_quakes():
+    d = SESSION.get('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson',
+                    timeout=15).json()
+    pts = []
+    for f in d.get('features', []):
+        c = (f.get('geometry') or {}).get('coordinates') or []
+        p = f.get('properties') or {}
+        if len(c) >= 2:
+            pts.append({'lat': c[1], 'lon': c[0], 'mag': p.get('mag'),
+                        'label': p.get('place') or 'quake', 'w': p.get('mag') or 1})
+    return {'points': pts}
+
+def _layer_flights():
+    d = SESSION.get('https://opensky-network.org/api/states/all', timeout=20).json()
+    pts = []
+    for s in (d.get('states') or [])[:4000]:
+        lon, lat = s[5], s[6]
+        if lat is not None and lon is not None:
+            pts.append({'lat': lat, 'lon': lon,
+                        'label': (s[1] or '').strip() or s[0], 'country': s[2]})
+    return {'points': pts}
+
+def _layer_fires():
+    d = SESSION.get('https://eonet.gsfc.nasa.gov/api/v3/events?category=wildfires&status=open&limit=500',
+                    timeout=15).json()
+    pts = []
+    for ev in d.get('events', []):
+        geo = ev.get('geometry') or []
+        if geo:
+            c = geo[-1].get('coordinates') or []
+            if len(c) >= 2:
+                pts.append({'lat': c[1], 'lon': c[0], 'label': ev.get('title') or 'fire'})
+    return {'points': pts}
+
+def _layer_disasters():
+    d = SESSION.get('https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP', timeout=15).json()
+    pts = []
+    for f in (d.get('features') or []):
+        c = (f.get('geometry') or {}).get('coordinates') or []
+        p = f.get('properties') or {}
+        if len(c) >= 2:
+            pts.append({'lat': c[1], 'lon': c[0],
+                        'label': p.get('name') or p.get('htmldescription') or 'event',
+                        'level': p.get('alertlevel')})
+    return {'points': pts}
+
+_MAP_LAYERS = {'quakes': _layer_quakes, 'flights': _layer_flights,
+               'fires': _layer_fires, 'disasters': _layer_disasters}
+
+@app.route('/api/v2/map/layer/<name>')
+def api_v2_map_layer(name):
+    """Live global data layer for the map (server-side fetch: no CORS, honors OPSEC).
+    Sources: USGS quakes, OpenSky flights, NASA EONET fires, GDACS disasters — all keyless."""
+    fetch = _MAP_LAYERS.get(name)
+    if not fetch:
+        return _error('unknown layer', 404)
+    return jsonify(_layer_cached(name, fetch))
 
 # ── Diff (compare two workspaces) ─────────────────────────────────────────────
 @app.route('/api/v2/diff')
