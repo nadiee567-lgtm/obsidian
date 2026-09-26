@@ -2301,15 +2301,22 @@ def _t_anubis_subdomains(entity, ctx):
                 break
 
 @transform(input='ip', outputs=('country', 'org', 'asn'), name='geo_ip',
-           description='Geolocation and network info of the IP (ip-api.com)')
+           description='Geolocation and network info of the IP, incl. lat/lon for the map (ip-api.com)')
 def _t_geo_ip(entity, ctx):
     try:
         r = SESSION.get(f'http://ip-api.com/json/{entity.value}'
-                        '?fields=status,country,org,isp,as', timeout=8)
+                        '?fields=status,country,city,lat,lon,org,isp,as', timeout=8)
         d = r.json()
         if d.get('status') != 'success':
             return
+        # store real coordinates on the IP itself so the map can plot it precisely
+        if isinstance(d.get('lat'), (int, float)) and isinstance(d.get('lon'), (int, float)):
+            entity.properties['lat'] = d['lat']
+            entity.properties['lon'] = d['lon']
+        if d.get('city'):
+            entity.properties['city'] = d['city']
         if d.get('country'):
+            entity.properties['country'] = d['country']
             ctx.emit('country', d['country'], label='location')
         org = d.get('org') or d.get('isp')
         if org:
@@ -5267,6 +5274,47 @@ def api_v2_webhook_run(token):
                 log.warning("autosave failed: %s", _e)
     return jsonify({'ok': True, 'playbook': pb['name'], 'produced': len(produced),
                     'total_entities': len(_store)})
+
+# ── Map: geolocated case data (points + arcs) ────────────────────────────────
+def _coords_of(e):
+    """(lat, lon) of an entity if it carries real coordinates. IPs get them from
+    geo_ip; images/urls from EXIF GPS (lat/lon or a 'gps' 'lat,lon' string)."""
+    p = e.properties or {}
+    for la, lo in (('lat', 'lon'), ('latitude', 'longitude')):
+        if isinstance(p.get(la), (int, float)) and isinstance(p.get(lo), (int, float)):
+            return float(p[la]), float(p[lo])
+    gps = p.get('gps') or p.get('GPSPosition')
+    if isinstance(gps, str) and ',' in gps:
+        try:
+            a, b = gps.split(',', 1)
+            return float(a.strip()), float(b.strip())
+        except ValueError:
+            pass
+    return None
+
+@app.route('/api/v2/map')
+def api_v2_map():
+    """Geolocated points of the current case + arcs between related located entities.
+    Feeds the live map. Coordinates are REAL (geo_ip lat/lon, EXIF GPS) — IP geo is
+    city/datacenter-accurate, not household-accurate."""
+    pts, by_id = [], {}
+    for e in _store.entities:
+        c = _coords_of(e)
+        if not c:
+            continue
+        by_id[e.id] = c
+        pts.append({'id': e.id, 'type': e.type, 'value': e.value,
+                    'lat': c[0], 'lon': c[1],
+                    'city': (e.properties or {}).get('city'),
+                    'country': (e.properties or {}).get('country')})
+    arcs = []
+    for r in _store.relations:
+        if r.source in by_id and r.target in by_id and r.source != r.target:
+            s, t = by_id[r.source], by_id[r.target]
+            arcs.append({'from': {'lat': s[0], 'lon': s[1]},
+                         'to': {'lat': t[0], 'lon': t[1]}, 'label': r.label})
+    return jsonify({'points': pts, 'arcs': arcs,
+                    'located': len(pts), 'total': len(_store)})
 
 # ── Diff (compare two workspaces) ─────────────────────────────────────────────
 @app.route('/api/v2/diff')

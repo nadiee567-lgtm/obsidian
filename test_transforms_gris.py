@@ -181,3 +181,15 @@ def test_secret_scan(monkeypatch):
     labels = {p.value.split(':')[0] for p in prod}
     assert 'AWS access key' in labels and 'Google API key' in labels
     assert all(p.type == 'credential' and 'exposed-secret' in p.tags for p in prod)
+
+
+def test_geo_ip_stores_coords(monkeypatch):
+    monkeypatch.setattr(ob.SESSION, 'get',
+                        lambda *a, **k: _Resp(data={'status': 'success', 'country': 'United States',
+                                                     'city': 'Ashburn', 'lat': 39.04, 'lon': -77.48,
+                                                     'org': 'ACME', 'as': 'AS123 ACME'}))
+    store = Store()
+    e = store.create('ip', '1.2.3.4')
+    run_by_name('geo_ip', e, store)
+    assert e.properties['lat'] == 39.04 and e.properties['lon'] == -77.48
+    assert e.properties['city'] == 'Ashburn'

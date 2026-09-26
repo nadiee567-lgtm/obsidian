@@ -142,6 +142,19 @@ def test_v2_webhook_flow(monkeypatch):
             pass
 
 
+def test_v2_map():
+    from core.modelo import Store
+    ob._store = Store()
+    a = ob._store.create('ip', '1.2.3.4', properties={'lat': 39.0, 'lon': -77.0, 'city': 'Ashburn'})
+    b = ob._store.create('ip', '5.6.7.8', properties={'lat': 48.85, 'lon': 2.35})
+    ob._store.create('domain', 'nocoords.com')          # no coords -> excluded
+    ob._store.relate(a, b, 'linked')
+    d = _client().get('/api/v2/map').get_json()
+    assert d['located'] == 2
+    assert {p['value'] for p in d['points']} == {'1.2.3.4', '5.6.7.8'}
+    assert len(d['arcs']) == 1 and d['arcs'][0]['from']['lat'] == 39.0
+
+
 def test_v2_diff():
     a = ob._gestor.create('difftest_a'); a.create('domain', 'a-only.com'); a.create('ip', '1.1.1.1')
     ob._gestor.save('difftest_a', a)
