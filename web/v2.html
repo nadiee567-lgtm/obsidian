@@ -122,6 +122,17 @@
   .pbd{color:var(--muted);font-size:.68rem}
   .pbimport{margin-top:.8rem;border-top:1px solid var(--line);padding-top:.6rem}
   #pbImportText{width:100%;height:5rem;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:.4rem .5rem;font-family:var(--mono);font-size:.74rem;margin-bottom:.4rem;resize:vertical}
+  #repeater{display:none;position:fixed;z-index:97;top:50%;left:50%;transform:translate(-50%,-50%);width:min(880px,95vw);height:80vh;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1rem;box-shadow:0 20px 60px rgba(0,0,0,.6);flex-direction:column}
+  #repeater h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .6rem} #repeater h2 span{color:var(--muted);font-size:.7rem}
+  #repeater .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
+  .rprow{display:flex;gap:.4rem;margin-bottom:.5rem}
+  #rpMethod{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;font-family:var(--mono);font-size:.76rem;padding:.3rem}
+  #rpUrl{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:.35rem .5rem;font-family:var(--mono);font-size:.76rem}
+  .rplab{font-size:.6rem;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin:.3rem 0 .2rem}
+  #rpHeaders,#rpBody{width:100%;height:3.2rem;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:.35rem .5rem;font-family:var(--mono);font-size:.72rem;resize:vertical}
+  .rpstatus{font-family:var(--mono);font-size:.76rem;margin:.5rem 0 .3rem;color:var(--muted)}
+  .rpstatus.err{color:var(--red)} .rpok{color:var(--green)} .rpbad{color:var(--amber)}
+  #rpResp{flex:1;overflow:auto;background:#05070a;border:1px solid var(--line);border-radius:8px;padding:.6rem;font-family:var(--mono);font-size:.72rem;color:#c8d2dc;white-space:pre-wrap;word-break:break-word;margin:0}
   .krow{display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--line);font-size:.76rem;flex-wrap:wrap}
   .krow .ks{font-family:var(--mono);min-width:6rem;color:var(--cyan)}
   .krow input{flex:1;min-width:9rem;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem .4rem;font-family:var(--mono);font-size:.72rem}
@@ -162,11 +173,12 @@
 <body>
 <div class="wrap">
   <h1><span class="sq"></span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
   <div id="keys"></div>
   <div id="opsec"></div>
   <div id="terminal"></div>
   <div id="playbooks"></div>
+  <div id="repeater"></div>
 
   <div class="wsbar">
     <span class="wslabel">workspace</span>
@@ -715,6 +727,40 @@ async function panelPlaybooks(){
   setTimeout(()=>tgt.focus(),50);
 }
 $('#btnPlaybooks').onclick=(e)=>{ e.preventDefault(); panelPlaybooks(); };
+async function panelRepeater(){
+  const ov=$('#repeater');
+  if(!ov.dataset.init){
+    ov.innerHTML='<span class="cerrar" id="rpCerrar">✕</span>'
+      +'<h2>⚡ HTTP repeater · <span>craft &amp; send · public URLs only · no auto-redirect</span></h2>'
+      +'<div class="rprow"><select id="rpMethod">'
+      +['GET','POST','PUT','DELETE','PATCH','HEAD','OPTIONS'].map(m=>'<option>'+m+'</option>').join('')
+      +'</select><input id="rpUrl" placeholder="https://target.com/path" autocomplete="off" spellcheck="false">'
+      +'<button class="modbtn" id="rpSend">send ▶</button></div>'
+      +'<div class="rplab">request headers</div>'
+      +'<textarea id="rpHeaders" placeholder="User-Agent: x&#10;Authorization: Bearer …"></textarea>'
+      +'<div class="rplab">request body</div><textarea id="rpBody" placeholder="(POST/PUT body)"></textarea>'
+      +'<div id="rpStatus" class="rpstatus"></div><pre id="rpResp"></pre>';
+    $('#rpSend').onclick=async()=>{
+      const url=$('#rpUrl').value.trim(); if(!url) return;
+      const st=$('#rpStatus'), resp=$('#rpResp');
+      st.textContent='sending…'; st.className='rpstatus'; resp.textContent='';
+      try{
+        const d=await(await fetch('/api/v2/repeater',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({method:$('#rpMethod').value,url,headers:$('#rpHeaders').value,body:$('#rpBody').value})})).json();
+        if(d.error){ st.textContent='✗ '+d.error; st.className='rpstatus err'; return; }
+        st.innerHTML='<b class="'+(d.status<400?'rpok':'rpbad')+'">'+d.status+' '+esc(d.reason||'')+'</b> · '
+          +d.elapsed_ms+' ms · '+d.size+' bytes';
+        const hz=Object.entries(d.headers||{}).map(([k,v])=>k+': '+v).join('\n');
+        resp.textContent=hz+'\n\n'+(d.body||'');
+      }catch(e){ st.textContent='error: '+e.message; st.className='rpstatus err'; }
+    };
+    $('#rpUrl').onkeydown=(ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); $('#rpSend').click(); } };
+    ov.dataset.init='1';
+  }
+  ov.style.display='flex'; $('#rpCerrar').onclick=()=>ov.style.display='none';
+  setTimeout(()=>{ const u=$('#rpUrl'); if(u) u.focus(); },50);
+}
+$('#btnRepeater').onclick=(e)=>{ e.preventDefault(); panelRepeater(); };
 async function iaCaso(modo){
   const out=$('#iaResumen'); out.innerHTML='<div class="iaresumen">AI ('+esc(modo)+') analyzing the case…</div>';
   try{ const r=await fetch('/api/v2/ia/'+modo,{method:'POST'}); const d=await r.json();

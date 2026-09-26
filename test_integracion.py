@@ -113,6 +113,33 @@ def test_v2_import_bulk():
     assert {'ip', 'domain', 'email'} <= {e.type for e in ob._store.entities}
 
 
+def test_v2_repeater_bad_method():
+    r = _client().post('/api/v2/repeater', json={'method': 'FOO', 'url': 'https://x.com'})
+    assert r.status_code == 400
+
+
+def test_v2_repeater_blocks_internal(monkeypatch):
+    monkeypatch.setattr(ob, '_public_url', lambda u: False)
+    r = _client().post('/api/v2/repeater', json={'method': 'GET', 'url': 'http://127.0.0.1/'})
+    assert r.status_code == 400
+
+
+def test_v2_repeater_sends(monkeypatch):
+    monkeypatch.setattr(ob, '_public_url', lambda u: True)
+
+    class _R:
+        status_code = 200
+        reason = 'OK'
+        headers = {'Content-Type': 'text/plain'}
+        content = b'hello'
+        text = 'hello'
+    monkeypatch.setattr(ob.SESSION, 'request', lambda *a, **k: _R())
+    d = _client().post('/api/v2/repeater',
+                       json={'method': 'GET', 'url': 'https://example.com',
+                             'headers': 'X-Test: 1'}).get_json()
+    assert d['status'] == 200 and d['body'] == 'hello' and d['size'] == 5
+
+
 def test_v2_transforms_applicable():
     c = _client()
     r = c.get('/api/v2/transforms/domain')

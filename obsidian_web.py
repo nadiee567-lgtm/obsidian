@@ -5222,6 +5222,50 @@ def api_v2_terminal():
         out = f'error: {e}\n'
     return jsonify({'output': out[:200000], 'cwd': cwd})
 
+# ── HTTP Repeater (craft & send custom requests, see the raw response) ────────
+@app.route('/api/v2/repeater', methods=['POST'])
+def api_v2_repeater():
+    """Send a hand-crafted HTTP request and return the raw response. Anti-SSRF (public
+    URLs only), honors the OPSEC kill-switch, and does NOT auto-follow redirects (you
+    see the real 3xx). Goes through the current session (Tor/proxy if OPSEC is on)."""
+    d = request.json or {}
+    method = (d.get('method') or 'GET').upper()
+    if method not in ('GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'):
+        return _error('unsupported method', 400)
+    url = (d.get('url') or '').strip()
+    if '://' not in url:
+        url = 'https://' + url
+    if not _public_url(url):
+        return _error('URL blocked (SSRF): internal/private/loopback or disallowed scheme', 400)
+    headers = {}
+    raw_h = d.get('headers')
+    if isinstance(raw_h, dict):
+        headers = {str(k): str(v) for k, v in raw_h.items()}
+    elif isinstance(raw_h, str):
+        for line in raw_h.splitlines():
+            if ':' in line:
+                k, v = line.split(':', 1)
+                if k.strip():
+                    headers[k.strip()] = v.strip()
+    try:
+        _opsec_guard()
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 200
+    t0 = time.time()
+    try:
+        r = SESSION.request(method, url, headers=headers or None,
+                            data=(d.get('body') or None), timeout=20, allow_redirects=False)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 200
+    try:
+        body = r.text[:200000]
+    except Exception:
+        body = ''
+    return jsonify({'status': r.status_code, 'reason': r.reason,
+                    'elapsed_ms': int((time.time() - t0) * 1000),
+                    'size': len(r.content or b''),
+                    'headers': dict(r.headers), 'body': body})
+
 _personas = PersonaManager(os.path.join(HOME, '.obsidian', 'personas.json'))
 
 @app.route('/api/v2/persons', methods=['GET', 'POST', 'DELETE'])
