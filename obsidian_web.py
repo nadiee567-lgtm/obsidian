@@ -2365,6 +2365,26 @@ def _t_ports(entity, ctx):
         service = parts[2] if len(parts) > 2 else '?'
         ctx.emit('port', f'{entity.value}:{num}', label='open', service=service)
 
+@transform(input='ip', outputs=('port', 'tech'), name='deep_scan',
+           description='Deep nmap: top-1000 ports + service/version + default NSE scripts (-sV -sC). '
+                       'Emits detected services as tech (pivots to CVEs). Aim ONLY at hosts you are authorized to scan')
+def _t_deep_scan(entity, ctx):
+    if not _which('nmap'):
+        return
+    out = run_tool(['nmap', '-T4', '-sV', '-sC', '--top-ports', '1000', '--open', entity.value], timeout=300)
+    for line in out.splitlines():
+        if '/tcp' not in line and '/udp' not in line:
+            continue
+        parts = line.split()
+        num = parts[0].split('/')[0] if parts else ''
+        if not num.isdigit():
+            continue
+        service = parts[2] if len(parts) > 2 else '?'
+        version = ' '.join(parts[3:]).strip() if len(parts) > 3 else ''
+        ctx.emit('port', f'{entity.value}:{num}', label='open', service=service, version=version)
+        if len(parts) > 3 and re.match(r'^[A-Za-z]', parts[3]):
+            ctx.emit('tech', parts[3], label='service')
+
 @transform(input='ip', outputs=('port', 'cve', 'domain', 'subdomain', 'tech'), name='internetdb',
            description='Passive exposure from Shodan InternetDB: open ports, CVEs and hostnames -- no packets sent, keyless (mass-scan data for free)')
 def _t_internetdb(entity, ctx):
@@ -2921,6 +2941,46 @@ def _t_cve_lookup(entity, ctx):
             e = ctx.emit('cve', cid, label='critical CVE')
             if e:
                 e.tag('version-unverified')
+
+_KEV_CACHE = {'ts': 0.0, 'set': None}
+_KEV_TTL = 86400
+
+def _cisa_kev_set():
+    """CISA Known-Exploited-Vulnerabilities catalog (CVE ids), cached for a day."""
+    now = time.time()
+    if _KEV_CACHE['set'] is not None and (now - _KEV_CACHE['ts'] < _KEV_TTL):
+        return _KEV_CACHE['set']
+    s = set()
+    try:
+        data = SESSION.get('https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json',
+                           timeout=20).json()
+        s = {v.get('cveID') for v in (data.get('vulnerabilities') or []) if v.get('cveID')}
+    except Exception as _e:
+        log.debug("cisa kev unavailable: %s", _e)
+    _KEV_CACHE.update({'ts': now, 'set': s})
+    return s
+
+@transform(input='cve', outputs=(), name='cve_intel',
+           description='CVE threat intel: EPSS exploit-probability + CISA Known-Exploited '
+                       '(is it actively exploited in the wild?). Keyless')
+def _t_cve_intel(entity, ctx):
+    cid = entity.value.upper()
+    try:
+        rows = (SESSION.get('https://api.first.org/data/v1/epss', params={'cve': cid}, timeout=12)
+                .json().get('data') or [])
+        if rows and rows[0].get('epss') is not None:
+            entity.properties['epss'] = rows[0]['epss']
+            entity.properties['epss_percentile'] = rows[0].get('percentile')
+            try:
+                if float(rows[0]['epss']) >= 0.5:
+                    entity.tag('high-exploit-probability')
+            except (TypeError, ValueError):
+                pass
+    except Exception as _e:
+        log.debug("epss unavailable: %s", _e)
+    if cid in _cisa_kev_set():
+        entity.properties['cisa_kev'] = True
+        entity.tag('actively-exploited')
 
 @transform(input='tech', outputs=(), name='eol',
            description='End-of-life status of the technology (endoflife.date, keyless) (F16 step 179)')

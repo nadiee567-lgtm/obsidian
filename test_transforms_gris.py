@@ -93,3 +93,43 @@ def test_anubis_subdomains(monkeypatch):
     prod = run_by_name('anubis_subdomains', e, store)
     assert {p.value for p in prod} == {'a.ejemplo.com', 'b.ejemplo.com'}  # apex + otro.com excluded
     assert all(p.type == 'subdomain' for p in prod)
+
+
+def test_deep_scan(monkeypatch):
+    out = ("PORT     STATE SERVICE VERSION\n"
+           "22/tcp   open  ssh     OpenSSH 8.9\n"
+           "443/tcp  open  https   nginx 1.24.0\n")
+    monkeypatch.setattr(ob, '_which', lambda c: True)
+    monkeypatch.setattr(ob, 'run_tool', lambda *a, **k: out)
+    store = Store()
+    e = store.create('ip', '1.2.3.4')
+    prod = run_by_name('deep_scan', e, store)
+    assert {p.value for p in prod if p.type == 'port'} == {'1.2.3.4:22', '1.2.3.4:443'}
+    assert {p.value for p in prod if p.type == 'tech'} == {'OpenSSH', 'nginx'}
+
+
+def test_deep_scan_no_nmap(monkeypatch):
+    monkeypatch.setattr(ob, '_which', lambda c: False)
+    store = Store()
+    e = store.create('ip', '1.2.3.4')
+    assert run_by_name('deep_scan', e, store) == []
+
+
+def test_cve_intel(monkeypatch):
+    ob._KEV_CACHE['set'] = None
+    ob._KEV_CACHE['ts'] = 0.0
+
+    def fake_get(url, *a, **k):
+        if 'first.org' in url:
+            return _Resp(data={'data': [{'epss': '0.97', 'percentile': '0.99'}]})
+        if 'cisa.gov' in url:
+            return _Resp(data={'vulnerabilities': [{'cveID': 'CVE-2021-44228'}]})
+        return _Resp(data={})
+    monkeypatch.setattr(ob.SESSION, 'get', fake_get)
+    store = Store()
+    e = store.create('cve', 'CVE-2021-44228')
+    run_by_name('cve_intel', e, store)
+    assert e.properties.get('epss') == '0.97'
+    assert e.properties.get('cisa_kev') is True
+    assert 'high-exploit-probability' in e.tags and 'actively-exploited' in e.tags
+    ob._KEV_CACHE['set'] = None
