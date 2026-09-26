@@ -62,8 +62,10 @@ UA hygiene + jitter + kill-switch + hardened headers at once), live exit-IP / co
 leak readout, and one-click **Tor identity rotation**. On top of the base layer: proxy
 rotation, per-case network identity, sock-puppet vault, and IP-leak checks.
 
-**Everything else.** Continuous asset monitoring with ntfy push alerts, workspaces
-backed by SQLite with snapshots, a self-contained HTML report, and exports to
+**Everything else.** Continuous asset monitoring with ntfy push alerts, an optional
+**loopback-gated web terminal** (a real shell in the UI — git clone, pip, anything —
+disabled unless OBSIDIAN is bound to localhost), workspaces backed by SQLite with
+snapshots, a self-contained HTML report, and exports to
 JSON / CSV / PDF **and an Obsidian notes vault** (each entity a note, relations as
 `[[wikilinks]]` — open it in the Obsidian app and the graph rebuilds the case). A
 scriptable CLI does all of the above.
@@ -293,11 +295,13 @@ and the CLI are two fronts over the same engine.
 The design assumes the target's data is hostile.
 
 - Per-type **allowlist** validation, and every external command runs through a
-  single `run_tool()` helper that uses `argv` lists — **there is no `shell=True`
-  anywhere** — so command and argument injection are both closed. The only shell
-  is an explicit, localized `bash -c` for the handful of pentest tools that are
-  pipelines by design (`echo | tool`, `tool | head`), and even there the argument
-  is metacharacter-filtered first.
+  single `run_tool()` helper that uses `argv` lists — **no `shell=True` in the
+  transform/recon path** — so command and argument injection are both closed. The
+  only shells are an explicit, localized `bash -c` for the handful of pentest tools
+  that are pipelines by design (`echo | tool`, `tool | head`, argument
+  metacharacter-filtered first), and the **opt-in web terminal**, which is by design
+  a real shell and is therefore **gated to a loopback bind** so a network-exposed
+  instance never becomes remote command execution.
 - **Anti-SSRF:** private, loopback, and link-local addresses are rejected, and every
   redirect is revalidated (including cloud-metadata IPs).
 - **Fail-closed OPSEC kill-switch:** with the kill-switch (or paranoid mode) on, a

@@ -106,6 +106,13 @@
   .opinfo{font-family:var(--mono);font-size:.72rem;color:var(--text);line-height:1.7;margin:.7rem 0}
   .opacts{display:flex;gap:.4rem;margin-top:.3rem}
   #btnOpsec.up{color:var(--green)} #btnOpsec.down{color:var(--red)}
+  #terminal{display:none;position:fixed;z-index:97;top:50%;left:50%;transform:translate(-50%,-50%);width:min(860px,95vw);height:72vh;background:#0b0e13;border:1px solid var(--line);border-radius:12px;padding:1rem;box-shadow:0 20px 60px rgba(0,0,0,.6);flex-direction:column}
+  #terminal h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .6rem;color:var(--text)} #terminal h2 span{color:var(--muted);font-size:.7rem}
+  #terminal .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
+  #termout{flex:1;overflow:auto;background:#05070a;border:1px solid var(--line);border-radius:8px;padding:.6rem;font-family:var(--mono);font-size:.74rem;color:#c8d2dc;white-space:pre-wrap;word-break:break-word;margin:0}
+  .termin{display:flex;align-items:center;gap:.45rem;margin-top:.5rem;font-family:var(--mono);font-size:.76rem}
+  #termcwd{color:var(--green);white-space:nowrap;max-width:38%;overflow:hidden;text-overflow:ellipsis}
+  #termcmd{flex:1;background:#05070a;border:1px solid var(--line);color:#e6edf3;border-radius:6px;padding:.35rem .5rem;font-family:var(--mono);font-size:.76rem}
   .krow{display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--line);font-size:.76rem;flex-wrap:wrap}
   .krow .ks{font-family:var(--mono);min-width:6rem;color:var(--cyan)}
   .krow input{flex:1;min-width:9rem;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem .4rem;font-family:var(--mono);font-size:.72rem}
@@ -146,9 +153,10 @@
 <body>
 <div class="wrap">
   <h1><span class="sq"></span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
   <div id="keys"></div>
   <div id="opsec"></div>
+  <div id="terminal"></div>
 
   <div class="wsbar">
     <span class="wslabel">workspace</span>
@@ -620,6 +628,43 @@ async function panelOpsec(){
   ov.style.display='block'; $('#opCerrar').onclick=()=>ov.style.display='none';
 }
 $('#btnOpsec').onclick=(e)=>{ e.preventDefault(); panelOpsec(); };
+let TERM_CWD='~', TERM_HIST=[], TERM_HI=0, _termInit=false;
+async function panelTerminal(){
+  const ov=$('#terminal');
+  if(!_termInit){
+    ov.innerHTML='<span class="cerrar" id="tmCerrar">✕</span>'
+      +'<h2>⌨ terminal · <span>runs on THIS host · localhost only</span></h2>'
+      +'<pre id="termout"></pre>'
+      +'<div class="termin"><span id="termcwd">$</span><input id="termcmd" autocomplete="off" spellcheck="false" placeholder="type a command… (git clone, ls, pip, cd)"></div>';
+    const out=$('#termout');
+    try{ const s=await(await fetch('/api/v2/terminal')).json();
+      if(s && s.enabled && !s.error){ TERM_CWD=s.cwd||'~';
+        out.textContent='OBSIDIAN shell — real commands on this host. cd persists, type "clear" to wipe.\n(not a full PTY: interactive apps like vim/top won\'t work)\n\n'; }
+      else { out.textContent='terminal disabled: '+((s&&s.error)||'OBSIDIAN is exposed to the network')+'\n'; }
+    }catch(e){ out.textContent='could not reach terminal: '+e.message+'\n'; }
+    $('#termcwd').textContent=TERM_CWD+' $';
+    const inp=$('#termcmd');
+    inp.onkeydown=async(ev)=>{
+      if(ev.key==='Enter'){
+        const cmd=inp.value; inp.value='';
+        if(cmd.trim()){ TERM_HIST.push(cmd); TERM_HI=TERM_HIST.length; }
+        out.textContent+=TERM_CWD+' $ '+cmd+'\n';
+        if(cmd.trim()==='clear'){ out.textContent=''; return; }
+        try{ const d=await(await fetch('/api/v2/terminal',{method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({cmd,cwd:TERM_CWD})})).json();
+          if(d.error){ out.textContent+=d.error+'\n'; }
+          else { if(d.output) out.textContent+=d.output; TERM_CWD=d.cwd||TERM_CWD; $('#termcwd').textContent=TERM_CWD+' $'; }
+        }catch(e){ out.textContent+='error: '+e.message+'\n'; }
+        out.scrollTop=out.scrollHeight;
+      } else if(ev.key==='ArrowUp'){ if(TERM_HI>0){ TERM_HI--; inp.value=TERM_HIST[TERM_HI]||''; } ev.preventDefault(); }
+      else if(ev.key==='ArrowDown'){ if(TERM_HI<TERM_HIST.length-1){ TERM_HI++; inp.value=TERM_HIST[TERM_HI]||''; } else { TERM_HI=TERM_HIST.length; inp.value=''; } ev.preventDefault(); }
+    };
+    _termInit=true;
+  }
+  ov.style.display='flex'; $('#tmCerrar').onclick=()=>ov.style.display='none';
+  setTimeout(()=>{ const i=$('#termcmd'); if(i) i.focus(); }, 60);
+}
+$('#btnTerminal').onclick=(e)=>{ e.preventDefault(); panelTerminal(); };
 async function iaCaso(modo){
   const out=$('#iaResumen'); out.innerHTML='<div class="iaresumen">AI ('+esc(modo)+') analyzing the case…</div>';
   try{ const r=await fetch('/api/v2/ia/'+modo,{method:'POST'}); const d=await r.json();

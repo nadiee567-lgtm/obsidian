@@ -63,6 +63,23 @@ def test_v2_export_obsidian_zip():
         ob._store = prev
 
 
+def test_v2_terminal_runs_command():
+    r = _client().post('/api/v2/terminal', json={'cmd': 'echo terminaltest'})
+    assert r.status_code == 200
+    assert 'terminaltest' in r.get_json()['output']
+
+
+def test_v2_terminal_cd_persists():
+    import tempfile, os
+    tmp = tempfile.gettempdir()
+    d = _client().post('/api/v2/terminal', json={'cmd': f'cd {tmp}'}).get_json()
+    assert os.path.realpath(d['cwd']) == os.path.realpath(tmp)
+
+
+def test_v2_terminal_enabled_on_localhost():
+    assert _client().get('/api/v2/terminal').get_json().get('enabled') is True
+
+
 def test_v2_transforms_applicable():
     c = _client()
     r = c.get('/api/v2/transforms/domain')

@@ -5073,6 +5073,51 @@ def api_v2_opsec_status():
         'footprint_exposed': exposed,
     })
 
+# ── Interactive terminal (web shell) ─────────────────────────────────────────
+# Runs real shell commands on the HOST. This is the one deliberate shell=True in the
+# codebase, and it is gated: only when OBSIDIAN is bound to loopback (so a LAN/Tailscale-
+# exposed instance never becomes remote RCE), unless the operator explicitly opts in.
+def _terminal_allowed():
+    host = os.environ.get('OBSIDIAN_HOST', '127.0.0.1')
+    loopback = host in ('127.0.0.1', '::1', 'localhost', '')
+    return loopback or os.environ.get('OBSIDIAN_TERMINAL_EXPOSED') == '1'
+
+@app.route('/api/v2/terminal', methods=['GET', 'POST'])
+def api_v2_terminal():
+    """A working shell on the host (git clone, pip, ls, ... — anything). Command/response
+    model, not a full PTY, so interactive TUIs (vim/top) don't apply. Loopback-gated."""
+    if not _terminal_allowed():
+        return _error('Terminal disabled: OBSIDIAN is bound to a non-local address. It would '
+                      'expose full command execution. Set OBSIDIAN_TERMINAL_EXPOSED=1 only if '
+                      'you understand this is remote RCE.', 403)
+    home = os.path.expanduser('~')
+    if request.method == 'GET':
+        return jsonify({'enabled': True, 'cwd': home})
+    d = request.json or {}
+    cmd = (d.get('cmd') or '').strip()
+    cwd = d.get('cwd') or home
+    if not os.path.isdir(cwd):
+        cwd = home
+    if not cmd:
+        return jsonify({'output': '', 'cwd': cwd})
+    # persist directory changes for a bare `cd` (each command is otherwise its own shell)
+    if cmd == 'cd' or cmd.startswith('cd ') and '&&' not in cmd and '|' not in cmd and ';' not in cmd:
+        target = os.path.expanduser(cmd[2:].strip() or home)
+        newcwd = target if os.path.isabs(target) else os.path.normpath(os.path.join(cwd, target))
+        if os.path.isdir(newcwd):
+            return jsonify({'output': '', 'cwd': newcwd})
+        return jsonify({'output': f'cd: no such file or directory: {target}\n', 'cwd': cwd})
+    try:
+        r = subprocess.run(cmd, shell=True, cwd=cwd, capture_output=True, text=True, timeout=180)
+        out = (r.stdout or '') + (r.stderr or '')
+        if r.returncode != 0 and not out:
+            out = f'(exit {r.returncode})\n'
+    except subprocess.TimeoutExpired:
+        out = '⏱ command timed out (180s)\n'
+    except Exception as e:
+        out = f'error: {e}\n'
+    return jsonify({'output': out[:200000], 'cwd': cwd})
+
 _personas = PersonaManager(os.path.join(HOME, '.obsidian', 'personas.json'))
 
 @app.route('/api/v2/persons', methods=['GET', 'POST', 'DELETE'])
