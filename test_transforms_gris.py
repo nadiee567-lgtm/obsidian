@@ -16,6 +16,14 @@ class _Resp:
         return self._data
 
 
+class _FR:
+    """Fake _fetch_seguro response (status_code / text / headers)."""
+    def __init__(self, status_code=200, text='', ctype='text/plain'):
+        self.status_code = status_code
+        self.text = text
+        self.headers = {'Content-Type': ctype}
+
+
 def test_rapiddns(monkeypatch):
     html = ('<table><tr><th>domain</th></tr>'
             '<tr><td>shop.ejemplo.com</td><td>1.2.3.4</td><td>A</td></tr>'
@@ -133,3 +141,43 @@ def test_cve_intel(monkeypatch):
     assert e.properties.get('cisa_kev') is True
     assert 'high-exploit-probability' in e.tags and 'actively-exploited' in e.tags
     ob._KEV_CACHE['set'] = None
+
+
+def test_exposed_files(monkeypatch):
+    def ff(url, **k):
+        if url.endswith('/.env'):
+            return _FR(200, 'SECRET=abc\nDB_PASS=1', 'text/plain')
+        if url.endswith('/.git/HEAD'):
+            return _FR(200, 'ref: refs/heads/main', 'text/plain')
+        return _FR(404, 'nope', 'text/html')
+    monkeypatch.setattr(ob, '_fetch_seguro', ff)
+    store = Store()
+    e = store.create('domain', 'ejemplo.com')
+    prod = run_by_name('exposed_files', e, store)
+    vals = {p.value for p in prod}
+    assert 'https://ejemplo.com/.env' in vals
+    assert 'https://ejemplo.com/.git/HEAD' in vals
+    assert all('exposed-file' in p.tags for p in prod)
+
+
+def test_exposed_files_soft_404(monkeypatch):
+    # a generic path returning an HTML page must NOT be flagged
+    monkeypatch.setattr(ob, '_fetch_seguro',
+                        lambda url, **k: _FR(200, '<html>Not Found</html>', 'text/html'))
+    store = Store()
+    e = store.create('domain', 'ejemplo.com')
+    assert run_by_name('exposed_files', e, store) == []
+
+
+def test_secret_scan(monkeypatch):
+    def ff(url, **k):
+        if url.endswith('.js'):
+            return _FR(200, 'var k="AIza' + 'B' * 35 + '";', 'application/javascript')
+        return _FR(200, 'AKIA' + 'A' * 16 + ' <script src="/app.js"></script>', 'text/html')
+    monkeypatch.setattr(ob, '_fetch_seguro', ff)
+    store = Store()
+    e = store.create('url', 'https://ejemplo.com/')
+    prod = run_by_name('secret_scan', e, store)
+    labels = {p.value.split(':')[0] for p in prod}
+    assert 'AWS access key' in labels and 'Google API key' in labels
+    assert all(p.type == 'credential' and 'exposed-secret' in p.tags for p in prod)

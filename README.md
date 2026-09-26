@@ -6,8 +6,8 @@
 
 ![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-blue)
 ![Python 3.14](https://img.shields.io/badge/python-3.14-3776ab)
-![Tests](https://img.shields.io/badge/tests-317%20passing-brightgreen)
-![Transforms](https://img.shields.io/badge/transforms-112-orange)
+![Tests](https://img.shields.io/badge/tests-320%20passing-brightgreen)
+![Transforms](https://img.shields.io/badge/transforms-114-orange)
 
 OBSIDIAN takes two ideas that already work — Maltego's model (entities you expand
 with transforms into a graph) and SpiderFoot's (typed events feeding a correlation
@@ -31,8 +31,9 @@ carries where it came from.
 enumeration (crt.sh, certspotter, HackerTarget, **RapidDNS**, **Anubis**), **passive DNS
 (AlienVault OTX)**, **reverse-IP co-hosting lookup**, HTTP probing, screenshots, nuclei,
 **a deep nmap scan (top-1000 + service/version + default NSE scripts)**, tech and CVE
-lookups, **CVE exploit intel (EPSS probability + CISA Known-Exploited)**, breach checks,
-infostealer logs, IP reputation, favicon and
+lookups, **CVE exploit intel (EPSS probability + CISA Known-Exploited)**, **exposed-file
+probing (.env / .git / backups / configs)**, **hardcoded-secret scanning of a page and its
+JavaScript**, breach checks, infostealer logs, IP reputation, favicon and
 TLS-cert pivots, Wayback, **historical URL/endpoint discovery (Wayback CDX)**,
 **ASN → announced-netblock mapping (RIPEstat)**, reverse WHOIS, EXIF metadata, crypto
 tracing, end-of-life detection, passive exposure from Shodan InternetDB (ports and CVEs

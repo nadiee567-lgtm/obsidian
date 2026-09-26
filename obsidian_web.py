@@ -3719,6 +3719,82 @@ def _t_render_js(entity, ctx):
     except Exception as _e:
         log.debug("render_js: %s", _e)
 
+_EXPOSED_PATHS = [
+    '/.env', '/.git/HEAD', '/.git/config', '/config.php.bak', '/wp-config.php.bak',
+    '/.htpasswd', '/.htaccess', '/backup.zip', '/backup.sql', '/database.sql', '/dump.sql',
+    '/.DS_Store', '/.svn/entries', '/docker-compose.yml', '/.npmrc', '/.dockercfg',
+    '/.vscode/sftp.json', '/server-status', '/phpinfo.php', '/.aws/credentials',
+]
+_EXPOSED_SIG = {
+    '/.env':        lambda t: '=' in t,
+    '/.git/HEAD':   lambda t: t.strip().startswith('ref:'),
+    '/.git/config': lambda t: '[core]' in t,
+    '/.htpasswd':   lambda t: ':' in t,
+    '/.svn/entries': lambda t: t.strip()[:1].isdigit(),
+    '/phpinfo.php': lambda t: 'phpinfo()' in t or 'PHP Version' in t,
+}
+
+@transform(input='domain', outputs=('url',), name='exposed_files',
+           description='Probes for publicly exposed sensitive files (.env, .git, backups, keys, configs). '
+                       'Plain HTTP GET on public URLs — no auth, no exploitation. Run ONLY against sites '
+                       'you are authorized to test')
+def _t_exposed_files(entity, ctx):
+    base = f'https://{entity.value}'
+    for path in _EXPOSED_PATHS:
+        try:
+            r = _fetch_seguro(base + path, timeout=8)
+        except Exception:
+            continue
+        if r.status_code != 200:
+            continue
+        body = (r.text or '')[:4000]
+        sig = _EXPOSED_SIG.get(path)
+        if sig:
+            if not sig(body):
+                continue
+        elif 'text/html' in (r.headers.get('Content-Type', '') or '').lower():
+            continue   # generic path returning an HTML page -> almost certainly a soft-404
+        u = ctx.emit('url', base + path, label='EXPOSED file')
+        if u:
+            u.tag('exposed-file')
+
+_SECRET_RE = [
+    ('AWS access key',  re.compile(r'AKIA[0-9A-Z]{16}')),
+    ('Google API key',  re.compile(r'AIza[0-9A-Za-z_\-]{35}')),
+    ('Stripe live key', re.compile(r'sk_live_[0-9A-Za-z]{24,}')),
+    ('GitHub token',    re.compile(r'gh[pousr]_[0-9A-Za-z]{36,}')),
+    ('Slack token',     re.compile(r'xox[baprs]-[0-9A-Za-z-]{10,}')),
+    ('JWT',             re.compile(r'eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{6,}')),
+    ('Private key',     re.compile(r'-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----')),
+]
+
+@transform(input='url', outputs=('credential',), name='secret_scan',
+           description='Fetches a page and its JavaScript and flags hardcoded secrets (API keys, tokens, '
+                       'private keys). Public files only — no auth, no exploitation. Values are redacted in the graph')
+def _t_secret_scan(entity, ctx):
+    try:
+        corpus = (_fetch_seguro(entity.value, timeout=10).text or '')[:500000]
+    except Exception:
+        return
+    for src in re.findall(r'<script[^>]+src=["\']([^"\']+\.js[^"\']*)["\']', corpus)[:8]:
+        try:
+            corpus += '\n' + (_fetch_seguro(urljoin(entity.value, src), timeout=8).text or '')[:300000]
+        except Exception:
+            continue
+    seen = set()
+    for label, rx in _SECRET_RE:
+        for val in rx.findall(corpus):
+            val = val if isinstance(val, str) else val[0]
+            if (label, val) in seen:
+                continue
+            seen.add((label, val))
+            red = (val[:6] + '…' + val[-4:]) if len(val) > 14 else val
+            c = ctx.emit('credential', f'{label}: {red}', label='exposed secret')
+            if c:
+                c.tag('exposed-secret')
+            if len(seen) >= 30:
+                return
+
 @transform(input='file', outputs=(), name='yara_bulk',
            description='Scans a folder with yara-rules (local only)')
 def _t_yara_bulk(entity, ctx):
