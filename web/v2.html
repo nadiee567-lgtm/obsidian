@@ -150,6 +150,9 @@
   .trbtns{display:flex;justify-content:space-between;margin-top:.25rem}
   .trbtns button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:4px;cursor:pointer;font-size:.62rem;padding:0 .35rem}
   .trbtns button:disabled{opacity:.3;cursor:default}
+  #exports{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(600px,93vw);max-height:84vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #exports h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .6rem}
+  #exports .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
   .krow{display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--line);font-size:.76rem;flex-wrap:wrap}
   .krow .ks{font-family:var(--mono);min-width:6rem;color:var(--cyan)}
   .krow input{flex:1;min-width:9rem;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem .4rem;font-family:var(--mono);font-size:.72rem}
@@ -198,6 +201,7 @@
   <div id="repeater"></div>
   <div id="diff"></div>
   <div id="triage"></div>
+  <div id="exports"></div>
 
   <div class="wsbar">
     <span class="wslabel">workspace</span>
@@ -230,7 +234,7 @@
     <span style="margin-left:auto"></span>
     <button id="btnTimeline">timeline</button>
     <button id="btnReporte">report</button>
-    <button id="btnNotas" title="Download the case as an Obsidian notes vault (.zip)">⬇ notes</button>
+    <button id="btnExports" title="Export & interop (Obsidian / STIX / MISP / GraphML / JSON / CSV + webhook)">⬇ export</button>
     <button id="btnReacomodar">↻ re-layout</button>
     <button id="btnExport">⬇ PNG</button>
   </div>
@@ -593,7 +597,41 @@ function timeline(){
 }
 $('#btnTimeline').onclick=timeline;
 $('#btnReporte').onclick=()=>window.open('/v2/report','_blank');
-$('#btnNotas').onclick=()=>window.location='/api/v2/export/obsidian';
+async function panelExports(){
+  const ov=$('#exports');
+  ov.innerHTML='<span class="cerrar" id="exCerrar">✕</span><h2>⬇ export &amp; interop</h2>';
+  [['/api/v2/export/obsidian','Obsidian notes vault (.zip)','entities as notes, relations as [[wikilinks]]'],
+   ['/api/v2/export/stix','STIX 2.1 bundle','observables + findings for threat-intel platforms'],
+   ['/api/v2/export/misp','MISP event','one attribute per mappable entity'],
+   ['/api/v2/export/graphml','GraphML','Gephi / yEd / Cytoscape / Maltego'],
+   ['/api/v2/export/json','JSON','full case, re-importable'],
+   ['/api/v2/export/csv','CSV','one row per entity']].forEach(([url,label,desc])=>{
+    const row=el('div','pbrow');
+    const info=el('div'); info.innerHTML='<b>'+esc(label)+'</b><br><span class="pbd">'+esc(desc)+'</span>';
+    const b=el('button','modbtn'); b.textContent='download'; b.onclick=()=>{ window.location=url; };
+    row.appendChild(info); row.appendChild(b); ov.appendChild(row);
+  });
+  const wbox=el('div','pbimport');
+  wbox.innerHTML='<div class="modtit">WEBHOOK — trigger a playbook by HTTP (automation)</div><div id="whBox"></div>';
+  ov.appendChild(wbox);
+  let wh={configured:false,token:''}; try{ wh=await(await fetch('/api/v2/webhook')).json(); }catch(_){}
+  renderWebhook(wh);
+  ov.style.display='block'; $('#exCerrar').onclick=()=>ov.style.display='none';
+}
+function renderWebhook(wh){
+  const box=$('#whBox'); box.innerHTML='';
+  if(wh.configured && wh.token){
+    const t=el('div','pbd'); t.style.wordBreak='break-all'; t.innerHTML='token: <b>'+esc(wh.token)+'</b>';
+    const cmd=el('pre'); cmd.style.cssText='background:#05070a;border:1px solid var(--line);border-radius:6px;padding:.5rem;font-size:.66rem;white-space:pre-wrap;word-break:break-all;color:#c8d2dc;margin:.4rem 0';
+    cmd.textContent="curl -X POST "+location.origin+"/api/v2/webhook/"+wh.token+" -H 'Content-Type: application/json' -d '{\"playbook\":\"external_recon\",\"value\":\"example.com\"}'";
+    box.appendChild(t); box.appendChild(cmd);
+  } else { const s=el('span','pbd'); s.textContent='no token yet — generate one to enable the webhook'; box.appendChild(s); }
+  const b=el('button','modbtn'); b.textContent=wh.configured?'regenerate token':'generate token';
+  b.onclick=async()=>{ try{ const d=await(await fetch('/api/v2/webhook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})})).json();
+    renderWebhook({configured:true,token:d.token}); }catch(e){ setStatus('error: '+e.message,'err'); } };
+  box.appendChild(b);
+}
+$('#btnExports').onclick=(e)=>{ e.preventDefault(); panelExports(); };
 const SERVICIOS_KEY=[
   ['shodan','Shodan key'],['censys','id:secret'],['zoomeye','API-KEY'],['fofa','email:key'],
   ['quake','token'],['hunter','api-key'],['netlas','api-key'],['criminalip','api-key'],

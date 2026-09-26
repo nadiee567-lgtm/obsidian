@@ -178,3 +178,88 @@ def export_obsidian_vault(store, findings=None, score=0, meta=None) -> dict:
         idx.append('')
     files[f'{folder}/{index_name}.md'] = '\n'.join(idx).rstrip() + '\n'
     return files
+
+
+# ── Interoperability exporters (STIX 2.1 / MISP / GraphML) ────────────────────
+import uuid as _uuid
+
+_STIX_SCO = {  # entity type -> (STIX SCO type, value property)
+    'domain': ('domain-name', 'value'), 'subdomain': ('domain-name', 'value'),
+    'ip': ('ipv4-addr', 'value'), 'url': ('url', 'value'),
+    'email': ('email-addr', 'value'), 'file': ('file', 'name'),
+    'netblock': ('ipv4-addr', 'value'),
+}
+
+
+def export_stix(store, findings=None, meta=None) -> str:
+    """A STIX 2.1 bundle of observables (SCOs) for the mappable entities, plus the
+    risk findings as `note` objects. Importable into TIPs that speak STIX."""
+    objects = []
+    for e in store.entities:
+        m = _STIX_SCO.get(e.type)
+        if not m:
+            continue
+        stype, prop = m
+        oid = f'{stype}--{_uuid.uuid5(_uuid.NAMESPACE_URL, f"{stype}:{e.value}")}'
+        objects.append({'type': stype, 'spec_version': '2.1', 'id': oid, prop: e.value})
+    for h in (findings or []):
+        objects.append({
+            'type': 'note', 'spec_version': '2.1',
+            'id': f'note--{_uuid.uuid5(_uuid.NAMESPACE_URL, f"{h.rule}:{h.message}")}',
+            'abstract': f'[{h.severity}] {h.rule}', 'content': h.message,
+        })
+    bundle = {'type': 'bundle',
+              'id': f'bundle--{_uuid.uuid4()}', 'objects': objects}
+    return json.dumps(bundle, ensure_ascii=False, indent=2)
+
+
+_MISP_ATTR = {  # entity type -> (MISP attribute type, category)
+    'domain': ('domain', 'Network activity'), 'subdomain': ('domain', 'Network activity'),
+    'ip': ('ip-dst', 'Network activity'), 'url': ('url', 'Network activity'),
+    'email': ('email-src', 'Payload delivery'), 'hash': ('sha256', 'Payload delivery'),
+    'netblock': ('ip-dst', 'Network activity'),
+}
+
+
+def export_misp(store, meta=None) -> str:
+    """A MISP event JSON: one attribute per mappable entity. Import via MISP's
+    'Populate from... > JSON'."""
+    meta = dict(meta or {})
+    attrs = []
+    for e in store.entities:
+        m = _MISP_ATTR.get(e.type)
+        if not m:
+            continue
+        atype, cat = m
+        attrs.append({'type': atype, 'category': cat, 'to_ids': False, 'value': e.value})
+    event = {'Event': {
+        'info': f"OBSIDIAN — {meta.get('workspace') or 'case'}",
+        'date': datetime.datetime.now().strftime('%Y-%m-%d'),
+        'analysis': '0', 'threat_level_id': '4', 'distribution': '0',
+        'Attribute': attrs,
+    }}
+    return json.dumps(event, ensure_ascii=False, indent=2)
+
+
+def _xml(s) -> str:
+    return (str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            .replace('"', '&quot;'))
+
+
+def export_graphml(store) -> str:
+    """GraphML (nodes + typed edges) — opens in Gephi, yEd, Cytoscape, and Maltego
+    (via CSV/GraphML import). Keeps the whole graph structure, not just a flat list."""
+    out = ['<?xml version="1.0" encoding="UTF-8"?>',
+           '<graphml xmlns="http://graphml.graphdrawing.org/xmlns">',
+           '<key id="type" for="node" attr.name="type" attr.type="string"/>',
+           '<key id="value" for="node" attr.name="value" attr.type="string"/>',
+           '<key id="label" for="edge" attr.name="label" attr.type="string"/>',
+           '<graph edgedefault="directed">']
+    for e in store.entities:
+        out.append(f'<node id="{_xml(e.id)}"><data key="type">{_xml(e.type)}</data>'
+                   f'<data key="value">{_xml(e.value)}</data></node>')
+    for i, r in enumerate(store.relations):
+        out.append(f'<edge id="e{i}" source="{_xml(r.source)}" target="{_xml(r.target)}">'
+                   f'<data key="label">{_xml(r.label)}</data></edge>')
+    out.append('</graph></graphml>')
+    return '\n'.join(out)

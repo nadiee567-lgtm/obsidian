@@ -113,6 +113,35 @@ def test_v2_import_bulk():
     assert {'ip', 'domain', 'email'} <= {e.type for e in ob._store.entities}
 
 
+def test_v2_export_interop_endpoints():
+    import json as _j
+    from core.modelo import Store
+    ob._store = Store(); ob._store.create('domain', 'x.com'); ob._store.create('ip', '1.2.3.4')
+    b = _j.loads(_client().get('/api/v2/export/stix').data)
+    assert b['type'] == 'bundle'
+    assert _client().get('/api/v2/export/misp').status_code == 200
+    assert _client().get('/api/v2/export/graphml').status_code == 200
+
+
+def test_v2_webhook_flow(monkeypatch):
+    from core.transforms import REGISTRO
+    from core.modelo import Store
+    c = _client()
+    try:
+        tok = c.post('/api/v2/webhook', json={}).get_json()['token']
+        assert c.post('/api/v2/webhook/wrongtoken',
+                      json={'playbook': 'ip_recon', 'value': '1.2.3.4'}).status_code == 403
+        monkeypatch.setattr(REGISTRO, 'by_name', lambda n: None)   # skip steps -> no network
+        ob._store = Store()
+        r = c.post('/api/v2/webhook/' + tok, json={'playbook': 'ip_recon', 'value': '1.2.3.4'})
+        assert r.status_code == 200 and r.get_json()['ok'] is True
+    finally:
+        try:
+            ob._boveda.delete('webhook_token')
+        except Exception:
+            pass
+
+
 def test_v2_diff():
     a = ob._gestor.create('difftest_a'); a.create('domain', 'a-only.com'); a.create('ip', '1.1.1.1')
     ob._gestor.save('difftest_a', a)

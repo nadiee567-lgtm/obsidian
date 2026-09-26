@@ -6,7 +6,7 @@
 
 ![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-blue)
 ![Python 3.14](https://img.shields.io/badge/python-3.14-3776ab)
-![Tests](https://img.shields.io/badge/tests-333%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-338%20passing-brightgreen)
 ![Transforms](https://img.shields.io/badge/transforms-114-orange)
 
 OBSIDIAN takes two ideas that already work — Maltego's model (entities you expand
@@ -71,10 +71,11 @@ new / investigating / confirmed / dismissed), continuous asset monitoring
 with ntfy push alerts, an optional
 **loopback-gated web terminal** (a real shell in the UI — git clone, pip, anything —
 disabled unless OBSIDIAN is bound to localhost), workspaces backed by SQLite with
-snapshots, a self-contained HTML report, and exports to
-JSON / CSV / PDF **and an Obsidian notes vault** (each entity a note, relations as
-`[[wikilinks]]` — open it in the Obsidian app and the graph rebuilds the case). A
-scriptable CLI does all of the above.
+snapshots, a self-contained HTML report, and exports to JSON / CSV / PDF, an **Obsidian
+notes vault** (each entity a note, relations as `[[wikilinks]]` — open it in the Obsidian
+app and the graph rebuilds the case), and **interop formats — STIX 2.1, MISP, and GraphML**
+(for TIPs, Gephi/yEd/Cytoscape/Maltego). A **token-authed webhook** triggers playbooks over
+HTTP for CI / SOAR automation, and a scriptable CLI does all of the above.
 
 ![Report](docs/img/reporte.jpg)
 

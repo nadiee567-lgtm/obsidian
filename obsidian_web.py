@@ -157,7 +157,7 @@ _login_attempts = {}
 _LOCK_THRESHOLD = 5
 _LOCK_SECONDS   = 300
 _PUBLIC_PATHS   = {'/login', '/manifest.json', '/sw.js', '/cert.pem'}
-_PUBLIC_PREFIXES = ('/static/', '/icon-')
+_PUBLIC_PREFIXES = ('/static/', '/icon-', '/api/v2/webhook/')  # webhook verifies its own token
 
 _LOGIN_HTML = _load_web('login.html')
 
@@ -5221,6 +5221,52 @@ def api_v2_terminal():
     except Exception as e:
         out = f'error: {e}\n'
     return jsonify({'output': out[:200000], 'cwd': cwd})
+
+# ── Webhook trigger (external automation: POST a target -> run a playbook) ────
+def _webhook_token():
+    return os.environ.get('OBSIDIAN_WEBHOOK_TOKEN') or _boveda.get('webhook_token')
+
+@app.route('/api/v2/webhook', methods=['GET', 'POST'])
+def api_v2_webhook_admin():
+    """Authed: view or (re)generate the webhook token."""
+    if request.method == 'POST':
+        tok = ((request.json or {}).get('token') or '').strip() or secrets.token_urlsafe(24)
+        _boveda.save('webhook_token', tok)
+        return jsonify({'token': tok})
+    return jsonify({'configured': bool(_webhook_token()), 'token': _webhook_token()})
+
+@app.route('/api/v2/webhook/<token>', methods=['POST'])
+def api_v2_webhook_run(token):
+    """Token-authed (no session): run a playbook on a target. For CI / SOAR / automation."""
+    cfg = _webhook_token()
+    if not cfg:
+        return _error('webhook disabled — set a token first', 403)
+    if not secrets.compare_digest(str(token), str(cfg)):
+        return _error('bad token', 403)
+    d = request.json or {}
+    pb = next((p for p in _PLAYBOOKS if p['name'] == d.get('playbook')), None)
+    if not pb:
+        return _error('unknown playbook', 404)
+    value = (d.get('value') or d.get('target') or '').strip()
+    try:
+        seed = Entity(pb['input'], value)
+        if not seed.well_formed():
+            return _error(f'malformed {pb["input"]}: {value}', 400)
+        _opsec_guard()
+    except ValueError as e:
+        return _error(str(e), 400)
+    from core.transforms import Machine, Runner
+    with _almacen_lock:
+        seed = _store.add(seed)
+        produced = Runner(_store).run_machine(Machine(name=pb['name'], steps=tuple(pb['steps'])), seed)
+        if _ws_activo:
+            try:
+                _gestor.save(_ws_activo, _store)
+                _gestor.record(_ws_activo, f"webhook:{pb['name']}", value, len(produced))
+            except Exception as _e:
+                log.warning("autosave failed: %s", _e)
+    return jsonify({'ok': True, 'playbook': pb['name'], 'produced': len(produced),
+                    'total_entities': len(_store)})
 
 # ── Diff (compare two workspaces) ─────────────────────────────────────────────
 @app.route('/api/v2/diff')

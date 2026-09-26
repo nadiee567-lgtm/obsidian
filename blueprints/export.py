@@ -13,7 +13,8 @@ import datetime
 from flask import Blueprint, Response
 
 from core.correlacion import correlate, risk_score
-from core.exportar import export_json, export_csv, export_obsidian_vault
+from core.exportar import (export_json, export_csv, export_obsidian_vault,
+                           export_stix, export_misp, export_graphml)
 from core.validacion import _case_slug
 
 bp = Blueprint('export', __name__)
@@ -65,3 +66,29 @@ def export_obsidian_route():
             z.writestr(rel, content)
     return Response(buf.getvalue(), mimetype='application/zip',
                     headers={'Content-Disposition': f'attachment; filename="{_export_name()}-notes.zip"'})
+
+
+@bp.route('/api/v2/export/stix')
+def export_stix_route():
+    """STIX 2.1 bundle (observables + findings) for threat-intel platforms."""
+    W = _web()
+    data = export_stix(W._store, correlate(W._store), {'workspace': W._ws_activo})
+    return Response(data, mimetype='application/json',
+                    headers={'Content-Disposition': f'attachment; filename="{_export_name()}-stix.json"'})
+
+
+@bp.route('/api/v2/export/misp')
+def export_misp_route():
+    """MISP event JSON (one attribute per mappable entity)."""
+    W = _web()
+    data = export_misp(W._store, {'workspace': W._ws_activo})
+    return Response(data, mimetype='application/json',
+                    headers={'Content-Disposition': f'attachment; filename="{_export_name()}-misp.json"'})
+
+
+@bp.route('/api/v2/export/graphml')
+def export_graphml_route():
+    """GraphML (nodes + typed edges) for Gephi / yEd / Cytoscape / Maltego."""
+    data = export_graphml(_web()._store)
+    return Response(data, mimetype='application/xml',
+                    headers={'Content-Disposition': f'attachment; filename="{_export_name()}.graphml"'})
