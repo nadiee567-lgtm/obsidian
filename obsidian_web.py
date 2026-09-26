@@ -5977,7 +5977,8 @@ def api_v2_verificar():
 def v2_page():
     """v2 engine demo page: run transforms and view the typed graph.
     Protected by the auth guard (not in _PUBLIC_PATHS)."""
-    return _load_web('v2.html')
+    return Response(_load_web('v2.html'),
+                    headers={'Cache-Control': 'no-cache, no-store, must-revalidate'})
 
 
 @app.route('/api/report', methods=['POST'])

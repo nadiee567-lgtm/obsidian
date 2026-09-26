@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OBSIDIAN · engine v2</title>
 <script src="/static/vis-network.min.js"></script>
+<script src="/static/maplibre-gl.min.js"></script>
 <link rel="stylesheet" href="/static/maplibre-gl.css">
 <style>
   :root{
@@ -154,7 +155,10 @@
   #exports{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(600px,93vw);max-height:84vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   #exports h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .6rem}
   #exports .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
-  #mapwrap{display:none;position:fixed;z-index:98;inset:2.5vh 2.5vw;background:#05070a;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.7)}
+  #mapHandle{position:fixed;top:50%;left:0;transform:translateY(-50%);z-index:60;background:var(--panel2);border:1px solid var(--line);border-left:none;color:var(--muted);font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;padding:1rem .35rem;cursor:pointer;writing-mode:vertical-rl}
+  #mapHandle:hover{color:var(--green);border-color:var(--green)}
+  #mapwrap{position:fixed;inset:0;z-index:98;background:#05070a;overflow:hidden;transform:translateX(-100%);transition:transform .28s ease}
+  #mapwrap.open{transform:translateX(0)}
   #mapcanvas{position:absolute;inset:0}
   #mapbar{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;padding:.5rem .7rem;background:linear-gradient(180deg,rgba(5,7,10,.92),rgba(5,7,10,0));font-family:var(--mono);font-size:.72rem}
   #mapbar .mt{color:var(--text);font-weight:bold;margin-right:.4rem}
@@ -298,6 +302,7 @@
   </div>
 </div>
 
+<div id="mapHandle">&#8592; 🌍 MAP</div>
 <div id="toolsHandle">TOOLS &#8594;</div>
 <div id="toolsView">
   <div class="tvhead">
@@ -716,26 +721,44 @@ async function mapLoadLayer(name){
   MAP.getSource(name).setData(fc(ptFeatures(d.points,LAYER_STYLE[name])));
 }
 function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }
+const MAP_STYLE={
+  version:8, glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+  sources:{demo:{type:'vector',url:'https://demotiles.maplibre.org/tiles/tiles.json'}},
+  layers:[
+    {id:'bg',type:'background',paint:{'background-color':'#071019'}},
+    {id:'land',type:'fill',source:'demo','source-layer':'countries',
+      paint:{'fill-color':'#12314a','fill-opacity':0.92}},
+    {id:'borders',type:'line',source:'demo','source-layer':'countries',
+      paint:{'line-color':'#3f7bb6','line-width':0.7,'line-opacity':0.8}}
+  ]
+};
 function panelMap(){
-  const wrap=$('#mapwrap'); wrap.style.display='block';
+  const wrap=$('#mapwrap'); wrap.classList.add('open');
   if(!MAP){
-    if(typeof maplibregl==='undefined'){ $('#mapinfo').textContent='map library failed to load (/static/maplibre-gl.min.js)'; return; }
-    MAP=new maplibregl.Map({container:'mapcanvas',style:'https://demotiles.maplibre.org/style.json',
-      center:[0,20],zoom:1.4,attributionControl:false});
-    MAP.on('style.load',()=>{ try{ MAP.setProjection({type:'globe'}); }catch(_){}
+    if(typeof maplibregl==='undefined'){ $('#mapinfo').textContent='map library failed to load — hard-refresh (Ctrl+Shift+R)'; return; }
+    MAP=new maplibregl.Map({container:'mapcanvas',style:MAP_STYLE,center:[0,20],zoom:1.5,
+      attributionControl:false,renderWorldCopies:false});
+    MAP.on('style.load',()=>{
+      try{ MAP.setProjection({type:'globe'}); }catch(_){}
+      try{ MAP.setSky({'sky-color':'#0a1a2f','horizon-color':'#1b3a5c','fog-color':'#05070a',
+                       'sky-horizon-blend':0.5,'horizon-fog-blend':0.6,'fog-ground-blend':0.4,'atmosphere-blend':0.7}); }catch(_){}
       mapRefreshAll();
       if(MAP_TIMER) clearInterval(MAP_TIMER);
-      MAP_TIMER=setInterval(()=>{ if($('#mapwrap').style.display==='block') mapRefreshAll(); },60000);
+      MAP_TIMER=setInterval(()=>{ if($('#mapwrap').classList.contains('open')) mapRefreshAll(); },60000);
     });
-  } else { setTimeout(()=>{ MAP.resize(); mapRefreshAll(); },80); }
+    MAP.on('error',(e)=>{ $('#mapinfo').textContent='map: '+((e.error&&e.error.message)||'tile load error — check connection'); });
+    // WebGL needs a resize once the slide-over finishes animating into view
+    setTimeout(()=>{ try{ MAP.resize(); }catch(_){} }, 360);
+  } else { setTimeout(()=>{ try{ MAP.resize(); }catch(_){} mapRefreshAll(); },360); }
 }
 document.querySelectorAll('.maplayer').forEach(el=>{
   el.onclick=()=>{ const L=el.dataset.layer; MAP_ON[L]=!MAP_ON[L]; el.classList.toggle('on',MAP_ON[L]);
     if(!MAP) return;
     if(L==='case'||L==='arcs') mapLoadCase(); else mapLoadLayer(L); };
 });
-$('#mapCerrar').onclick=()=>{ $('#mapwrap').style.display='none'; };
+$('#mapCerrar').onclick=()=>{ $('#mapwrap').classList.remove('open'); };
 $('#btnMap').onclick=(e)=>{ e.preventDefault(); panelMap(); };
+$('#mapHandle').onclick=panelMap;
 const SERVICIOS_KEY=[
   ['shodan','Shodan key'],['censys','id:secret'],['zoomeye','API-KEY'],['fofa','email:key'],
   ['quake','token'],['hunter','api-key'],['netlas','api-key'],['criminalip','api-key'],
