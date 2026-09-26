@@ -133,6 +133,23 @@
   .rpstatus{font-family:var(--mono);font-size:.76rem;margin:.5rem 0 .3rem;color:var(--muted)}
   .rpstatus.err{color:var(--red)} .rpok{color:var(--green)} .rpbad{color:var(--amber)}
   #rpResp{flex:1;overflow:auto;background:#05070a;border:1px solid var(--line);border-radius:8px;padding:.6rem;font-family:var(--mono);font-size:.72rem;color:#c8d2dc;white-space:pre-wrap;word-break:break-word;margin:0}
+  #diff{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(720px,94vw);max-height:82vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #diff h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .8rem} #diff h2 span{color:var(--muted);font-size:.7rem}
+  #diff .cerrar,#triage .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
+  #dfA,#dfB{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:.35rem;font-family:var(--mono);font-size:.74rem}
+  .diffcols{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-top:.6rem}
+  .diffcol h3{font-family:var(--mono);font-size:.72rem;margin:0 0 .4rem;color:var(--text)}
+  .diffitem{font-family:var(--mono);font-size:.7rem;color:var(--muted);padding:.15rem 0;border-bottom:1px solid var(--line);word-break:break-all}
+  #triage{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(1000px,96vw);height:80vh;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1rem;box-shadow:0 20px 60px rgba(0,0,0,.6);flex-direction:column}
+  #triage h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .4rem} #triage h2 span{color:var(--muted);font-size:.7rem}
+  .trboard{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;flex:1;overflow:hidden;margin-top:.5rem}
+  .trcol{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.5rem;overflow:auto;display:flex;flex-direction:column}
+  .trcol h3{font-family:var(--mono);font-size:.7rem;margin:0 0 .4rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text)}
+  .trchip{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:.3rem .4rem;margin-bottom:.35rem;font-size:.68rem}
+  .trv{color:var(--text);word-break:break-all}
+  .trbtns{display:flex;justify-content:space-between;margin-top:.25rem}
+  .trbtns button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:4px;cursor:pointer;font-size:.62rem;padding:0 .35rem}
+  .trbtns button:disabled{opacity:.3;cursor:default}
   .krow{display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--line);font-size:.76rem;flex-wrap:wrap}
   .krow .ks{font-family:var(--mono);min-width:6rem;color:var(--cyan)}
   .krow input{flex:1;min-width:9rem;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.25rem .4rem;font-family:var(--mono);font-size:.72rem}
@@ -173,12 +190,14 @@
 <body>
 <div class="wrap">
   <h1><span class="sq"></span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnDiff">⇄ diff</a> · <a href="#" id="btnTriage">▦ triage</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
   <div id="keys"></div>
   <div id="opsec"></div>
   <div id="terminal"></div>
   <div id="playbooks"></div>
   <div id="repeater"></div>
+  <div id="diff"></div>
+  <div id="triage"></div>
 
   <div class="wsbar">
     <span class="wslabel">workspace</span>
@@ -761,6 +780,53 @@ async function panelRepeater(){
   setTimeout(()=>{ const u=$('#rpUrl'); if(u) u.focus(); },50);
 }
 $('#btnRepeater').onclick=(e)=>{ e.preventDefault(); panelRepeater(); };
+async function panelDiff(){
+  const ov=$('#diff');
+  let wss=[]; try{ wss=(await(await fetch('/api/v2/workspaces')).json()).workspaces||[]; }catch(_){}
+  const opts=wss.map(w=>'<option>'+esc(w)+'</option>').join('');
+  ov.innerHTML='<span class="cerrar" id="dfCerrar">✕</span><h2>⇄ diff · <span>compare two workspaces</span></h2>'
+    +'<div class="rprow"><select id="dfA">'+opts+'</select><select id="dfB">'+opts+'</select>'
+    +'<button class="modbtn" id="dfGo">compare</button></div><div id="dfOut"></div>';
+  $('#dfGo').onclick=async()=>{
+    const a=$('#dfA').value, b=$('#dfB').value, out=$('#dfOut');
+    out.textContent='comparing…';
+    try{ const d=await(await fetch('/api/v2/diff?a='+encodeURIComponent(a)+'&b='+encodeURIComponent(b))).json();
+      if(d.error){ out.textContent=d.error; return; }
+      const list=arr=>arr.map(e=>'<div class="diffitem"><span class="pbin">'+esc(e.type)+'</span> '+esc(e.value)+'</div>').join('')||'<div class="pbd">(none)</div>';
+      out.innerHTML='<div class="pbd" style="margin:.5rem 0">'+esc(a)+': '+d.count_a+' · '+esc(b)+': '+d.count_b+' · shared: '+d.common+'</div>'
+        +'<div class="diffcols"><div class="diffcol"><h3>only in '+esc(a)+' ('+d.only_a.length+')</h3>'+list(d.only_a)+'</div>'
+        +'<div class="diffcol"><h3>only in '+esc(b)+' ('+d.only_b.length+')</h3>'+list(d.only_b)+'</div></div>';
+    }catch(e){ out.textContent='error: '+e.message; }
+  };
+  ov.style.display='block'; $('#dfCerrar').onclick=()=>ov.style.display='none';
+}
+$('#btnDiff').onclick=(e)=>{ e.preventDefault(); panelDiff(); };
+const TR_COLS=['new','investigating','confirmed','dismissed'];
+async function panelTriage(){
+  const ov=$('#triage');
+  let data={columns:{},counts:{}}; try{ data=await(await fetch('/api/v2/triage')).json(); }catch(_){}
+  ov.innerHTML='<span class="cerrar" id="trCerrar">✕</span><h2>▦ triage · <span>move findings across the board (◀ ▶)</span></h2><div class="trboard" id="trBoard"></div>';
+  const board=$('#trBoard');
+  TR_COLS.forEach((col,ci)=>{
+    const c=el('div','trcol');
+    c.innerHTML='<h3>'+col+' ('+((data.counts&&data.counts[col])||0)+')</h3>';
+    (data.columns[col]||[]).forEach(en=>{
+      const chip=el('div','trchip');
+      const v=el('div','trv'); v.innerHTML='<span class="pbin">'+esc(en.type)+'</span> '+esc(en.value); chip.appendChild(v);
+      const bt=el('div','trbtns');
+      const left=el('button'); left.textContent='◀'; left.disabled=ci===0; left.onclick=()=>moveTriage(en.id,TR_COLS[ci-1]);
+      const right=el('button'); right.textContent='▶'; right.disabled=ci===TR_COLS.length-1; right.onclick=()=>moveTriage(en.id,TR_COLS[ci+1]);
+      bt.appendChild(left); bt.appendChild(right); chip.appendChild(bt); c.appendChild(chip);
+    });
+    board.appendChild(c);
+  });
+  ov.style.display='flex'; $('#trCerrar').onclick=()=>ov.style.display='none';
+}
+async function moveTriage(id,status){
+  try{ await fetch('/api/v2/triage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status})}); }catch(_){}
+  panelTriage();
+}
+$('#btnTriage').onclick=(e)=>{ e.preventDefault(); panelTriage(); };
 async function iaCaso(modo){
   const out=$('#iaResumen'); out.innerHTML='<div class="iaresumen">AI ('+esc(modo)+') analyzing the case…</div>';
   try{ const r=await fetch('/api/v2/ia/'+modo,{method:'POST'}); const d=await r.json();

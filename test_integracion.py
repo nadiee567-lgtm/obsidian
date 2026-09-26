@@ -113,6 +113,30 @@ def test_v2_import_bulk():
     assert {'ip', 'domain', 'email'} <= {e.type for e in ob._store.entities}
 
 
+def test_v2_diff():
+    a = ob._gestor.create('difftest_a'); a.create('domain', 'a-only.com'); a.create('ip', '1.1.1.1')
+    ob._gestor.save('difftest_a', a)
+    b = ob._gestor.create('difftest_b'); b.create('domain', 'b-only.com'); b.create('ip', '1.1.1.1')
+    ob._gestor.save('difftest_b', b)
+    try:
+        d = _client().get('/api/v2/diff?a=difftest_a&b=difftest_b').get_json()
+        assert 'a-only.com' in {x['value'] for x in d['only_a']}
+        assert 'b-only.com' in {x['value'] for x in d['only_b']}
+        assert d['common'] == 1   # 1.1.1.1 shared
+    finally:
+        ob._gestor.delete('difftest_a'); ob._gestor.delete('difftest_b')
+
+
+def test_v2_triage():
+    from core.modelo import Store
+    ob._store = Store()
+    e = ob._store.create('domain', 'triage-test.com')
+    assert _client().post('/api/v2/triage', json={'id': e.id, 'status': 'confirmed'}).status_code == 200
+    d = _client().get('/api/v2/triage').get_json()
+    assert 'triage-test.com' in {x['value'] for x in d['columns']['confirmed']}
+    assert 'triage:confirmed' in e.tags
+
+
 def test_v2_repeater_bad_method():
     r = _client().post('/api/v2/repeater', json={'method': 'FOO', 'url': 'https://x.com'})
     assert r.status_code == 400

@@ -5222,6 +5222,62 @@ def api_v2_terminal():
         out = f'error: {e}\n'
     return jsonify({'output': out[:200000], 'cwd': cwd})
 
+# ── Diff (compare two workspaces) ─────────────────────────────────────────────
+@app.route('/api/v2/diff')
+def api_v2_diff():
+    """Compare two workspaces: what's only in A, only in B, and shared."""
+    a = _case_slug(request.args.get('a', '') or '')
+    b = _case_slug(request.args.get('b', '') or '')
+    if not a or not b:
+        return _error('need workspaces a and b', 400)
+    try:
+        sa, sb = _gestor.load(a), _gestor.load(b)
+    except Exception as e:
+        return _error(f'could not load: {e}', 404)
+    ida = {e.id: e for e in sa.entities}
+    idb = {e.id: e for e in sb.entities}
+    ent = lambda e: {'type': e.type, 'value': e.value}
+    only_a = sorted((ent(ida[i]) for i in (ida.keys() - idb.keys())), key=lambda x: (x['type'], x['value']))
+    only_b = sorted((ent(idb[i]) for i in (idb.keys() - ida.keys())), key=lambda x: (x['type'], x['value']))
+    return jsonify({'a': a, 'b': b, 'count_a': len(ida), 'count_b': len(idb),
+                    'common': len(ida.keys() & idb.keys()),
+                    'only_a': only_a[:500], 'only_b': only_b[:500]})
+
+# ── Triage board (entity workflow via triage: tags) ──────────────────────────
+_TRIAGE = ('new', 'investigating', 'confirmed', 'dismissed')
+
+@app.route('/api/v2/triage', methods=['GET', 'POST'])
+def api_v2_triage():
+    if request.method == 'POST':
+        d = request.json or {}
+        status = d.get('status')
+        if status not in _TRIAGE:
+            return _error('bad status', 400)
+        with _almacen_lock:
+            e = _store.get(d.get('id'))
+            if not e:
+                return _error('entity not found', 404)
+            for t in [t for t in e.tags if t.startswith('triage:')]:
+                e.untag(t)
+            if status != 'new':
+                e.tag(f'triage:{status}')
+            if _ws_activo:
+                try:
+                    _gestor.save(_ws_activo, _store)
+                except Exception as _e:
+                    log.warning("autosave failed: %s", _e)
+        return jsonify({'ok': True, 'id': d.get('id'), 'status': status})
+    cols = {s: [] for s in _TRIAGE}
+    for e in _store.entities:
+        st = next((t.split(':', 1)[1] for t in e.tags if t.startswith('triage:')), 'new')
+        if st not in cols:
+            st = 'new'
+        cols[st].append({'id': e.id, 'type': e.type, 'value': e.value})
+    # 'new' can be huge (everything untouched) -> cap it, keep the workflow columns full
+    counts = {s: len(cols[s]) for s in _TRIAGE}
+    cols['new'] = cols['new'][:100]
+    return jsonify({'columns': cols, 'counts': counts})
+
 # ── HTTP Repeater (craft & send custom requests, see the raw response) ────────
 @app.route('/api/v2/repeater', methods=['POST'])
 def api_v2_repeater():

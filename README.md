@@ -6,7 +6,7 @@
 
 ![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-blue)
 ![Python 3.14](https://img.shields.io/badge/python-3.14-3776ab)
-![Tests](https://img.shields.io/badge/tests-331%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-333%20passing-brightgreen)
 ![Transforms](https://img.shields.io/badge/transforms-114-orange)
 
 OBSIDIAN takes two ideas that already work — Maltego's model (entities you expand
@@ -65,7 +65,9 @@ rotation, per-case network identity, sock-puppet vault, and IP-leak checks.
 **Everything else.** One-click **recon playbooks** (curated transform chains that cascade
 from a seed — external recon, attack surface, IP recon, person, email) and **bulk target
 import** (paste a list, types auto-detected), an **HTTP repeater** (craft & send custom
-requests, see the raw response — anti-SSRF, honors OPSEC), continuous asset monitoring
+requests, see the raw response — anti-SSRF, honors OPSEC), **workspace diff** (compare two
+cases: what's only in A, only in B, shared) and a **triage board** (move entities across
+new / investigating / confirmed / dismissed), continuous asset monitoring
 with ntfy push alerts, an optional
 **loopback-gated web terminal** (a real shell in the UI — git clone, pip, anything —
 disabled unless OBSIDIAN is bound to localhost), workspaces backed by SQLite with
