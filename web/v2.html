@@ -176,15 +176,51 @@
   .statbig .score{font-size:2.6rem;font-weight:bold;font-variant-numeric:tabular-nums} .statbig .sl{color:var(--muted);font-family:var(--mono);font-size:.72rem}
   #mapHandle{position:fixed;top:50%;left:0;transform:translateY(-50%);z-index:60;background:var(--panel2);border:1px solid var(--line);border-left:none;color:var(--muted);font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;padding:1rem .35rem;cursor:pointer;writing-mode:vertical-rl}
   #mapHandle:hover{color:var(--green);border-color:var(--green)}
-  #mapwrap{position:fixed;inset:0;z-index:98;background:#05070a;overflow:hidden;transform:translateX(-100%);transition:transform .28s ease}
+  #mapwrap{position:fixed;inset:0;z-index:98;background:#0a0e12;overflow:hidden;transform:translateX(-100%);transition:transform .28s ease;font-family:var(--mono)}
   #mapwrap.open{transform:translateX(0)}
-  #mapcanvas{position:absolute;inset:0}
-  #mapbar{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;padding:.5rem .7rem;background:linear-gradient(180deg,rgba(5,7,10,.92),rgba(5,7,10,0));font-family:var(--mono);font-size:.72rem}
-  #mapbar .mt{color:var(--text);font-weight:bold;margin-right:.4rem}
-  .maplayer{border:1px solid var(--line);border-radius:5px;padding:.15rem .5rem;cursor:pointer;color:var(--muted);background:rgba(10,14,19,.7);user-select:none}
-  .maplayer.on{color:var(--green);border-color:var(--green)}
-  #mapbar .cerrar{margin-left:auto;cursor:pointer;color:var(--muted)}
-  #mapinfo{position:absolute;bottom:.6rem;left:.7rem;z-index:2;font-family:var(--mono);font-size:.68rem;color:var(--muted);background:rgba(5,7,10,.75);border:1px solid var(--line);border-radius:6px;padding:.3rem .5rem;max-width:60%}
+  #mapcanvas{position:absolute;top:34px;left:0;right:340px;bottom:0}
+  /* top sub-header (GLOBAL SITUATION | clock | 2D/3D | close) */
+  #wmTop{position:absolute;top:0;left:0;right:0;height:34px;z-index:5;display:flex;align-items:center;gap:.7rem;padding:0 .8rem;background:#0d1218;border-bottom:1px solid var(--line);font-size:.7rem}
+  #wmTop .wmt{color:var(--green);font-weight:bold;letter-spacing:.1em}
+  #wmClock{color:var(--muted)}
+  #wmTop .spacer{margin-left:auto}
+  .wm23{border:1px solid var(--line);border-radius:4px;padding:.1rem .5rem;cursor:pointer;color:var(--muted)}
+  .wm23.on{color:#06131f;background:var(--green);border-color:var(--green);font-weight:bold}
+  #wmClose{cursor:pointer;color:var(--muted);padding:.1rem .4rem}#wmClose:hover{color:var(--red)}
+  /* time range */
+  #wmTime{position:absolute;top:44px;left:12px;z-index:4;display:flex;gap:2px;background:#0d1218cc;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+  #wmTime span{padding:.2rem .55rem;cursor:pointer;color:var(--muted);font-size:.66rem}
+  #wmTime span.on{background:var(--green);color:#06131f;font-weight:bold}
+  /* left LAYERS panel */
+  #wmLayers{position:absolute;left:12px;bottom:12px;width:220px;max-height:62vh;z-index:4;background:#0d1218ee;border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+  #wmLayers .hd{padding:.4rem .6rem;border-bottom:1px solid var(--line);color:var(--text);font-weight:bold;font-size:.68rem;letter-spacing:.08em;display:flex;justify-content:space-between;cursor:pointer}
+  #wmLayerList{overflow:auto}
+  .wmlay{display:flex;align-items:center;gap:.5rem;padding:.3rem .6rem;cursor:pointer;font-size:.68rem;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.03)}
+  .wmlay:hover{background:rgba(255,255,255,.04)}
+  .wmlay .bx{width:12px;height:12px;border:1px solid var(--line);border-radius:3px;flex:0 0 12px;display:grid;place-items:center;font-size:.6rem}
+  .wmlay.on{color:var(--text)} .wmlay.on .bx{background:var(--green);border-color:var(--green);color:#06131f}
+  .wmlay .em{width:1rem;text-align:center}
+  .wmlay .ct{margin-left:auto;color:var(--muted);font-size:.6rem;font-variant-numeric:tabular-nums}
+  /* zoom controls */
+  #wmZoom{position:absolute;top:44px;right:352px;z-index:4;display:flex;flex-direction:column;gap:2px}
+  #wmZoom button{width:26px;height:26px;background:#0d1218cc;border:1px solid var(--line);color:var(--text);cursor:pointer;border-radius:4px}
+  #wmZoom button:hover{border-color:var(--green);color:var(--green)}
+  /* legend */
+  #wmLegend{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:4;display:flex;gap:.8rem;background:#0d1218cc;border:1px solid var(--line);border-radius:6px;padding:.3rem .7rem;font-size:.62rem;color:var(--muted)}
+  #wmLegend b{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:.25rem;vertical-align:middle}
+  /* right LIVE panel (news + webcams) */
+  #wmRight{position:absolute;top:34px;right:0;bottom:0;width:340px;z-index:4;background:#0d1218;border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+  .wmRhd{padding:.45rem .7rem;border-bottom:1px solid var(--line);color:var(--text);font-weight:bold;font-size:.7rem;display:flex;align-items:center;gap:.4rem}
+  .wmRhd .dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:wmpulse 1.6s infinite}
+  @keyframes wmpulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .wmRhd .n{margin-left:auto;color:var(--muted);font-weight:normal;font-size:.64rem}
+  #wmNewsList{flex:1;overflow:auto;padding:.3rem 0}
+  #wmNewsCtry{display:flex;flex-wrap:wrap;gap:.2rem;padding:.4rem .6rem;border-bottom:1px solid var(--line)}
+  .wmnart{padding:.4rem .7rem;border-bottom:1px solid rgba(255,255,255,.04)}
+  .wmnart a{color:var(--text);text-decoration:none;font-size:.72rem;line-height:1.3} .wmnart a:hover{color:var(--cyan)}
+  .wmnart .m{color:var(--muted);font-size:.6rem;margin-top:.15rem}
+  #mapinfo{position:absolute;bottom:12px;left:242px;z-index:4;font-size:.62rem;color:var(--muted);background:#0d1218cc;border:1px solid var(--line);border-radius:6px;padding:.25rem .5rem}
+  @media(max-width:820px){#mapcanvas{right:0;bottom:40%}#wmRight{top:auto;bottom:0;width:100%;height:40%}#wmZoom{right:12px}}
   .maplibregl-popup-content{background:#0b0e13;color:#c8d2dc;font-family:var(--mono);font-size:.7rem;border:1px solid var(--line);border-radius:6px;padding:.4rem .6rem}
   .maplibregl-popup-tip{border-top-color:#0b0e13!important;border-bottom-color:#0b0e13!important}
   .krow{display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--line);font-size:.76rem;flex-wrap:wrap}
@@ -239,21 +275,36 @@
   <div id="news"></div>
   <div id="stats"></div>
   <div id="mapwrap">
+    <div id="wmTop">
+      <span class="wmt">◉ GLOBAL SITUATION</span>
+      <span id="wmClock">--</span>
+      <span class="spacer"></span>
+      <span class="wm23 on" id="wm2d">2D</span><span class="wm23" id="wm3d">3D</span>
+      <span id="wmClose">✕ close</span>
+    </div>
+    <div id="wmTime">
+      <span data-t="6h">6h</span><span data-t="24h">24h</span><span data-t="48h">48h</span><span data-t="7d" class="on">7d</span><span data-t="all">all</span>
+    </div>
     <div id="mapcanvas"></div>
-    <div id="mapbar">
-      <span class="mt">🌍 live map</span>
-      <span class="maplayer on" data-layer="case">🎯 case</span>
-      <span class="maplayer on" data-layer="arcs">↔ arcs</span>
-      <span class="maplayer" data-layer="quakes">🌍 quakes</span>
-      <span class="maplayer" data-layer="flights">✈️ flights</span>
-      <span class="maplayer" data-layer="fires">🔥 fires</span>
-      <span class="maplayer" data-layer="disasters">🌊 disasters</span>
-      <span class="maplayer" data-layer="rain">🌧️ rain</span>
-      <span class="maplayer" data-layer="cables">🌐 cables</span>
-      <span class="maplayer" data-layer="news">📰 news</span>
-      <span class="cerrar" id="mapCerrar">✕ close</span>
+    <div id="wmZoom"><button id="wmZin">+</button><button id="wmZout">−</button><button id="wmZhome">⌂</button></div>
+    <div id="wmLayers">
+      <div class="hd" id="wmLayHd">LAYERS <span>▾</span></div>
+      <div id="wmLayerList"></div>
+    </div>
+    <div id="wmLegend">
+      <span><b style="background:#f7768e"></b>case</span>
+      <span><b style="background:#e0af68"></b>quakes</span>
+      <span><b style="background:#ff7a45"></b>fires</span>
+      <span><b style="background:#e0575f"></b>disasters</span>
+      <span><b style="background:#6f9298"></b>flights</span>
+      <span><b style="background:#7aa2f7"></b>news</span>
     </div>
     <div id="mapinfo"></div>
+    <div id="wmRight">
+      <div class="wmRhd"><span class="dot"></span> LIVE NEWS <span class="n" id="wmNewsN"></span></div>
+      <div id="wmNewsCtry"></div>
+      <div id="wmNewsList"><div style="padding:.7rem;color:var(--muted);font-size:.7rem">pick countries above to load live headlines</div></div>
+    </div>
   </div>
 
   <div class="wsbar">
@@ -879,44 +930,94 @@ async function mapLoadLayer(name){
   updateMapInfo();
 }
 function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters','news','rain','cables'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }
+// World-Monitor-style flat 2D basemap: CARTO dark raster tiles (keyless, same as WM)
 const MAP_STYLE={
-  version:8, glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-  sources:{demo:{type:'vector',url:'https://demotiles.maplibre.org/tiles/tiles.json'}},
-  layers:[
-    {id:'bg',type:'background',paint:{'background-color':'#071019'}},
-    {id:'land',type:'fill',source:'demo','source-layer':'countries',
-      paint:{'fill-color':'#12314a','fill-opacity':0.92}},
-    {id:'borders',type:'line',source:'demo','source-layer':'countries',
-      paint:{'line-color':'#3f7bb6','line-width':0.7,'line-opacity':0.8}}
-  ]
+  version:8,
+  sources:{esri:{type:'raster',tileSize:256,attribution:'© Esri © OpenStreetMap',
+    tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}']}},
+  layers:[{id:'bg',type:'background',paint:{'background-color':'#0a0e12'}},
+          {id:'esri',type:'raster',source:'esri'}]
 };
+// layers menu (icon, label). data comes from the functions already wired.
+const WM_LAYERS=[
+  ['case','🎯','CASE'],['arcs','↔','ARCS'],['news','📰','LIVE NEWS'],
+  ['quakes','🌋','EARTHQUAKES'],['flights','✈️','AVIATION'],['fires','🔥','FIRES'],
+  ['disasters','🌊','DISASTERS'],['rain','🌧️','SEVERE WEATHER'],['cables','🔌','UNDERSEA CABLES']
+];
+let MAP_3D=false;
+function buildLayerMenu(){
+  const box=$('#wmLayerList'); box.innerHTML='';
+  WM_LAYERS.forEach(([id,em,label])=>{
+    const row=el('div','wmlay'+(MAP_ON[id]?' on':'')); row.dataset.layer=id;
+    row.innerHTML='<span class="bx">'+(MAP_ON[id]?'✓':'')+'</span><span class="em">'+em+'</span><span>'+label+'</span><span class="ct" id="wmct_'+id+'"></span>';
+    row.onclick=()=>{ MAP_ON[id]=!MAP_ON[id]; row.classList.toggle('on',MAP_ON[id]);
+      row.querySelector('.bx').textContent=MAP_ON[id]?'✓':'';
+      if(!MAP) return;
+      if(id==='case'||id==='arcs') mapLoadCase(); else mapLoadLayer(id);
+    };
+    box.appendChild(row);
+  });
+}
+function wmTickCounts(){
+  WM_LAYERS.forEach(([id])=>{ const c=$('#wmct_'+id); if(c) c.textContent=(MAP_COUNTS[id]!=null?MAP_COUNTS[id]:''); });
+}
 function panelMap(){
   const wrap=$('#mapwrap'); wrap.classList.add('open');
+  buildLayerMenu(); wmBuildNewsChips(); wmLoadNews();
+  if(!$('#wmClock').dataset.on){ $('#wmClock').dataset.on='1';
+    setInterval(()=>{ $('#wmClock').textContent=new Date().toISOString().slice(0,19).replace('T',' ')+' UTC'; },1000); }
   if(!MAP){
     if(typeof maplibregl==='undefined'){ $('#mapinfo').textContent='map library failed to load — hard-refresh (Ctrl+Shift+R)'; return; }
-    MAP=new maplibregl.Map({container:'mapcanvas',style:MAP_STYLE,center:[0,20],zoom:1.5,
-      attributionControl:false,renderWorldCopies:false});
-    MAP.on('style.load',()=>{
-      try{ MAP.setProjection({type:'globe'}); }catch(_){}
-      try{ MAP.setSky({'sky-color':'#0a1a2f','horizon-color':'#1b3a5c','fog-color':'#05070a',
-                       'sky-horizon-blend':0.5,'horizon-fog-blend':0.6,'fog-ground-blend':0.4,'atmosphere-blend':0.7}); }catch(_){}
-      mapRefreshAll();
+    MAP=new maplibregl.Map({container:'mapcanvas',style:MAP_STYLE,center:[20,25],zoom:1.6,
+      attributionControl:false,renderWorldCopies:true});
+    MAP.on('style.load',()=>{ mapRefreshAll();
       if(MAP_TIMER) clearInterval(MAP_TIMER);
-      MAP_TIMER=setInterval(()=>{ if($('#mapwrap').classList.contains('open')) mapRefreshAll(); },60000);
+      MAP_TIMER=setInterval(()=>{ if($('#mapwrap').classList.contains('open')){ mapRefreshAll(); wmTickCounts(); } },60000);
     });
-    MAP.on('error',(e)=>{ $('#mapinfo').textContent='map: '+((e.error&&e.error.message)||'tile load error — check connection'); });
-    // WebGL needs a resize once the slide-over finishes animating into view
-    setTimeout(()=>{ try{ MAP.resize(); }catch(_){} }, 360);
-  } else { setTimeout(()=>{ try{ MAP.resize(); }catch(_){} mapRefreshAll(); },360); }
+    MAP.on('mousemove',(e)=>{ $('#mapinfo').textContent=e.lngLat.lat.toFixed(3)+', '+e.lngLat.lng.toFixed(3); });
+    MAP.on('error',(e)=>{ const m=(e.error&&e.error.message)||''; if(m) $('#mapinfo').textContent='map: '+m; });
+    setTimeout(()=>{ try{ MAP.resize(); }catch(_){} setTimeout(wmTickCounts,1500); }, 360);
+  } else { setTimeout(()=>{ try{ MAP.resize(); }catch(_){} mapRefreshAll(); setTimeout(wmTickCounts,1500); },360); }
 }
-document.querySelectorAll('.maplayer').forEach(el=>{
-  el.onclick=()=>{ const L=el.dataset.layer; MAP_ON[L]=!MAP_ON[L]; el.classList.toggle('on',MAP_ON[L]);
-    if(!MAP) return;
-    if(L==='case'||L==='arcs') mapLoadCase(); else mapLoadLayer(L); };
-});
-$('#mapCerrar').onclick=()=>{ $('#mapwrap').classList.remove('open'); };
+// 2D / 3D toggle
+function setMap3D(on){
+  MAP_3D=on; $('#wm2d').classList.toggle('on',!on); $('#wm3d').classList.toggle('on',on);
+  if(!MAP) return;
+  try{
+    if(on){ MAP.setProjection({type:'globe'});
+      try{ MAP.setSky({'sky-color':'#0a1a2f','horizon-color':'#1b3a5c','fog-color':'#05070a','atmosphere-blend':0.6}); }catch(_){}
+    } else { MAP.setProjection({type:'mercator'}); }
+  }catch(_){}
+}
+$('#wm2d').onclick=()=>setMap3D(false);
+$('#wm3d').onclick=()=>setMap3D(true);
+$('#wmZin').onclick=()=>MAP&&MAP.zoomIn(); $('#wmZout').onclick=()=>MAP&&MAP.zoomOut();
+$('#wmZhome').onclick=()=>MAP&&MAP.easeTo({center:[20,25],zoom:1.6});
+$('#wmLayHd').onclick=()=>{ const l=$('#wmLayerList'); l.style.display=l.style.display==='none'?'block':'none'; };
+$('#wmClose').onclick=()=>{ $('#mapwrap').classList.remove('open'); };
 $('#btnMap').onclick=(e)=>{ e.preventDefault(); panelMap(); };
 $('#mapHandle').onclick=panelMap;
+// right-panel news country chips + headlines
+const WM_NEWS_CTRY=[['MX','MX'],['US','US'],['UK','UK'],['UP','UA'],['RS','RU'],['IS','IL'],['CH','CN'],['FR','FR'],['SP','ES']];
+function wmBuildNewsChips(){
+  const box=$('#wmNewsCtry'); if(box.dataset.on) return; box.dataset.on='1';
+  WM_NEWS_CTRY.forEach(([code,lbl])=>{ const c=el('span','nctry'+(NEWS_SEL.includes(code)?' on':'')); c.textContent=lbl;
+    c.onclick=()=>{ if(NEWS_SEL.includes(code)) NEWS_SEL=NEWS_SEL.filter(x=>x!==code); else NEWS_SEL.push(code);
+      c.classList.toggle('on'); wmLoadNews(); }; box.appendChild(c); });
+}
+async function wmLoadNews(){
+  const list=$('#wmNewsList'); list.innerHTML='<div style="padding:.7rem;color:var(--muted);font-size:.7rem">loading…</div>';
+  if(!NEWS_SEL.length){ list.innerHTML='<div style="padding:.7rem;color:var(--muted);font-size:.7rem">pick countries above</div>'; return; }
+  let d={news:{}}; try{ d=await(await fetch('/api/v2/news?countries='+NEWS_SEL.join(','))).json(); }catch(e){ list.textContent='error'; return; }
+  const arts=[]; Object.values(d.news||{}).forEach(a=>arts.push(...a));
+  $('#wmNewsN').textContent=arts.length||'';
+  if(!arts.length){ list.innerHTML='<div style="padding:.7rem;color:var(--muted);font-size:.7rem">no headlines yet (GDELT rate-limits; wait a moment)</div>'; return; }
+  list.innerHTML='';
+  arts.forEach(a=>{ const r=el('div','wmnart');
+    const link=el('a'); link.href=a.url; link.target='_blank'; link.rel='noopener noreferrer'; link.textContent=a.title||a.url;
+    const m=el('div','m'); m.textContent=[a.country,a.domain,(a.seendate||'').replace('T',' ').replace('Z','')].filter(Boolean).join(' · ');
+    r.appendChild(link); r.appendChild(m); list.appendChild(r); });
+}
 const SERVICIOS_KEY=[
   ['shodan','Shodan key'],['censys','id:secret'],['zoomeye','API-KEY'],['fofa','email:key'],
   ['quake','token'],['hunter','api-key'],['netlas','api-key'],['criminalip','api-key'],
