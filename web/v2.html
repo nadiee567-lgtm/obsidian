@@ -238,6 +238,7 @@
       <span class="maplayer" data-layer="flights">✈️ flights</span>
       <span class="maplayer" data-layer="fires">🔥 fires</span>
       <span class="maplayer" data-layer="disasters">🌊 disasters</span>
+      <span class="maplayer" data-layer="rain">🌧️ rain</span>
       <span class="maplayer" data-layer="news">📰 news</span>
       <span class="cerrar" id="mapCerrar">✕ close</span>
     </div>
@@ -708,13 +709,25 @@ async function loadNewsFeed(){
 }
 $('#btnNews').onclick=(e)=>{ e.preventDefault(); panelNews(); };
 /* ---- 🌍 live map (MapLibre GL globe) ---- */
-let MAP=null, MAP_ON={case:true,arcs:true,quakes:false,flights:false,fires:false,disasters:false,news:false}, MAP_TIMER=null;
+let MAP=null, MAP_ON={case:true,arcs:true,quakes:false,flights:false,fires:false,disasters:false,news:false,rain:false}, MAP_TIMER=null;
 let NEWS_SEL=['MX','US'];  // selected country codes for the news layer/panel
+let MAP_COUNTS={};         // per-layer counts shown in the info bar
 const LAYER_STYLE={
   case:{color:'#f7768e',radius:6}, quakes:{color:'#e0af68',radius:4},
   flights:{color:'#6f9298',radius:2.2}, fires:{color:'#ff7a45',radius:3.5},
   disasters:{color:'#a86a70',radius:4}, news:{color:'#7aa2f7',radius:4}
 };
+const ZONE_COLOR={red:'#e0575f',orange:'#e0af68',green:'#7d9a78'};
+function circlePolygon(lat,lon,km,n=40){
+  const R=6371, coords=[];
+  const latR=lat*Math.PI/180, lonR=lon*Math.PI/180, d=km/R;
+  for(let i=0;i<=n;i++){const brng=2*Math.PI*i/n;
+    const la=Math.asin(Math.sin(latR)*Math.cos(d)+Math.cos(latR)*Math.sin(d)*Math.cos(brng));
+    const lo=lonR+Math.atan2(Math.sin(brng)*Math.sin(d)*Math.cos(latR),Math.cos(d)-Math.sin(latR)*Math.sin(la));
+    coords.push([lo*180/Math.PI,la*180/Math.PI]);
+  }
+  return coords;
+}
 function greatCircle(a,b,n=48){
   const rad=x=>x*Math.PI/180, deg=x=>x*180/Math.PI;
   const la1=rad(a.lat),lo1=rad(a.lon),la2=rad(b.lat),lo2=rad(b.lon);
@@ -758,16 +771,64 @@ async function mapLoadCase(){
   MAP.getSource('case').setData(fc(MAP_ON.case?ptFeatures(d.points,LAYER_STYLE.case):[]));
   const arcF=(MAP_ON.arcs?d.arcs:[]).map(a=>({type:'Feature',geometry:{type:'LineString',coordinates:greatCircle(a.from,a.to)},properties:{}}));
   MAP.getSource('arcs').setData(fc(arcF));
-  $('#mapinfo').textContent=d.located+' located / '+d.total+' entities in case · IP geo is city/datacenter-accurate';
+  MAP_COUNTS.case=d.located; MAP_COUNTS.total=d.total;
+  updateMapInfo();
+}
+function updateMapInfo(){
+  const loc=MAP_COUNTS.case||0, tot=MAP_COUNTS.total||0;
+  const parts=[loc+' located / '+tot+' in case'];
+  const em={quakes:'🌍',flights:'✈️',fires:'🔥',disasters:'🌊',news:'📰'};
+  ['quakes','flights','fires','disasters','news'].forEach(n=>{ if(MAP_ON[n]&&MAP_COUNTS[n]!=null) parts.push(em[n]+' '+MAP_COUNTS[n]); });
+  if(MAP_ON.rain) parts.push('🌧️ radar');
+  $('#mapinfo').textContent=parts.join('  ·  ')+'  ·  IP geo city-accurate';
+}
+function ensureZoneLayer(){
+  if(MAP.getSource('disasters_zone')) return;
+  MAP.addSource('disasters_zone',{type:'geojson',data:fc([])});
+  MAP.addLayer({id:'disasters_zone_fill',type:'fill',source:'disasters_zone',
+    paint:{'fill-color':['get','color'],'fill-opacity':0.18}});
+  MAP.addLayer({id:'disasters_zone_line',type:'line',source:'disasters_zone',
+    paint:{'line-color':['get','color'],'line-width':1.2,'line-opacity':0.7}});
+}
+async function mapLoadDisasters(){
+  ensureZoneLayer(); ensurePointLayer('disasters');
+  if(!MAP_ON.disasters){ MAP.getSource('disasters_zone').setData(fc([])); MAP.getSource('disasters').setData(fc([])); MAP_COUNTS.disasters=null; return; }
+  let d={zones:[]}; try{ d=await(await fetch('/api/v2/map/layer/disasters')).json(); }catch(_){}
+  const zones=d.zones||[];
+  MAP_COUNTS.disasters=zones.length;
+  const polys=zones.map(z=>({type:'Feature',
+    geometry:{type:'Polygon',coordinates:[circlePolygon(z.lat,z.lon,z.radius_km||150)]},
+    properties:{color:ZONE_COLOR[z.level]||'#a86a70'}}));
+  MAP.getSource('disasters_zone').setData(fc(polys));
+  // center markers with label
+  const centers=zones.map(z=>({lat:z.lat,lon:z.lon,label:(z.kind?z.kind+': ':'')+z.label,
+    type:'disaster',w:0,city:z.level+' alert · ~'+z.radius_km+' km'}));
+  MAP.getSource('disasters').setData(fc(ptFeatures(centers,{color:'#e0575f',radius:4})));
+  updateMapInfo();
+}
+async function mapLoadRain(){
+  if(!MAP_ON.rain){ if(MAP.getLayer('rain')) MAP.removeLayer('rain'); if(MAP.getSource('rain')) MAP.removeSource('rain'); return; }
+  if(MAP.getSource('rain')) return;
+  let w={}; try{ w=await(await fetch('/api/v2/map/weather')).json(); }catch(_){}
+  if(!w.host||!w.path) return;
+  MAP.addSource('rain',{type:'raster',tiles:[w.host+w.path+'/256/{z}/{x}/{y}/2/1_1.png'],tileSize:256});
+  // put rain under the point layers so dots stay on top
+  const firstPt = ['case','quakes','flights','fires','disasters','news'].find(id=>MAP.getLayer(id));
+  MAP.addLayer({id:'rain',type:'raster',source:'rain',paint:{'raster-opacity':0.55}}, firstPt);
 }
 async function mapLoadLayer(name){
+  if(name==='disasters') return mapLoadDisasters();
+  if(name==='rain') return mapLoadRain();
   ensurePointLayer(name);
-  if(!MAP_ON[name]){ MAP.getSource(name).setData(fc([])); return; }
+  if(!MAP_ON[name]){ MAP.getSource(name).setData(fc([])); MAP_COUNTS[name]=null; updateMapInfo(); return; }
   const url = name==='news' ? '/api/v2/map/layer/news?countries='+NEWS_SEL.join(',') : '/api/v2/map/layer/'+name;
   let d={points:[]}; try{ d=await(await fetch(url)).json(); }catch(_){}
-  MAP.getSource(name).setData(fc(ptFeatures(d.points,LAYER_STYLE[name])));
+  const pts=d.points||[];
+  MAP_COUNTS[name]=pts.length;
+  MAP.getSource(name).setData(fc(ptFeatures(pts,LAYER_STYLE[name])));
+  updateMapInfo();
 }
-function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters','news'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }
+function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters','news','rain'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }
 const MAP_STYLE={
   version:8, glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
   sources:{demo:{type:'vector',url:'https://demotiles.maplibre.org/tiles/tiles.json'}},
@@ -888,7 +949,7 @@ async function panelTerminal(){
     ov.innerHTML='<span class="cerrar" id="tmCerrar">✕</span>'
       +'<h2>⌨ terminal · <span>runs on THIS host · localhost only</span></h2>'
       +'<pre id="termout"></pre>'
-      +'<div class="termin"><span id="termcwd">$</span><input id="termcmd" autocomplete="off" spellcheck="false" placeholder="type a command… (git clone, ls, pip, cd)"></div>';
+      +'<div class="termin"><span id="termcwd">$</span><input id="termcmd" autocomplete="off" spellcheck="false" placeholder="type a command… (git clone, ls, pip, cd)"><button class="modbtn" id="termRun">run ▶</button></div>';
     const out=$('#termout');
     try{ const s=await(await fetch('/api/v2/terminal')).json();
       if(s && s.enabled && !s.error){ TERM_CWD=s.cwd||'~';
@@ -897,19 +958,22 @@ async function panelTerminal(){
     }catch(e){ out.textContent='could not reach terminal: '+e.message+'\n'; }
     $('#termcwd').textContent=TERM_CWD+' $';
     const inp=$('#termcmd');
-    inp.onkeydown=async(ev)=>{
-      if(ev.key==='Enter'){
-        const cmd=inp.value; inp.value='';
-        if(cmd.trim()){ TERM_HIST.push(cmd); TERM_HI=TERM_HIST.length; }
-        out.textContent+=TERM_CWD+' $ '+cmd+'\n';
-        if(cmd.trim()==='clear'){ out.textContent=''; return; }
-        try{ const d=await(await fetch('/api/v2/terminal',{method:'POST',headers:{'Content-Type':'application/json'},
-              body:JSON.stringify({cmd,cwd:TERM_CWD})})).json();
-          if(d.error){ out.textContent+=d.error+'\n'; }
-          else { if(d.output) out.textContent+=d.output; TERM_CWD=d.cwd||TERM_CWD; $('#termcwd').textContent=TERM_CWD+' $'; }
-        }catch(e){ out.textContent+='error: '+e.message+'\n'; }
-        out.scrollTop=out.scrollHeight;
-      } else if(ev.key==='ArrowUp'){ if(TERM_HI>0){ TERM_HI--; inp.value=TERM_HIST[TERM_HI]||''; } ev.preventDefault(); }
+    async function termRun(){
+      const cmd=inp.value; inp.value='';
+      if(cmd.trim()){ TERM_HIST.push(cmd); TERM_HI=TERM_HIST.length; }
+      out.textContent+=TERM_CWD+' $ '+cmd+'\n';
+      if(cmd.trim()==='clear'){ out.textContent=''; return; }
+      try{ const d=await(await fetch('/api/v2/terminal',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({cmd,cwd:TERM_CWD})})).json();
+        if(d.error){ out.textContent+=d.error+'\n'; }
+        else { if(d.output) out.textContent+=d.output; TERM_CWD=d.cwd||TERM_CWD; $('#termcwd').textContent=TERM_CWD+' $'; }
+      }catch(e){ out.textContent+='error: '+e.message+'\n'; }
+      out.scrollTop=out.scrollHeight;
+    }
+    $('#termRun').onclick=termRun;
+    inp.onkeydown=(ev)=>{
+      if(ev.key==='Enter'){ ev.preventDefault(); termRun(); }
+      else if(ev.key==='ArrowUp'){ if(TERM_HI>0){ TERM_HI--; inp.value=TERM_HIST[TERM_HI]||''; } ev.preventDefault(); }
       else if(ev.key==='ArrowDown'){ if(TERM_HI<TERM_HIST.length-1){ TERM_HI++; inp.value=TERM_HIST[TERM_HI]||''; } else { TERM_HI=TERM_HIST.length; inp.value=''; } ev.preventDefault(); }
     };
     _termInit=true;

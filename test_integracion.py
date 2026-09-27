@@ -179,6 +179,32 @@ def test_v2_map_layer_news(monkeypatch):
     ob._NEWS_CACHE.clear()
 
 
+def test_v2_map_weather(monkeypatch):
+    class _R:
+        def json(self):
+            return {'host': 'https://tc.rainviewer.com',
+                    'radar': {'past': [{'time': 123, 'path': '/v2/radar/abc'}]}}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R())
+    ob._LAYER_CACHE.clear()
+    d = _client().get('/api/v2/map/weather').get_json()
+    assert d['host'] == 'https://tc.rainviewer.com' and d['path'] == '/v2/radar/abc'
+    ob._LAYER_CACHE.clear()
+
+
+def test_v2_map_disasters_zones(monkeypatch):
+    class _R:
+        def json(self):
+            return {'features': [{'geometry': {'coordinates': [120.0, 14.0]},
+                                  'properties': {'name': 'Typhoon X', 'eventtype': 'TC',
+                                                 'alertlevel': 'Red'}}]}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R())
+    ob._LAYER_CACHE.clear()
+    d = _client().get('/api/v2/map/layer/disasters').get_json()
+    z = d['zones'][0]
+    assert z['kind'] == 'cyclone' and z['level'] == 'red' and z['radius_km'] == 700
+    ob._LAYER_CACHE.clear()
+
+
 def test_v2_map_layer_quakes(monkeypatch):
     class _R:
         def json(self):

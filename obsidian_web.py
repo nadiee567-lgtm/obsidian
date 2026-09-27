@@ -5381,20 +5381,40 @@ def _layer_fires():
                 pts.append({'lat': c[1], 'lon': c[0], 'label': ev.get('title') or 'fire'})
     return {'points': pts}
 
+_GDACS_RADIUS = {'green': 120, 'orange': 350, 'red': 700}   # km, by alert level (zone size)
+
 def _layer_disasters():
     d = SESSION.get('https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP', timeout=15).json()
-    pts = []
+    zones = []
     for f in (d.get('features') or []):
         c = (f.get('geometry') or {}).get('coordinates') or []
         p = f.get('properties') or {}
-        if len(c) >= 2:
-            pts.append({'lat': c[1], 'lon': c[0],
-                        'label': p.get('name') or p.get('htmldescription') or 'event',
-                        'level': p.get('alertlevel')})
-    return {'points': pts}
+        if len(c) < 2:
+            continue
+        level = (p.get('alertlevel') or 'green').lower()
+        etype = p.get('eventtype') or ''
+        kinds = {'EQ': 'earthquake', 'TC': 'cyclone', 'FL': 'flood', 'VO': 'volcano',
+                 'DR': 'drought', 'WF': 'wildfire', 'TS': 'tsunami'}
+        zones.append({'lat': c[1], 'lon': c[0],
+                      'label': p.get('name') or p.get('htmldescription') or kinds.get(etype, 'event'),
+                      'kind': kinds.get(etype, etype), 'level': level,
+                      'radius_km': _GDACS_RADIUS.get(level, 150)})
+    return {'points': [], 'zones': zones}
 
 _MAP_LAYERS = {'quakes': _layer_quakes, 'flights': _layer_flights,
                'fires': _layer_fires, 'disasters': _layer_disasters}
+
+@app.route('/api/v2/map/weather')
+def api_v2_map_weather():
+    """RainViewer radar config (rain shown as colored ZONES via raster tiles, keyless).
+    Frontend builds tiles as {host}{path}/256/{z}/{x}/{y}/2/1_1.png"""
+    def fetch():
+        d = SESSION.get('https://api.rainviewer.com/public/weather-maps.json', timeout=12).json()
+        past = (d.get('radar') or {}).get('past') or []
+        frame = past[-1] if past else None
+        return {'host': d.get('host'), 'path': frame.get('path') if frame else None,
+                'ts': frame.get('time') if frame else None}
+    return jsonify(_layer_cached('weather', fetch))
 
 @app.route('/api/v2/map/layer/<name>')
 def api_v2_map_layer(name):
