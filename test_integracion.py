@@ -179,6 +179,23 @@ def test_v2_map_layer_news(monkeypatch):
     ob._NEWS_CACHE.clear()
 
 
+def test_v2_briefing(monkeypatch):
+    # no external calls: stub the layer fetchers + news + ia
+    monkeypatch.setattr(ob, '_layer_quakes', lambda: {'points': [{'mag': 5.1, 'label': 'X'}]})
+    monkeypatch.setattr(ob, '_layer_fires', lambda: {'points': [{'lat': 1, 'lon': 1}]})
+    monkeypatch.setattr(ob, '_layer_disasters', lambda: {'zones': []})
+    monkeypatch.setattr(ob, '_fetch_news', lambda code: [{'country': code, 'title': 'H '+code}])
+    monkeypatch.setattr(ob.ia, 'available', lambda: False)
+    ob._LAYER_CACHE.clear(); ob._BRIEF_CACHE.update({'ts': 0, 'data': None})
+    d = _client().get('/api/v2/briefing').get_json()
+    assert 'WORLD BRIEFING' in d['digest'] and 'M5.1' in d['digest']
+    assert d['ai'] is None and d['ai_available'] is False
+    # asking for ai when unavailable -> graceful note, still returns digest
+    d2 = _client().get('/api/v2/briefing?ai=1').get_json()
+    assert d2['ai'] is None and 'ai_note' in d2
+    ob._LAYER_CACHE.clear(); ob._BRIEF_CACHE.update({'ts': 0, 'data': None})
+
+
 def test_v2_stats():
     from core.modelo import Store
     ob._store = Store()

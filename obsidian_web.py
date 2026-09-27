@@ -5543,6 +5543,64 @@ def api_v2_map_layer_news():
                         'label': a['title'][:90], 'url': a['url'], 'domain': a['domain']})
     return jsonify({'points': pts})
 
+# ── Daily world briefing (lightweight; AI is optional + on-demand) ────────────
+_BRIEF_CACHE = {'ts': 0.0, 'data': None}
+_BRIEF_TTL = 1800  # 30 min
+
+def _build_briefing():
+    """Compose the day's situation from the live feeds — PURE Python, no LLM, ~0 RAM,
+    works on any machine. Reuses the cached map layers so it's cheap."""
+    quakes = _layer_cached('quakes', _layer_quakes).get('points', [])
+    top_q = sorted([q for q in quakes if isinstance(q.get('mag'), (int, float))],
+                   key=lambda q: -q['mag'])[:5]
+    fires = _layer_cached('fires', _layer_fires).get('points', [])
+    dis = _layer_cached('disasters', _layer_disasters).get('zones', [])
+    news = []
+    for code in ('US', 'UK', 'MX'):
+        news += _fetch_news(code)[:4]
+    lines = [f"WORLD BRIEFING — {datetime.datetime.utcnow():%Y-%m-%d %H:%M UTC}", ""]
+    lines.append(f"Earthquakes (24h): {len(quakes)} total.")
+    for q in top_q:
+        lines.append(f"  • M{q['mag']} {q.get('label','')}")
+    lines.append(f"Active wildfires (recent): {len(fires)}.")
+    if dis:
+        lines.append(f"Disaster alerts (GDACS): {len(dis)}.")
+        for z in dis[:5]:
+            lines.append(f"  • [{z.get('level','').upper()}] {z.get('kind','')}: {z.get('label','')}")
+    else:
+        lines.append("Disaster alerts (GDACS): none active.")
+    if news:
+        lines.append("")
+        lines.append("Top headlines:")
+        for a in news[:10]:
+            lines.append(f"  • [{a.get('country','')}] {a.get('title','')}")
+    return "\n".join(lines)
+
+@app.route('/api/v2/briefing')
+def api_v2_briefing():
+    """Daily world briefing. Base digest is template-only (no AI). Add ?ai=1 to also get a
+    narrative from the LOCAL Ollama model — on demand only, never a background daemon; if
+    Ollama isn't installed/available it degrades to the template with a clear note."""
+    now = time.time()
+    if _BRIEF_CACHE['data'] and now - _BRIEF_CACHE['ts'] < _BRIEF_TTL:
+        digest = _BRIEF_CACHE['data']
+    else:
+        digest = _build_briefing()
+        _BRIEF_CACHE.update({'ts': now, 'data': digest})
+    out = {'digest': digest, 'ai': None, 'ai_available': ia.available()}
+    if request.args.get('ai') == '1':
+        if not out['ai_available']:
+            out['ai_note'] = 'Local AI (Ollama) not available — showing the plain digest. AI is optional.'
+        else:
+            try:
+                out['ai'] = ia.ask(
+                    'Summarize this world situation briefing in 4-6 sentences for an analyst, '
+                    'neutral tone, most important first:\n\n' + digest,
+                    max_tokens=350, temp=0.4)
+            except Exception as e:
+                out['ai_note'] = f'AI summary failed: {e}'
+    return jsonify(out)
+
 # ── Investigation stats (the numbers) ────────────────────────────────────────
 @app.route('/api/v2/stats')
 def api_v2_stats():

@@ -167,6 +167,10 @@
   .nsec{font-family:var(--mono);font-size:.7rem;color:var(--amber);margin:.6rem 0 .2rem}
   #stats{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(640px,94vw);max-height:84vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   #stats h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .8rem} #stats .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
+  #brief{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(640px,94vw);max-height:84vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;font-family:var(--mono)}
+  #brief h2{font-size:.9rem;margin:0 0 .6rem} #brief .cerrar{float:right;cursor:pointer;color:var(--muted)}
+  #briefText{white-space:pre-wrap;font-size:.74rem;color:var(--text);line-height:1.5;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.7rem;margin:.5rem 0}
+  #briefAI{white-space:pre-wrap;font-size:.76rem;color:var(--green);line-height:1.55;border-left:3px solid var(--green);padding:.4rem .7rem;margin:.5rem 0}
   .statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.6rem}
   .statcard{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.6rem .7rem}
   .statcard .n{font-family:var(--font-d,var(--mono));font-size:1.5rem;font-weight:bold;color:var(--text);font-variant-numeric:tabular-nums}
@@ -268,7 +272,7 @@
 <body>
 <div class="wrap">
   <h1><span class="sq"></span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnMap">🌍 map</a> · <a href="#" id="btnStats">📊 stats</a> · <a href="#" id="btnNews">📰 news</a> · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnDiff">⇄ diff</a> · <a href="#" id="btnTriage">▦ triage</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnMap">🌍 map</a> · <a href="#" id="btnBrief">📋 briefing</a> · <a href="#" id="btnStats">📊 stats</a> · <a href="#" id="btnNews">📰 news</a> · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnDiff">⇄ diff</a> · <a href="#" id="btnTriage">▦ triage</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
   <div id="keys"></div>
   <div id="opsec"></div>
   <div id="terminal"></div>
@@ -279,6 +283,7 @@
   <div id="exports"></div>
   <div id="news"></div>
   <div id="stats"></div>
+  <div id="brief"></div>
   <div id="mapwrap">
     <div id="wmTop">
       <span class="wmt">◉ GLOBAL SITUATION</span>
@@ -805,6 +810,28 @@ async function panelStats(){
   $('#statBody').innerHTML=html;
 }
 $('#btnStats').onclick=(e)=>{ e.preventDefault(); panelStats(); };
+async function panelBrief(){
+  const ov=$('#brief');
+  ov.innerHTML='<span class="cerrar" id="brCerrar">✕</span><h2>📋 world briefing · <span style="color:var(--muted);font-size:.7rem">live feeds · no AI needed</span></h2>'
+    +'<div id="briefText">loading…</div><div id="briefAIwrap"></div>';
+  ov.style.display='block'; $('#brCerrar').onclick=()=>ov.style.display='none';
+  let d={}; try{ d=await(await fetch('/api/v2/briefing')).json(); }catch(e){ $('#briefText').textContent='error: '+e.message; return; }
+  $('#briefText').textContent=d.digest||'(no data)';
+  const w=$('#briefAIwrap');
+  const b=el('button','modbtn');
+  b.textContent=d.ai_available?'✨ enhance with local AI (Ollama)':'AI off — Ollama not detected';
+  if(!d.ai_available){ b.disabled=true; b.style.opacity=.5; }
+  b.onclick=async()=>{ b.textContent='thinking… (runs Ollama only now, then frees RAM)'; b.disabled=true;
+    try{ const r=await(await fetch('/api/v2/briefing?ai=1')).json();
+      if(r.ai){ const a=el('div'); a.id='briefAI'; a.textContent=r.ai; w.innerHTML=''; w.appendChild(a); }
+      else { b.textContent=r.ai_note||'AI unavailable'; b.disabled=false; }
+    }catch(e){ b.textContent='error: '+e.message; b.disabled=false; } };
+  w.innerHTML=''; w.appendChild(b);
+  const note=el('div'); note.style.cssText='color:var(--muted);font-size:.64rem;margin-top:.5rem';
+  note.textContent='Base briefing is pure data (instant, works on any machine). AI is optional and only runs when you click.';
+  w.appendChild(note);
+}
+$('#btnBrief').onclick=(e)=>{ e.preventDefault(); panelBrief(); };
 /* ---- 🌍 live map (MapLibre GL globe) ---- */
 let MAP=null, MAP_ON={case:true,arcs:true,quakes:false,flights:false,fires:false,disasters:false,news:false,rain:false,cables:false}, MAP_TIMER=null;
 let NEWS_SEL=['MX','US'];  // selected country codes for the news layer/panel
