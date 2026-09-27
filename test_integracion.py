@@ -179,6 +179,21 @@ def test_v2_map_layer_news(monkeypatch):
     ob._NEWS_CACHE.clear()
 
 
+def test_v2_stats():
+    from core.modelo import Store
+    ob._store = Store()
+    ob._store.create('ip', '1.2.3.4', properties={'lat': 39.0, 'lon': -77.0, 'country': 'United States'})
+    ob._store.create('subdomain', 'a.example.com')
+    ob._store.create('subdomain', 'b.example.com')
+    cve = ob._store.create('cve', 'CVE-2021-44228'); cve.tag('actively-exploited')
+    d = _client().get('/api/v2/stats').get_json()
+    h = d['headline']
+    assert h['entities'] == 4 and h['subdomains'] == 2 and h['ips'] == 1
+    assert h['cves'] == 1 and h['cves_actively_exploited'] == 1
+    assert h['located_on_map'] == 1
+    assert 'United States' in d['countries']
+
+
 def test_v2_map_weather(monkeypatch):
     class _R:
         def json(self):

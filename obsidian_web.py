@@ -121,6 +121,7 @@ if not os.path.exists(os.path.join(STATIC_DIR, _VIS)) and os.path.exists(os.path
 _MAPLIBRE = {
     'maplibre-gl.min.js': 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js',
     'maplibre-gl.css': 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css',
+    'submarine-cables.geojson': 'https://raw.githubusercontent.com/lintaojlu/submarine_cable_information/master/web/public/api/v3/cable/cable-geo.json',
 }
 for _fn, _url in _MAPLIBRE.items():
     _dst = os.path.join(STATIC_DIR, _fn)
@@ -5507,6 +5508,43 @@ def api_v2_map_layer_news():
             pts.append({'lat': lat + (i % 5) * 0.6 - 1.2, 'lon': lon + (i // 5) * 0.6 - 0.6,
                         'label': a['title'][:90], 'url': a['url'], 'domain': a['domain']})
     return jsonify({'points': pts})
+
+# ── Investigation stats (the numbers) ────────────────────────────────────────
+@app.route('/api/v2/stats')
+def api_v2_stats():
+    """Live numbers for the current case: risk score, entity counts by type, findings by
+    severity, and headline metrics (open ports, CVEs incl. actively-exploited, exposed
+    files/secrets, subdomains, located entities)."""
+    ents = _store.entities
+    by_type = {}
+    for e in ents:
+        by_type[e.type] = by_type.get(e.type, 0) + 1
+    findings = correlate(_store)
+    sev = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
+    for h in findings:
+        if h.severity in sev:
+            sev[h.severity] += 1
+    def _tagged(tag):
+        return sum(1 for e in ents if tag in e.tags)
+    located = sum(1 for e in ents if _coords_of(e))
+    countries = sorted({(e.properties or {}).get('country') for e in ents
+                        if (e.properties or {}).get('country')})
+    headline = {
+        'entities': len(ents),
+        'risk_score': risk_score(findings),
+        'findings': len(findings),
+        'open_ports': by_type.get('port', 0),
+        'subdomains': by_type.get('subdomain', 0),
+        'ips': by_type.get('ip', 0),
+        'cves': by_type.get('cve', 0),
+        'cves_actively_exploited': _tagged('actively-exploited'),
+        'cves_high_exploit_prob': _tagged('high-exploit-probability'),
+        'exposed_files': _tagged('exposed-file'),
+        'exposed_secrets': _tagged('exposed-secret'),
+        'located_on_map': located,
+    }
+    return jsonify({'workspace': _ws_activo, 'headline': headline,
+                    'severity': sev, 'by_type': by_type, 'countries': countries})
 
 # ── Diff (compare two workspaces) ─────────────────────────────────────────────
 @app.route('/api/v2/diff')

@@ -165,6 +165,15 @@
   .nart a{color:var(--text);text-decoration:none;font-size:.82rem} .nart a:hover{color:var(--cyan);text-decoration:underline}
   .nart .meta{color:var(--muted);font-family:var(--mono);font-size:.64rem;margin-top:.15rem}
   .nsec{font-family:var(--mono);font-size:.7rem;color:var(--amber);margin:.6rem 0 .2rem}
+  #stats{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(640px,94vw);max-height:84vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #stats h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .8rem} #stats .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
+  .statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.6rem}
+  .statcard{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.6rem .7rem}
+  .statcard .n{font-family:var(--font-d,var(--mono));font-size:1.5rem;font-weight:bold;color:var(--text);font-variant-numeric:tabular-nums}
+  .statcard .l{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:.15rem}
+  .statcard.crit .n{color:var(--red)} .statcard.warn .n{color:var(--amber)} .statcard.ok .n{color:var(--green)}
+  .statbig{display:flex;align-items:baseline;gap:.6rem;margin-bottom:.8rem}
+  .statbig .score{font-size:2.6rem;font-weight:bold;font-variant-numeric:tabular-nums} .statbig .sl{color:var(--muted);font-family:var(--mono);font-size:.72rem}
   #mapHandle{position:fixed;top:50%;left:0;transform:translateY(-50%);z-index:60;background:var(--panel2);border:1px solid var(--line);border-left:none;color:var(--muted);font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;padding:1rem .35rem;cursor:pointer;writing-mode:vertical-rl}
   #mapHandle:hover{color:var(--green);border-color:var(--green)}
   #mapwrap{position:fixed;inset:0;z-index:98;background:#05070a;overflow:hidden;transform:translateX(-100%);transition:transform .28s ease}
@@ -218,7 +227,7 @@
 <body>
 <div class="wrap">
   <h1><span class="sq"></span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnMap">🌍 map</a> · <a href="#" id="btnNews">📰 news</a> · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnDiff">⇄ diff</a> · <a href="#" id="btnTriage">▦ triage</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnMap">🌍 map</a> · <a href="#" id="btnStats">📊 stats</a> · <a href="#" id="btnNews">📰 news</a> · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnDiff">⇄ diff</a> · <a href="#" id="btnTriage">▦ triage</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
   <div id="keys"></div>
   <div id="opsec"></div>
   <div id="terminal"></div>
@@ -228,6 +237,7 @@
   <div id="triage"></div>
   <div id="exports"></div>
   <div id="news"></div>
+  <div id="stats"></div>
   <div id="mapwrap">
     <div id="mapcanvas"></div>
     <div id="mapbar">
@@ -239,6 +249,7 @@
       <span class="maplayer" data-layer="fires">🔥 fires</span>
       <span class="maplayer" data-layer="disasters">🌊 disasters</span>
       <span class="maplayer" data-layer="rain">🌧️ rain</span>
+      <span class="maplayer" data-layer="cables">🌐 cables</span>
       <span class="maplayer" data-layer="news">📰 news</span>
       <span class="cerrar" id="mapCerrar">✕ close</span>
     </div>
@@ -708,8 +719,35 @@ async function loadNewsFeed(){
   if(!any) feed.innerHTML='<div class="pbd">no headlines right now (GDELT rate-limits; try again in a moment)</div>';
 }
 $('#btnNews').onclick=(e)=>{ e.preventDefault(); panelNews(); };
+async function panelStats(){
+  const ov=$('#stats');
+  ov.innerHTML='<span class="cerrar" id="stCerrar">✕</span><h2>📊 investigation stats</h2><div id="statBody">loading…</div>';
+  ov.style.display='block'; $('#stCerrar').onclick=()=>ov.style.display='none';
+  let d={}; try{ d=await(await fetch('/api/v2/stats')).json(); }catch(e){ $('#statBody').textContent='error: '+e.message; return; }
+  const h=d.headline||{}, sev=d.severity||{};
+  const scoreCls=h.risk_score>=70?'crit':h.risk_score>=35?'warn':'ok';
+  const card=(n,l,cls)=>'<div class="statcard '+(cls||'')+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>';
+  let html='<div class="statbig"><span class="score '+scoreCls+'" style="color:var(--'+(scoreCls==="crit"?"red":scoreCls==="warn"?"amber":"green")+')">'+(h.risk_score||0)+'</span>'
+    +'<span class="sl">/100 risk score · '+(h.entities||0)+' entities · '+(d.workspace||'no workspace')+'</span></div>';
+  html+='<div class="statgrid">';
+  html+=card(sev.critical||0,'critical', (sev.critical? 'crit':''));
+  html+=card(sev.high||0,'high',(sev.high?'warn':''));
+  html+=card(h.cves_actively_exploited||0,'exploited CVEs',(h.cves_actively_exploited?'crit':''));
+  html+=card(h.exposed_secrets||0,'exposed secrets',(h.exposed_secrets?'crit':''));
+  html+=card(h.exposed_files||0,'exposed files',(h.exposed_files?'warn':''));
+  html+=card(h.open_ports||0,'open ports');
+  html+=card(h.cves||0,'CVEs total');
+  html+=card(h.subdomains||0,'subdomains');
+  html+=card(h.ips||0,'IPs');
+  html+=card(h.located_on_map||0,'on map');
+  html+='</div>';
+  if((d.countries||[]).length) html+='<div class="nsec">countries</div><div class="pbd">'+d.countries.map(esc).join(' · ')+'</div>';
+  if((d.by_type)){ html+='<div class="nsec">entities by type</div><div class="pbd">'+Object.entries(d.by_type).sort((a,b)=>b[1]-a[1]).map(([k,v])=>esc(k)+': '+v).join(' · ')+'</div>'; }
+  $('#statBody').innerHTML=html;
+}
+$('#btnStats').onclick=(e)=>{ e.preventDefault(); panelStats(); };
 /* ---- 🌍 live map (MapLibre GL globe) ---- */
-let MAP=null, MAP_ON={case:true,arcs:true,quakes:false,flights:false,fires:false,disasters:false,news:false,rain:false}, MAP_TIMER=null;
+let MAP=null, MAP_ON={case:true,arcs:true,quakes:false,flights:false,fires:false,disasters:false,news:false,rain:false,cables:false}, MAP_TIMER=null;
 let NEWS_SEL=['MX','US'];  // selected country codes for the news layer/panel
 let MAP_COUNTS={};         // per-layer counts shown in the info bar
 const LAYER_STYLE={
@@ -816,9 +854,21 @@ async function mapLoadRain(){
   const firstPt = ['case','quakes','flights','fires','disasters','news'].find(id=>MAP.getLayer(id));
   MAP.addLayer({id:'rain',type:'raster',source:'rain',paint:{'raster-opacity':0.55}}, firstPt);
 }
+async function mapLoadCables(){
+  if(!MAP_ON.cables){ if(MAP.getLayer('cables')) MAP.setLayoutProperty('cables','visibility','none'); MAP_COUNTS.cables=null; updateMapInfo(); return; }
+  if(!MAP.getSource('cables')){
+    MAP.addSource('cables',{type:'geojson',data:'/static/submarine-cables.geojson'});
+    MAP.addLayer({id:'cables',type:'line',source:'cables',
+      paint:{'line-color':'#4fd6be','line-width':0.8,'line-opacity':0.55}});
+    MAP.on('click','cables',(e)=>{ const p=e.features[0].properties||{};
+      new maplibregl.Popup().setLngLat(e.lngLat).setHTML('<b>🌐 '+esc(p.name||p.id||'cable')+'</b>').addTo(MAP); });
+  } else { MAP.setLayoutProperty('cables','visibility','visible'); }
+  MAP_COUNTS.cables='510'; updateMapInfo();
+}
 async function mapLoadLayer(name){
   if(name==='disasters') return mapLoadDisasters();
   if(name==='rain') return mapLoadRain();
+  if(name==='cables') return mapLoadCables();
   ensurePointLayer(name);
   if(!MAP_ON[name]){ MAP.getSource(name).setData(fc([])); MAP_COUNTS[name]=null; updateMapInfo(); return; }
   const url = name==='news' ? '/api/v2/map/layer/news?countries='+NEWS_SEL.join(',') : '/api/v2/map/layer/'+name;
@@ -828,7 +878,7 @@ async function mapLoadLayer(name){
   MAP.getSource(name).setData(fc(ptFeatures(pts,LAYER_STYLE[name])));
   updateMapInfo();
 }
-function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters','news','rain'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }
+function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters','news','rain','cables'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }
 const MAP_STYLE={
   version:8, glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
   sources:{demo:{type:'vector',url:'https://demotiles.maplibre.org/tiles/tiles.json'}},
