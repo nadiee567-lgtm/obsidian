@@ -192,8 +192,20 @@
   .statcard.crit .n{color:var(--red)} .statcard.warn .n{color:var(--amber)} .statcard.ok .n{color:var(--green)}
   .statbig{display:flex;align-items:baseline;gap:.6rem;margin-bottom:.8rem}
   .statbig .score{font-size:2.6rem;font-weight:bold;font-variant-numeric:tabular-nums} .statbig .sl{color:var(--muted);font-family:var(--mono);font-size:.72rem}
-  #mapHandle{position:fixed;top:50%;left:0;transform:translateY(-50%);z-index:60;background:var(--panel2);border:1px solid var(--line);border-left:none;color:var(--muted);font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;padding:1rem .35rem;cursor:pointer;writing-mode:vertical-rl}
-  #mapHandle:hover{color:var(--green);border-color:var(--green)}
+  #mapHandle{display:none}
+  /* left dock — one button per panel (replaces the blue text links) */
+  #dock{position:fixed;top:50%;left:8px;transform:translateY(-50%);z-index:70;display:flex;flex-direction:column;gap:4px;
+    background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:6px 5px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .dockbtn{position:relative;width:34px;height:34px;display:grid;place-items:center;border:1px solid transparent;border-radius:8px;
+    background:var(--panel);cursor:pointer;font-size:1rem;color:var(--muted);user-select:none;transition:all .12s}
+  .dockbtn:hover{border-color:var(--cyan);color:var(--text);transform:translateX(2px)}
+  .dockbtn .tip{position:absolute;left:44px;top:50%;transform:translateY(-50%);white-space:nowrap;background:#05070a;border:1px solid var(--line);
+    border-radius:6px;padding:.2rem .5rem;font-family:var(--mono);font-size:.66rem;color:var(--text);opacity:0;pointer-events:none;transition:opacity .12s;z-index:71}
+  .dockbtn:hover .tip{opacity:1}
+  .docksep{height:1px;background:var(--line);margin:3px 2px}
+  #terminal>h2,#msf>h2,#repeater>h2,#diff>h2,#triage>h2,#exports>h2,#news>h2,#stats>h2,#brief>h2,#playbooks>h2,#keys>h2,#opsec>h2{cursor:move}
+  @media(max-width:640px){#dock{flex-direction:row;flex-wrap:wrap;top:auto;bottom:6px;left:50%;transform:translateX(-50%);max-width:96vw}
+    .dockbtn .tip{display:none}}
   #mapwrap{position:fixed;inset:0;z-index:98;background:#0a0e12;overflow:hidden;transform:translateX(-100%);transition:transform .28s ease;font-family:var(--mono)}
   #mapwrap.open{transform:translateX(0)}
   #mapcanvas{position:absolute;top:34px;left:0;right:340px;bottom:0}
@@ -286,7 +298,8 @@
 <body>
 <div class="wrap">
   <h1><span class="sq"></span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnMap">🌍 map</a> · <a href="#" id="btnBrief">📋 briefing</a> · <a href="#" id="btnStats">📊 stats</a> · <a href="#" id="btnNews">📰 news</a> · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnDiff">⇄ diff</a> · <a href="#" id="btnTriage">▦ triage</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnMsf">💥 metasploit</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
+  <div class="sub">typed interactive graph · right-click a node → transforms · tools in the dock ◀ · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
+  <div id="dock"></div>
   <div id="keys"></div>
   <div id="opsec"></div>
   <div id="terminal"></div>
@@ -450,6 +463,40 @@ const SHAPE={target:'star',ip:'diamond',email:'triangle',user:'hexagon',org:'box
 const SEVCOLOR={critical:'#f7768e',high:'#ff9e64',medium:'#e0af68',low:'#7dcfff'};
 const $=s=>document.querySelector(s);
 const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e;};
+// left dock: one button per panel (buttons carry the same ids the panel wiring expects)
+const DOCK=[
+  ['btnMap','🌍','map'],['btnToolsDock','🧰','tools (distros)'],['sep'],
+  ['btnBrief','📋','briefing'],['btnStats','📊','stats'],['btnNews','📰','news'],['sep'],
+  ['btnPlaybooks','▶','playbooks'],['btnRepeater','⚡','repeater'],['btnDiff','⇄','diff'],['btnTriage','▦','triage'],['sep'],
+  ['btnOpsec','🛡','OPSEC'],['btnTerminal','⌨','terminal'],['btnMsf','💥','metasploit'],['btnKeys','🔑','API keys']
+];
+function buildDock(){
+  const d=$('#dock'); if(!d) return;
+  DOCK.forEach(row=>{
+    if(row[0]==='sep'){ const s=el('div','docksep'); d.appendChild(s); return; }
+    const [id,icon,tip]=row; const b=el('div','dockbtn'); b.id=id;
+    b.innerHTML=icon+'<span class="tip">'+tip+'</span>'; d.appendChild(b);
+  });
+  // tools button opens the distros slide-over (openTools defined later; called lazily)
+  const t=$('#btnToolsDock'); if(t) t.onclick=()=>{ try{ openTools(); }catch(_){} };
+  const m=$('#mapHandle'); // keep legacy handle working if present
+}
+buildDock();
+// delegated drag: any floating panel can be moved by its header (h2)
+const DRAG_PANELS=['terminal','msf','repeater','diff','triage','exports','news','stats','brief','playbooks','keys','opsec'];
+document.addEventListener('pointerdown',(e)=>{
+  const hd=e.target.closest('h2'); if(!hd) return;
+  const panel=hd.parentElement; if(!panel || DRAG_PANELS.indexOf(panel.id)<0) return;
+  if(e.target.closest('button,input,select,a,textarea,.cerrar')) return;
+  const r=panel.getBoundingClientRect();
+  panel.style.transform='none'; panel.style.left=r.left+'px'; panel.style.top=r.top+'px'; panel.style.margin='0';
+  const ox=e.clientX-r.left, oy=e.clientY-r.top; hd.style.cursor='grabbing';
+  const mv=(ev)=>{ panel.style.left=Math.max(0,Math.min(window.innerWidth-80,ev.clientX-ox))+'px';
+    panel.style.top=Math.max(0,Math.min(window.innerHeight-24,ev.clientY-oy))+'px'; };
+  const up=()=>{ hd.style.cursor='move'; document.removeEventListener('pointermove',mv); document.removeEventListener('pointerup',up); };
+  document.addEventListener('pointermove',mv); document.addEventListener('pointerup',up);
+  e.preventDefault();
+});
 let entMap={};   // id -> entity
 let tiposOcultos=new Set();
 
