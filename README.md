@@ -6,7 +6,7 @@
 
 ![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-blue)
 ![Python 3.14](https://img.shields.io/badge/python-3.14-3776ab)
-![Tests](https://img.shields.io/badge/tests-345%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-355%20passing-brightgreen)
 ![Transforms](https://img.shields.io/badge/transforms-114-orange)
 
 OBSIDIAN takes two ideas that already work — Maltego's model (entities you expand
@@ -17,6 +17,50 @@ background monitor pings your phone when something changes. Most of it runs with
 a single API key.
 
 ![Interactive graph](docs/img/grafo.jpg)
+
+---
+
+## Live global map & command dashboard
+
+Beyond the OSINT graph, OBSIDIAN ships a real-time situational-awareness map (2D flat or a
+3D globe, toggleable) that plots your own investigation **and** live global feeds — flights,
+earthquakes, wildfires, disasters, weather radar, submarine cables, satellites, news and
+public webcams — all from keyless (or free-key) public sources, refreshed on their own.
+Every panel is reachable from a left icon dock and can be dragged around.
+
+![Live global map](docs/img/livemap.jpg)
+
+**Map layers (real data, most keyless):**
+
+| Layer | Source |
+|---|---|
+| 🎯 Your case | IPs geolocated (real lat/lon) + EXIF GPS, with great-circle arcs between related entities |
+| ✈️ Aviation | OpenSky ADS-B — thousands of live flights as airplane icons rotated by heading (altitude/speed/callsign in the popup) |
+| 🌋 Earthquakes | USGS (24h) — magnitude, depth, time, tsunami flag |
+| 🔥 Fires | NASA EONET — **only fires active in the last 14 days** (honest count, not stale "open" events) |
+| 🌊 Disasters | GDACS — drawn as **zones** with a real km radius by alert level |
+| 🌧️ Severe weather | RainViewer radar — rain shown as coloured **zones**, not dots |
+| 🔌 Undersea cables | 510 real submarine fibre cables |
+| 🛰️ Satellites | CelesTrak TLEs propagated live with SGP4 (real orbits, moving) |
+| 📷 Live webcams | Windy Webcams (free key) — real geolocated public cameras, live player in the popup |
+| 📰 / 📺 News & TV | GDELT live headlines by country + embedded 24/7 news channels (Al Jazeera, DW, France 24, Sky, Bloomberg, ABC) |
+
+**Command panels (in the dock):**
+
+- **▶ Playbooks** — one-click recon chains that cascade from a seed (external recon, attack
+  surface, IP recon, person, email) + **bulk target import**.
+- **⚡ HTTP repeater** — craft & send custom requests, see the raw response (anti-SSRF, honors OPSEC).
+- **📊 Stats** — live investigation numbers: risk score, findings by severity, actively-exploited
+  CVEs, exposed secrets/files, open ports, subdomains, IPs, countries.
+- **📋 Briefing** — a daily world briefing composed from the live feeds; **pure data, no LLM,
+  runs on any machine**, with an *optional* on-demand summary from a local Ollama model (never a
+  24/7 daemon; degrades cleanly if Ollama isn't installed).
+- **⇄ Diff & ▦ Triage** — compare two workspaces; move findings across new/investigating/confirmed/dismissed.
+- **⌨ Terminal** — a real shell on the host (git clone, pip, …), plus an **interactive PTY mode**
+  (xterm.js over WebSocket) for full TUIs (vim, top, colours). Loopback-gated.
+- **💥 Metasploit console** — drive a real `msfconsole` from the browser via the msfrpcd RPC
+  (loopback + login gated; authorized targets only; degrades with setup steps if not running).
+- **🛡 Extreme OPSEC**, **⬇ Export/interop**, **🔑 API keys** — as described below.
 
 ---
 
