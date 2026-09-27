@@ -38,6 +38,13 @@ app   = Flask(__name__,
 os.makedirs(CASES_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
 
+# Optional WebSocket support (flask-sock) for the interactive PTY terminal.
+try:
+    from flask_sock import Sock
+    sock = Sock(app)
+except Exception:
+    sock = None
+
 def _error(message, codigo=400):
     """Consistent JSON error response: {'error': msg, 'code': n}."""
     return jsonify({'error': message, 'code': codigo}), codigo
@@ -123,6 +130,9 @@ _MAPLIBRE = {
     'maplibre-gl.css': 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css',
     'submarine-cables.geojson': 'https://raw.githubusercontent.com/lintaojlu/submarine_cable_information/master/web/public/api/v3/cable/cable-geo.json',
     'satellite.min.js': 'https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js',
+    'xterm.js': 'https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js',
+    'xterm.css': 'https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css',
+    'xterm-addon-fit.js': 'https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js',
 }
 for _fn, _url in _MAPLIBRE.items():
     _dst = os.path.join(STATIC_DIR, _fn)
@@ -5209,6 +5219,64 @@ def _terminal_allowed():
     host = os.environ.get('OBSIDIAN_HOST', '127.0.0.1')
     loopback = host in ('127.0.0.1', '::1', 'localhost', '')
     return loopback or os.environ.get('OBSIDIAN_TERMINAL_EXPOSED') == '1'
+
+# ── Interactive PTY terminal over WebSocket (full TUI: vim/top/colors) ────────
+if sock is not None:
+    @sock.route('/ws/terminal')
+    def ws_terminal(ws):
+        """A real pseudo-terminal streamed over WebSocket (xterm.js frontend). Same
+        loopback gate + session auth as the command terminal. Input is raw keystrokes;
+        a JSON {"resize":[rows,cols]} message resizes the PTY."""
+        if not session.get('auth') or not _terminal_allowed():
+            try: ws.close()
+            except Exception: pass
+            return
+        import pty, struct, fcntl, termios, select as _sel, signal
+        shell = os.environ.get('SHELL', '/bin/bash')
+        pid, fd = pty.fork()
+        if pid == 0:  # child -> exec the shell
+            os.environ['TERM'] = 'xterm-256color'
+            try: os.execvp(shell, [shell])
+            except Exception: os._exit(1)
+        # parent: relay pty <-> websocket
+        def _reader():
+            try:
+                while True:
+                    r, _, _ = _sel.select([fd], [], [], 0.2)
+                    if fd in r:
+                        data = os.read(fd, 4096)
+                        if not data:
+                            break
+                        ws.send(data.decode('utf-8', 'replace'))
+            except Exception:
+                pass
+            finally:
+                try: ws.close()
+                except Exception: pass
+        t = threading.Thread(target=_reader, daemon=True); t.start()
+        try:
+            while True:
+                msg = ws.receive()
+                if msg is None:
+                    break
+                if msg.startswith('{') and 'resize' in msg:
+                    try:
+                        rc = json.loads(msg)['resize']
+                        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack('HHHH', rc[0], rc[1], 0, 0))
+                        continue
+                    except Exception:
+                        pass
+                os.write(fd, msg.encode('utf-8', 'replace'))
+        except Exception:
+            pass
+        finally:
+            try: os.kill(pid, signal.SIGKILL); os.waitpid(pid, 0)
+            except Exception: pass
+
+@app.route('/api/v2/terminal/pty')
+def api_v2_terminal_pty():
+    """Whether the interactive PTY terminal is available (flask-sock present + allowed)."""
+    return jsonify({'available': sock is not None and _terminal_allowed()})
 
 @app.route('/api/v2/terminal', methods=['GET', 'POST'])
 def api_v2_terminal():

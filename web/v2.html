@@ -7,7 +7,10 @@
 <script src="/static/vis-network.min.js"></script>
 <script src="/static/maplibre-gl.min.js"></script>
 <script src="/static/satellite.min.js"></script>
+<script src="/static/xterm.js"></script>
+<script src="/static/xterm-addon-fit.js"></script>
 <link rel="stylesheet" href="/static/maplibre-gl.css">
+<link rel="stylesheet" href="/static/xterm.css">
 <style>
   :root{
     /* dry, matte palette -- sober, low-saturation, no glow */
@@ -1252,13 +1255,52 @@ async function panelOpsec(){
 }
 $('#btnOpsec').onclick=(e)=>{ e.preventDefault(); panelOpsec(); };
 let TERM_CWD='~', TERM_HIST=[], TERM_HI=0, _termInit=false;
+let PTY_TERM=null, PTY_WS=null, PTY_FIT=null;
+async function setupPtyButton(){
+  const btn=$('#termPtyBtn'); if(!btn) return;
+  let avail=false; try{ avail=(await(await fetch('/api/v2/terminal/pty')).json()).available; }catch(_){}
+  if(!avail){ btn.style.display='none'; return; }
+  btn.onclick=()=>{
+    const on=$('#ptyBox').style.display!=='none';
+    if(on){ // back to basic
+      $('#ptyBox').style.display='none'; $('#termout').style.display='block'; $('.termin').style.display='flex';
+      btn.textContent='▶ interactive (vim/top)';
+      if(PTY_WS){ try{PTY_WS.close();}catch(_){} PTY_WS=null; }
+      return;
+    }
+    $('#termout').style.display='none'; $('.termin').style.display='none'; $('#ptyBox').style.display='block';
+    btn.textContent='▉ basic shell';
+    startPty();
+  };
+}
+function startPty(){
+  if(typeof Terminal==='undefined'){ $('#ptyBox').textContent='xterm not loaded (hard-refresh)'; return; }
+  const box=$('#ptyBox'); box.innerHTML='';
+  PTY_TERM=new Terminal({fontSize:13,fontFamily:'ui-monospace,monospace',theme:{background:'#05070a',foreground:'#c8d2dc'},cursorBlink:true});
+  try{ PTY_FIT=new FitAddon.FitAddon(); PTY_TERM.loadAddon(PTY_FIT); }catch(_){ PTY_FIT=null; }
+  PTY_TERM.open(box);
+  try{ PTY_FIT&&PTY_FIT.fit(); }catch(_){}
+  const proto=location.protocol==='https:'?'wss':'ws';
+  PTY_WS=new WebSocket(proto+'://'+location.host+'/ws/terminal');
+  PTY_WS.onopen=()=>{ sendResize();
+    PTY_TERM.onData(d=>{ if(PTY_WS&&PTY_WS.readyState===1) PTY_WS.send(d); }); };
+  PTY_WS.onmessage=(e)=>{ PTY_TERM.write(e.data); };
+  PTY_WS.onclose=()=>{ PTY_TERM.write('\r\n\x1b[31m[session closed]\x1b[0m\r\n'); };
+  function sendResize(){ try{ PTY_FIT&&PTY_FIT.fit(); const d={resize:[PTY_TERM.rows,PTY_TERM.cols]};
+    if(PTY_WS&&PTY_WS.readyState===1) PTY_WS.send(JSON.stringify(d)); }catch(_){} }
+  window.addEventListener('resize',sendResize);
+  setTimeout(sendResize,200);
+}
 async function panelTerminal(){
   const ov=$('#terminal');
   if(!_termInit){
     ov.innerHTML='<span class="cerrar" id="tmCerrar">✕</span>'
-      +'<h2>⌨ terminal · <span>runs on THIS host · localhost only</span></h2>'
+      +'<h2>⌨ terminal · <span>runs on THIS host · localhost only</span> '
+      +'<button class="modbtn" id="termPtyBtn" style="margin-left:.5rem">▶ interactive (vim/top)</button></h2>'
       +'<pre id="termout"></pre>'
+      +'<div id="ptyBox" style="display:none;flex:1;min-height:0"></div>'
       +'<div class="termin"><span id="termcwd">$</span><input id="termcmd" autocomplete="off" spellcheck="false" placeholder="type a command… (git clone, ls, pip, cd)"><button class="modbtn" id="termRun">run ▶</button></div>';
+    setupPtyButton();
     const out=$('#termout');
     try{ const s=await(await fetch('/api/v2/terminal')).json();
       if(s && s.enabled && !s.error){ TERM_CWD=s.cwd||'~';
