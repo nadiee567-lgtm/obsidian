@@ -850,6 +850,10 @@ function popupHTML(p,layer){
     R('type',p.type); R('city',p.city); R('country',p.country);
   } else if(layer==='disasters'){
     R('kind',p.type); R('detail',p.city);
+  } else if(layer==='fires'){
+    R('last active',p.when);
+  } else if(layer==='news'){
+    R('source',p.domain); R('country',p.country);
   } else { R('info',p.sub); }
   const title=(p.callsign||p.label||p.value||'—');
   return '<b>'+t+' '+esc(String(title))+'</b>'+(rows.length?'<div style="margin-top:.3rem;font-size:.66rem;line-height:1.5">'+rows.join('')+'</div>':'');

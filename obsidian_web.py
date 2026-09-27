@@ -5388,15 +5388,32 @@ def _layer_flights():
     return {'points': pts}
 
 def _layer_fires():
-    d = SESSION.get('https://eonet.gsfc.nasa.gov/api/v3/events?category=wildfires&status=open&limit=500',
+    # EONET marks wildfires "open" for a long time (many started months ago and were never
+    # closed). To keep the layer HONEST — only fires with a data point in the last 14 days,
+    # i.e. actually active recently — we filter by the latest geometry date.
+    import datetime as _dt
+    d = SESSION.get('https://eonet.gsfc.nasa.gov/api/v3/events?category=wildfires&status=open&limit=1000&days=20',
                     timeout=15).json()
+    now = _dt.datetime.now(_dt.timezone.utc)
     pts = []
     for ev in d.get('events', []):
         geo = ev.get('geometry') or []
-        if geo:
-            c = geo[-1].get('coordinates') or []
-            if len(c) >= 2:
-                pts.append({'lat': c[1], 'lon': c[0], 'label': ev.get('title') or 'fire'})
+        if not geo:
+            continue
+        last = geo[-1]
+        c = last.get('coordinates') or []
+        if len(c) < 2:
+            continue
+        when = last.get('date', '')
+        recent = False
+        try:
+            dt = _dt.datetime.fromisoformat(when.replace('Z', '+00:00'))
+            recent = (now - dt).days <= 14
+        except Exception:
+            recent = True  # keep if date unparseable rather than hide
+        if recent:
+            pts.append({'lat': c[1], 'lon': c[0], 'label': ev.get('title') or 'fire',
+                        'when': when.replace('T', ' ').replace('Z', ' UTC')})
     return {'points': pts}
 
 _GDACS_RADIUS = {'green': 120, 'orange': 350, 'red': 700}   # km, by alert level (zone size)
