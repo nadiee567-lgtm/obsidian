@@ -214,7 +214,12 @@
   .wmRhd .dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:wmpulse 1.6s infinite}
   @keyframes wmpulse{0%,100%{opacity:1}50%{opacity:.3}}
   .wmRhd .n{margin-left:auto;color:var(--muted);font-weight:normal;font-size:.64rem}
-  #wmNewsList{flex:1;overflow:auto;padding:.3rem 0}
+  #wmTvTabs{display:flex;flex-wrap:wrap;gap:.2rem;padding:.4rem .6rem;border-bottom:1px solid var(--line)}
+  .wmtv{border:1px solid var(--line);border-radius:4px;padding:.12rem .45rem;cursor:pointer;color:var(--muted);font-size:.62rem;user-select:none}
+  .wmtv.on{color:#06131f;background:var(--red);border-color:var(--red);font-weight:bold}
+  #wmTvBox{aspect-ratio:16/9;background:#000;border-bottom:1px solid var(--line)}
+  #wmTvBox iframe{width:100%;height:100%;border:0;display:block}
+  #wmNewsList{flex:1;overflow:auto;padding:.3rem 0;min-height:120px}
   #wmNewsCtry{display:flex;flex-wrap:wrap;gap:.2rem;padding:.4rem .6rem;border-bottom:1px solid var(--line)}
   .wmnart{padding:.4rem .7rem;border-bottom:1px solid rgba(255,255,255,.04)}
   .wmnart a{color:var(--text);text-decoration:none;font-size:.72rem;line-height:1.3} .wmnart a:hover{color:var(--cyan)}
@@ -301,6 +306,9 @@
     </div>
     <div id="mapinfo"></div>
     <div id="wmRight">
+      <div class="wmRhd"><span class="dot"></span> LIVE TV</div>
+      <div id="wmTvTabs"></div>
+      <div id="wmTvBox"><div style="padding:.7rem;color:var(--muted);font-size:.7rem">pick a channel to play a live stream</div></div>
       <div class="wmRhd"><span class="dot"></span> LIVE NEWS <span class="n" id="wmNewsN"></span></div>
       <div id="wmNewsCtry"></div>
       <div id="wmNewsList"><div style="padding:.7rem;color:var(--muted);font-size:.7rem">pick countries above to load live headlines</div></div>
@@ -1023,7 +1031,7 @@ function wmTickCounts(){
 }
 function panelMap(){
   const wrap=$('#mapwrap'); wrap.classList.add('open');
-  buildLayerMenu(); wmBuildNewsChips(); wmLoadNews();
+  buildLayerMenu(); wmBuildTv(); wmBuildNewsChips(); wmLoadNews();
   if(!$('#wmClock').dataset.on){ $('#wmClock').dataset.on='1';
     setInterval(()=>{ $('#wmClock').textContent=new Date().toISOString().slice(0,19).replace('T',' ')+' UTC'; },1000); }
   if(!MAP){
@@ -1059,6 +1067,23 @@ $('#btnMap').onclick=(e)=>{ e.preventDefault(); panelMap(); };
 $('#mapHandle').onclick=panelMap;
 // right-panel news country chips + headlines
 const WM_NEWS_CTRY=[['MX','MX'],['US','US'],['UK','UK'],['UP','UA'],['RS','RU'],['IS','IL'],['CH','CN'],['FR','FR'],['SP','ES']];
+// LIVE TV — public 24/7 news channels (YouTube live). channel IDs are stable.
+const WM_TV=[
+  ['Al Jazeera','UCNye-wNBqNL5ZzHSJj3l8Bg'],
+  ['DW News','UCknLrEdhRCp1aegoMqRaCZg'],
+  ['France 24','UCQfwfsi5VrQ8yKZ-UWmAEFg'],
+  ['Sky News','UCoMdktPbSTixAyNGwb-UYkQ'],
+  ['Bloomberg','UCIALMKvObZNtJ6AmdCLP7Lg'],
+  ['ABC News','UCBi2mrWuNuyYy4gbM6fU18Q']
+];
+function wmBuildTv(){
+  const tabs=$('#wmTvTabs'); if(tabs.dataset.on) return; tabs.dataset.on='1';
+  WM_TV.forEach(([name,ch],i)=>{ const b=el('span','wmtv'); b.textContent=name;
+    b.onclick=()=>{ document.querySelectorAll('.wmtv').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+      $('#wmTvBox').innerHTML='<iframe allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen '
+        +'src="https://www.youtube.com/embed/live_stream?channel='+ch+'&autoplay=1&mute=1"></iframe>'; };
+    tabs.appendChild(b); });
+}
 function wmBuildNewsChips(){
   const box=$('#wmNewsCtry'); if(box.dataset.on) return; box.dataset.on='1';
   WM_NEWS_CTRY.forEach(([code,lbl])=>{ const c=el('span','nctry'+(NEWS_SEL.includes(code)?' on':'')); c.textContent=lbl;
