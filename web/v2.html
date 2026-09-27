@@ -833,11 +833,35 @@ function greatCircle(a,b,n=48){
   return out;
 }
 function fc(features){ return {type:'FeatureCollection',features}; }
-function ptFeatures(points,style){
+// build a rich popup (title + detail rows) from a point's fields, per layer
+const LAYER_TITLE={case:'🎯',quakes:'🌋',flights:'✈️',fires:'🔥',disasters:'🌊',news:'📰'};
+function popupHTML(p,layer){
+  const t=LAYER_TITLE[layer]||'●';
+  const rows=[];
+  const R=(k,v)=>{ if(v!==undefined&&v!==null&&v!==''&&v!=='null') rows.push('<div style="color:var(--muted)">'+k+': <b style="color:var(--text)">'+esc(String(v))+'</b></div>'); };
+  if(layer==='flights'){
+    R('country',p.country); R('altitude',p.alt_m!=null?p.alt_m+' m':null);
+    R('speed',p.speed_kmh!=null?p.speed_kmh+' km/h':null); R('heading',p.heading!=null?p.heading+'°':null);
+    R('status',p.on_ground==='true'||p.on_ground===true?'on ground':'in air'); R('icao24',p.icao24);
+  } else if(layer==='quakes'){
+    R('magnitude',p.mag!=null?('M'+p.mag):null); R('depth',p.depth_km!=null?p.depth_km+' km':null);
+    R('when',p.when); if(p.tsunami==='1'||p.tsunami===1) R('⚠ tsunami','possible');
+  } else if(layer==='case'){
+    R('type',p.type); R('city',p.city); R('country',p.country);
+  } else if(layer==='disasters'){
+    R('kind',p.type); R('detail',p.city);
+  } else { R('info',p.sub); }
+  const title=(p.callsign||p.label||p.value||'—');
+  return '<b>'+t+' '+esc(String(title))+'</b>'+(rows.length?'<div style="margin-top:.3rem;font-size:.66rem;line-height:1.5">'+rows.join('')+'</div>':'');
+}
+function ptFeatures(points,style,layer){
   return (points||[]).map(p=>({type:'Feature',
     geometry:{type:'Point',coordinates:[p.lon,p.lat]},
-    properties:{label:(p.label||p.value||''),sub:[p.type,p.city,p.country,p.mag!=null?('M'+p.mag):null].filter(Boolean).join(' · '),
-      color:style.color,radius:(p.w?Math.min(3+p.w*1.5,12):style.radius),id:p.id||''}}));
+    properties:Object.assign({}, p, {
+      _layer:layer||'', label:(p.label||p.value||''),
+      sub:[p.type,p.city,p.country,p.mag!=null?('M'+p.mag):null].filter(Boolean).join(' · '),
+      color:style.color, radius:(p.w?Math.min(3+p.w*1.5,12):style.radius), id:p.id||'',
+      _html:popupHTML(p,layer)})}));
 }
 function ensurePointLayer(id){
   if(MAP.getSource(id)) return;
@@ -847,17 +871,48 @@ function ensurePointLayer(id){
     'circle-color':['coalesce',['get','color'],'#888'],
     'circle-opacity':0.85,'circle-stroke-width':1,'circle-stroke-color':'rgba(0,0,0,.5)'}});
   MAP.on('click',id,(e)=>{ const p=e.features[0].properties;
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML('<b>'+esc(p.label)+'</b>'+(p.sub?'<br>'+esc(p.sub):'')).addTo(MAP);
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(p._html||('<b>'+esc(p.label)+'</b>')).addTo(MAP);
     if(p.id){ try{ if(nodes && nodes.get && nodes.get(p.id)){ network.selectNodes([p.id]); network.focus(p.id,{scale:1.2}); } }catch(_){} } });
   MAP.on('mouseenter',id,()=>MAP.getCanvas().style.cursor='pointer');
   MAP.on('mouseleave',id,()=>MAP.getCanvas().style.cursor='');
+}
+// airplane icon (SVG) for the flights layer, rotated by heading
+function ensurePlaneIcon(cb){
+  if(MAP.hasImage&&MAP.hasImage('plane')){ cb&&cb(); return; }
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="%236f9298" stroke="%23000" stroke-width="0.5" d="M12 2l1.5 7L22 13v2l-8.5-2.5L13 20l2 1.5V23l-3-1-3 1v-1.5L11 20l-.5-7.5L2 15v-2l8.5-4L12 2z"/></svg>';
+  const img=new Image(24,24);
+  img.onload=()=>{ try{ if(!MAP.hasImage('plane')) MAP.addImage('plane',img); }catch(_){} cb&&cb(); };
+  img.onerror=()=>{ cb&&cb(); };
+  img.src='data:image/svg+xml;utf8,'+svg;
+}
+function ensureFlightLayer(){
+  if(MAP.getSource('flights')) return;
+  MAP.addSource('flights',{type:'geojson',data:fc([])});
+  ensurePlaneIcon(()=>{
+    if(MAP.getLayer('flights')) return;
+    MAP.addLayer({id:'flights',type:'symbol',source:'flights',layout:{
+      'icon-image':'plane','icon-size':0.8,'icon-rotate':['coalesce',['get','heading'],0],
+      'icon-rotation-alignment':'map','icon-allow-overlap':true}});
+    MAP.on('click','flights',(e)=>{ const p=e.features[0].properties;
+      new maplibregl.Popup().setLngLat(e.lngLat).setHTML(p._html||('<b>✈️ '+esc(p.label)+'</b>')).addTo(MAP); });
+    MAP.on('mouseenter','flights',()=>MAP.getCanvas().style.cursor='pointer');
+    MAP.on('mouseleave','flights',()=>MAP.getCanvas().style.cursor='');
+  });
+}
+async function mapLoadFlights(){
+  ensureFlightLayer();
+  if(!MAP_ON.flights){ if(MAP.getSource('flights')) MAP.getSource('flights').setData(fc([])); MAP_COUNTS.flights=null; updateMapInfo(); return; }
+  let d={points:[]}; try{ d=await(await fetch('/api/v2/map/layer/flights')).json(); }catch(_){}
+  const pts=d.points||[]; MAP_COUNTS.flights=pts.length;
+  const set=()=>{ if(MAP.getSource('flights')) MAP.getSource('flights').setData(fc(ptFeatures(pts,LAYER_STYLE.flights,'flights'))); };
+  ensurePlaneIcon(set); set(); updateMapInfo();
 }
 async function mapLoadCase(){
   if(!MAP.getSource('arcs')){ MAP.addSource('arcs',{type:'geojson',data:fc([])});
     MAP.addLayer({id:'arcs',type:'line',source:'arcs',paint:{'line-color':'#7aa2f7','line-width':1,'line-opacity':0.5}}); }
   ensurePointLayer('case');
   let d={points:[],arcs:[]}; try{ d=await(await fetch('/api/v2/map')).json(); }catch(_){}
-  MAP.getSource('case').setData(fc(MAP_ON.case?ptFeatures(d.points,LAYER_STYLE.case):[]));
+  MAP.getSource('case').setData(fc(MAP_ON.case?ptFeatures(d.points,LAYER_STYLE.case,'case'):[]));
   const arcF=(MAP_ON.arcs?d.arcs:[]).map(a=>({type:'Feature',geometry:{type:'LineString',coordinates:greatCircle(a.from,a.to)},properties:{}}));
   MAP.getSource('arcs').setData(fc(arcF));
   MAP_COUNTS.case=d.located; MAP_COUNTS.total=d.total;
@@ -891,8 +946,8 @@ async function mapLoadDisasters(){
   MAP.getSource('disasters_zone').setData(fc(polys));
   // center markers with label
   const centers=zones.map(z=>({lat:z.lat,lon:z.lon,label:(z.kind?z.kind+': ':'')+z.label,
-    type:'disaster',w:0,city:z.level+' alert · ~'+z.radius_km+' km'}));
-  MAP.getSource('disasters').setData(fc(ptFeatures(centers,{color:'#e0575f',radius:4})));
+    type:z.kind||'event',w:0,city:z.level+' alert · ~'+z.radius_km+' km'}));
+  MAP.getSource('disasters').setData(fc(ptFeatures(centers,{color:'#e0575f',radius:4},'disasters')));
   updateMapInfo();
 }
 async function mapLoadRain(){
@@ -920,13 +975,14 @@ async function mapLoadLayer(name){
   if(name==='disasters') return mapLoadDisasters();
   if(name==='rain') return mapLoadRain();
   if(name==='cables') return mapLoadCables();
+  if(name==='flights') return mapLoadFlights();
   ensurePointLayer(name);
   if(!MAP_ON[name]){ MAP.getSource(name).setData(fc([])); MAP_COUNTS[name]=null; updateMapInfo(); return; }
   const url = name==='news' ? '/api/v2/map/layer/news?countries='+NEWS_SEL.join(',') : '/api/v2/map/layer/'+name;
   let d={points:[]}; try{ d=await(await fetch(url)).json(); }catch(_){}
   const pts=d.points||[];
   MAP_COUNTS[name]=pts.length;
-  MAP.getSource(name).setData(fc(ptFeatures(pts,LAYER_STYLE[name])));
+  MAP.getSource(name).setData(fc(ptFeatures(pts,LAYER_STYLE[name],name)));
   updateMapInfo();
 }
 function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters','news','rain','cables'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }

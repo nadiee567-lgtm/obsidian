@@ -5356,8 +5356,16 @@ def _layer_quakes():
         c = (f.get('geometry') or {}).get('coordinates') or []
         p = f.get('properties') or {}
         if len(c) >= 2:
+            import datetime as _dt
+            t = p.get('time')
+            when = ''
+            if isinstance(t, (int, float)):
+                try: when = _dt.datetime.utcfromtimestamp(t/1000).strftime('%Y-%m-%d %H:%M UTC')
+                except Exception: pass
             pts.append({'lat': c[1], 'lon': c[0], 'mag': p.get('mag'),
-                        'label': p.get('place') or 'quake', 'w': p.get('mag') or 1})
+                        'label': p.get('place') or 'quake', 'w': p.get('mag') or 1,
+                        'depth_km': round(c[2], 1) if len(c) > 2 and isinstance(c[2], (int, float)) else None,
+                        'when': when, 'felt': p.get('felt'), 'tsunami': p.get('tsunami')})
     return {'points': pts}
 
 def _layer_flights():
@@ -5365,9 +5373,18 @@ def _layer_flights():
     pts = []
     for s in (d.get('states') or [])[:4000]:
         lon, lat = s[5], s[6]
-        if lat is not None and lon is not None:
-            pts.append({'lat': lat, 'lon': lon,
-                        'label': (s[1] or '').strip() or s[0], 'country': s[2]})
+        if lat is None or lon is None:
+            continue
+        alt = s[7] if s[7] is not None else s[13]  # baro or geo altitude (m)
+        vel = s[9]        # m/s
+        heading = s[10]   # true track degrees
+        pts.append({'lat': lat, 'lon': lon,
+                    'label': (s[1] or '').strip() or s[0],
+                    'callsign': (s[1] or '').strip(), 'icao24': s[0],
+                    'country': s[2], 'on_ground': bool(s[8]),
+                    'alt_m': round(alt) if isinstance(alt, (int, float)) else None,
+                    'speed_kmh': round(vel * 3.6) if isinstance(vel, (int, float)) else None,
+                    'heading': round(heading) if isinstance(heading, (int, float)) else 0})
     return {'points': pts}
 
 def _layer_fires():
