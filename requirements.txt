@@ -26,3 +26,4 @@ Pillow==12.3.0        # optional: image ELA (126) + pHash (127)
 PySocks==1.7.1        # optional: .onion routing over Tor (F10)
 telethon==1.44.0      # optional: Telegram scraping (F10, needs your api_id/api_hash)
 flask-sock
+msgpack

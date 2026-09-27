@@ -119,6 +119,16 @@
   .termin{display:flex;align-items:center;gap:.45rem;margin-top:.5rem;font-family:var(--mono);font-size:.76rem}
   #termcwd{color:var(--green);white-space:nowrap;max-width:38%;overflow:hidden;text-overflow:ellipsis}
   #termcmd{flex:1;background:#05070a;border:1px solid var(--line);color:#e6edf3;border-radius:6px;padding:.35rem .5rem;font-family:var(--mono);font-size:.76rem}
+  #msf{display:none;position:fixed;z-index:97;top:50%;left:50%;transform:translate(-50%,-50%);width:min(880px,95vw);height:80vh;background:#0b0e13;border:1px solid var(--line);border-radius:12px;padding:1rem;box-shadow:0 20px 60px rgba(0,0,0,.6);flex-direction:column}
+  #msf h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .5rem} #msf .cerrar{float:right;cursor:pointer;color:var(--muted)}
+  .msfwarn{background:rgba(168,106,112,.15);border:1px solid var(--red);border-radius:6px;padding:.35rem .6rem;font-family:var(--mono);font-size:.66rem;color:#f3b6ba;margin-bottom:.5rem}
+  #msfStatus{font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-bottom:.5rem}
+  #msfStatus b{color:var(--green)}
+  #msfOut{flex:1;overflow:auto;background:#05070a;border:1px solid var(--line);border-radius:8px;padding:.6rem;font-family:var(--mono);font-size:.73rem;color:#c8d2dc;white-space:pre-wrap;word-break:break-word;margin:0}
+  .msfin{display:flex;gap:.45rem;margin-top:.5rem}
+  #msfPrompt{color:var(--red);white-space:nowrap;font-family:var(--mono);font-size:.73rem}
+  #msfCmd{flex:1;background:#05070a;border:1px solid var(--line);color:#e6edf3;border-radius:6px;padding:.35rem .5rem;font-family:var(--mono);font-size:.75rem}
+  #msfCfg input{background:#05070a;border:1px solid var(--line);color:var(--text);border-radius:5px;padding:.3rem .5rem;font-family:var(--mono);font-size:.72rem;margin:.15rem}
   #playbooks{display:none;position:fixed;z-index:96;top:50%;left:50%;transform:translate(-50%,-50%);width:min(600px,93vw);max-height:82vh;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1.2rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   #playbooks h2{font-family:var(--mono);font-size:.9rem;margin:0 0 .8rem} #playbooks h2 span{color:var(--muted);font-size:.7rem}
   #playbooks .cerrar{float:right;cursor:pointer;color:var(--muted);font-family:var(--mono)}
@@ -276,10 +286,11 @@
 <body>
 <div class="wrap">
   <h1><span class="sq"></span> OBSIDIAN · engine v2</h1>
-  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnMap">🌍 map</a> · <a href="#" id="btnBrief">📋 briefing</a> · <a href="#" id="btnStats">📊 stats</a> · <a href="#" id="btnNews">📰 news</a> · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnDiff">⇄ diff</a> · <a href="#" id="btnTriage">▦ triage</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
+  <div class="sub">typed interactive graph · right-click a node → transforms · <a href="#" id="btnMap">🌍 map</a> · <a href="#" id="btnBrief">📋 briefing</a> · <a href="#" id="btnStats">📊 stats</a> · <a href="#" id="btnNews">📰 news</a> · <a href="#" id="btnPlaybooks">▶ playbooks</a> · <a href="#" id="btnRepeater">⚡ repeater</a> · <a href="#" id="btnDiff">⇄ diff</a> · <a href="#" id="btnTriage">▦ triage</a> · <a href="#" id="btnOpsec">🛡 OPSEC</a> · <a href="#" id="btnTerminal">⌨ terminal</a> · <a href="#" id="btnMsf">💥 metasploit</a> · <a href="#" id="btnKeys">API keys</a> · <a href="/v2/status">system status</a> · <a href="/classic">← classic interface</a></div>
   <div id="keys"></div>
   <div id="opsec"></div>
   <div id="terminal"></div>
+  <div id="msf"></div>
   <div id="playbooks"></div>
   <div id="repeater"></div>
   <div id="diff"></div>
@@ -1333,6 +1344,57 @@ async function panelTerminal(){
   setTimeout(()=>{ const i=$('#termcmd'); if(i) i.focus(); }, 60);
 }
 $('#btnTerminal').onclick=(e)=>{ e.preventDefault(); panelTerminal(); };
+let MSF_CID=null, MSF_POLL=null;
+async function panelMsf(){
+  const ov=$('#msf'); ov.style.display='flex'; ov.style.flexDirection='column';
+  ov.innerHTML='<span class="cerrar" id="msfCerrar">✕</span><h2>💥 metasploit console</h2>'
+    +'<div class="msfwarn">⚠ EXPLOITATION FRAMEWORK — use ONLY against systems you are authorized to test (your lab, a CTF, an engagement). Loopback-only + login-gated.</div>'
+    +'<div id="msfStatus">checking msfrpcd…</div><div id="msfBody"></div>';
+  $('#msfCerrar').onclick=()=>{ ov.style.display='none'; if(MSF_POLL){clearInterval(MSF_POLL);MSF_POLL=null;} };
+  let s={}; try{ s=await(await fetch('/api/v2/msf/status')).json(); }catch(e){ $('#msfStatus').textContent='error: '+e.message; return; }
+  if(s.gated){ $('#msfStatus').textContent='🔒 '+s.note; return; }
+  if(s.connected){
+    const m=s.modules||{};
+    $('#msfStatus').innerHTML='<b>connected</b> · Metasploit '+esc(String(s.version&&s.version.version||''))
+      +' · '+(m.exploits||0)+' exploits · '+(m.auxiliary||0)+' aux · '+(m.payloads||0)+' payloads';
+    $('#msfBody').innerHTML='<pre id="msfOut">starting console…\n</pre>'
+      +'<div class="msfin"><span id="msfPrompt">msf ></span><input id="msfCmd" autocomplete="off" spellcheck="false" placeholder="msfconsole command… (e.g. search type:exploit smb)"></div>';
+    startMsfConsole();
+  } else {
+    // not connected -> show setup + config form
+    $('#msfStatus').textContent = s.error ? ('not connected: '+s.error) : (s.note||'not configured');
+    $('#msfBody').innerHTML='<div id="msfCfg" style="margin-top:.5rem;font-family:var(--mono);font-size:.72rem;color:var(--muted)">'
+      +'<div>1) On the host: <b style="color:var(--text)">msfrpcd -P yourpass -S -a 127.0.0.1</b></div>'
+      +'<div style="margin:.4rem 0">2) Save the connection here:</div>'
+      +'<input id="msfP" type="password" placeholder="msfrpcd password"><input id="msfH" placeholder="host (127.0.0.1)"><input id="msfPort" placeholder="port (55553)">'
+      +'<button class="modbtn" id="msfSave">save &amp; connect</button></div>';
+    $('#msfSave').onclick=async()=>{
+      await fetch('/api/v2/msf/config',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({password:$('#msfP').value,host:$('#msfH').value||undefined,port:$('#msfPort').value||undefined})});
+      panelMsf();
+    };
+  }
+}
+async function startMsfConsole(){
+  const out=$('#msfOut'), inp=$('#msfCmd');
+  try{ const c=await(await fetch('/api/v2/msf/console',{method:'POST'})).json(); MSF_CID=c.id!=null?c.id:'0'; }
+  catch(e){ out.textContent+='could not create console: '+e.message; return; }
+  async function poll(){
+    try{ const d=await(await fetch('/api/v2/msf/console/read?id='+MSF_CID)).json();
+      if(d.data){ out.textContent+=d.data; out.scrollTop=out.scrollHeight; }
+      if(d.prompt){ $('#msfPrompt').textContent=(d.prompt||'msf >').replace(/\x01|\x02/g,''); }
+    }catch(_){}
+  }
+  if(MSF_POLL) clearInterval(MSF_POLL);
+  MSF_POLL=setInterval(poll,1000); poll();
+  inp.onkeydown=async(ev)=>{ if(ev.key==='Enter'){ const cmd=inp.value; inp.value='';
+    out.textContent+='\n'+$('#msfPrompt').textContent+' '+cmd+'\n';
+    try{ await fetch('/api/v2/msf/console/write',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:MSF_CID,cmd})}); }
+    catch(e){ out.textContent+='error: '+e.message+'\n'; }
+    setTimeout(poll,400); } };
+  setTimeout(()=>inp.focus(),80);
+}
+$('#btnMsf').onclick=(e)=>{ e.preventDefault(); panelMsf(); };
 async function panelPlaybooks(){
   const ov=$('#playbooks');
   let pbs=[]; try{ pbs=(await(await fetch('/api/v2/playbooks')).json()).playbooks||[]; }catch(_){}
