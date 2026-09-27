@@ -5437,8 +5437,31 @@ def _layer_disasters():
                       'radius_km': _GDACS_RADIUS.get(level, 150)})
     return {'points': [], 'zones': zones}
 
+def _layer_webcams():
+    """Real geolocated public webcams via the Windy Webcams API (BYOK: add a free 'windy'
+    key in the vault). Keyless-first ethos: without a key the layer is empty with a note."""
+    key = _rotating_key('windy') or os.environ.get('WINDY_API_KEY')
+    if not key:
+        return {'points': [], 'note': 'add a free Windy webcams key (vault: windy) to see public cameras'}
+    r = SESSION.get('https://api.windy.com/webcams/api/v3/webcams',
+                    params={'limit': 50, 'include': 'location,player,images'},
+                    headers={'x-windy-api-key': key}, timeout=15)
+    d = r.json()
+    pts = []
+    for w in (d.get('webcams') or []):
+        loc = w.get('location') or {}
+        lat, lon = loc.get('latitude'), loc.get('longitude')
+        if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+            continue
+        player = ((w.get('player') or {}).get('live') or (w.get('player') or {}).get('day') or {})
+        pts.append({'lat': lat, 'lon': lon, 'label': w.get('title') or 'webcam',
+                    'city': loc.get('city'), 'country': loc.get('country'),
+                    'embed': player.get('embed') or ''})
+    return {'points': pts}
+
 _MAP_LAYERS = {'quakes': _layer_quakes, 'flights': _layer_flights,
-               'fires': _layer_fires, 'disasters': _layer_disasters}
+               'fires': _layer_fires, 'disasters': _layer_disasters,
+               'webcams': _layer_webcams}
 
 _TLE_GROUPS = {'stations': 'stations', 'visual': 'visual', 'gps': 'gps-ops', 'starlink': 'starlink'}
 

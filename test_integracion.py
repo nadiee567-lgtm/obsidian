@@ -211,6 +211,28 @@ def test_v2_stats():
     assert 'United States' in d['countries']
 
 
+def test_v2_map_webcams_no_key(monkeypatch):
+    monkeypatch.setattr(ob, '_rotating_key', lambda s: None)
+    monkeypatch.setenv('WINDY_API_KEY', '')
+    ob._LAYER_CACHE.clear()
+    d = _client().get('/api/v2/map/layer/webcams').get_json()
+    assert d['points'] == [] and 'note' in d
+    ob._LAYER_CACHE.clear()
+
+
+def test_v2_map_webcams_with_key(monkeypatch):
+    monkeypatch.setattr(ob, '_rotating_key', lambda s: 'k' if s == 'windy' else None)
+    class _R:
+        def json(self):
+            return {'webcams': [{'title': 'Times Square', 'location': {'latitude': 40.7, 'longitude': -74.0,
+                    'city': 'New York', 'country': 'US'}, 'player': {'live': {'embed': 'https://x/embed'}}}]}
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R())
+    ob._LAYER_CACHE.clear()
+    d = _client().get('/api/v2/map/layer/webcams').get_json()
+    assert d['points'][0]['label'] == 'Times Square' and d['points'][0]['embed'] == 'https://x/embed'
+    ob._LAYER_CACHE.clear()
+
+
 def test_v2_map_sats(monkeypatch):
     tle = ("ISS (ZARYA)\n"
            "1 25544U 98067A   26270.17419514  .00009528  00000+0  18291-3 0  9996\n"

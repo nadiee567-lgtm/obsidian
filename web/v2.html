@@ -834,14 +834,15 @@ async function panelBrief(){
 }
 $('#btnBrief').onclick=(e)=>{ e.preventDefault(); panelBrief(); };
 /* ---- 🌍 live map (MapLibre GL globe) ---- */
-let MAP=null, MAP_ON={case:true,arcs:true,quakes:false,flights:false,fires:false,disasters:false,news:false,rain:false,cables:false,sats:false}, MAP_TIMER=null;
+let MAP=null, MAP_ON={case:true,arcs:true,quakes:false,flights:false,fires:false,disasters:false,news:false,rain:false,cables:false,sats:false,webcams:false}, MAP_TIMER=null;
 let SAT_TLES=[], SAT_TIMER=null;
 let NEWS_SEL=['MX','US'];  // selected country codes for the news layer/panel
 let MAP_COUNTS={};         // per-layer counts shown in the info bar
 const LAYER_STYLE={
   case:{color:'#f7768e',radius:6}, quakes:{color:'#e0af68',radius:4},
   flights:{color:'#6f9298',radius:2.2}, fires:{color:'#ff7a45',radius:3.5},
-  disasters:{color:'#a86a70',radius:4}, news:{color:'#7aa2f7',radius:4}, sats:{color:'#4fd6be',radius:3}
+  disasters:{color:'#a86a70',radius:4}, news:{color:'#7aa2f7',radius:4}, sats:{color:'#4fd6be',radius:3},
+  webcams:{color:'#c9a227',radius:4}
 };
 const ZONE_COLOR={red:'#e0575f',orange:'#e0af68',green:'#7d9a78'};
 function circlePolygon(lat,lon,km,n=40){
@@ -893,6 +894,12 @@ function popupHTML(p,layer){
     R('source',p.domain); R('country',p.country);
   } else if(layer==='sats'){
     R('altitude',p.city);
+  } else if(layer==='webcams'){
+    const loc=[p.city,p.country].filter(x=>x&&x!=='null').join(', ');
+    let h='<b>📷 '+esc(String(p.label||'webcam'))+'</b>';
+    if(loc) h+='<div style="color:var(--muted);font-size:.64rem">'+esc(loc)+'</div>';
+    if(p.embed&&p.embed!=='null') h+='<iframe src="'+esc(p.embed)+'" style="width:260px;height:150px;border:0;margin-top:.3rem" allow="autoplay;fullscreen"></iframe>';
+    return h;
   } else { R('info',p.sub); }
   const title=(p.callsign||p.label||p.value||'—');
   return '<b>'+t+' '+esc(String(title))+'</b>'+(rows.length?'<div style="margin-top:.3rem;font-size:.66rem;line-height:1.5">'+rows.join('')+'</div>':'');
@@ -1058,6 +1065,7 @@ async function mapLoadLayer(name){
   const pts=d.points||[];
   MAP_COUNTS[name]=pts.length;
   MAP.getSource(name).setData(fc(ptFeatures(pts,LAYER_STYLE[name],name)));
+  if(d.note && !pts.length) $('#mapinfo').textContent=name+': '+d.note;
   updateMapInfo();
 }
 function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters','news','rain','cables','sats'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }
@@ -1074,7 +1082,7 @@ const WM_LAYERS=[
   ['case','🎯','CASE'],['arcs','↔','ARCS'],['news','📰','LIVE NEWS'],
   ['quakes','🌋','EARTHQUAKES'],['flights','✈️','AVIATION'],['fires','🔥','FIRES'],
   ['disasters','🌊','DISASTERS'],['rain','🌧️','SEVERE WEATHER'],['cables','🔌','UNDERSEA CABLES'],
-  ['sats','🛰️','SATELLITES']
+  ['sats','🛰️','SATELLITES'],['webcams','📷','LIVE WEBCAMS']
 ];
 let MAP_3D=false;
 function buildLayerMenu(){
@@ -1173,6 +1181,7 @@ const SERVICIOS_KEY=[
   ['binaryedge','api-key'],['virustotal','api-key (passivedns)'],['abuseipdb','api-key'],
   ['github','token (better limits)'],['viewdns','api-key'],
   ['abusech','abuse.ch Auth-Key (MalwareBazaar + ThreatFox) FREE'],['emailrep','EmailRep key FREE'],
+  ['windy','Windy key — LIVE WEBCAMS on the map FREE'],
   ['hibp','optional and PAID — you already have breaches_xon + stealer_hudsonrock FREE']];
 const OBTENER={shodan:'https://account.shodan.io/register',censys:'https://accounts.censys.io/register',
   zoomeye:'https://www.zoomeye.org/',fofa:'https://en.fofa.info/',quake:'https://quake.360.net/',
@@ -1180,7 +1189,7 @@ const OBTENER={shodan:'https://account.shodan.io/register',censys:'https://accou
   binaryedge:'https://www.binaryedge.io/',virustotal:'https://www.virustotal.com/gui/join-us',
   abuseipdb:'https://www.abuseipdb.com/register',github:'https://github.com/settings/tokens',
   viewdns:'https://viewdns.info/api/',hibp:'https://haveibeenpwned.com/API/Key',
-  abusech:'https://auth.abuse.ch/',emailrep:'https://emailrep.io/key'};
+  abusech:'https://auth.abuse.ch/',emailrep:'https://emailrep.io/key',windy:'https://api.windy.com/keys'};
 async function panelKeys(){
   const ov=$('#keys');
   let conf=new Set(); try{ conf=new Set((await (await fetch('/api/v2/keys')).json()).servicios||[]); }catch(_){}
