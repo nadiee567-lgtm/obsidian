@@ -247,8 +247,9 @@
   #wmTvTabs{display:flex;flex-wrap:wrap;gap:.2rem;padding:.4rem .6rem;border-bottom:1px solid var(--line)}
   .wmtv{border:1px solid var(--line);border-radius:4px;padding:.12rem .45rem;cursor:pointer;color:var(--muted);font-size:.62rem;user-select:none}
   .wmtv.on{color:#06131f;background:var(--red);border-color:var(--red);font-weight:bold}
-  #wmTvBox{aspect-ratio:16/9;background:#000;border-bottom:1px solid var(--line)}
-  #wmTvBox iframe{width:100%;height:100%;border:0;display:block}
+  #wmTvBox,#wmCamBox{aspect-ratio:16/9;background:#000;border-bottom:1px solid var(--line)}
+  #wmTvBox iframe,#wmCamBox iframe{width:100%;height:100%;border:0;display:block}
+  #wmCamTabs{display:flex;flex-wrap:wrap;gap:.2rem;padding:.4rem .6rem;border-bottom:1px solid var(--line)}
   #wmNewsList{flex:1;overflow:auto;padding:.3rem 0;min-height:120px}
   #wmNewsCtry{display:flex;flex-wrap:wrap;gap:.2rem;padding:.4rem .6rem;border-bottom:1px solid var(--line)}
   .wmnart{padding:.4rem .7rem;border-bottom:1px solid rgba(255,255,255,.04)}
@@ -342,6 +343,9 @@
       <div class="wmRhd"><span class="dot"></span> LIVE TV</div>
       <div id="wmTvTabs"></div>
       <div id="wmTvBox"><div style="padding:.7rem;color:var(--muted);font-size:.7rem">pick a channel to play a live stream</div></div>
+      <div class="wmRhd"><span class="dot"></span> LIVE WEBCAMS</div>
+      <div id="wmCamTabs"></div>
+      <div id="wmCamBox"><div style="padding:.7rem;color:var(--muted);font-size:.7rem">pick a public camera to watch live</div></div>
       <div class="wmRhd"><span class="dot"></span> LIVE NEWS <span class="n" id="wmNewsN"></span></div>
       <div id="wmNewsCtry"></div>
       <div id="wmNewsList"><div style="padding:.7rem;color:var(--muted);font-size:.7rem">pick countries above to load live headlines</div></div>
@@ -466,7 +470,7 @@ const el=(t,c)=>{const e=document.createElement(t); if(c)e.className=c; return e
 // left dock: one button per panel (buttons carry the same ids the panel wiring expects)
 const DOCK=[
   ['btnMap','🌍','map'],['btnToolsDock','🧰','tools (distros)'],['sep'],
-  ['btnBrief','📋','briefing'],['btnStats','📊','stats'],['btnNews','📰','news'],['sep'],
+  ['btnBrief','📋','briefing'],['btnStats','📊','stats'],['sep'],
   ['btnPlaybooks','▶','playbooks'],['btnRepeater','⚡','repeater'],['btnDiff','⇄','diff'],['btnTriage','▦','triage'],['sep'],
   ['btnOpsec','🛡','OPSEC'],['btnTerminal','⌨','terminal'],['btnMsf','💥','metasploit'],['btnKeys','🔑','API keys']
 ];
@@ -844,7 +848,7 @@ async function loadNewsFeed(){
   });
   if(!any) feed.innerHTML='<div class="pbd">no headlines right now (GDELT rate-limits; try again in a moment)</div>';
 }
-$('#btnNews').onclick=(e)=>{ e.preventDefault(); panelNews(); };
+/* news lives in the map's right panel (LIVE NEWS) — no standalone dock button */
 async function panelStats(){
   const ov=$('#stats');
   ov.innerHTML='<span class="cerrar" id="stCerrar">✕</span><h2>📊 investigation stats</h2><div id="statBody">loading…</div>';
@@ -1164,7 +1168,7 @@ function wmTickCounts(){
 }
 function panelMap(){
   const wrap=$('#mapwrap'); wrap.classList.add('open');
-  buildLayerMenu(); wmBuildTv(); wmBuildNewsChips(); wmLoadNews();
+  buildLayerMenu(); wmBuildTv(); wmBuildCams(); wmBuildNewsChips(); wmLoadNews();
   if(!$('#wmClock').dataset.on){ $('#wmClock').dataset.on='1';
     setInterval(()=>{ $('#wmClock').textContent=new Date().toISOString().slice(0,19).replace('T',' ')+' UTC'; },1000); }
   if(!MAP){
@@ -1215,6 +1219,25 @@ function wmBuildTv(){
     b.onclick=()=>{ document.querySelectorAll('.wmtv').forEach(x=>x.classList.remove('on')); b.classList.add('on');
       $('#wmTvBox').innerHTML='<iframe allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen '
         +'src="https://www.youtube.com/embed/live_stream?channel='+ch+'&autoplay=1&mute=1"></iframe>'; };
+    tabs.appendChild(b); });
+}
+// LIVE WEBCAMS — real geolocated public cameras via the Windy webcam network (needs a free
+// 'windy' key). YouTube public cams block embedding / rotate ids, so we use the real source.
+async function wmBuildCams(){
+  const tabs=$('#wmCamTabs'); if(tabs.dataset.on) return; tabs.dataset.on='1';
+  let d={points:[]}; try{ d=await(await fetch('/api/v2/map/layer/webcams')).json(); }catch(_){}
+  const cams=(d.points||[]).filter(c=>c.embed&&c.embed!=='null');
+  if(!cams.length){
+    tabs.innerHTML='';
+    $('#wmCamBox').innerHTML='<div style="padding:.7rem;color:var(--muted);font-size:.68rem;line-height:1.5">'
+      +(d.note||'no cameras')+'<br><a href="https://api.windy.com/keys" target="_blank" style="color:var(--cyan)">get a free Windy key</a>'
+      +' → paste it in 🔑 keys (windy). Real public cameras then appear here and on the map.</div>';
+    return;
+  }
+  cams.slice(0,12).forEach((c,i)=>{ const b=el('span','wmtv'); b.textContent=(c.city||c.label||('cam '+(i+1))).slice(0,14);
+    b.title=[c.label,c.city,c.country].filter(x=>x&&x!=='null').join(' · ');
+    b.onclick=()=>{ document.querySelectorAll('#wmCamTabs .wmtv').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+      $('#wmCamBox').innerHTML='<iframe allow="autoplay; fullscreen" src="'+c.embed+'"></iframe>'; };
     tabs.appendChild(b); });
 }
 function wmBuildNewsChips(){
