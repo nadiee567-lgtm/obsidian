@@ -6,6 +6,7 @@
 <title>OBSIDIAN · engine v2</title>
 <script src="/static/vis-network.min.js"></script>
 <script src="/static/maplibre-gl.min.js"></script>
+<script src="/static/satellite.min.js"></script>
 <link rel="stylesheet" href="/static/maplibre-gl.css">
 <style>
   :root{
@@ -833,13 +834,14 @@ async function panelBrief(){
 }
 $('#btnBrief').onclick=(e)=>{ e.preventDefault(); panelBrief(); };
 /* ---- 🌍 live map (MapLibre GL globe) ---- */
-let MAP=null, MAP_ON={case:true,arcs:true,quakes:false,flights:false,fires:false,disasters:false,news:false,rain:false,cables:false}, MAP_TIMER=null;
+let MAP=null, MAP_ON={case:true,arcs:true,quakes:false,flights:false,fires:false,disasters:false,news:false,rain:false,cables:false,sats:false}, MAP_TIMER=null;
+let SAT_TLES=[], SAT_TIMER=null;
 let NEWS_SEL=['MX','US'];  // selected country codes for the news layer/panel
 let MAP_COUNTS={};         // per-layer counts shown in the info bar
 const LAYER_STYLE={
   case:{color:'#f7768e',radius:6}, quakes:{color:'#e0af68',radius:4},
   flights:{color:'#6f9298',radius:2.2}, fires:{color:'#ff7a45',radius:3.5},
-  disasters:{color:'#a86a70',radius:4}, news:{color:'#7aa2f7',radius:4}
+  disasters:{color:'#a86a70',radius:4}, news:{color:'#7aa2f7',radius:4}, sats:{color:'#4fd6be',radius:3}
 };
 const ZONE_COLOR={red:'#e0575f',orange:'#e0af68',green:'#7d9a78'};
 function circlePolygon(lat,lon,km,n=40){
@@ -889,6 +891,8 @@ function popupHTML(p,layer){
     R('last active',p.when);
   } else if(layer==='news'){
     R('source',p.domain); R('country',p.country);
+  } else if(layer==='sats'){
+    R('altitude',p.city);
   } else { R('info',p.sub); }
   const title=(p.callsign||p.label||p.value||'—');
   return '<b>'+t+' '+esc(String(title))+'</b>'+(rows.length?'<div style="margin-top:.3rem;font-size:.66rem;line-height:1.5">'+rows.join('')+'</div>':'');
@@ -1010,11 +1014,43 @@ async function mapLoadCables(){
   } else { MAP.setLayoutProperty('cables','visibility','visible'); }
   MAP_COUNTS.cables='510'; updateMapInfo();
 }
+function satPositions(){
+  // propagate each TLE to NOW -> lat/lon/alt using satellite.js (SGP4)
+  if(typeof satellite==='undefined') return [];
+  const now=new Date(), gmst=satellite.gstime(now), out=[];
+  for(const s of SAT_TLES){
+    try{
+      const rec=satellite.twoline2satrec(s.l1,s.l2);
+      const pv=satellite.propagate(rec,now); if(!pv.position) continue;
+      const g=satellite.eciToGeodetic(pv.position,gmst);
+      const lat=satellite.degreesLat(g.latitude), lon=satellite.degreesLong(g.longitude);
+      if(isFinite(lat)&&isFinite(lon))
+        out.push({lat,lon,label:s.name,type:'satellite',city:'alt '+Math.round(g.height)+' km'});
+    }catch(_){}
+  }
+  return out;
+}
+function satRender(){
+  if(!MAP||!MAP.getSource('sats')||!MAP_ON.sats) return;
+  const pts=satPositions(); MAP_COUNTS.sats=pts.length;
+  MAP.getSource('sats').setData(fc(ptFeatures(pts,LAYER_STYLE.sats,'sats'))); updateMapInfo();
+}
+async function mapLoadSats(){
+  ensurePointLayer('sats');
+  if(!MAP_ON.sats){ if(MAP.getSource('sats')) MAP.getSource('sats').setData(fc([]));
+    if(SAT_TIMER){clearInterval(SAT_TIMER);SAT_TIMER=null;} MAP_COUNTS.sats=null; updateMapInfo(); return; }
+  if(typeof satellite==='undefined'){ $('#mapinfo').textContent='satellites: propagation lib not loaded (hard-refresh)'; return; }
+  if(!SAT_TLES.length){ try{ SAT_TLES=(await(await fetch('/api/v2/map/sats?group=visual')).json()).sats||[]; }catch(_){ SAT_TLES=[]; } }
+  satRender();
+  if(SAT_TIMER) clearInterval(SAT_TIMER);
+  SAT_TIMER=setInterval(satRender,3000);  // move them every 3s
+}
 async function mapLoadLayer(name){
   if(name==='disasters') return mapLoadDisasters();
   if(name==='rain') return mapLoadRain();
   if(name==='cables') return mapLoadCables();
   if(name==='flights') return mapLoadFlights();
+  if(name==='sats') return mapLoadSats();
   ensurePointLayer(name);
   if(!MAP_ON[name]){ MAP.getSource(name).setData(fc([])); MAP_COUNTS[name]=null; updateMapInfo(); return; }
   const url = name==='news' ? '/api/v2/map/layer/news?countries='+NEWS_SEL.join(',') : '/api/v2/map/layer/'+name;
@@ -1024,7 +1060,7 @@ async function mapLoadLayer(name){
   MAP.getSource(name).setData(fc(ptFeatures(pts,LAYER_STYLE[name],name)));
   updateMapInfo();
 }
-function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters','news','rain','cables'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }
+function mapRefreshAll(){ mapLoadCase(); ['quakes','flights','fires','disasters','news','rain','cables','sats'].forEach(n=>{ if(MAP_ON[n]) mapLoadLayer(n); }); }
 // World-Monitor-style flat 2D basemap: CARTO dark raster tiles (keyless, same as WM)
 const MAP_STYLE={
   version:8,
@@ -1037,7 +1073,8 @@ const MAP_STYLE={
 const WM_LAYERS=[
   ['case','🎯','CASE'],['arcs','↔','ARCS'],['news','📰','LIVE NEWS'],
   ['quakes','🌋','EARTHQUAKES'],['flights','✈️','AVIATION'],['fires','🔥','FIRES'],
-  ['disasters','🌊','DISASTERS'],['rain','🌧️','SEVERE WEATHER'],['cables','🔌','UNDERSEA CABLES']
+  ['disasters','🌊','DISASTERS'],['rain','🌧️','SEVERE WEATHER'],['cables','🔌','UNDERSEA CABLES'],
+  ['sats','🛰️','SATELLITES']
 ];
 let MAP_3D=false;
 function buildLayerMenu(){

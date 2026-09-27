@@ -122,6 +122,7 @@ _MAPLIBRE = {
     'maplibre-gl.min.js': 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js',
     'maplibre-gl.css': 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css',
     'submarine-cables.geojson': 'https://raw.githubusercontent.com/lintaojlu/submarine_cable_information/master/web/public/api/v3/cable/cable-geo.json',
+    'satellite.min.js': 'https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js',
 }
 for _fn, _url in _MAPLIBRE.items():
     _dst = os.path.join(STATIC_DIR, _fn)
@@ -5438,6 +5439,25 @@ def _layer_disasters():
 
 _MAP_LAYERS = {'quakes': _layer_quakes, 'flights': _layer_flights,
                'fires': _layer_fires, 'disasters': _layer_disasters}
+
+_TLE_GROUPS = {'stations': 'stations', 'visual': 'visual', 'gps': 'gps-ops', 'starlink': 'starlink'}
+
+@app.route('/api/v2/map/sats')
+def api_v2_map_sats():
+    """TLEs from CelesTrak (keyless) for the frontend to propagate with satellite.js (SGP4).
+    Default group 'stations' (ISS + a few); ?group=visual|gps|starlink for more."""
+    group = _TLE_GROUPS.get(request.args.get('group', 'stations'), 'stations')
+    def fetch():
+        txt = SESSION.get(f'https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=tle',
+                          timeout=15).text
+        lines = [l.rstrip() for l in txt.splitlines() if l.strip()]
+        sats = []
+        for i in range(0, len(lines) - 2, 3):
+            name, l1, l2 = lines[i], lines[i+1], lines[i+2]
+            if l1.startswith('1 ') and l2.startswith('2 '):
+                sats.append({'name': name.strip(), 'l1': l1, 'l2': l2})
+        return {'sats': sats[:300]}  # cap for render
+    return jsonify(_layer_cached('sats_' + group, fetch))
 
 @app.route('/api/v2/map/weather')
 def api_v2_map_weather():

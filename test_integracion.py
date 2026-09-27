@@ -211,6 +211,20 @@ def test_v2_stats():
     assert 'United States' in d['countries']
 
 
+def test_v2_map_sats(monkeypatch):
+    tle = ("ISS (ZARYA)\n"
+           "1 25544U 98067A   26270.17419514  .00009528  00000+0  18291-3 0  9996\n"
+           "2 25544  51.6315 155.3455 0007168 193.0560 167.0244 15.48664528587561\n")
+    class _R:
+        text = tle
+    monkeypatch.setattr(ob.SESSION, 'get', lambda *a, **k: _R())
+    ob._LAYER_CACHE.clear()
+    d = _client().get('/api/v2/map/sats?group=stations').get_json()
+    assert d['sats'][0]['name'] == 'ISS (ZARYA)'
+    assert d['sats'][0]['l1'].startswith('1 25544')
+    ob._LAYER_CACHE.clear()
+
+
 def test_v2_map_weather(monkeypatch):
     class _R:
         def json(self):
