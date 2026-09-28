@@ -5278,95 +5278,7 @@ def api_v2_terminal_pty():
     """Whether the interactive PTY terminal is available (flask-sock present + allowed)."""
     return jsonify({'available': sock is not None and _terminal_allowed()})
 
-# ── Metasploit console GUI (msfrpcd) ─────────────────────────────────────────
-# Drives a real msfconsole via Metasploit's RPC. This is an EXPLOITATION tool:
-# gated to a loopback bind + the app login, and only works once the operator has
-# started msfrpcd and set its password here. Use ONLY against authorized targets.
-_MSF = {'client': None}
-
-def _msf_cfg():
-    return {
-        'host': _boveda.get('msf_host') or os.environ.get('MSF_HOST', '127.0.0.1'),
-        'port': int(_boveda.get('msf_port') or os.environ.get('MSF_PORT', '55553')),
-        'password': _rotating_key('msf_password') or os.environ.get('MSF_PASSWORD', ''),
-        'ssl': (_boveda.get('msf_ssl') or 'true') != 'false',
-    }
-
-def _msf_client():
-    from core.msf import MsfRpc
-    cfg = _msf_cfg()
-    if not cfg['password']:
-        return None
-    c = _MSF['client']
-    if c is None:
-        c = _MSF['client'] = MsfRpc(host=cfg['host'], port=cfg['port'],
-                                    password=cfg['password'], ssl=cfg['ssl'])
-    return c
-
-@app.route('/api/v2/msf/status')
-def api_v2_msf_status():
-    """Is the Metasploit RPC reachable? (loopback-gated). Reports version + module counts."""
-    if not _terminal_allowed():
-        return jsonify({'connected': False, 'gated': True,
-                        'note': 'Metasploit is disabled when OBSIDIAN is network-exposed.'})
-    cfg = _msf_cfg()
-    if not cfg['password']:
-        return jsonify({'connected': False, 'configured': False,
-                        'note': 'Start msfrpcd and set its password (vault: msf_password). '
-                                'e.g. msfrpcd -P yourpass -S -a 127.0.0.1'})
-    try:
-        c = _msf_client()
-        ver = c.version()
-        return jsonify({'connected': True, 'version': ver, 'modules': c.module_stats()})
-    except Exception as e:
-        _MSF['client'] = None
-        return jsonify({'connected': False, 'configured': True, 'error': str(e)})
-
-@app.route('/api/v2/msf/config', methods=['POST'])
-def api_v2_msf_config():
-    """Save msfrpcd connection settings (password stored in the encrypted vault)."""
-    if not _terminal_allowed():
-        return _error('Metasploit disabled on a network-exposed instance', 403)
-    d = request.json or {}
-    if 'password' in d:
-        _boveda.save('msf_password', d['password'])
-    if d.get('host'):
-        _boveda.save('msf_host', d['host'])
-    if d.get('port'):
-        _boveda.save('msf_port', str(d['port']))
-    if 'ssl' in d:
-        _boveda.save('msf_ssl', 'true' if d['ssl'] else 'false')
-    _MSF['client'] = None
-    return jsonify({'ok': True})
-
-@app.route('/api/v2/msf/console', methods=['POST'])
-def api_v2_msf_console_create():
-    if not _terminal_allowed():
-        return _error('Metasploit disabled on a network-exposed instance', 403)
-    try:
-        return jsonify(_msf_client().console_create())
-    except Exception as e:
-        return _error(f'msf: {e}', 502)
-
-@app.route('/api/v2/msf/console/write', methods=['POST'])
-def api_v2_msf_console_write():
-    if not _terminal_allowed():
-        return _error('Metasploit disabled on a network-exposed instance', 403)
-    d = request.json or {}
-    try:
-        _msf_client().console_write(d.get('id', '0'), d.get('cmd', ''))
-        return jsonify({'ok': True})
-    except Exception as e:
-        return _error(f'msf: {e}', 502)
-
-@app.route('/api/v2/msf/console/read')
-def api_v2_msf_console_read():
-    if not _terminal_allowed():
-        return _error('Metasploit disabled on a network-exposed instance', 403)
-    try:
-        return jsonify(_msf_client().console_read(request.args.get('id', '0')))
-    except Exception as e:
-        return _error(f'msf: {e}', 502)
+# Metasploit console GUI (msfrpcd RPC) moved to blueprints/msf.py.
 
 @app.route('/api/v2/terminal', methods=['GET', 'POST'])
 def api_v2_terminal():
@@ -6591,6 +6503,8 @@ for _rl_nombre in ('crtsh', 'ct_certspotter', 'shodan', 'censys', 'zoomeye', 'fo
 # blueprint modules can read them at request time without a circular-import trap.
 from blueprints.export import bp as _export_bp
 app.register_blueprint(_export_bp)
+from blueprints.msf import bp as _msf_bp
+app.register_blueprint(_msf_bp)
 
 if __name__ == '__main__':
     _load_user_rules()
