@@ -44,3 +44,43 @@ def test_status_not_configured(monkeypatch):
         s['auth'] = True
     d = c.get('/api/v2/msf/status').get_json()
     assert d['connected'] is False and d.get('configured') is False
+
+
+def test_full_http_msgpack_roundtrip():
+    """End-to-end over real HTTP + msgpack against an in-process mock msfrpcd."""
+    import msgpack, threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from core.msf import MsfRpc
+
+    class H(BaseHTTPRequestHandler):
+        def do_POST(self):
+            req = msgpack.unpackb(self.rfile.read(int(self.headers.get('Content-Length', 0))), raw=True)
+            m = req[0].decode() if isinstance(req[0], bytes) else req[0]
+            if m == 'auth.login':
+                resp = {'result': 'success', 'token': 'T'}
+            elif m == 'core.version':
+                resp = {'version': '6.4.0'}
+            elif m == 'console.create':
+                resp = {'id': '0', 'prompt': 'msf6 > '}
+            elif m == 'console.write':
+                resp = {'wrote': 5}
+            elif m == 'console.read':
+                resp = {'data': 'Matching Modules\n eternalblue\n', 'prompt': 'msf6 > '}
+            else:
+                resp = {'modules': []}
+            body = msgpack.packb(resp, use_bin_type=True)
+            self.send_response(200); self.send_header('Content-Length', str(len(body))); self.end_headers()
+            self.wfile.write(body)
+        def log_message(self, *a): pass
+
+    srv = HTTPServer(('127.0.0.1', 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    port = srv.server_address[1]
+    try:
+        c = MsfRpc(host='127.0.0.1', port=port, password='x', ssl=False)
+        assert c.login() and c.version()['version'] == '6.4.0'
+        cid = c.console_create()['id']
+        c.console_write(cid, 'search ms17_010')
+        assert 'eternalblue' in c.console_read(cid)['data']
+    finally:
+        srv.shutdown()
