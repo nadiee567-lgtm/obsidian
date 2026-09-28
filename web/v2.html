@@ -1259,40 +1259,57 @@ async function wmLoadNews(){
     const m=el('div','m'); m.textContent=[a.country,a.domain,(a.seendate||'').replace('T',' ').replace('Z','')].filter(Boolean).join(' · ');
     r.appendChild(link); r.appendChild(m); list.appendChild(r); });
 }
-const SERVICIOS_KEY=[
-  ['shodan','Shodan key'],['censys','id:secret'],['zoomeye','API-KEY'],['fofa','email:key'],
-  ['quake','token'],['hunter','api-key'],['netlas','api-key'],['criminalip','api-key'],
-  ['binaryedge','api-key'],['virustotal','api-key (passivedns)'],['abuseipdb','api-key'],
-  ['github','token (better limits)'],['viewdns','api-key'],
-  ['abusech','abuse.ch Auth-Key (MalwareBazaar + ThreatFox) FREE'],['emailrep','EmailRep key FREE'],
-  ['windy','Windy key — LIVE WEBCAMS on the map FREE'],
-  ['hibp','optional and PAID — you already have breaches_xon + stealer_hudsonrock FREE']];
-const OBTENER={shodan:'https://account.shodan.io/register',censys:'https://accounts.censys.io/register',
-  zoomeye:'https://www.zoomeye.org/',fofa:'https://en.fofa.info/',quake:'https://quake.360.net/',
-  hunter:'https://hunter.how/',netlas:'https://app.netlas.io/registration/',criminalip:'https://www.criminalip.io/',
-  binaryedge:'https://www.binaryedge.io/',virustotal:'https://www.virustotal.com/gui/join-us',
-  abuseipdb:'https://www.abuseipdb.com/register',github:'https://github.com/settings/tokens',
-  viewdns:'https://viewdns.info/api/',hibp:'https://haveibeenpwned.com/API/Key',
-  abusech:'https://auth.abuse.ch/',emailrep:'https://emailrep.io/key',windy:'https://api.windy.com/keys'};
+// [service, format-hint, what it unlocks, free?, get-link, category]
+const KEYS_INFO=[
+  ['windy','api key','LIVE WEBCAMS — real geolocated public cameras on the map + panel',true,'https://api.windy.com/keys','maps & feeds'],
+  ['shodan','api key','Internet-exposure search (ports/services/infra). Keyless alt: internetdb',true,'https://account.shodan.io/register','search engines'],
+  ['censys','id:secret','Host/cert search engine (free tier)',true,'https://accounts.censys.io/register','search engines'],
+  ['zoomeye','api key','Chinese infra search engine (free tier)',true,'https://www.zoomeye.org/','search engines'],
+  ['fofa','email:key','Chinese infra search engine (free tier)',true,'https://en.fofa.info/','search engines'],
+  ['quake','token','Chinese infra search engine (360 Quake)',true,'https://quake.360.net/','search engines'],
+  ['hunter','api key','Infra/attack-surface search (hunter.how)',true,'https://hunter.how/','search engines'],
+  ['netlas','api key','Host/domain search engine (free tier)',true,'https://app.netlas.io/registration/','search engines'],
+  ['criminalip','api key','IP/asset intelligence search',true,'https://www.criminalip.io/','search engines'],
+  ['binaryedge','api key','Internet scan data search',true,'https://www.binaryedge.io/','search engines'],
+  ['virustotal','api key','Passive-DNS history of a domain. Keyless alt: crtsh + rdap',true,'https://www.virustotal.com/gui/join-us','enrichment'],
+  ['abuseipdb','api key','IP abuse reputation. Keyless alt: greynoise + ip_blocklist',true,'https://www.abuseipdb.com/register','enrichment'],
+  ['github','token','Better API limits + github secret scan',true,'https://github.com/settings/tokens','enrichment'],
+  ['viewdns','api key','Reverse WHOIS (other domains of a registrant)',true,'https://viewdns.info/api/','enrichment'],
+  ['abusech','Auth-Key','MalwareBazaar + ThreatFox (malware/C2)',true,'https://auth.abuse.ch/','threat intel'],
+  ['emailrep','api key','Email reputation lookup',true,'https://emailrep.io/key','enrichment'],
+  ['msf_password','msfrpcd pass','💥 Metasploit console (start: msfrpcd -P pass -S -a 127.0.0.1)',true,'https://docs.metasploit.com/docs/using-metasploit/advanced/RPC/how-to-use-metasploit-messagepack-rpc.html','tools'],
+  ['hibp','api key','Email breaches — PAID. You already have breaches_xon + stealer_hudsonrock FREE',false,'https://haveibeenpwned.com/API/Key','enrichment'],
+];
 async function panelKeys(){
   const ov=$('#keys');
   let conf=new Set(); try{ conf=new Set((await (await fetch('/api/v2/keys')).json()).servicios||[]); }catch(_){}
-  ov.innerHTML='<span class="cerrar" id="kCerrar">✕</span><h2>API keys · <span>encrypted vault · the key never leaves your machine</span></h2>';
-  SERVICIOS_KEY.forEach(([s,hint])=>{
+  ov.innerHTML='<span class="cerrar" id="kCerrar">✕</span><h2>API keys · <span>encrypted vault (Fernet) · keys never leave your machine</span></h2>'
+    +'<div style="color:var(--muted);font-size:.7rem;margin-bottom:.6rem;line-height:1.5">OBSIDIAN is <b style="color:var(--green)">keyless-first</b> — most of it works with no key at all. '
+    +'These are optional & bring-your-own; almost all have a free tier. Each row says what it unlocks.</div>';
+  let cat='';
+  KEYS_INFO.forEach(([s,hint,desc,free,link,category])=>{
+    if(category!==cat){ cat=category; const h=el('div'); h.textContent=cat.toUpperCase();
+      h.style.cssText='font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;color:var(--amber);margin:.7rem 0 .2rem'; ov.appendChild(h); }
+    const wrap=el('div'); wrap.style.cssText='border-bottom:1px solid var(--line);padding:.4rem 0';
     const row=el('div','krow'); const ok=conf.has(s);
-    const lab=el('span','ks'); lab.innerHTML=esc(s)+(ok?' <b style="color:var(--green)">●</b>':''); row.appendChild(lab);
+    const lab=el('span','ks'); lab.innerHTML=esc(s)+(ok?' <b style="color:var(--green)">●</b>':'')
+      +' <span style="font-size:.58rem;color:'+(free?'var(--green)':'var(--red)')+'">'+(free?'FREE':'PAID')+'</span>';
+    row.appendChild(lab);
     const inp=el('input'); inp.type='password'; inp.placeholder=ok?'(configured) — enter a new one to replace':hint; row.appendChild(inp);
     const g=el('button'); g.textContent='save'; g.onclick=async()=>{ if(!inp.value)return;
       await fetch('/api/v2/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({service:s,value:inp.value})});
       inp.value=''; setStatus(''+s+' saved'); panelKeys(); }; row.appendChild(g);
     const st=el('span','kst');
-    if(OBTENER[s]){ const o=el('a'); o.textContent='get'; o.href=OBTENER[s]; o.target='_blank'; o.style.cssText='color:var(--muted);font-size:.68rem;text-decoration:underline'; row.appendChild(o); }
-    const p=el('button'); p.textContent='probar'; p.onclick=async()=>{ st.textContent='testing '+s+'…'; st.style.color='var(--muted)';
+    if(link){ const o=el('a'); o.textContent='get key ↗'; o.href=link; o.target='_blank'; o.rel='noopener noreferrer';
+      o.style.cssText='color:var(--cyan);font-size:.66rem;text-decoration:underline;white-space:nowrap'; row.appendChild(o); }
+    const p=el('button'); p.textContent='test'; p.onclick=async()=>{ st.textContent='testing '+s+'…'; st.style.color='var(--muted)';
       try{ const d=await (await fetch('/api/v2/keys/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({service:s})})).json();
         st.textContent=d.nota||''; st.style.color=d.ok?'var(--green)':'var(--amber)'; }catch(e){ st.textContent='error: '+e.message; } };
     row.appendChild(p);
     if(ok){ const b=el('button'); b.textContent='delete'; b.onclick=async()=>{ await fetch('/api/v2/keys',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({service:s})}); panelKeys(); }; row.appendChild(b); }
-    row.appendChild(st); ov.appendChild(row);
+    wrap.appendChild(row);
+    const d2=el('div'); d2.textContent=desc; d2.style.cssText='color:var(--muted);font-size:.64rem;margin:.2rem 0 0 .1rem'; wrap.appendChild(d2);
+    wrap.appendChild(st); ov.appendChild(wrap);
   });
   ov.style.display='block'; $('#kCerrar').onclick=()=>ov.style.display='none';
 }
